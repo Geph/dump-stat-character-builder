@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { ArrowUp, Check, ChevronLeft, ChevronRight, X } from "lucide-react"
+import { ArrowUp, Check, ChevronLeft, ChevronRight, Dices, X } from "lucide-react"
+import { AsiAllocator } from "@/components/builder/asi-allocator"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { createClient } from "@/lib/db/client"
@@ -11,6 +12,12 @@ import {
   normalizeCharacterClassRows,
   type CharacterClassDetail,
 } from "@/lib/character/character-classes"
+import { collectAsiPoolsFromFeat } from "@/lib/character/feat-asi-pools"
+import {
+  averageHpGain,
+  rollHitDie,
+  rolledHpGain,
+} from "@/lib/character/level-up-improvements"
 import {
   buildLevelUpPlan,
   countReplacedPicks,
@@ -18,20 +25,18 @@ import {
   type LevelUpPlan,
 } from "@/lib/character/level-up-plan"
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
+import {
+  isAsiFeat,
+  isValidAsiAllocation,
+  type AsiAllocation,
+  type AsiAllocationsByFeatId,
+} from "@/lib/builder/asi-allocation"
 import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
+import { enrichSrdFeatRow } from "@/lib/compendium/enrich-srd-feats"
 import { asCompendiumRows } from "@/lib/data/types"
 import type { Character, CustomAbility, DndClass, Feat, Spell, Subclass } from "@/lib/types"
 import { ABILITY_SCORE_KEYS, type AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
-
-const ABILITY_LABELS: Record<AbilityScoreKey, string> = {
-  strength: "STR",
-  dexterity: "DEX",
-  constitution: "CON",
-  intelligence: "INT",
-  wisdom: "WIS",
-  charisma: "CHA",
-}
 
 type LevelUpWizardProps = {
   characterId: string
@@ -49,6 +54,24 @@ type Loaded = {
   customAbilities: CustomAbility[]
 }
 
+type HpMethod = "average" | "roll"
+
+function conModFromScore(score: number): number {
+  return Math.floor((score - 10) / 2)
+}
+
+/** Constitution after pending ASI allocations (so HP gain uses the bump from this level). */
+function constitutionAfterAsi(
+  character: Character,
+  allocations: AsiAllocationsByFeatId,
+): number {
+  let score = character.constitution ?? 10
+  for (const allocation of Object.values(allocations)) {
+    score += allocation.constitution ?? 0
+  }
+  return score
+}
+
 export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelUpWizardProps) {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -58,10 +81,11 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
   const [choicePicks, setChoicePicks] = useState<Record<string, string[]>>({})
   const [subclassId, setSubclassId] = useState<string | null>(null)
   const [featId, setFeatId] = useState<string | null>(null)
-  const [asi, setAsi] = useState<Partial<Record<AbilityScoreKey, number>>>({})
-  const [asiMode, setAsiMode] = useState<"feat" | "asi">("feat")
+  const [featAsiAllocations, setFeatAsiAllocations] = useState<AsiAllocationsByFeatId>({})
   const [spellIds, setSpellIds] = useState<string[]>([])
   const [cantripIds, setCantripIds] = useState<string[]>([])
+  const [hpMethod, setHpMethod] = useState<HpMethod>("average")
+  const [hpNatural, setHpNatural] = useState<number | null>(null)
 
   useEffect(() => {
     if (!open || !characterId) return
@@ -77,13 +101,13 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         { data: spells },
         { data: customAbilities },
       ] = await Promise.all([
-          db.from("characters").select("*").eq("id", characterId).single(),
-          db.from("classes").select("*"),
-          db.from("subclasses").select("*"),
-          db.from("feats").select("*"),
-          db.from("spells").select("*"),
-          db.from("custom_abilities").select("*"),
-        ])
+        db.from("characters").select("*").eq("id", characterId).single(),
+        db.from("classes").select("*"),
+        db.from("subclasses").select("*"),
+        db.from("feats").select("*"),
+        db.from("spells").select("*"),
+        db.from("custom_abilities").select("*"),
+      ])
       if (cancelled) return
       if (!character) {
         setError("Could not load character.")
@@ -96,11 +120,14 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         asCompendiumRows(classes) as unknown as DndClass[],
         asCompendiumRows(subclasses) as unknown as Subclass[],
       )
+      const enrichedFeats = (asCompendiumRows(feats) as unknown as Feat[]).map(
+        (feat) => enrichSrdFeatRow(feat as unknown as Record<string, unknown>) as unknown as Feat,
+      )
       setLoaded({
         character: char,
         classDetails,
         subclasses: asCompendiumRows(subclasses) as unknown as Subclass[],
-        feats: asCompendiumRows(feats) as unknown as Feat[],
+        feats: enrichedFeats,
         spells: asCompendiumRows(spells) as unknown as Spell[],
         customAbilities: asCompendiumRows(customAbilities) as unknown as CustomAbility[],
       })
@@ -109,10 +136,11 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       setStepIndex(0)
       setSubclassId(null)
       setFeatId(null)
-      setAsi({})
-      setAsiMode("feat")
+      setFeatAsiAllocations({})
       setSpellIds([])
       setCantripIds([])
+      setHpMethod("average")
+      setHpNatural(null)
     }
     void load()
     return () => {
@@ -138,8 +166,26 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
   const eligibleFeats = useMemo(() => {
     if (!loaded) return []
     const owned = new Set(loaded.character.feat_ids ?? [])
-    return loaded.feats.filter((feat) => !owned.has(feat.id) && (feat.level_requirement ?? 1) <= (plan?.toLevel ?? 1))
+    return loaded.feats
+      .filter((feat) => !owned.has(feat.id) && (feat.level_requirement ?? 1) <= (plan?.toLevel ?? 1))
+      .slice()
+      .sort((a, b) => {
+        const aAsi = isAsiFeat(a) ? 0 : 1
+        const bAsi = isAsiFeat(b) ? 0 : 1
+        if (aAsi !== bAsi) return aAsi - bAsi
+        return a.name.localeCompare(b.name)
+      })
   }, [loaded, plan?.toLevel])
+
+  const selectedFeat = useMemo(
+    () => (featId && loaded ? loaded.feats.find((feat) => feat.id === featId) ?? null : null),
+    [featId, loaded],
+  )
+
+  const featAsiPools = useMemo(() => {
+    if (!selectedFeat) return []
+    return collectAsiPoolsFromFeat(selectedFeat, `feat:${selectedFeat.id}`)
+  }, [selectedFeat])
 
   const knownSpellNames = useMemo(() => {
     if (!loaded) return []
@@ -163,6 +209,18 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
   /** Picks as they stood before this level-up, so swap steps can measure what changed. */
   const originalPicks = loaded?.character.feature_choice_picks ?? {}
 
+  const pendingConMod = useMemo(() => {
+    if (!loaded) return 0
+    return conModFromScore(constitutionAfterAsi(loaded.character, featAsiAllocations))
+  }, [featAsiAllocations, loaded])
+
+  const hpGainPreview = useMemo(() => {
+    if (!plan) return 0
+    if (hpMethod === "average") return averageHpGain(plan.hitDie, pendingConMod)
+    if (hpNatural == null) return averageHpGain(plan.hitDie, pendingConMod)
+    return rolledHpGain(plan.hitDie, pendingConMod, hpNatural)
+  }, [hpMethod, hpNatural, pendingConMod, plan])
+
   const canAdvance = (): boolean => {
     if (!current) return true
     if (current.kind === "subclass") return Boolean(subclassId)
@@ -172,13 +230,23 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       return countReplacedPicks(originalPicks[current.id] ?? [], picks) !== null
     }
     if (current.kind === "feat_or_asi") {
-      if (asiMode === "feat") return Boolean(featId)
-      const total = Object.values(asi).reduce((sum, value) => sum + (value ?? 0), 0)
-      return total === 2
+      if (!featId || !selectedFeat) return false
+      return featAsiPools.every((grant) =>
+        isValidAsiAllocation(
+          featAsiAllocations[grant.allocationKey] ?? {},
+          grant.points,
+          grant.allowedAbilities,
+        ),
+      )
     }
     if (current.kind === "spells") {
       return cantripIds.length === current.extraCantrips && spellIds.length === current.extraPrepared
     }
+    return true
+  }
+
+  const canApply = (): boolean => {
+    if (hpMethod === "roll" && hpNatural == null) return false
     return true
   }
 
@@ -204,21 +272,16 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         ? [...new Set([...(loaded.character.feat_ids ?? []), featId])]
         : loaded.character.feat_ids ?? []
       const nextSpellIds = [...new Set([...(loaded.character.spell_ids ?? []), ...cantripIds, ...spellIds])]
-      const hitDie = selectedEntry.class?.hit_die ?? 8
-      const conMod = Math.floor(((loaded.character.constitution ?? 10) - 10) / 2)
-      const hpGain = Math.floor(hitDie / 2) + 1 + conMod
+      const nextAsi: AsiAllocationsByFeatId = { ...(loaded.character.asi_allocations ?? {}) }
+      for (const [key, allocation] of Object.entries(featAsiAllocations)) {
+        nextAsi[key] = allocation
+      }
+
+      const hpGain =
+        hpMethod === "roll" && hpNatural != null
+          ? rolledHpGain(plan.hitDie, pendingConMod, hpNatural)
+          : averageHpGain(plan.hitDie, pendingConMod)
       const nextMax = Math.max(1, (loaded.character.hit_point_max ?? loaded.character.hit_points ?? 1) + hpGain)
-      const nextAsi = { ...(loaded.character.asi_allocations ?? {}) }
-      if (asiMode === "asi" && Object.keys(asi).length) {
-        nextAsi[`level-up:${plan.classId}:${plan.toLevel}`] = asi
-      }
-      const abilityPatch: Partial<Record<AbilityScoreKey, number>> = {}
-      if (asiMode === "asi") {
-        for (const key of ABILITY_SCORE_KEYS) {
-          const bump = asi[key] ?? 0
-          if (bump) abilityPatch[key] = (loaded.character[key] ?? 10) + bump
-        }
-      }
 
       const { error: updateError } = await db
         .from("characters")
@@ -226,7 +289,9 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           level: plan.newTotalLevel,
           character_classes: nextRows,
           subclass_id:
-            selectedEntry.row.order === 0 ? (subclassId ?? loaded.character.subclass_id) : loaded.character.subclass_id,
+            selectedEntry.row.order === 0
+              ? (subclassId ?? loaded.character.subclass_id)
+              : loaded.character.subclass_id,
           feature_choice_picks: nextPicks,
           feat_ids: nextFeatIds,
           spell_ids: nextSpellIds,
@@ -234,7 +299,6 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           asi_allocations: nextAsi,
           hit_point_max: nextMax,
           hit_points: nextMax,
-          ...abilityPatch,
         })
         .eq("id", loaded.character.id)
       if (updateError) throw new Error(updateError.message)
@@ -303,13 +367,32 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                 </label>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {plan.className} {plan.fromLevel} → {plan.toLevel} (character level {plan.newTotalLevel})
+                  {plan.className} {plan.fromLevel} → {plan.toLevel} (character level{" "}
+                  {plan.newTotalLevel})
                 </p>
               )}
 
+              {plan.standardizedNotes.length > 0 ? (
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-primary">
+                    Standardized improvements
+                  </p>
+                  <ul className="mt-2 space-y-1.5">
+                    {plan.standardizedNotes.map((note) => (
+                      <li key={note.id}>
+                        <p className="text-sm font-semibold text-foreground">{note.title}</p>
+                        <p className="text-xs text-muted-foreground">{note.detail}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               {plan.newFeatures.length > 0 ? (
                 <div className="rounded-xl border border-border bg-muted/30 p-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">New features</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    New features
+                  </p>
                   <ul className="mt-2 space-y-2">
                     {plan.newFeatures.map((feature) => (
                       <li key={`${feature.source}-${feature.name}`}>
@@ -326,12 +409,16 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                   </ul>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No named features unlock at this level — resources and proficiency still scale.</p>
+                <p className="text-sm text-muted-foreground">
+                  No named features unlock at this level — resources and proficiency still scale.
+                </p>
               )}
 
               {current?.kind === "subclass" ? (
                 <div>
-                  <p className="mb-2 text-sm font-semibold">Choose subclass (level {current.unlockLevel}+)</p>
+                  <p className="mb-2 text-sm font-semibold">
+                    Choose subclass (level {current.unlockLevel}+)
+                  </p>
                   <div className="grid gap-2">
                     {loaded.subclasses
                       .filter((sub) => sub.class_id === current.classId)
@@ -341,7 +428,9 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                           type="button"
                           onClick={() => setSubclassId(sub.id)}
                           className={`rounded-lg border px-3 py-2 text-left text-sm ${
-                            subclassId === sub.id ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"
+                            subclassId === sub.id
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:border-primary/40"
                           }`}
                         >
                           {sub.name}
@@ -365,59 +454,59 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                   }))}
                   maxCount={current.required}
                   selected={choicePicks[current.id] ?? []}
-                  onChange={(selected) => setChoicePicks((prev) => ({ ...prev, [current.id]: selected }))}
+                  onChange={(selected) =>
+                    setChoicePicks((prev) => ({ ...prev, [current.id]: selected }))
+                  }
                   showOptionInfo
                 />
               ) : null}
 
               {current?.kind === "feat_or_asi" ? (
                 <div className="space-y-3">
-                  <div className="flex gap-2">
-                    {(["feat", "asi"] as const).map((mode) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setAsiMode(mode)}
-                        className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
-                          asiMode === mode ? "border-primary bg-primary/10" : "border-border"
-                        }`}
-                      >
-                        {mode === "feat" ? "Feat" : "Ability scores"}
-                      </button>
+                  <p className="text-sm text-muted-foreground">
+                    Pick a feat. For ability score increases, choose the Ability Score Improvement
+                    feat (or a half-feat that grants +1) and allocate below — there is no separate
+                    ability-score step.
+                  </p>
+                  <select
+                    value={featId ?? ""}
+                    onChange={(event) => {
+                      const nextId = event.target.value || null
+                      setFeatId(nextId)
+                      setFeatAsiAllocations({})
+                    }}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Choose a feat…</option>
+                    {eligibleFeats.map((feat) => (
+                      <option key={feat.id} value={feat.id}>
+                        {isAsiFeat(feat) ? `${feat.name} (+2 ability scores)` : feat.name}
+                      </option>
                     ))}
-                  </div>
-                  {asiMode === "feat" ? (
-                    <select
-                      value={featId ?? ""}
-                      onChange={(event) => setFeatId(event.target.value || null)}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="">Choose a feat…</option>
-                      {eligibleFeats.map((feat) => (
-                        <option key={feat.id} value={feat.id}>
-                          {feat.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-2">
-                      {ABILITY_SCORE_KEYS.map((key) => (
-                        <label key={key} className="text-xs">
-                          <span className="mb-1 block font-semibold">{ABILITY_LABELS[key]}</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={2}
-                            value={asi[key] ?? 0}
-                            onChange={(event) =>
-                              setAsi((prev) => ({ ...prev, [key]: Number(event.target.value) || 0 }))
-                            }
-                            className="w-full rounded-md border border-border bg-background px-2 py-1"
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  )}
+                  </select>
+                  {featAsiPools.map((grant) => (
+                    <AsiAllocator
+                      key={grant.allocationKey}
+                      title={grant.label}
+                      sourceLabel={grant.sourceLabel}
+                      totalPoints={grant.points}
+                      pickCount={grant.points >= 2 ? Math.floor(grant.points / 2) : 1}
+                      allowedAbilities={grant.allowedAbilities}
+                      allocation={featAsiAllocations[grant.allocationKey] ?? {}}
+                      onChange={(allocation: AsiAllocation) =>
+                        setFeatAsiAllocations((prev) => ({
+                          ...prev,
+                          [grant.allocationKey]: allocation,
+                        }))
+                      }
+                      baseScores={Object.fromEntries(
+                        ABILITY_SCORE_KEYS.map((key) => [
+                          key,
+                          (loaded.character[key as AbilityScoreKey] as number | undefined) ?? 10,
+                        ]),
+                      )}
+                    />
+                  ))}
                 </div>
               ) : null}
 
@@ -434,9 +523,71 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
               ) : null}
 
               {isReview ? (
-                <p className="text-sm text-muted-foreground">
-                  Confirm to apply level {plan.toLevel} in {plan.className}. Hit points increase by the class average.
-                </p>
+                <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Hit points (d{plan.hitDie})
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Constitution modifier this level:{" "}
+                    <span className="font-semibold text-foreground">
+                      {pendingConMod >= 0 ? `+${pendingConMod}` : pendingConMod}
+                    </span>
+                  </p>
+                  <div className="flex gap-2">
+                    {(
+                      [
+                        ["average", "Take average"],
+                        ["roll", "Roll"],
+                      ] as const
+                    ).map(([method, label]) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => {
+                          setHpMethod(method)
+                          if (method === "average") setHpNatural(null)
+                        }}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                          hpMethod === method
+                            ? "border-primary bg-primary/10"
+                            : "border-border"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {hpMethod === "average" ? (
+                    <p className="text-sm text-foreground">
+                      Average:{" "}
+                      <span className="font-bold">
+                        {Math.floor(plan.hitDie / 2) + 1}
+                      </span>{" "}
+                      + CON = <span className="font-bold">{hpGainPreview}</span> HP
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setHpNatural(rollHitDie(plan.hitDie))}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold hover:border-primary/40"
+                      >
+                        <Dices className="h-4 w-4" />
+                        {hpNatural == null ? `Roll d${plan.hitDie}` : `Reroll (got ${hpNatural})`}
+                      </button>
+                      {hpNatural != null ? (
+                        <p className="text-sm text-foreground">
+                          {hpNatural} + CON = <span className="font-bold">{hpGainPreview}</span> HP
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Roll before applying.</p>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    Confirm to apply level {plan.toLevel} in {plan.className}.
+                  </p>
+                </div>
               ) : null}
 
               {current?.kind === "feature_choice" && current.mode === "swap" && !canAdvance() ? (
@@ -459,7 +610,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                 {isReview ? (
                   <button
                     type="button"
-                    disabled={saving}
+                    disabled={saving || !canApply()}
                     onClick={() => void applyLevelUp()}
                     className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-50"
                   >
@@ -514,11 +665,18 @@ function SpellPickStep({
       {current.extraCantrips > 0 ? (
         <MultiSelectChoices
           title={`Cantrips (${current.extraCantrips})`}
-          options={cantrips.map((spell) => ({ name: spell.name, description: spell.description ?? undefined }))}
+          options={cantrips.map((spell) => ({
+            name: spell.name,
+            description: spell.description ?? undefined,
+          }))}
           maxCount={current.extraCantrips}
-          selected={cantrips.filter((spell) => cantripIds.includes(spell.id)).map((spell) => spell.name)}
+          selected={cantrips
+            .filter((spell) => cantripIds.includes(spell.id))
+            .map((spell) => spell.name)}
           onChange={(names) =>
-            onCantripsChange(cantrips.filter((spell) => names.includes(spell.name)).map((spell) => spell.id))
+            onCantripsChange(
+              cantrips.filter((spell) => names.includes(spell.name)).map((spell) => spell.id),
+            )
           }
           showOptionInfo
         />
@@ -531,9 +689,13 @@ function SpellPickStep({
             description: `L${spell.level} · ${spell.description ?? ""}`,
           }))}
           maxCount={current.extraPrepared}
-          selected={leveled.filter((spell) => spellIds.includes(spell.id)).map((spell) => spell.name)}
+          selected={leveled
+            .filter((spell) => spellIds.includes(spell.id))
+            .map((spell) => spell.name)}
           onChange={(names) =>
-            onSpellsChange(leveled.filter((spell) => names.includes(spell.name)).map((spell) => spell.id))
+            onSpellsChange(
+              leveled.filter((spell) => names.includes(spell.name)).map((spell) => spell.id),
+            )
           }
           showOptionInfo
         />

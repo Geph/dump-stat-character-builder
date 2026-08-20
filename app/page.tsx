@@ -256,27 +256,29 @@ export default function HomePage() {
             </motion.div>
           </div>
 
-          {/* Floating class icons */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
-            {classHighlights.map((cls, index) => {
-              const Icon = cls.icon
-              return (
-                <motion.div
-                  key={cls.name}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 0.07 }}
-                  transition={{ delay: 0.5 + index * 0.3 }}
-                  className="absolute text-primary"
-                  style={{
-                    top: `${25 + index * 25}%`,
-                    left: index % 2 === 0 ? "8%" : "84%",
-                  }}
-                >
-                  <Icon className="w-24 h-24" />
-                </motion.div>
-              )
-            })}
-          </div>
+          {/* Floating class icons — only when no hero art (they compete with the photo). */}
+          {!heroBackgroundUrl ? (
+            <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
+              {classHighlights.map((cls, index) => {
+                const Icon = cls.icon
+                return (
+                  <motion.div
+                    key={cls.name}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 0.07 }}
+                    transition={{ delay: 0.5 + index * 0.3 }}
+                    className="absolute text-primary"
+                    style={{
+                      top: `${25 + index * 25}%`,
+                      left: index % 2 === 0 ? "8%" : "84%",
+                    }}
+                  >
+                    <Icon className="w-24 h-24" />
+                  </motion.div>
+                )
+              })}
+            </div>
+          ) : null}
         </section>
 
         {/* Features Section */}

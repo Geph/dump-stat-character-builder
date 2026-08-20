@@ -189,6 +189,7 @@ function CombatStatsCompactRow({
           title="Roll initiative"
           size="md"
           layout="stack"
+          modeToggleSurface="onFill"
           rollContext={{ kind: "initiative", ability: "dexterity" }}
           onRoll={onInitiativeRoll}
         />

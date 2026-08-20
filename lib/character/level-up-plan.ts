@@ -7,6 +7,10 @@ import {
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { featureShowsOnSheetTab } from "@/lib/compendium/feature-sheet-display"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import {
+  buildLevelUpStandardizedNotes,
+  type LevelUpStandardizedNote,
+} from "@/lib/character/level-up-improvements"
 import type { Feature, Spell, Subclass } from "@/lib/types"
 
 export type LevelUpNewFeature = {
@@ -67,7 +71,9 @@ export type LevelUpPlan = {
   fromLevel: number
   toLevel: number
   newTotalLevel: number
+  hitDie: number
   newFeatures: LevelUpNewFeature[]
+  standardizedNotes: LevelUpStandardizedNote[]
   steps: LevelUpChoiceStep[]
 }
 
@@ -97,6 +103,36 @@ function progressionAt(cls: CharacterClassDetail["class"], level: number) {
   return prior ?? null
 }
 
+/** Count cantrip / leveled spell picks that unlock between `fromLevel` (exclusive) and `toLevel`. */
+function spellsKnownUnlockDelta(
+  features: Feature[] | undefined,
+  fromLevel: number,
+  toLevel: number,
+): { cantrips: number; leveled: number; maxSpellLevel: number } {
+  let cantrips = 0
+  let leveled = 0
+  let maxSpellLevel = 0
+  for (const feature of features ?? []) {
+    if ((feature.level ?? 0) > toLevel) continue
+    for (const instance of feature.linkedModifiers ?? []) {
+      for (const mod of instance.characteristics ?? []) {
+        if (mod.type !== "spells_known") continue
+        for (const grant of mod.choiceGrants ?? []) {
+          if (grant.count <= 0) continue
+          const unlock = grant.unlocksAtClassLevel ?? feature.level ?? 0
+          if (unlock <= fromLevel || unlock > toLevel) continue
+          if (grant.level === 0) cantrips += grant.count
+          else {
+            leveled += grant.count
+            maxSpellLevel = Math.max(maxSpellLevel, grant.level)
+          }
+        }
+      }
+    }
+  }
+  return { cantrips, leveled, maxSpellLevel }
+}
+
 export function buildLevelUpPlan(params: {
   entry: CharacterClassDetail
   subclasses: Subclass[]
@@ -109,6 +145,7 @@ export function buildLevelUpPlan(params: {
   if (fromLevel >= 20) return null
   const toLevel = fromLevel + 1
   const classId = params.entry.row.class_id
+  const newTotalLevel = params.currentTotalLevel + 1
 
   const classFeatures = featuresGainedAtLevel(cls.features as Feature[] | undefined, fromLevel, toLevel)
   const subclassFeatures = featuresGainedAtLevel(
@@ -154,7 +191,7 @@ export function buildLevelUpPlan(params: {
     steps.push({
       kind: "feat_or_asi",
       id: `asi:${classId}:${feature.level}`,
-      title: `${feature.name} (level ${feature.level})`,
+      title: `Choose a feat (level ${feature.level})`,
       classId,
       featureName: feature.name,
       level: feature.level,
@@ -216,9 +253,9 @@ export function buildLevelUpPlan(params: {
       steps.push({
         kind: "feat_or_asi",
         id: `asi:${classId}:${toLevel}`,
-        title: `Feat or Ability Score Improvement (level ${toLevel})`,
+        title: `Choose a feat (level ${toLevel})`,
         classId,
-        featureName: "Feat or ASI",
+        featureName: "Feat",
         level: toLevel,
       })
     }
@@ -226,24 +263,34 @@ export function buildLevelUpPlan(params: {
 
   const before = progressionAt(cls, fromLevel)
   const after = progressionAt(cls, toLevel)
-  if (after) {
-    const extraCantrips = Math.max(0, (after.cantrips ?? 0) - (before?.cantrips ?? 0))
-    const extraPrepared = Math.max(0, (after.prepared ?? 0) - (before?.prepared ?? 0))
-    if (extraCantrips > 0 || extraPrepared > 0) {
-      steps.push({
-        kind: "spells",
-        id: `spells:${classId}:${toLevel}`,
-        title: extraPrepared > 0 && cls.spellcasting?.prepared !== false
+  const knownUnlock = spellsKnownUnlockDelta(
+    [
+      ...((cls.features as Feature[] | undefined) ?? []),
+      ...((params.entry.subclass?.features as Feature[] | undefined) ?? []),
+    ],
+    fromLevel,
+    toLevel,
+  )
+  const extraCantrips =
+    Math.max(0, (after?.cantrips ?? 0) - (before?.cantrips ?? 0)) + knownUnlock.cantrips
+  const extraPrepared =
+    Math.max(0, (after?.prepared ?? 0) - (before?.prepared ?? 0)) + knownUnlock.leveled
+  const maxSpellLevel = Math.max(after?.max_spell_level ?? 1, knownUnlock.maxSpellLevel || 0, 1)
+  if (extraCantrips > 0 || extraPrepared > 0) {
+    steps.push({
+      kind: "spells",
+      id: `spells:${classId}:${toLevel}`,
+      title:
+        extraPrepared > 0 && cls.spellcasting?.prepared !== false
           ? "Prepare additional spells"
           : "Learn additional spells",
-        classId,
-        className: cls.name,
-        extraCantrips,
-        extraPrepared,
-        maxSpellLevel: after.max_spell_level ?? 1,
-        preparedCaster: cls.spellcasting?.prepared !== false && !cls.spellcasting?.pact_magic,
-      })
-    }
+      classId,
+      className: cls.name,
+      extraCantrips,
+      extraPrepared,
+      maxSpellLevel,
+      preparedCaster: cls.spellcasting?.prepared !== false && !cls.spellcasting?.pact_magic,
+    })
   }
 
   return {
@@ -251,8 +298,15 @@ export function buildLevelUpPlan(params: {
     className: cls.name,
     fromLevel,
     toLevel,
-    newTotalLevel: params.currentTotalLevel + 1,
+    newTotalLevel,
+    hitDie: cls.hit_die ?? 8,
     newFeatures,
+    standardizedNotes: buildLevelUpStandardizedNotes({
+      fromTotalLevel: params.currentTotalLevel,
+      toTotalLevel: newTotalLevel,
+      maxSpellLevelBefore: before?.max_spell_level ?? null,
+      maxSpellLevelAfter: after?.max_spell_level ?? (knownUnlock.maxSpellLevel || null),
+    }),
     steps,
   }
 }

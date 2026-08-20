@@ -163,7 +163,7 @@ export function DeathSaveTracker({
         className={`rounded border px-1 py-0.5 text-[9px] font-bold uppercase ${
           modeBadge || manualOverride !== "normal"
             ? "border-primary/40 text-primary"
-            : "border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:border-border"
+            : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
         }`}
         title="Cycle manual advantage / disadvantage override"
         aria-label="Cycle death save roll mode override"

@@ -175,7 +175,7 @@ export function WeaponDamageRollButton({
       : "border-white/25 bg-black/10 text-white/80 hover:border-white/45"
     : optionsActive
       ? "border-primary/40 text-primary"
-      : "border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:border-border"
+      : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
 
   const rollButtonClass =
     layout === "panel"

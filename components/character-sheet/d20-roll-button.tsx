@@ -21,6 +21,11 @@ type D20RollButtonProps = {
   layout?: "inline" | "stack" | "panel"
   /** Color fill for weapon / large combat buttons. */
   tone?: "default" | "action" | "bonus"
+  /**
+   * Mode-toggle contrast when the control sits on a colored sheet tile (e.g. Initiative)
+   * rather than on the roll button's own fill.
+   */
+  modeToggleSurface?: "default" | "onFill"
   /** Optional caption shown inside filled panel buttons (e.g. TO HIT). */
   caption?: string
   className?: string
@@ -67,6 +72,7 @@ export function D20RollButton({
   size = "sm",
   layout = "inline",
   tone = "default",
+  modeToggleSurface = "default",
   caption,
   className,
   breakdown,
@@ -133,6 +139,7 @@ export function D20RollButton({
 
   const effectiveMode = resolved.mode
   const filled = tone !== "default" || layout === "panel"
+  const modeToggleOnFill = filled || modeToggleSurface === "onFill"
   const sizeClass =
     layout === "panel"
       ? "h-auto min-h-[2.75rem] w-full px-2 py-1.5 pr-9 text-sm gap-1"
@@ -201,13 +208,13 @@ export function D20RollButton({
         setManualOverride((current) => cycleManualOverride(current))
       }}
       className={`inline-flex min-h-6 min-w-6 items-center justify-center rounded border px-1.5 py-1 text-[10px] font-bold uppercase leading-none ${
-        filled
+        modeToggleOnFill
           ? modeBadge || manualOverride !== "normal"
             ? "border-white/55 bg-black/15 text-white"
-            : "border-white/25 bg-black/10 text-white/80 hover:border-white/45"
+            : "border-white/40 bg-black/15 text-white/90 hover:border-white/65 hover:text-white"
           : modeBadge || manualOverride !== "normal"
             ? "border-primary/40 text-primary"
-            : "border-transparent text-muted-foreground/50 hover:text-muted-foreground hover:border-border"
+            : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
       }`}
       title="Cycle manual advantage / disadvantage override"
       aria-label="Cycle roll mode override"
