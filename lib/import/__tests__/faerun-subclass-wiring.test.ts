@@ -105,7 +105,8 @@ describe("Heroes of Faerûn subclass wiring", () => {
     ) as { features?: FeatureRow[] }
     const auraFeat = aura.features?.[0]
     expect(auraFeat?.isChoice).toBe(true)
-    expect(auraFeat?.choices?.swappableOnRest).toBeUndefined()
+    // Free swap each turn — not a rest-gated rebuild choice.
+    expect(auraFeat?.choices?.swappableOnRest).toBeFalsy()
     expect((auraFeat?.choices?.options ?? []).every((o) => (o.linkedModifiers?.length ?? 0) > 0)).toBe(
       true,
     )

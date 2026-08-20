@@ -5,13 +5,18 @@ import { DYNAMIC_ROUTES } from "../../../scripts/static-build-routes.mjs"
 
 const root = process.cwd()
 
+/** Normalize to forward slashes so Windows `relative()` paths match DYNAMIC_ROUTES. */
+function asRoutePath(value: string): string {
+  return value.replace(/\\/g, "/")
+}
+
 /** Every app/ directory holding a [dynamic] segment, shallowest first. */
 function dynamicRouteDirs(dir: string, found: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
     const full = join(dir, entry.name)
     if (/^\[.+\]$/.test(entry.name)) {
-      found.push(relative(root, full))
+      found.push(asRoutePath(relative(root, full)))
       continue
     }
     dynamicRouteDirs(full, found)

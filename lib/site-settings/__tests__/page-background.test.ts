@@ -5,6 +5,7 @@ import {
   resolvePageBackgroundUrl,
   validatePageBackgroundFile,
 } from "@/lib/site-settings/page-background"
+import { withBasePath } from "@/lib/config/deploy-mode"
 import { themePageBackgroundAssetPath } from "@/lib/site-settings/theme-page-backgrounds"
 
 describe("page background upload", () => {
@@ -33,6 +34,8 @@ describe("page background upload", () => {
   })
 
   it("uses predictable bundled asset paths per theme", () => {
-    expect(themePageBackgroundAssetPath("astral")).toBe("/images/page-backgrounds/astral.webp")
+    expect(themePageBackgroundAssetPath("astral")).toBe(
+      withBasePath("/images/page-backgrounds/astral.webp"),
+    )
   })
 })

@@ -206,6 +206,7 @@ describe.skipIf(!hasDriveFixture)("Warmage Drive import wiring", () => {
       "Pawn Wall",
       "Fundamental Mastery",
       "Lead from the Front",
+      "Checkmate [Maneuver]",
     ]
     for (const name of structuralNames) {
       const row = rows.find((r) => r.featureName === name)

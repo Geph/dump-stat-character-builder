@@ -93,6 +93,8 @@ export function isStructuralOrNarrativeFeature(
     "pawn wall",
     "fundamental mastery",
     "lead from the front",
+    // Capstone maneuver shell — ally-direction rider tracked as Battle Die spend, not a sheet mod.
+    String.raw`checkmate(?:\s*\[maneuver\])?`,
   ]
   if (WARMAGE_NARRATIVE_FEATURE_NAMES.some((entry) => new RegExp(`^${entry}$`, "i").test(name))) {
     return true
