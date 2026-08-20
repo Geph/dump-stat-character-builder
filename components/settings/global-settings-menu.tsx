@@ -20,6 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { SiteGraphicsSettings } from "@/components/settings/site-graphics-settings"
+import { ClearCompendiumSection } from "@/components/settings/clear-compendium-section"
 import { useBuilderLayout } from "@/components/settings/use-builder-layout"
 import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import { useDefaultMidjourneyGraphics } from "@/components/settings/use-default-midjourney-graphics"
@@ -316,6 +317,8 @@ export function GlobalSettingsMenu() {
                   </span>
                 </label>
               </div>
+
+              <ClearCompendiumSection onStatus={setStatus} />
             </TabsContent>
 
             <TabsContent value="about" className="mt-0 space-y-6">
