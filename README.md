@@ -6,6 +6,10 @@ A 5E-compatible character builder and compendium. **[Try the live app](https://g
 
 **Maximally customizable by design.** Nearly every mechanical decision — species, classes, subclasses, feats, spells, equipment, backgrounds, creatures & companions, custom abilities, and the modifier effects behind them — is editable in-app from a single shared catalog. The same wiring that powers the bundled SRD content can process your own imported homebrew.
 
+**Author and purpose.** Hi all, I'm Jeff and this is a hobby project of mine. I made this app because I really wanted a character creator and interactive sheet that does custom classes! There are so many outstanding D&D content creators out there like [Kibbles Tasty](https://www.kthomebrew.com/), [Mage Hand Press](https://magehandpress.com/) or [Laserllama](https://www.gmbinder.com/profile/laserllama) who make content that's brilliant but too complicated to easily adapt to D&D Beyond or Foundry VTT (those are great and I think you should support them too!). While I'd like for this app to remain open source and free for everyone I won't say no if you'd like to [buy me a coffee](https://buymeacoffee.com/geph). The first thing I plan to do with any money raised by the project is pay a real artist for art. 
+
+Please note that I'd like to keep the scope of this app to assisting play at a physical table (so no VTT ever) but I am open to feature suggestions and could absolutely use your help [identifying bugs to fix](https://github.com/Geph/dump-stat-character-builder/issues).
+
 ## Contents
 
 - [Features](#features)
@@ -134,7 +138,7 @@ Vercel is **not recommended** (no persistent MySQL on the same project).
 
 ## Local card art (optional)
 
-The public repo ships card art for **SRD 5.2.1**, **Kibbles Tasty**, **Mage Hand Press**, and **all species portraits** (original graphics). Player’s Handbook / setting-book backgrounds and other class/subclass art can still run on *your* copy when present locally; those files are not committed.
+In visual mode the public repo ships Midjourney-created card art for **SRD 5.2.1**, **species portraits** and potentially more I may have added since writing this. Player’s Handbook / setting-book backgrounds and other class/subclass art can still run on *your* copy when present locally, you can also import jsons of art sources from external URL's.
 
 This README is the policy. Drop-folder notes live next to the masters:
 
@@ -150,10 +154,6 @@ Put full-resolution masters in origin folders (`SRD/`, `kibbles/`, `magehandpres
 ```bash
 pnpm images:optimize
 ```
-
-GitHub-eligible class/subclass/background art comes from `SRD/`, `kibbles/`, and `magehandpress/` (aliases: `mage-hand-press`, `mhp`). Anything else is compressed for local use. **Species** from any origin folder are safe to commit.
-
-Do **not** `git add` local-only PNGs or `public/images/compendium/local-available-card-art.json`. On a fresh clone, PHB/setting **background** defaults stay unset until you optimize those masters locally — no broken image URLs.
 
 Map display names in the matching `lib/compendium/*-card-images-defaults.ts` file. Masters in `scripts/*-card-sources/` stay gitignored.
 
