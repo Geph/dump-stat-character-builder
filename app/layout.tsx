@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist_Mono } from 'next/font/google'
+import { solberaFontVariables } from './fonts/solbera'
 import { AppThemeProvider } from '@/components/providers/app-theme-provider'
 import { StaticDataProvider } from '@/components/providers/static-data-provider'
 import './globals.css'
 import '../styles/print.css'
 
-// Solbera fonts are loaded via @font-face in globals.css
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
@@ -41,7 +41,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-background" data-theme="parchment" suppressHydrationWarning>
+    <html lang="en" className={`bg-background ${solberaFontVariables}`} data-theme="parchment" suppressHydrationWarning>
       <body className={`${geistMono.variable} font-sans antialiased`}>
         <AppThemeProvider>
           <StaticDataProvider>{children}</StaticDataProvider>

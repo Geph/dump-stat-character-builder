@@ -30,7 +30,7 @@ Content is data. Mechanics are modifiers. The builder and sheet never hard-code 
 | `app/` | Next.js App Router: landing, builder, characters, sheet, compendium, import, dashboard, table, share, and `app/api/` |
 | `components/` | Shared UI. Pages stay thin; almost all interactive UI lives here |
 | `lib/` | Domain logic. If it calculates, persists, imports, or seeds, it belongs here |
-| `docs/` | Maintainer notes (this file, import review, modifier vs feature-effect) |
+| `docs/` | Maintainer notes (this file, import formats, import review, modifier vs feature-effect) |
 | `public/` | Static assets: `icons/` (game-icons.net SVGs), `images/` (marketing + bundled card defaults) |
 | `scripts/` | Build, seed, image optimize, git hooks, homebrew import ops |
 | `mysql/` | Hosted MySQL DDL (`schema.sql`) |
@@ -41,7 +41,7 @@ Content is data. Mechanics are modifiers. The builder and sheet never hard-code 
 | `.github/` | CI and issue templates |
 | `.cursor/` | Cursor hooks and agent config |
 
-Root files that matter: `README.md` (product + license), `LICENSE` (MIT + SRD attribution), `CONTRIBUTING.md`, `package.json`, `next.config.mjs`.
+Root files that matter: `README.md` (product + license), `docs/import.md` (import formats), `LICENSE` (MIT + SRD attribution), `CONTRIBUTING.md`, `package.json`, `next.config.mjs`.
 
 ---
 

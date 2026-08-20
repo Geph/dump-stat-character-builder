@@ -4,11 +4,11 @@ Thank you for your interest in contributing. This guide covers local setup, pull
 
 ## Getting started
 
-Follow the [Local development](README.md#local-development) section in the README:
+Follow the [Quick start](README.md#quick-start) section in the README:
 
 ```bash
-git clone https://github.com/Geph/v0-dump-stat-character-builder.git
-cd v0-dump-stat-character-builder
+git clone https://github.com/Geph/dump-stat-character-builder.git
+cd dump-stat-character-builder
 corepack enable
 pnpm install
 cp .env.example .env.local
@@ -83,4 +83,16 @@ Put **UI** in `app/` and `components/`, **business rules and calculations** in `
 
 ## Code of conduct
 
-This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By participating, you agree to uphold it. To report concerns, [open a GitHub issue](https://github.com/Geph/v0-dump-stat-character-builder/issues/new).
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By participating, you agree to uphold it. To report concerns, [open a GitHub issue](https://github.com/Geph/dump-stat-character-builder/issues/new).
+
+## Updating the release version
+
+**Maintainers only** — do not bump version in contributor PRs.
+
+After merging to `main`, run:
+
+```bash
+pnpm version:bump
+```
+
+This increments `VERSION` and syncs `package.json` `version` (e.g. `0.3` → `0.4`). Commit the result as part of the release push.

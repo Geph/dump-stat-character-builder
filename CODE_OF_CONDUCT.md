@@ -60,7 +60,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement by
-[opening a GitHub issue](https://github.com/Geph/v0-dump-stat-character-builder/issues/new)
+[opening a GitHub issue](https://github.com/Geph/dump-stat-character-builder/issues/new)
 in this repository. All complaints will be reviewed and investigated promptly and
 fairly.
 

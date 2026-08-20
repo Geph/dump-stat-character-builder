@@ -21,8 +21,6 @@ const ChoiceOptionsAiSchema = z.object({
       description: z.string(),
       prerequisite: z.string().nullable(),
       repeatable: z.boolean().nullable(),
-      linkedModifiers: z.array(z.record(z.unknown())).nullable().optional(),
-      modifierRefs: z.array(z.string()).nullable().optional(),
     }),
   ),
   optionsSource: z
@@ -339,9 +337,6 @@ const ClassFeatureAiSchema = z.object({
   choices: ChoiceOptionsAiSchema.nullable(),
   mechanics: z.array(ImportMechanicAiSchema).nullable(),
   basedOnSrdFeature: z.string().nullable(),
-  linkedModifiers: z.array(z.record(z.unknown())).nullable().optional(),
-  modifierRefs: z.array(z.string()).nullable().optional(),
-  importModifierMeta: z.array(z.record(z.unknown())).nullable().optional(),
 })
 
 const SpeciesTraitAiSchema = z.object({
@@ -964,8 +959,6 @@ function normalizeChoiceOptions(
         description: option.description,
         prerequisite: option.prerequisite,
         repeatable: option.repeatable,
-        linkedModifiers: option.linkedModifiers,
-        modifierRefs: option.modifierRefs,
       }),
     ) as ImportChoiceOptions["options"],
     ...omitNull({
@@ -1065,9 +1058,6 @@ function normalizeFeatureLike(
     choices: normalizeChoiceOptions(feature.choices),
     mechanics: normalizeMechanics(feature.mechanics),
     basedOnSrdFeature: feature.basedOnSrdFeature ?? undefined,
-    linkedModifiers: feature.linkedModifiers,
-    modifierRefs: feature.modifierRefs,
-    importModifierMeta: feature.importModifierMeta,
   })
   return next as ImportContent["classes"] extends (infer T)[] | undefined
     ? T extends { features: (infer F)[] }

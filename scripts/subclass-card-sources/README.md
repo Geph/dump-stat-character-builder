@@ -1,7 +1,7 @@
 Drop **full-resolution** subclass card art here, then run:
 
 ```bash
-npm run images:optimize
+pnpm images:optimize
 ```
 
 Organize by **origin book/pack**, not by output path. Filenames are `{Class} {Remainder}.png`. Remainder can be a short label (`Life`, `Knowing`) or the full subclass name (`College of the Moon`). Origin folders are ignored when writing outputs.
@@ -22,5 +22,4 @@ The optimizer expands short remainders (`Cleric Light` → `cleric/light-domain`
 
 Wire display names → class + slug in `lib/compendium/subclass-card-images-defaults.ts`.
 
-**GitHub only ships generated SRD art.** Put those masters in `SRD/` or other origin folders ( `kibbles/`, `magehandpress/` - aliases: `mage-hand-press`, `mhp`, `PHB/`, `eberron/`, `ravenloft/`, `faerun/`, …) still optimize into `public/images/` on your machine; those outputs are gitignored and must not be committed. See the README “Local card art” section.
-
+**GitHub ships generated SRD art plus Kibbles Tasty and Mage Hand Press subclass portraits.** Put those masters in `SRD/`, `kibbles/`, or `magehandpress/` (aliases: `mage-hand-press`, `mhp`). Other origin folders (`PHB/`, `eberron/`, `ravenloft/`, `faerun/`, …) still optimize into `public/images/` on your machine; those outputs are gitignored and must not be committed. See the README **[Local card art](../../README.md#local-card-art-optional)** section.

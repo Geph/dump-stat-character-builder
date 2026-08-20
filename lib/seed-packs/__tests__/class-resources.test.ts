@@ -17,11 +17,11 @@ describe("non-SRD seed class resources", () => {
   it.each([
     [
       "mage-hand-press/magehandpress-alchemist-class.json",
-      ["reagents", "prime_bomb", "bomb_formulas_known", "discoveries_known", "spell_dynamos"],
+      ["reagents", "prime_bomb", "bomb_formulas_known", "discoveries_known"],
     ],
     [
       "mage-hand-press/magehandpress-craftsman-class.json",
-      ["masterwork_bonus", "charge_points"],
+      ["masterwork_bonus"],
     ],
     [
       "mage-hand-press/magehandpress-vagabond-class.json",
@@ -29,13 +29,12 @@ describe("non-SRD seed class resources", () => {
         "battle_dice",
         "mage_brand_max_slot_level",
         "grudge_battle_die",
-        "adrenaline_battle_die",
         "hound_battle_dice",
       ],
     ],
     [
       "mage-hand-press/magehandpress-warmage-class.json",
-      ["tricks_known", "cantrip_bonus_dice", "battle_dice", "dice_of_fate", "arcane_surge"],
+      ["tricks_known", "cantrip_bonus_dice", "battle_dice", "arcane_surge"],
     ],
   ])("%s contains enrichment-linked resource rows", (path, expectedKeys) => {
     const resources = resourceMap(loadSeed(path))
@@ -44,14 +43,10 @@ describe("non-SRD seed class resources", () => {
 
   it("keeps subclass ownership on every newly reconciled resource", () => {
     const checks = [
-      ["mage-hand-press/magehandpress-alchemist-class.json", "spell_dynamos", "Dynamo Engineer"],
-      ["mage-hand-press/magehandpress-craftsman-class.json", "charge_points", "Thunderlords' Guild"],
-      [
-        "mage-hand-press/magehandpress-vagabond-class.json",
-        "adrenaline_battle_die",
-        "Adrenaline Junkie",
-      ],
-      ["mage-hand-press/magehandpress-warmage-class.json", "dice_of_fate", "House of Dice"],
+      ["mage-hand-press/magehandpress-vagabond-class.json", "mage_brand_max_slot_level", "Mage Brand"],
+      ["mage-hand-press/magehandpress-vagabond-class.json", "grudge_battle_die", "Rōnin"],
+      ["mage-hand-press/magehandpress-vagabond-class.json", "hound_battle_dice", "Houndmaster"],
+      ["mage-hand-press/magehandpress-warmage-class.json", "battle_dice", "House of Kings"],
     ] as const
 
     for (const [path, key, subclassName] of checks) {

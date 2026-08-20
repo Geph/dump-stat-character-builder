@@ -19,4 +19,4 @@ Output: `public/images/compendium/classes/*.png` at **771×1024** (**3:4** portr
 
 Backgrounds use **21:9** (`1680×720`) — see `scripts/background-card-sources/README.md`.
 
-Source files here are gitignored. 
+Source files here are gitignored. What GitHub ships vs local-only is documented in the repository README **[Local card art](../../README.md#local-card-art-optional)** section.

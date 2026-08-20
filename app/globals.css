@@ -3,52 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* =========================================================
-   Solbera D&D Fonts (CC BY-SA 4.0 — Solbera / Ryrok)
-   https://jonathonf.github.io/solbera-dnd-fonts/
-   ========================================================= */
-@font-face {
-  font-family: 'Nodesto Caps Condensed';
-  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Nodesto%20Caps%20Condensed/Nodesto%20Caps%20Condensed.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Nodesto Caps Condensed';
-  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Nodesto%20Caps%20Condensed/Nodesto%20Caps%20Condensed%20Bold.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Bookinsanity';
-  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Bookinsanity/Bookinsanity.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Bookinsanity';
-  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Bookinsanity/Bookinsanity%20Bold.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Scaly Sans';
-  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Scaly%20Sans/Scaly%20Sans.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Scaly Sans';
-  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Scaly%20Sans/Scaly%20Sans%20Bold.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Mr Eaves Small Caps';
-  src: url('https://jonathonf.github.io/solbera-dnd-fonts/Mr%20Eaves%20Small%20Caps/Mr%20Eaves%20Small%20Caps.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-}
+/* Solbera D&D Fonts are self-hosted via next/font in app/fonts/solbera.ts (CC BY-SA 4.0). */
 
 /* =========================================================
    Design Tokens — theme variants via html[data-theme]
@@ -426,8 +381,8 @@
 
 @theme inline {
   /* Typography — Solbera stack with system fallbacks */
-  --font-sans: 'Scaly Sans', 'Bookinsanity', system-ui, sans-serif;
-  --font-display: 'Nodesto Caps Condensed', 'Mr Eaves Small Caps', system-ui, sans-serif;
+  --font-sans: var(--font-scaly-sans), var(--font-bookinsanity), system-ui, sans-serif;
+  --font-display: var(--font-nodesto), var(--font-mr-eaves), system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
 
   --color-background: var(--background);

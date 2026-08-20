@@ -1,559 +1,176 @@
 # Dump Stat
 
-![Dump Stat — 5E compatible character creator](./public/images/features/hero.webp)
+[![Dump Stat landing page](./public/images/features/readme-landing.png)](https://geph.github.io/dump-stat-character-builder/)
 
-A modern 5E compatible character builder and compendium built with Next.js and MySQL.
+A 5E-compatible character builder and compendium. **[Try the live app](https://geph.github.io/dump-stat-character-builder/)** (static GitHub Pages, data stays in your browser). Current release: **0.25**.
 
-**Maximally customizable by design.** Nearly every mechanical decision — species, classes, subclasses, feats, spells, equipment, backgrounds, creatures & companions, custom abilities, and the modifier effects behind them — is editable in-app from a single shared catalog. The same wiring that powers the bundled SRD content can be used to process your own imported content.
+**Maximally customizable by design.** Nearly every mechanical decision — species, classes, subclasses, feats, spells, equipment, backgrounds, creatures & companions, custom abilities, and the modifier effects behind them — is editable in-app from a single shared catalog. The same wiring that powers the bundled SRD content can process your own imported homebrew.
+
+## Contents
+
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [Requirements](#requirements)
+- [Quick start](#quick-start)
+- [Deployment](#deployment)
+- [Local card art](#local-card-art-optional)
+- [Troubleshooting](#troubleshooting)
+- [Project structure](#project-structure)
+- [License & credits](#license--credits)
 
 ## Features
 
-### Character Builder
-- **Step-by-step character creation** — Guided workflow through species, class, ability scores, background, gear, spells, and details
-- **Multi-class support** — Build characters with multiple classes and track levels independently
-- **Player-choice modifiers everywhere** — Skill/expertise picks, tool & instrument choices, languages, weapon-mastery selections, and feat grants surface as interactive choices at the step where they apply
-- **Real-time preview** — Live character sheet with Summary, Combat, Features, Companion / Beast Form, and Custom tabs
-- **Point buy & standard array** — Multiple methods for determining ability scores
-- **Automatic calculations** — HP, AC, weapon attacks, saving throws, skills, and modifiers calculated automatically
+### Character builder
+- Guided creation through species, class, ability scores, background, gear, spells, and details
+- Multiclass with independent levels, plus a live sheet preview
+- Player-choice modifiers (skills, tools, languages, weapon masteries, feat grants) at the step where they apply
+- Point buy and standard array; HP, AC, attacks, saves, and skills calculate automatically
 
 ### Compendium
-- **SRD content** — Seed the full SRD 5.2.1 compendium (classes, species, spells, equipment, creatures, and more)
-- **Custom content creation** — Create and manage species, classes, subclasses, backgrounds, feats, spells, equipment, creatures & companions, and custom abilities
-- **Creatures & Companions** — First-class compendium type with editable stat blocks (size, type, AC, HP, speeds, abilities, traits, actions). Bundled SRD seed includes familiar/steed/Wild Shape forms plus undead and other summon targets. Features, spells, and magic items grant companions via the **Grant Creature** common modifier (`grant_creature`) — including Druid Wild Shape, Find Familiar, Find Steed / Faithful Steed, Beast Master, *Animate Dead* / *Create Undead*, and other summoning content
-- **Common Modifier Effects** — A permanent, editable system catalog under Custom Abilities that merges class-feature activation templates with characteristic modifiers; class/subclass features, feats, species traits, custom abilities, and choice options all pick from this searchable list and configure it inline instead of defining effects from scratch
-- **Configurable everywhere** — Linked modifiers attach to class/subclass features, feats, species traits, *and* custom abilities with the same editor, so a homebrew ability can carry skill choices, languages, resource pools, level-scaling dice, alternate-ability checks, creature grants, or feat grants exactly like SRD content
-- **Player-choice modifiers** — Skill/expertise (with optional "any skill" or class-list scoping), tool/instrument selections, languages, sizes, weapon masteries, feat grants, and creature picks are authored once on a modifier and rendered as builder choices automatically
-- **Choice prerequisites** — Option lists (knacks, talents, upgrades, and similar) can gate picks on class level, other selected options, known spells, and freeform requirements so the builder only offers legal choices
-- **Level-scaling effects** — Effects like unarmed/Martial Arts die, Sneak Attack, and player-chosen feature branches (Druid *Elemental Fury*, Cleric *Blessed Strikes*) scale by level from the player's original choice without needing duplicate higher-level entries
-- **Companions on the sheet** — Granted creatures resolve into the character sheet Companion / Beast Form tab (polymorph forms vs summoned companions), with stat blocks from the Creatures catalog rather than one-off embedded templates alone
-- **Spell-slot progression editor** — Accordion editor with full / half / third / pact caster presets for class spellcasting
-- **SRD modifier enrichment** — Bundled SRD classes, subclasses, feats, and species traits ship with linked common-modifier presets (class resources, cast spell, movement types, Metamagic/Eldritch Invocations catalogs, unarmed die scaling, standard-language grants, size options, Monk tool/weapon proficiencies, creature grants, and more); run `pnpm dlx tsx scripts/audit-srd-class-features.ts` to list gaps
-- **Card background graphics** — Every compendium entry can have a hero image for selection cards and full-screen detail overlays (upload or URL in the editor header area); classes, species, and subclasses use **3:4 portrait** art on browse cards and a side-by-side **Description & card art** editor row
-- **Cinematic selection UI** — Builder class/species/background pickers and compendium detail views use full-bleed artwork with gold-framed cards inspired by D&D Beyond
-- **Default SRD icons** — Bundled defaults for subclasses, mundane weapons (same icons as the mastery visual grid), and all 13 mundane armor types; compendium browse shows them when no custom icon is set
-- **Class resources** — Dedicated compendium tab for per-class resource pools (Rage, Ki, etc.) linked from feature limited uses; subclass-only pools (Superiority Dice, Psionic Energy Dice) appear when those subclasses are loaded
-- **Enable / disable content** — Toggle compendium entries off for the builder (grayed-out cards including artwork); prompts when disabling or re-enabling related entries (subclasses, class resources, attached abilities, etc.)
-- **Unified editor header** — Icon picker and theme color (fly-out), name, source, and source link on one row across all compendium editors
-- **Background editor** — Structured tools & vehicles (SRD dropdown + custom), weapon categories, armor checkboxes, languages, origin feat grants, tool/language choice phrases wired as builder picks, and Choose A/B starting equipment packages
-- **Background granted spells** — Assign spells by overall character level (1st–20th), not spell level
-- **Spell editor** — Casting time, range, and duration presets with “Other” custom values; ritual and concentration on the same row as level and school; edit sections open by default
-- **Section export & clear** — Export or wipe an entire compendium tab from the gear menu
-- **Filtering & search** — Find content quickly with search, source, and category filters. Creatures and Species also filter by **type** (`Humanoid (Goblinoid)` matches `Humanoid`). Abilities and subclasses can filter by parent class
+- Seed the full SRD 5.2.1 catalog, then create or edit anything
+- One **common modifier** catalog: class features, feats, species traits, and custom abilities pick the same effects (resources, spell grants, creature grants, level-scaling dice, …)
+- Creatures & companions as a first-class type, including Wild Shape, familiars, steeds, and summons
+- Card art on browse cards and detail overlays; enable/disable entries for the builder
+- Class resource pools (Rage, Ki, Superiority Dice, …) linked from feature limited uses
 
-### Character Management
-- **Save & load characters** — Persist characters to MySQL; resume editing from the builder
-- **Character sheet** — Condensed sheet with skills grouped by ability, merged proficiencies, subclass features, chosen size, banner/portrait, in-sheet HP tracking, a Companion / Beast Form tab driven by Creatures & Companions grants, roll-able special actions from features, off-hand weapon slots for dual wielding, and class-feature toggles (e.g. Rage, Innate Sorcery) with conditional combat bonuses
-- **Level-up wizard** — On the sheet, gain a level and walk through new features, subclass unlocks, and ASI / feat picks
-- **Duration reminders** — Pin timed effects on the sheet (concentration, 1 minute, end of next turn) so they stay visible during play
-- **Resume last character** — Optional Home shortcut that opens the last sheet you used
-- **Manual skill ability** — Optional house rule: click a skill’s ability label to roll it with a different modifier
-- **Export options** — Download character and compendium data as JSON
+### Play
+- Condensed character sheet with rolls, HP tracking, companion / beast-form tab, duration reminders, and class-feature toggles
+- Level-up wizard for new features, subclass unlocks, and ASI / feat picks
+- Save characters (MySQL hosted, or IndexedDB in static mode) and export JSON
 
 ### Import
-- **SRD seed** — One-click SRD import from bundled JSON (`pnpm srd:build` regenerates seed from SRD 5.2.1 markdown, including armor types and Creatures & Companions); **no AI**
-- **PDF & text import** — Optional server AI (OpenAI, Anthropic, or Google Gemini), **deterministic** parsing for well-structured class PDFs, or **hybrid** (partial deterministic + AI); BYO LLM JSON paste always available without server keys
-- **Content-type hints** — Focus extraction on Class + subclasses (include spell list), Subclasses only (parent already imported), Species, Backgrounds, Spells, Feats / Fighting Styles / Boons, Equipment, Creatures & Companions, Custom Abilities / Resources, Custom Invocations / Metamagic, or **Images from URL** (card art only)
-- **Images from URL** — Map card art from a directory or page of image links. Server AI can call a same-host `fetch_url` tool (SSRF-limited) instead of guessing filenames. Image-only imports apply art to matching entries and do not invent class features
-- **Name collisions** — When an import matches an existing name: **Update existing** adds new features, resources, and images; **Replace existing** wipes the stored row; or import under a new name / skip
-- **Same-source replacements** — When importing a class that replaces SRD spells or feats, optionally prefer matching names from the import’s Source label over base SRD entries
-- **Creature import v2** — Structured creatures/companions JSON (schema `2.0`) with loud validation; Foundry NPC actors map into the same Creatures catalog
-- **Dump Stat JSON export** — Upload compendium export bundles (`.json`) via PDF import or paste into text import for fully-linked homebrew content
-- **Foundry VTT import** — Paste or upload Foundry `dnd5e` item and NPC actor exports ("Export Data" JSON, item arrays, `{ items: [...] }` actor/pack dumps, compendium object maps, or NeDB `.db` packs); auto-detected and parsed with **no AI** ([format reference](https://github.com/foundryvtt/dnd5e)). NPC actors import as Creatures & Companions; character/vehicle sheets are skipped.
-- **PDF paste cleanup** — BYO extraction prompts tell the LLM to collapse doubled ALL-CAPS glyphs (common in LaserLlama PDFs) and strip trailing superscript markers pasted as letters (e.g. KibblesTasty `Returning WeaponK` → `Returning Weapon`)
-- **Source limits** — Spell PDF imports cap at 15 pages per pass; pasted source text has a Plus-tier LLM character budget so extraction stays practical
-- **Multi-file import order** — On **Import**, expand **Import order** tips for spellcasters, KibblesTasty Psion disciplines, Martial Exploits, and similar split homebrew; paste a JSON array in dependency order or import files sequentially (libraries first, then one class chapter with core + subclasses together; include class spell lists in that same pass)
+- One-click SRD seed (no AI)
+- Dump Stat JSON and Foundry VTT JSON (no AI)
+- BYO LLM clipboard (paste text → copy prompt → paste JSON) without server keys
+- Optional server AI for PDF / text extraction (OpenAI, Anthropic, or Gemini)
+- Name-collision handling (update, replace, or rename)
 
-See [Import formats](#import-formats) and [Multi-file homebrew import order](#multi-file-homebrew-import-order) below.
+Formats, multi-file order, and AI keys: **[docs/import.md](docs/import.md)**.
 
-## Tech Stack
+## Tech stack
 
-- **Framework**: Next.js 16 (App Router)
-- **Database**: MySQL 8+
-- **Styling**: Tailwind CSS 4
-- **UI Components**: shadcn/ui
-- **Icons**: Lucide React + Game Icons
-- **Animations**: Framer Motion
+- **Framework:** Next.js 16 (App Router) + React 19
+- **Data:** MySQL 8+ with Drizzle (hosted) or IndexedDB (static)
+- **UI:** Tailwind CSS 4, shadcn/ui, Lucide + Game Icons
+- **Validation / tests:** Zod, Vitest
 
 ## Requirements
 
-- Node.js 20+ (recommended for build and production)
+- Node.js 20+
 - pnpm (via Corepack) or npm
-- MySQL 8+ — local install, managed service (RDS, PlanetScale-compatible host, etc.), or MySQL on the same VPS as the app
+- **Hosted mode only:** MySQL 8+
 
 The browser never connects to MySQL directly. Only the Next.js server uses database credentials from environment variables.
 
----
+## Quick start
 
-## Local development
+Pick a profile first:
 
-### 1. Clone and install
+| Profile | Storage | When to use |
+|---------|---------|-------------|
+| **Static** | IndexedDB in the browser | Try the app, GitHub Pages, no database |
+| **Hosted** | MySQL via `/api/*` | Self-host, multi-device save, PDF/server AI import |
+
+### Static (no MySQL)
 
 ```bash
-git clone https://github.com/Geph/v0-dump-stat-character-builder.git
-cd v0-dump-stat-character-builder
+git clone https://github.com/Geph/dump-stat-character-builder.git
+cd dump-stat-character-builder
 corepack enable
 pnpm install
+pnpm build:static
+npx serve out
 ```
 
-If `pnpm` is not on your PATH, use `corepack pnpm install` and `corepack pnpm dev`.
+Or just use the [live Pages build](https://geph.github.io/dump-stat-character-builder/). Details: [deploy/github-pages.md](deploy/github-pages.md).
 
-### 2. MySQL database
+### Hosted local development
 
-Create an empty database and a user with full privileges on it. Examples:
-
-**Local MySQL (Windows / macOS / Linux)**
-
-```sql
-CREATE DATABASE dump_stat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
--- Grant your app user access (adjust user/host as needed)
+```bash
+git clone https://github.com/Geph/dump-stat-character-builder.git
+cd dump-stat-character-builder
+corepack enable
+pnpm install
+cp .env.example .env.local
 ```
 
-**Or use the setup helper** (after setting `MYSQL_PASSWORD` in `.env.local`):
+Create a MySQL database, then either:
 
 ```bash
 pnpm db:setup
 ```
 
-This creates the `dump_stat` database and applies `mysql/schema.sql`.
-
-### 3. Environment variables
-
-```bash
-cp .env.example .env.local
-```
-
-Edit `.env.local`. Use **either** a connection URL **or** separate fields:
-
-```env
-# Option A — single URL
-DATABASE_URL=mysql://DB_USER:DB_PASSWORD@localhost:3306/dump_stat
-
-# Option B — separate fields
-# MYSQL_HOST=localhost
-# MYSQL_USER=your_db_user
-# MYSQL_PASSWORD=your_db_password
-# MYSQL_DATABASE=dump_stat
-# MYSQL_PORT=3306
-
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-NODE_ENV=development
-PORT=3000
-```
-
-URL-encode special characters in passwords (e.g. `@` → `%40`).
-
-Restart the dev server after changing `.env.local`.
-
-### 4. Schema (if not using `pnpm db:setup`)
-
-Run `mysql/schema.sql` once against your database:
-
-```bash
-mysql -h localhost -u YOUR_DB_USER -p dump_stat < mysql/schema.sql
-```
-
-Or import the file through phpMyAdmin, Adminer, or your host’s database UI.
-
-The seed step only inserts data; it does **not** create tables. After pulling schema updates, run:
-
-```bash
-pnpm db:migrate
-```
-
-This applies incremental migrations (new columns such as background `proficiencies`, character weapon/armor proficiencies, feat `repeatable`, etc.).
-
-### 5. Remote MySQL
-
-If MySQL runs on a remote server and blocks public connections (common on shared/VPS hosts), use one of:
-
-**A. SSH tunnel (recommended)**
-
-```bash
-ssh -N -L 3307:127.0.0.1:3306 user@your-server.example.com
-```
-
-```env
-DATABASE_URL=mysql://DB_USER:DB_PASSWORD@127.0.0.1:3307/dump_stat
-```
-
-**B. Allow your IP** in the host’s MySQL/firewall panel, then use the remote hostname in `DATABASE_URL`.
-
-**C. Develop on the server** — clone the repo there, use `localhost` as the DB host, run `pnpm dev`.
-
-### 6. Run the app and seed SRD content
+or import `mysql/schema.sql` yourself. Set `DATABASE_URL` (or `MYSQL_*`) in `.env.local`. URL-encode special characters in passwords.
 
 ```bash
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), go to **Import**, and click **Seed SRD 5.2.1 Content**, or:
+Open [http://localhost:3000](http://localhost:3000), go to **Import**, and click **Seed SRD 5.2.1 Content**, or `curl -X POST http://localhost:3000/api/seed`.
+
+After pulling schema updates:
 
 ```bash
-curl -X POST http://localhost:3000/api/seed
+pnpm db:migrate
 ```
 
-Seed data is built from SRD 5.2.1 markdown. To regenerate JSON after parser changes:
+If `pnpm` is not on your PATH, use `corepack pnpm …`. Remote MySQL often needs an SSH tunnel (`ssh -N -L 3307:127.0.0.1:3306 user@host`) and `DATABASE_URL` pointing at `127.0.0.1:3307`.
+
+**Optional AI import:** add one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_GENERATIVE_AI_API_KEY` to `.env.local`. Without a key, seed, JSON, Foundry, and BYO clipboard still work. See [docs/import.md](docs/import.md#server-ai-keys-optional).
+
+## Deployment
+
+Dump Stat is a **build-time** profile. There is no runtime toggle in the deployed app.
+
+| Profile | Command | Storage | Target |
+|---------|---------|---------|--------|
+| **Hosted** (default) | `pnpm build:hosted` | MySQL | VPS / Node (`pnpm start`) |
+| **Static** | `pnpm build:static` | IndexedDB | GitHub Pages (`out/`) |
+
+- **Static:** [deploy/github-pages.md](deploy/github-pages.md) — live at `https://geph.github.io/dump-stat-character-builder/`. Includes builder, characters, compendium, bundled SRD, and JSON import/export. Excludes PDF/server AI and the seed API.
+- **Hosted VPS:** [deploy/vps.md](deploy/vps.md) — Node + MySQL behind nginx/Caddy, PM2 config in `deploy/`.
+
+Vercel is **not recommended** (no persistent MySQL on the same project).
+
+## Local card art (optional)
+
+The public repo ships card art for **SRD 5.2.1**, **Kibbles Tasty**, **Mage Hand Press**, and **all species portraits** (original graphics). Player’s Handbook / setting-book backgrounds and other class/subclass art can still run on *your* copy when present locally; those files are not committed.
+
+This README is the policy. Drop-folder notes live next to the masters:
+
+| Drop folder | Optimized output |
+|-------------|------------------|
+| `scripts/subclass-card-sources/` | `public/images/compendium/subclasses/{class}/{slug}.png` (771×1024) |
+| `scripts/class-card-sources/` | `public/images/compendium/classes/{slug}.png` (771×1024) |
+| `scripts/species-card-sources/` | `public/images/compendium/species/{slug}.png` (all ship on GitHub) |
+| `scripts/background-card-sources/` | `public/images/compendium/backgrounds/{slug}.png` (1680×720) |
+
+Put full-resolution masters in origin folders (`SRD/`, `kibbles/`, `magehandpress/`, `PHB/`, `eberron/`, …), then:
 
 ```bash
-pnpm srd:build
+pnpm images:optimize
 ```
 
-### 7. AI import (optional — compendium import only)
+GitHub-eligible class/subclass/background art comes from `SRD/`, `kibbles/`, and `magehandpress/` (aliases: `mage-hand-press`, `mhp`). Anything else is compressed for local use. **Species** from any origin folder are safe to commit.
 
-**AI is used only for compendium import** (PDF upload and optional server-side text extraction). The character builder, character sheet, derived stats, SRD seed, Foundry VTT import, Dump Stat JSON bundles, and BYO LLM clipboard workflow do **not** call any AI APIs.
+Do **not** `git add` local-only PNGs or `public/images/compendium/local-available-card-art.json`. On a fresh clone, PHB/setting **background** defaults stay unset until you optimize those masters locally — no broken image URLs.
 
-| Path | Uses server AI? |
-|------|-----------------|
-| SRD seed (`POST /api/seed`) | No — bundled JSON |
-| Dump Stat JSON (file or paste) | No |
-| Foundry VTT JSON | No |
-| Clipboard BYO LLM | No — you run an external LLM and paste JSON |
-| PDF / server text extraction | Optional — see extraction modes below |
-
-**Extraction modes** (shown on the import report):
-
-| Mode | When |
-|------|------|
-| `deterministic` | Well-structured class documents pass the confidence gate with **zero** API calls |
-| `hybrid` | Partial deterministic parse (e.g. class shell + resources) plus AI for remaining sections |
-| `ai` | Full server AI extraction when deterministic parsing is not confident enough |
-| `byo-json` | You pasted LLM-generated JSON or a Dump Stat export bundle |
-
-**Supported providers** (set **one** API key; the first configured provider is used unless you set `IMPORT_AI_PROVIDER`):
-
-| Provider | Environment variable | Default model |
-|----------|---------------------|---------------|
-| OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini` |
-| Anthropic | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` |
-| Google Gemini | `GOOGLE_GENERATIVE_AI_API_KEY` or `GOOGLE_API_KEY` | `gemini-2.0-flash-001` |
-
-The Import page also offers additional model choices per provider (e.g. GPT-4o, Claude 3.5 Haiku, Gemini 2.5 Flash); override the default with Import settings or `IMPORT_AI_MODEL`.
-
-Add to `.env.local` (examples):
-
-```env
-# Pick ONE provider key:
-OPENAI_API_KEY=sk-your-key-here
-# ANTHROPIC_API_KEY=sk-ant-your-key-here
-# GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-key-here
-
-# Optional: force a provider when multiple keys are set
-# IMPORT_AI_PROVIDER=openai|anthropic|google
-
-# Optional: override the default model for that provider
-# IMPORT_AI_MODEL=gpt-4o-mini
-```
-
-Restart the dev server after changing keys. Without any provider key, seed, Dump Stat JSON, Foundry JSON, BYO clipboard import, and manual compendium edits still work — only **server AI extraction** on PDF upload or the Clipboard **Import with server AI** action returns a configuration error.
-
-**Import page UI:** The BYO LLM tab always shows the bring-your-own-LLM workflow (paste text → copy prompt → paste JSON). When server AI is configured, an expandable **server AI extraction** section also appears on BYO LLM and PDF tabs (provider/model override stored in browser localStorage). API keys always stay on the server. Static deploys use the same BYO LLM panel layout; PDF/server AI require a hosted build.
-
-**Chunk cache:** Successful AI sections are cached in server memory by hash. If a large import fails mid-way (quota/rate limit), retry the **same** text with the same provider/model — finished sections are reused without extra API cost until the server restarts.
-
----
-
-## Import formats
-
-Dump Stat supports six compendium import paths:
-
-| Method | Input | AI? | Best for |
-|--------|--------|-----|----------|
-| **SRD seed** | Button / `POST /api/seed` | No | Official SRD baseline |
-| **Dump Stat JSON** | `.json` file or pasted JSON | No | Homebrew with full `linkedModifiers`, repeatable imports |
-| **Foundry VTT JSON** | `dnd5e` item/NPC/pack export (file or pasted) | No | Migrating items, feats, spells, classes, and creatures from Foundry |
-| **Text import** | Pasted plain text + optional content hint | Optional server AI or BYO LLM | UA PDFs, website copy-paste, copied stat blocks |
-| **Images from URL** | Directory or page URL + Images from URL hint | Optional server AI or BYO LLM | Card art mapping without rewriting rules |
-| **PDF import** | Uploaded PDF (+ optional page range) | Optional server AI | Same as text; also accepts JSON export files (no AI) |
-
-### Dump Stat JSON export
-
-Export bundles use type `dump-stat-export` with an `items` array. Each item has `type` (e.g. `dnd-subclass`, `dnd-feat`, `dnd-spell`) and `data` (compendium fields without server ids).
-
-**Single-item shape:**
-
-```json
-{
-  "type": "dnd-subclass",
-  "version": 1,
-  "data": {
-    "name": "Circle of the Titan",
-    "class_name": "Druid",
-    "description": "…",
-    "source": "UA 2026",
-    "features": [
-      { "level": 3, "name": "Circle of the Titan Spells", "description": "…" }
-    ]
-  }
-}
-```
-
-**Bulk bundle:**
-
-```json
-{
-  "type": "dump-stat-export",
-  "version": 1,
-  "section": "my-homebrew",
-  "items": [ … ]
-}
-```
-
-Import via **Import → PDF upload** (choose the `.json` file) or **paste the entire JSON into Text Import**.
-
-- Subclasses resolve parent classes by `class_name` (must exist in compendium — seed SRD first).
-- Subclass rows run **post-import enrichment** (always-prepared spell links, limited uses, class-resource bindings) when presets exist.
-- Feats should include `"category": "Origin"` or `"Epic Boon"` so they appear in the correct builder pickers.
-
-**Example bundle:** [lib/import/examples/ua-villainous-options-export.json](lib/import/examples/ua-villainous-options-export.json) — UA 2026 Villainous Options (three subclasses, Destructive Wave, Origin/Epic Boon feats). Regenerate with:
-
-```bash
-pnpm dlx tsx scripts/build-ua-villainous-export.ts
-```
-
-### Text import (BYO LLM + optional server AI)
-
-The **Clipboard** tab is the primary import path for pasted text:
-
-1. Paste raw source text (from a PDF copy, website, or document).
-2. Copy the **extraction prompt** and **JSON template** (matched to your content-type hint).
-3. Run the prompt in ChatGPT, Claude, Gemini, or any LLM — using your own API key or subscription.
-4. Paste the model's JSON output back into Dump Stat and click **Import JSON**.
-
-The prompt includes **clean PDF / paste guidelines** (keep level tables intact, one content type per run, preserve feature headings, collapse doubled ALL-CAPS PDF glyphs, strip trailing superscript markers like KibblesTasty `K`, etc.). No server API keys are required for this flow.
-
-**Optional server AI:** If the host has `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_GENERATIVE_AI_API_KEY` configured, an expandable **server AI extraction** section appears on Clipboard and PDF tabs (hidden when no provider is configured). The BYO prompt/template workflow remains available either way.
-
-**Dump Stat JSON export** — if the pasted text is a valid `dump-stat-export` bundle, it imports directly without LLM extraction (same as file upload; extraction mode `byo-json`).
-
-### PDF import (optional server AI)
-
-Same schema and persistence as text import. Optional **page range** limits extraction to specific pages. Upload a **`.json` export bundle** through the PDF file picker for non-AI JSON import.
-
-PDF text extraction tries **deterministic** parsing first, then **hybrid** or full **AI** when needed. Requires at least one [AI provider key](#7-ai-import-optional--compendium-import-only) for PDF text extraction (not for JSON bundles, SRD seed, or Foundry JSON).
-
-### Multi-file homebrew import order
-
-Many third-party classes ship as **several JSON files** (spell libraries, discipline powers, class chapter). **Happy path: two LLM extracts → one Step 2 paste.** Import **supporting libraries** and the **class chapter** (core + every archetype in `classes[]` + `subclasses[]`) as a JSON array — Dump Stat **auto-orders** libraries before the class chapter even if you paste them reversed. Do not leave archetypes for a later file unless you are intentionally adding to a class already in the compendium.
-
-On the app: **Import → Import tips → Import order** lists workflows for spellcasters, KibblesTasty Psion, Laserllama-style Martial Exploits, and Inventor.
-
-**General rules**
-
-1. **SRD spells** — If your compendium is SRD-seeded, standard spells (e.g. *Fireball*, *Burning Hands*) do not need a separate import; only import homebrew spell JSON for third-party names.
-2. **One batch or sequential** — Either paste a **JSON array** of import objects (order flexible — libraries are auto-sorted ahead of the class chapter), or run separate imports in the same order (earlier files persist to the compendium before later ones wire references).
-3. **Class + subclasses together** — Use content type **Class + subclasses**. An empty `subclasses[]` means no archetypes in the builder. Use **Subclasses only** only for add-ons when the parent class is already imported.
-4. **Set a source label** — Use the compendium source label field (e.g. `Kibbles Witch`) so you can filter and re-import safely.
-
-**Spellcasting classes** (Witch, full casters, etc.)
-
-| Step | Content |
-|------|---------|
-| 1 | Homebrew spell libraries (`kibbles-spells-parsed.json`, Valda's supplements, etc.) when needed |
-| 2 | Class chapter JSON: core class **and** subclasses, **including** the class spell list (Spell / School / Special tables) when present |
-| 3 | Choice options if separate (grand hexes, invocations, …) |
-
-**KibblesTasty Psion** (and similar psionic classes with separated powers)
-
-| Step | Content |
-|------|---------|
-| 1 | `psion-disciplines.json` (psionic powers as custom abilities / proposals — not ordinary `spells[]`) |
-| 2 | Class chapter: core Psion **and** all archetypes in one JSON (`classes[]` + `subclasses[]`) |
-
-Discipline powers with psi-point augments get `psionic_augments` at import; pick augments on the character sheet when casting those powers.
-
-**Martial Exploits** (Laserllama Alternate Fighter, etc.)
-
-| Step | Content |
-|------|---------|
-| 1 | Exploit / maneuver library (if separate) |
-| 2 | Class chapter: level table (Exploit Dice, Exploits Known) **and** all subclasses in the same pass |
-
-**JSON array example** (BYO LLM → Step 2):
-
-```json
-[
-  { "spells": [ … ] },
-  { "classes": [ … ], "subclasses": [ … ] }
-]
-```
-
-Dump Stat merges the array into one import batch before wiring modifiers.
-
----
-
-## Production deployment
-
-**This app is designed for self-hosted Node + MySQL**, not Vercel serverless. If the repo was linked to Vercel from v0, disconnect that integration in the Vercel dashboard (or remove the Git deploy hook) and deploy on your VPS instead.
-
-These steps apply to any Linux VPS or dedicated box where you run Node and MySQL yourself (DreamHost VPS, Linode, DigitalOcean, Hetzner, AWS EC2, a home server, etc.). Adjust paths and panel names for your host.
-
-### Architecture
-
-```
-Internet → reverse proxy (nginx/Caddy/Apache) → Node (Next.js on :3000) → MySQL (localhost or private network)
-```
-
-MySQL and Node on the **same machine** should use `localhost` (or a private IP) in `DATABASE_URL`.
-
-### 1. Server prerequisites
-
-- Node.js 20+
-- MySQL 8+
-- Git
-- A process manager (PM2, systemd) and reverse proxy (nginx recommended)
-
-### 2. Database
-
-On the server (or via your host’s DB panel):
-
-1. Create a database (e.g. `dump_stat`).
-2. Create a dedicated MySQL user with privileges **only** on that database.
-3. Import schema once:
-
-   ```bash
-   mysql -h localhost -u APP_USER -p dump_stat < mysql/schema.sql
-   ```
-
-### 3. Deploy the application
-
-```bash
-git clone https://github.com/Geph/v0-dump-stat-character-builder.git
-cd v0-dump-stat-character-builder
-pnpm install
-```
-
-Set production environment variables (`.env.local`, PM2 ecosystem file, or systemd `Environment=`):
-
-```env
-DATABASE_URL=mysql://APP_USER:APP_PASSWORD@localhost:3306/dump_stat
-NEXT_PUBLIC_SITE_URL=https://yourdomain.com
-NODE_ENV=production
-PORT=3000
-
-# AI import — one provider key (see "AI import" section above)
-OPENAI_API_KEY=sk-your-key-here
-# ANTHROPIC_API_KEY=sk-ant-...
-# GOOGLE_GENERATIVE_AI_API_KEY=...
-# IMPORT_AI_PROVIDER=openai|anthropic|google
-# IMPORT_AI_MODEL=gpt-4o-mini
-```
-
-Build and start:
-
-```bash
-NODE_OPTIONS='--max-old-space-size=4096' pnpm build
-pnpm start
-```
-
-Or with PM2 (config included in `deploy/`):
-
-```bash
-pm2 start deploy/ecosystem.config.cjs
-pm2 save
-```
-
-Optional standalone build (copies minimal `node_modules` into `.next/standalone`):
-
-```bash
-NEXT_OUTPUT=standalone pnpm build
-```
-
-### 4. Reverse proxy (nginx example)
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Add TLS with Let’s Encrypt (`certbot`) or your host’s certificate tooling.
-
-### 5. First-run seed
-
-After the app is up and connected to the database:
-
-```bash
-curl -X POST https://yourdomain.com/api/seed
-```
-
-### Managed / shared hosting notes
-
-| Host type | Typical approach |
-|-----------|------------------|
-| **VPS** (DreamHost, DO, Linode, …) | Node + MySQL on same box, nginx in front — steps above |
-| **Managed MySQL** (RDS, Aiven, …) | Point `DATABASE_URL` at the provider hostname; run Node on a VPS or PaaS |
-| **PaaS** (Railway, Render, Fly.io) | Deploy Next.js build; attach managed MySQL; set env vars in the dashboard |
-| **Vercel** | **Not recommended** — no persistent MySQL on the same project; use DreamHost VPS + nginx instead |
-| **Shared PHP/cPanel** | Often **no** long-running Node — use a VPS or PaaS instead unless your plan supports Node apps |
-
-DreamHost-specific: MySQL is created under **Goodies → MySQL Databases**; remote access may require an SSH tunnel or IP allowlist as described in local dev step 5.
-
----
-
-## Deployment profiles
-
-Dump Stat supports two **build-time** profiles. Choose one when building for production; there is no runtime toggle in the deployed app.
-
-| Profile | Command | Storage | Deploy target |
-|---------|---------|---------|---------------|
-| **Hosted** (default) | `pnpm build:hosted` | MySQL via `/api/*` | VPS / Node (`pnpm start`) |
-| **Static** | `pnpm build:static` | IndexedDB in browser | GitHub Pages (`out/`) |
-
-### Hosted (MySQL + Node)
-
-This is the default local development and VPS workflow documented above:
-
-1. Configure `DATABASE_URL` in `.env.local`
-2. `pnpm build:hosted` (or `pnpm build`)
-3. Run with `pnpm start` or PM2/nginx as in [deploy/](deploy/)
-
-Set `NEXT_PUBLIC_DEPLOY_MODE=hosted` or leave it unset.
-
-### Static (GitHub Pages)
-
-No database server required. Data lives in the visitor's browser.
-
-1. Set `NEXT_PUBLIC_BASE_PATH` to your repo name for project sites (e.g. `/dump-stat-character-builder`)
-2. `pnpm build:static` — writes static files to `out/`
-3. Deploy `out/` to GitHub Pages (see [deploy/github-pages.md](deploy/github-pages.md))
-
-**Static mode includes:** builder, characters, compendium, bundled SRD on first visit, JSON pack import/export.
-
-**Static mode excludes:** PDF/text server AI import, server seed API. JSON paste (Dump Stat exports, Foundry, BYO LLM) still works. Use JSON exports from a hosted instance to share custom content.
-
-Environment variables for static builds are documented in [.env.example](.env.example).
-
-**GitHub Pages:** See [deploy/github-pages.md](deploy/github-pages.md). After enabling Pages (Source: GitHub Actions), the app is served at `https://geph.github.io/dump-stat-character-builder/`.
-
----
+Map display names in the matching `lib/compendium/*-card-images-defaults.ts` file. Masters in `scripts/*-card-sources/` stay gitignored.
 
 ## Troubleshooting
 
 | Symptom | What to check |
 |---------|----------------|
-| Dev server hangs / pages never load | Stale `next dev` on port 3000 after sleep or reboot — kill the Node process, delete `.next`, run `pnpm dev` again (see below) |
-| `Database is not configured` | `.env.local` missing or placeholder values; restart dev server |
+| Dev server hangs / pages never load | Stale `next dev` on port 3000 — kill the Node process, delete `.next`, run `pnpm dev` again |
+| `Database is not configured` | `.env.local` missing or placeholder values; restart the dev server |
 | `fetch failed` / `ECONNREFUSED` | Wrong host/port, tunnel not running, or firewall blocking MySQL |
 | `Access denied` | Wrong user/password; user not granted access to the database |
 | `Unknown table` / `doesn't exist` | Run `mysql/schema.sql` or `pnpm db:setup` before seeding |
 | Seed returns 500 | Server logs; confirm `DATABASE_URL` points at the DB where schema was applied |
 | `next build` OOM | Set `NODE_OPTIONS='--max-old-space-size=4096'` |
+| Unknown column after `git pull` | `pnpm db:migrate` |
 
-### Dev server stuck after reboot
-
-If `http://localhost:3000` spins forever, a zombie Next.js process is often still holding the port:
+### Dev server stuck after reboot (Windows)
 
 ```powershell
 Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue |
@@ -562,145 +179,41 @@ Remove-Item -Recurse -Force .next
 pnpm dev
 ```
 
-Run `pnpm db:migrate` after pulling if you see unknown column errors for `card_image_url`.
-
----
-
-## Project Structure
+## Project structure
 
 ```
-app/
-├── page.tsx              # Landing page
-├── builder/              # Character builder
-├── characters/           # Character list and sheets
-├── compendium/           # Content browser and editors
-├── import/               # PDF, text, and Images from URL import
-└── api/                  # REST routes (seed, import, data, characters)
-
-lib/
-├── db/                   # MySQL connection, Drizzle schema, migrations
-├── builder/              # Draft storage, ASI allocation, feat selection, equipment utils
-├── character/            # Live sheet math (DerivedCharacter), level-up, rest, companions
-├── compendium/           # Modifiers, enrichment, display helpers, card-image defaults
-├── srd/                  # SRD seed data and parsers
-├── import/               # Import pipeline, collisions, enrichment presets, card art
-└── site-images.ts        # Marketing image paths
-
-docs/
-├── repository-overview.md          # Directory map, key files, copyright
-├── homebrew-import-review.md       # Drive extract → audit → enrich loop
-└── modifier-vs-feature-effect.md   # Which effect system to author
-
-components/
-├── compendium/           # Editor header row, card image field, selection cards, detail overlays
-├── builder/              # Step nav, multi-select choices, ASI allocator
-├── character-sheet/      # Play sheet, level-up wizard, duration reminders
-└── game-icon-picker.tsx  # SVG game-icons.net picker for compendium entries
-
-mysql/
-└── schema.sql            # Database DDL
-
-public/
-├── images/               # Hero, feature cards, backgrounds
-└── icons/                # Compendium SVG game icons (+ manifest.json from pnpm icons:manifest)
+app/            pages and API routes
+components/     builder, sheet, compendium, import UI
+lib/            rules, modifiers, import pipeline, seeds
+docs/           import handbook, repository map
+deploy/         GitHub Pages + VPS notes
+mysql/          hosted schema
+public/         icons and bundled images
+scripts/        seed, optimize, import ops
 ```
+
+Directory map and “why this folder exists”: [docs/repository-overview.md](docs/repository-overview.md).
 
 ## Customization
 
-Dump Stat is built so that **everything the SRD content does, your homebrew can do too** — there are no hard-coded class or species mechanics that you can't reproduce in the editors.
+Everything the SRD content does, your homebrew can do too — there are no hard-coded class mechanics you cannot reproduce in the editors.
 
-- **Content** — Create or edit species, classes, subclasses, backgrounds, feats, spells, equipment, creatures & companions, and custom abilities in the Compendium. Custom entries are marked with source **Custom**; SRD entries can be edited, disabled, exported, or replaced.
-- **Mechanics via Common Modifier Effects** — Instead of inline, one-off rules, every feature, trait, feat, choice option, and custom ability draws from one searchable catalog of modifier effects (ability/skill/save bonuses, proficiencies, resource pools, level-scaling dice, spell grants, alternate-ability checks, creature grants / beast forms, feat grants, and more). Edit a modifier once and every entry that links it updates.
-- **Player choices** — Author a choice (skills, tools/instruments, languages, sizes, weapon masteries, feat grants, creature picks) on a modifier and it renders automatically as an interactive pick in the builder at the right step.
-- **Layout & theme** — Toggle the builder between **compact** and **visual** layouts in settings. Theming lives in `app/globals.css` (Parchment default plus Astral, Stone, Moss, and Sands); use the gear icon in the header to switch styles. Both preferences are stored in `localStorage`.
-- **Portability** — Move content between instances (or between hosted and static deploys) with Dump Stat JSON export/import, and bring in third-party content via Foundry VTT, text, or PDF import.
+- **Content** — Create or edit catalog entries in the Compendium. Custom entries use source **Custom**; SRD rows can be edited, disabled, exported, or replaced.
+- **Mechanics** — Link **common modifier effects** instead of one-off rules. Edit a modifier once and every linked entry updates.
+- **Layout & theme** — Compact vs visual builder in settings. Themes live in `app/globals.css` (Parchment, Astral, Stone, Moss, Sands).
+- **Portability** — Dump Stat JSON between hosted and static deploys; Foundry, text, or PDF for third-party content.
 
-### Data layer
-
-- Browser code uses `createClient()` from `@/lib/db/client` → hosted: `/api/characters` and `/api/data/*`; static: IndexedDB via `lib/data/`
-- Server routes use `lib/db/*` (Drizzle + `mysql2`) — hosted builds only
-- There is **no** Supabase dependency. Run `pnpm check:mysql` to verify the repo has no stray Supabase references.
-
----
-
-## Updating the release version
-
-**Maintainers only** — do not bump version in contributor PRs.
-
-After merging to `main`, run:
-
-```bash
-pnpm version:bump
-```
-
-This increments `VERSION` and syncs `package.json` `version` (e.g. `0.3` → `0.4`). Commit the result as part of the release push. Contributors must not run this script or hand-edit those files.
-
----
-
-## Known issues / Roadmap
-
-Track bugs and feature ideas in [GitHub Issues](https://github.com/Geph/v0-dump-stat-character-builder/issues). There is no published roadmap yet — open an issue to discuss priorities.
-
-<!-- Roadmap items (uncomment when ready):
-- ...
--->
-
----
-
-## Local card art (optional)
-
-The public repo ships card art for **SRD 5.2.1**, **Kibbles Tasty**, **Mage Hand Press**, and **all species portraits** (original graphics). Setting-book **backgrounds** and some class/subclass art (Player’s Handbook, Eberron, Ravenloft, Faerûn, and similar) can still run on *your* copy of the app when present locally; those files are not committed or pushed.
-
-### Drop masters, then optimize
-
-1. Put **full-resolution** images in the matching drop folder. Origin subfolders are organization only; the optimizer writes a flat/nested slug under `public/images/compendium/`.
-
-| Drop folder | Typical filename | Optimized output |
-|-------------|------------------|------------------|
-| `scripts/subclass-card-sources/` | `{Class} {Remainder}.png` (e.g. `SRD/Cleric Life.png`, `kibbles/Psion Knowing.png`) | `public/images/compendium/subclasses/{class}/{slug}.png` at 771×1024 |
-| `scripts/class-card-sources/` | `{slug}.png` (e.g. `Kibbles/inventor.png`) | `public/images/compendium/classes/{slug}.png` at 771×1024 |
-| `scripts/species-card-sources/` | Title Case or kebab-case basename | `public/images/compendium/species/{slug}.png` at 771×1024 (**all ship on GitHub**) |
-| `scripts/background-card-sources/` | Title Case or kebab-case basename | `public/images/compendium/backgrounds/{slug}.png` at 1680×720 |
-| `scripts/spell-card-sources/` | Title Case basename | `public/images/compendium/spells/{slug}.png` at 771×1024 |
-| `scripts/page-bg-sources/` | Theme / hero / feature basenames | `public/images/page-backgrounds/`, `hero/`, `features/`, `welcome-splash/` |
-
-2. Use these **origin folder names** when you want GitHub-eligible class/subclass/background art (after optimize):
-
-- `SRD/` (spell cantrips may use `srd cantrips/`)
-- `kibbles/`
-- `magehandpress/` (also `mage-hand-press/` or `mhp/`)
-
-Anything else (`PHB/`, `eberron/`, `ravenloft/`, `faerun/`, `WotC/`, …) is compressed for local use for backgrounds and most class art. **Species** masters from any origin folder optimize to `public/images/compendium/species/` and are safe to commit.
-
-3. Run:
-
-```bash
-pnpm images:optimize
-```
-
-The script tags local-only outputs as `[local-only, not for GitHub]` and writes a gitignored `public/images/compendium/local-available-card-art.json` so the app only assigns those portraits when the files exist on this machine. Do **not** `git add` local-only PNGs or that manifest. `.gitignore` already excludes them. After optimize, commit bundled SRD / Kibbles / Mage Hand Press outputs **and** species portraits; leave PHB/setting backgrounds untracked.
-
-On a fresh GitHub clone, species art is present; PHB and setting-book **background** defaults stay unset until you optimize those masters locally — no broken image URLs.
-
-4. Map display names in the matching `lib/compendium/*-card-images-defaults.ts` file so import and compendium browse pick up the portrait.
-
-Masters in `scripts/*-card-sources/` stay gitignored (they are large). Keep a local backup of those folders; cloning the repo does not restore PHB-style background sources.
-
----
+Hosted builds talk to MySQL through `/api/*`. Static builds use IndexedDB in `lib/data/`. There is **no** Supabase dependency (`pnpm check:mysql`).
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, branch naming, and PR expectations, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before participating.
-
----
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Track bugs in [GitHub Issues](https://github.com/Geph/dump-stat-character-builder/issues).
 
 ## License & credits
 
 ### Application code
 
-The Dump Stat application source code in this repository is licensed under the [MIT License](LICENSE) (Copyright © Geph).
-
-The MIT license applies to **application code only**. It does **not** cover third-party game content or assets bundled with or displayed by the app.
+The Dump Stat application source code is licensed under the [MIT License](LICENSE) (Copyright © Geph). MIT covers **application code only**, not third-party game content or assets.
 
 ### SRD 5.2.1 (game content)
 
@@ -714,19 +227,22 @@ Seed data is rebuilt from SRD-derived markdown via `pnpm srd:build` — see [lib
 
 ### Icons (game-icons.net)
 
-Compendium icons are from [game-icons.net](https://game-icons.net/) (thousands of SVGs under `public/icons/`, manifest from `pnpm icons:manifest`). The site’s icons are licensed under [CC BY 3.0](http://creativecommons.org/licenses/by/3.0/). Attribution appears in the app footer, the landing page, and the compendium icon picker (link to game-icons.net). The site logo uses [Spiked Dragon Head](https://game-icons.net/1x1/delapouite/spiked-dragon-head.html) by Delapouite (CC BY 3.0).
+Compendium icons are from [game-icons.net](https://game-icons.net/) (CC BY 3.0). Attribution appears in the app footer, the landing page, and the icon picker. The site logo uses [Spiked Dragon Head](https://game-icons.net/1x1/delapouite/spiked-dragon-head.html) by Delapouite (CC BY 3.0).
 
 ### Fonts
 
-Solbera’s D&D Fonts by Solbera / Ryrok, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) — see [Solbera D&D Fonts](https://jonathonf.github.io/solbera-dnd-fonts/).
+Solbera’s D&D Fonts by Solbera / Ryrok, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) — see [Solbera D&D Fonts](https://jonathonf.github.io/solbera-dnd-fonts/). Copies used by the app live in `app/fonts/solbera/`.
 
 ### Trademarks & privacy
 
-All product names, logos, and brands are property of their respective owners. All company, product, and service names used in this project are for identification purposes only. Use of these names, logos, and brands does not imply endorsement.
+All product names, logos, and brands are property of their respective owners. Use of these names does not imply endorsement.
 
 Dump Stat does not collect personal identification data. Character and compendium data stay in your browser or your own database when you host the app yourself.
 
 ## Links
 
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Tailwind CSS](https://tailwindcss.com)
+- [Live app (GitHub Pages)](https://geph.github.io/dump-stat-character-builder/)
+- [Import formats](docs/import.md)
+- [Contributing](CONTRIBUTING.md)
+- [Issues](https://github.com/Geph/dump-stat-character-builder/issues)
+- [Next.js](https://nextjs.org/docs) · [Tailwind CSS](https://tailwindcss.com)

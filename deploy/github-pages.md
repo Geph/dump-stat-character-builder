@@ -37,7 +37,7 @@ Set at **build time** (not runtime):
 | Variable | Example | Purpose |
 |----------|---------|---------|
 | `NEXT_PUBLIC_DEPLOY_MODE` | `static` | Selects IndexedDB client (set by `build:static`) |
-| `NEXT_PUBLIC_BASE_PATH` | `/v0-dump-stat-character-builder` | GitHub project site path |
+| `NEXT_PUBLIC_BASE_PATH` | `/dump-stat-character-builder` | GitHub project site path |
 | `NEXT_OUTPUT` | `export` | Enables static export (set by `build:static`) |
 
 For a user/org site at `username.github.io` (no repo subpath), leave `NEXT_PUBLIC_BASE_PATH` empty.
