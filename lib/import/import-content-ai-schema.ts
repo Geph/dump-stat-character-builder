@@ -786,6 +786,16 @@ const EquipmentAiSchema = z.object({
   rarity: z.string().nullable(),
 })
 
+const LanguageAiSchema = z.object({
+  name: z.string(),
+  description: z.string().nullable(),
+  pool: z.enum(["standard", "rare"]).nullable(),
+  typical_speakers: z.string().nullable(),
+  script: z.string().nullable(),
+  source: z.string().nullable(),
+  icon: z.string().nullable(),
+})
+
 const CardArtAiSchema = z.object({
   content_type: z.enum([
     "class",
@@ -811,6 +821,7 @@ const ImportContentAiSchemaBase = z.object({
   feats: z.array(FeatAiSchema).nullable(),
   creatures: z.array(CreatureAiSchema).nullable(),
   equipment: z.array(EquipmentAiSchema).nullable(),
+  languages: z.array(LanguageAiSchema).nullable(),
   import_proposals: ImportProposalsAiSchema.nullable(),
   card_art: z.array(CardArtAiSchema).nullable(),
 })
@@ -876,6 +887,10 @@ export function buildImportContentAiSchema(options?: {
     case "equipment":
       return z.object({
         equipment: z.array(EquipmentAiSchema).nullable(),
+      })
+    case "languages":
+      return z.object({
+        languages: z.array(LanguageAiSchema).nullable(),
       })
     case "images":
       return z.object({
@@ -1291,6 +1306,20 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
         }) as unknown as Record<string, unknown>,
       ),
     ) as NonNullable<ImportContent["equipment"]>
+  }
+
+  if (raw.languages?.length) {
+    content.languages = raw.languages.map((language) =>
+      omitNull({
+        name: language.name,
+        description: language.description,
+        pool: language.pool ?? undefined,
+        typical_speakers: language.typical_speakers,
+        script: language.script,
+        source: language.source,
+        icon: language.icon,
+      }),
+    ) as NonNullable<ImportContent["languages"]>
   }
 
   if (raw.abilities?.length) {

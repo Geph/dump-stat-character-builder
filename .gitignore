@@ -70,6 +70,14 @@ scripts/**/Ravenloft-Astarion/
 scripts/**/Planescape/
 scripts/**/acrana unleashed/
 scripts/**/Arcana Unleashed/
+scripts/**/acrana/
+scripts/**/lorwyn/
+scripts/**/motm/
+scripts/**/spelljammer/
+scripts/**/Planescape/
+
+# Presence manifest for local-only portraits (written by images:optimize; never commit)
+public/images/compendium/local-available-card-art.json
 
 # Optimized card art: ignore local-only portraits, then re-include bundled SRD / Kibbles / MHP.
 public/images/compendium/classes/artificer.png
@@ -83,21 +91,8 @@ public/images/compendium/backgrounds/*
 !public/images/compendium/backgrounds/soldier.png
 !public/images/compendium/backgrounds/tinker.png
 
-public/images/compendium/species/*
-!public/images/compendium/species/augmented.png
-!public/images/compendium/species/awakened-undead.png
-!public/images/compendium/species/dragonborn.png
-!public/images/compendium/species/dwarf.png
-!public/images/compendium/species/elf.png
-!public/images/compendium/species/farling.png
-!public/images/compendium/species/gnome.png
-!public/images/compendium/species/goliath.png
-!public/images/compendium/species/halfling.png
-!public/images/compendium/species/human.png
-!public/images/compendium/species/ironwrought.png
-!public/images/compendium/species/orc.png
-!public/images/compendium/species/tiefling.png
-!public/images/compendium/species/warped.png
+# Species portraits are original graphics — all ship with the repo.
+# (Do not gitignore public/images/compendium/species/)
 
 public/images/compendium/subclasses/**
 !public/images/compendium/subclasses/

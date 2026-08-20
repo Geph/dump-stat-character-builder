@@ -1,3 +1,4 @@
+import { filterAvailableDefaultCardImageUrl } from "@/lib/compendium/available-card-art"
 import { withBasePath } from "@/lib/config/deploy-mode"
 
 const speciesCardImage = (slug: string) => withBasePath(`/images/compendium/species/${slug}.png`)
@@ -20,6 +21,8 @@ export const SPECIES_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "Aasimar (2014)": speciesCardImage("aasimar-2022"),
   "Aasimar (2022)": speciesCardImage("aasimar-2022"),
   "Aasimar (2024)": speciesCardImage("aasimar"),
+  "Aasimar (Eberron)": speciesCardImage("aasimar-eberron"),
+  "Aasimar-Eberron": speciesCardImage("aasimar-eberron"),
   "Air Genasi": speciesCardImage("air-genasi"),
   "Astral Elf": speciesCardImage("astral-elf"),
   Augmented: speciesCardImage("augmented"),
@@ -140,7 +143,7 @@ export function defaultSpeciesCardImageUrl(speciesName: string): string | null {
   if (!trimmed) return null
 
   const exact = lookupSpeciesCardImage(trimmed)
-  if (exact) return exact
+  if (exact) return filterAvailableDefaultCardImageUrl(exact)
 
   const colonMatch = trimmed.match(SPECIES_COLON_LABEL_RE)
   if (colonMatch) {
@@ -148,7 +151,7 @@ export function defaultSpeciesCardImageUrl(speciesName: string): string | null {
     const right = colonMatch[2]!.trim()
     if (left && right) {
       const flipped = lookupSpeciesCardImage(`${right} ${left}`)
-      if (flipped) return flipped
+      if (flipped) return filterAvailableDefaultCardImageUrl(flipped)
     }
   }
 
@@ -158,24 +161,24 @@ export function defaultSpeciesCardImageUrl(speciesName: string): string | null {
     const year = yearMatch[2]!
     if (base) {
       const yearKeyed = lookupSpeciesCardImage(`${base} (${year})`)
-      if (yearKeyed) return yearKeyed
+      if (yearKeyed) return filterAvailableDefaultCardImageUrl(yearKeyed)
       // MotM rows were formerly tagged (2014); accept either year for that portrait.
       if (year === "2014") {
         const motm = lookupSpeciesCardImage(`${base} (2022)`)
-        if (motm) return motm
+        if (motm) return filterAvailableDefaultCardImageUrl(motm)
       } else if (year === "2022") {
         const legacyTag = lookupSpeciesCardImage(`${base} (2014)`)
-        if (legacyTag) return legacyTag
+        if (legacyTag) return filterAvailableDefaultCardImageUrl(legacyTag)
         // Single-edition MotM names (e.g. Goblin) may only have a plain-name portrait.
         // Skip when a distinct 2024 portrait exists (Aasimar / Changeling).
         if (!lookupSpeciesCardImage(`${base} (2024)`)) {
           const baseKeyed = lookupSpeciesCardImage(base)
-          if (baseKeyed) return baseKeyed
+          if (baseKeyed) return filterAvailableDefaultCardImageUrl(baseKeyed)
         }
       } else if (year === "2024") {
         // Plain name is the 2024 portrait for Aasimar / Changeling.
         const baseKeyed = lookupSpeciesCardImage(base)
-        if (baseKeyed) return baseKeyed
+        if (baseKeyed) return filterAvailableDefaultCardImageUrl(baseKeyed)
       }
       // Do not fall back to a different edition's art for other year tags.
       return null
@@ -187,7 +190,7 @@ export function defaultSpeciesCardImageUrl(speciesName: string): string | null {
     const base = parenMatch[1]!.trim()
     if (base) {
       const baseKeyed = lookupSpeciesCardImage(base)
-      if (baseKeyed) return baseKeyed
+      if (baseKeyed) return filterAvailableDefaultCardImageUrl(baseKeyed)
     }
   }
 

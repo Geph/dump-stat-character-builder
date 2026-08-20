@@ -7,14 +7,14 @@ export const HERO_BG_CHANGE_EVENT = "dumpstat:hero-background-change"
 /** Wide cinematic banner — matches ~1370×498 hero (~2.75:1). */
 export const HERO_BG_ASPECT_LABEL = "21:9 wide (~2.75:1)"
 
-export const HERO_BG_RECOMMENDED_WIDTH = 2560
+export const HERO_BG_RECOMMENDED_WIDTH = 1920
 
-export const HERO_BG_RECOMMENDED_HEIGHT = 1080
+export const HERO_BG_RECOMMENDED_HEIGHT = 810
 
-/** Stored as a data URL in localStorage; JPEG/WebP compress well at this size. */
-export const MAX_HERO_BG_FILE_BYTES = 5 * 1024 * 1024
+/** Stored as a data URL in localStorage; keep small so three site graphics can coexist. */
+export const MAX_HERO_BG_FILE_BYTES = 2 * 1024 * 1024
 
-export const MAX_HERO_BG_FILE_MB = 5
+export const MAX_HERO_BG_FILE_MB = 2
 
 export const MAX_HERO_BG_DATA_URL_LENGTH =
   Math.ceil(MAX_HERO_BG_FILE_BYTES * (4 / 3)) + 128

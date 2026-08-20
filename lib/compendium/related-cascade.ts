@@ -31,6 +31,27 @@ function normalizeName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
+function normalizeAttachKey(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function attachmentKeysMatch(
+  attachedId: string,
+  keys: ReadonlySet<string>,
+): boolean {
+  const normalized = normalizeAttachKey(attachedId)
+  return Boolean(normalized) && keys.has(normalized)
+}
+
+function toAttachKeySet(attachKeys: ReadonlySet<string> | readonly string[]): Set<string> {
+  const out = new Set<string>()
+  for (const key of attachKeys) {
+    const normalized = normalizeAttachKey(String(key ?? ""))
+    if (normalized) out.add(normalized)
+  }
+  return out
+}
+
 function addTarget(
   targets: CompendiumToggleTarget[],
   seen: Set<string>,
@@ -134,20 +155,44 @@ async function findRelatedFeatsForParent(
 async function findAttachedAbilities(
   db: DataClient,
   attachType: string,
-  attachIds: ReadonlySet<string> | readonly string[],
+  attachKeys: ReadonlySet<string> | readonly string[],
 ): Promise<CompendiumToggleTarget[]> {
-  const idSet = attachIds instanceof Set ? attachIds : new Set(attachIds)
-  if (!idSet.size) return []
+  const keySet = toAttachKeySet(attachKeys)
+  if (!keySet.size) return []
 
   const { data } = await db
     .from("custom_abilities")
-    .select("id, name, attached_to_type, attached_to_id")
+    .select("id, name, attached_to_type, attached_to_id, eligible_classes")
   const targets: CompendiumToggleTarget[] = []
   const seen = new Set<string>()
   for (const row of asCompendiumRows(data)) {
     if (row.attached_to_type !== attachType) continue
     const attachedId = typeof row.attached_to_id === "string" ? row.attached_to_id : ""
-    if (!idSet.has(attachedId)) continue
+    if (!attachmentKeysMatch(attachedId, keySet)) continue
+    addTarget(targets, seen, "custom_abilities", row.id as string, row.name as string)
+  }
+  return targets.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Shared library rows that list this class in eligible_classes (often unattached). */
+async function findAbilitiesByEligibleClassNames(
+  db: DataClient,
+  classNames: readonly string[],
+): Promise<CompendiumToggleTarget[]> {
+  const wanted = toAttachKeySet(classNames)
+  if (!wanted.size) return []
+
+  const { data } = await db
+    .from("custom_abilities")
+    .select("id, name, attached_to_type, attached_to_id, eligible_classes")
+  const targets: CompendiumToggleTarget[] = []
+  const seen = new Set<string>()
+  for (const row of asCompendiumRows(data)) {
+    if (!Array.isArray(row.eligible_classes)) continue
+    const matches = row.eligible_classes.some(
+      (entry) => typeof entry === "string" && attachmentKeysMatch(entry, wanted),
+    )
+    if (!matches) continue
     addTarget(targets, seen, "custom_abilities", row.id as string, row.name as string)
   }
   return targets.sort((a, b) => a.name.localeCompare(b.name))
@@ -183,11 +228,15 @@ async function findEquipmentAttachedAbilities(
 async function collectGrantedCreatureNamesForClass(
   db: DataClient,
   classId: string,
+  className?: string | null,
 ): Promise<string[]> {
   const names: string[] = []
-  const { data: cls } = await db.from("classes").select("features").eq("id", classId).single()
+  const { data: cls } = await db.from("classes").select("features, name").eq("id", classId).single()
   const clsRow = asCompendiumRow(cls)
   names.push(...collectCreatureNamesFromFeatures(clsRow?.features))
+  const resolvedClassName =
+    (typeof className === "string" && className.trim() ? className.trim() : null) ||
+    (typeof clsRow?.name === "string" ? clsRow.name : null)
 
   const { data: subclasses } = await db
     .from("subclasses")
@@ -202,8 +251,11 @@ async function collectGrantedCreatureNamesForClass(
     .select(
       "companion_creature_names, linked_modifiers, linkedModifiers, modifierRefs, attached_to_type, attached_to_id",
     )
+  const classKeys = toAttachKeySet([classId, ...(resolvedClassName ? [resolvedClassName] : [])])
   for (const row of asCompendiumRows(abilities)) {
-    if (row.attached_to_type !== "class" || row.attached_to_id !== classId) continue
+    if (row.attached_to_type !== "class") continue
+    const attachedId = typeof row.attached_to_id === "string" ? row.attached_to_id : ""
+    if (!attachmentKeysMatch(attachedId, classKeys)) continue
     names.push(
       ...creatureNamesFromFeature({
         name: "",
@@ -247,8 +299,14 @@ async function collectGrantedCreatureNamesForSpecies(
     .select(
       "companion_creature_names, linked_modifiers, linkedModifiers, modifierRefs, attached_to_type, attached_to_id",
     )
+  const speciesKeys = toAttachKeySet([
+    speciesId,
+    typeof row.name === "string" ? row.name : "",
+  ])
   for (const ability of asCompendiumRows(abilities)) {
-    if (ability.attached_to_type !== "species" || ability.attached_to_id !== speciesId) continue
+    if (ability.attached_to_type !== "species") continue
+    const attachedId = typeof ability.attached_to_id === "string" ? ability.attached_to_id : ""
+    if (!attachmentKeysMatch(attachedId, speciesKeys)) continue
     names.push(
       ...creatureNamesFromFeature({
         name: "",
@@ -293,23 +351,33 @@ export async function findRelatedFeatsAndCompanions(
   if (!name) return { ...EMPTY_RELATED_CASCADE }
 
   if (contentType === "classes") {
-    const { data: subclassRows } = await db.from("subclasses").select("id").eq("class_id", id)
-    const subclassIds = asCompendiumRows(subclassRows).map((r) => r.id as string)
+    const { data: subclassRows } = await db
+      .from("subclasses")
+      .select("id, name")
+      .eq("class_id", id)
+    const subclassKeys: string[] = []
+    for (const row of asCompendiumRows(subclassRows)) {
+      if (typeof row.id === "string" && row.id) subclassKeys.push(row.id)
+      if (typeof row.name === "string" && row.name.trim()) subclassKeys.push(row.name.trim())
+    }
+    const classKeys = [id, name]
 
-    const [feats, creatures, classAbilities, subclassAbilities] = await Promise.all([
-      findRelatedFeatsForParent(db, {
-        id,
-        name,
-        idField: "prerequisite_class_ids",
-      }),
-      findCreaturesByNames(db, await collectGrantedCreatureNamesForClass(db, id)),
-      findAttachedAbilities(db, "class", [id]),
-      findAttachedAbilities(db, "subclass", subclassIds),
-    ])
+    const [feats, creatures, classAbilities, subclassAbilities, eligibleAbilities] =
+      await Promise.all([
+        findRelatedFeatsForParent(db, {
+          id,
+          name,
+          idField: "prerequisite_class_ids",
+        }),
+        findCreaturesByNames(db, await collectGrantedCreatureNamesForClass(db, id, name)),
+        findAttachedAbilities(db, "class", classKeys),
+        findAttachedAbilities(db, "subclass", subclassKeys),
+        findAbilitiesByEligibleClassNames(db, [name]),
+      ])
     return {
       feats,
       creatures,
-      abilities: mergeAbilityLists(classAbilities, subclassAbilities),
+      abilities: mergeAbilityLists(classAbilities, subclassAbilities, eligibleAbilities),
     }
   }
 
@@ -320,7 +388,7 @@ export async function findRelatedFeatsAndCompanions(
       idField: "prerequisite_species_ids",
     }),
     findCreaturesByNames(db, await collectGrantedCreatureNamesForSpecies(db, id)),
-    findAttachedAbilities(db, "species", [id]),
+    findAttachedAbilities(db, "species", [id, name]),
   ])
   return { feats, creatures, abilities }
 }
@@ -404,10 +472,13 @@ export async function findAttachedAbilitiesForSectionClear(
   }
 
   const table = contentTypeToTable(contentType)
-  const { data } = await db.from(table).select("id")
-  const ids = asCompendiumRows(data)
-    .map((row) => row.id as string)
-    .filter(Boolean)
+  const { data } = await db.from(table).select("id, name")
+  const rows = asCompendiumRows(data)
+  const keys: string[] = []
+  for (const row of rows) {
+    if (typeof row.id === "string" && row.id) keys.push(row.id)
+    if (typeof row.name === "string" && row.name.trim()) keys.push(row.name.trim())
+  }
 
   const attachType =
     contentType === "subclasses"
@@ -421,7 +492,7 @@ export async function findAttachedAbilitiesForSectionClear(
             : null
 
   if (!attachType) return []
-  return findAttachedAbilities(db, attachType, ids)
+  return findAttachedAbilities(db, attachType, keys)
 }
 
 export async function deleteCompendiumTargets(

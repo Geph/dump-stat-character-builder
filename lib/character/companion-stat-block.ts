@@ -127,6 +127,8 @@ export type CharacterCompanionState = {
   currentHp: number | null
   /** Temporary hit points stored on the companion (same rules as character temp HP). */
   tempHp?: number | null
+  /** Beastheart companion combat resource; builds during combat and resets after rampage/combat. */
+  ferocity?: number | null
   customName?: string | null
   /** Active conditions tracked on the companion sub-sheet. */
   activeConditions?: string[] | null

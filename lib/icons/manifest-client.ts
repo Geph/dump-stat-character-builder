@@ -1,4 +1,5 @@
 import { getBasePath, isStaticDeploy } from "@/lib/config/deploy-mode"
+import { searchItems } from "@/lib/search/ranked-search"
 import type { IconCategoryId } from "./categories"
 
 export type IconManifestCategory = {
@@ -58,7 +59,10 @@ export async function searchIcons(query: string): Promise<string[]> {
   if (!trimmed) return []
   if (shouldUseIconManifest()) {
     const manifest = await loadIconManifest()
-    return manifest.icons.filter((name) => name.toLowerCase().includes(trimmed)).slice(0, 240)
+    return searchItems(manifest.icons, trimmed, {
+      name: (name) => name.replace(/[-_]/g, " "),
+      limit: 240,
+    })
   }
   const res = await fetch(`/api/icons?search=${encodeURIComponent(trimmed)}`)
   const data = await res.json()

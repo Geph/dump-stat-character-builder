@@ -197,6 +197,74 @@ describe("findRelatedFeatsAndCompanions", () => {
     expect(related.abilities.map((a) => a.name).sort()).toEqual(["Gadget Upgrade", "Subclass Trick"])
   })
 
+  it("finds abilities attached by class/subclass name or eligible_classes", async () => {
+    const { findRelatedFeatsAndCompanions } = await import("@/lib/compendium/related-cascade")
+
+    const db = {
+      from: vi.fn((table: string) =>
+        mockQuery(table, {
+          "classes:single": () => ({
+            data: { name: "Gunslinger", features: [] },
+            error: null,
+          }),
+          "feats:list": () => ({ data: [], error: null }),
+          "subclasses:list": () => ({
+            data: [{ id: "sub-pistolero", name: "Pistolero", features: [] }],
+            error: null,
+          }),
+          "custom_abilities:list": () => ({
+            data: [
+              {
+                id: "fan",
+                name: "Fan the Hammer",
+                attached_to_type: "subclass",
+                attached_to_id: "Pistolero",
+                eligible_classes: null,
+              },
+              {
+                id: "bite",
+                name: "Bite the Bullet",
+                attached_to_type: "class",
+                attached_to_id: "Gunslinger",
+                eligible_classes: ["Gunslinger"],
+              },
+              {
+                id: "showdown",
+                name: "Showdown",
+                attached_to_type: null,
+                attached_to_id: null,
+                eligible_classes: ["Gunslinger"],
+              },
+              {
+                id: "manipulate",
+                name: "Manipulate Magic",
+                attached_to_type: "subclass",
+                attached_to_id: "Hedge Mage",
+                eligible_classes: null,
+              },
+              {
+                id: "shared",
+                name: "Mighty Leap",
+                attached_to_type: null,
+                attached_to_id: null,
+                eligible_classes: ["Barbarian", "Fighter"],
+              },
+            ],
+            error: null,
+          }),
+          "creatures:list": () => ({ data: [], error: null }),
+        }),
+      ),
+    }
+
+    const related = await findRelatedFeatsAndCompanions(db as never, "classes", "class-gun")
+    expect(related.abilities.map((a) => a.name).sort()).toEqual([
+      "Bite the Bullet",
+      "Fan the Hammer",
+      "Showdown",
+    ])
+  })
+
   it("finds species feats from free-text prerequisites", async () => {
     const { findRelatedFeatsAndCompanions } = await import("@/lib/compendium/related-cascade")
 

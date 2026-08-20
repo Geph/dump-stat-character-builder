@@ -86,6 +86,11 @@ export function resolveUsesAtLevel(
       return totalSpellSlotsForCasterType(uses.casterType ?? "full", characterLevel)
     case "unlimited":
       return null
+    case "special":
+      // Static caps remain non-trackable unless they provide an explicit count
+      // table. This also supports combat-state/dice pools whose recovery rules
+      // require a maximum while preserving prose-only special mechanics.
+      return uses.atLevelTable?.length ? tierCount(uses.atLevelTable, characterLevel) : null
     case "class_resource":
     case "custom_ability":
       return null

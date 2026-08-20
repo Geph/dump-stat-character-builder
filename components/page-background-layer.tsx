@@ -12,6 +12,7 @@ import {
   APP_PRESENTATION_MODE_CHANGE_EVENT,
   areDecorativeBackgroundImagesEnabled,
 } from "@/lib/site-settings/app-presentation-mode"
+import { DEFAULT_MIDJOURNEY_GRAPHICS_CHANGE_EVENT } from "@/lib/site-settings/default-midjourney-graphics"
 
 /** Full-viewport decorative background behind app content. */
 export function PageBackgroundLayer() {
@@ -28,7 +29,11 @@ export function PageBackgroundLayer() {
     const syncPresentation = () => setDecorativeImagesEnabled(areDecorativeBackgroundImagesEnabled())
     syncPresentation()
     window.addEventListener(APP_PRESENTATION_MODE_CHANGE_EVENT, syncPresentation)
-    return () => window.removeEventListener(APP_PRESENTATION_MODE_CHANGE_EVENT, syncPresentation)
+    window.addEventListener(DEFAULT_MIDJOURNEY_GRAPHICS_CHANGE_EVENT, syncPresentation)
+    return () => {
+      window.removeEventListener(APP_PRESENTATION_MODE_CHANGE_EVENT, syncPresentation)
+      window.removeEventListener(DEFAULT_MIDJOURNEY_GRAPHICS_CHANGE_EVENT, syncPresentation)
+    }
   }, [])
 
   useEffect(() => {
@@ -39,7 +44,11 @@ export function PageBackgroundLayer() {
     const sync = () => setBackgroundUrl(resolvePageBackgroundUrl(theme))
     sync()
     window.addEventListener(PAGE_BG_CHANGE_EVENT, sync)
-    return () => window.removeEventListener(PAGE_BG_CHANGE_EVENT, sync)
+    window.addEventListener(DEFAULT_MIDJOURNEY_GRAPHICS_CHANGE_EVENT, sync)
+    return () => {
+      window.removeEventListener(PAGE_BG_CHANGE_EVENT, sync)
+      window.removeEventListener(DEFAULT_MIDJOURNEY_GRAPHICS_CHANGE_EVENT, sync)
+    }
   }, [theme, decorativeImagesEnabled])
 
   useEffect(() => {

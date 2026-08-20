@@ -14,6 +14,7 @@ import {
   parseCatalogFeatPickId,
   resolveCatalogFeatPickEntry,
 } from "@/lib/builder/catalog-feat-options"
+import { abilityGrantsMetamagicFeat, isManipulateMagicAbility } from "@/lib/compendium/enrich-manipulate-magic"
 import { METAMAGIC_OPTIONS_CATALOG_ID } from "@/lib/compendium/system-option-catalogs"
 import type { CustomAbility, DndClass, Feat } from "@/lib/types"
 
@@ -26,6 +27,10 @@ export type MetamagicCastOption = {
   hitDiceCost?: number
   /** Sheet helper after cast (Empowered Spell damage rerolls). */
   effectHint?: "empowered_reroll" | "quicken" | null
+  /** Hedge Mage Manipulate Magic: never spends sorcery points. */
+  costSource?: "sorcery_points" | "manipulate_magic"
+  /** Extra spell slot to spend when the free ≤3 SP use does not apply. */
+  extraSpellSlotLevel?: number
 }
 
 export type SpellCastCostBlockReason =
@@ -129,6 +134,7 @@ export function metamagicOptionsFromCustomAbilities(
 }
 
 function isMetamagicCustomAbility(ability: CustomAbility): boolean {
+  if (isManipulateMagicAbility(ability) || abilityGrantsMetamagicFeat(ability)) return false
   const description = ability.description ?? ""
   if (/\b(?:costs?|spend|expend)\s+\d+\s+sorcery\s+points?\b/i.test(description)) return true
   if (/\bequal to the spell'?s level\b/i.test(description) && /sorcery\s+points?/i.test(description)) {
@@ -146,10 +152,13 @@ export function metamagicOptionsForCharacter(params: {
   /** Selected Metamagic knack names (class_knacks picks / grants). */
   selectedCustomAbilityNames?: string[]
   spellLevel?: number
+  /** Catalog pick ids granted by Manipulate Magic (Hedge Mage). */
+  manipulateMagicPickIds?: string[]
 }): MetamagicCastOption[] {
   const spellLevel = params.spellLevel ?? 1
   const options: MetamagicCastOption[] = []
   const seen = new Set<string>()
+  const ritePickIds = new Set(params.manipulateMagicPickIds ?? [])
 
   for (const feat of metamagicOptionsFromFeats(params.feats, spellLevel)) {
     options.push(feat)
@@ -162,10 +171,14 @@ export function metamagicOptionsForCharacter(params: {
     if (!parsed || parsed.catalogAbilityId !== METAMAGIC_OPTIONS_CATALOG_ID) continue
     const entry = resolveCatalogFeatPickEntry(pickId, params.customAbilities)
     if (!entry) continue
+    const originalCost = parseMetamagicCost(entry.summary, entry.description, spellLevel)
+    const fromRite = ritePickIds.has(pickId)
     options.push({
       id: pickId,
       name: entry.name,
-      cost: parseMetamagicCost(entry.summary, entry.description, spellLevel),
+      cost: fromRite ? 0 : originalCost,
+      costSource: fromRite ? "manipulate_magic" : undefined,
+      extraSpellSlotLevel: fromRite && originalCost > 3 ? originalCost : undefined,
     })
     seen.add(pickId)
   }
@@ -182,6 +195,20 @@ export function metamagicOptionsForCharacter(params: {
   }
 
   return options.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function manipulateMagicCatalogPickIds(
+  featureChoicePicks: Record<string, string[]> | null | undefined,
+): string[] {
+  if (!featureChoicePicks) return []
+  const ids: string[] = []
+  for (const [key, values] of Object.entries(featureChoicePicks)) {
+    if (!/manipulate\s+magic/i.test(key)) continue
+    for (const value of values) {
+      if (isCatalogFeatPickId(value)) ids.push(value)
+    }
+  }
+  return ids
 }
 
 /** Mortal Metamagic (and similar) options from subclass feature menus that spend Hit Dice. */

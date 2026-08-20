@@ -46,6 +46,24 @@ export function sanitizeVagabondImportContent(content: ImportContent): ImportCon
 
   let next: ImportContent = { ...content }
 
+  if (next.class_resources?.length) {
+    next = {
+      ...next,
+      class_resources: next.class_resources.map((resource) =>
+        resource.resource_key === "hound_battle_dice"
+          ? {
+              ...resource,
+              uses: {
+                ...resource.uses,
+                type: "at_level" as const,
+                atLevelMode: resource.uses.atLevelMode ?? "tier",
+              },
+            }
+          : resource,
+      ),
+    }
+  }
+
   if (next.classes?.length) {
     next = {
       ...next,

@@ -65,6 +65,23 @@ export function isCatalogFeatPickId(pickId: string): boolean {
   return parseCatalogFeatPickId(pickId) != null
 }
 
+/** Flatten catalog feat pick ids stored in feature/feat choice maps. */
+export function catalogFeatPickIdsFromPicks(
+  picks: Record<string, string[]> | null | undefined,
+): string[] {
+  if (!picks) return []
+  const ids: string[] = []
+  const seen = new Set<string>()
+  for (const values of Object.values(picks)) {
+    for (const value of values) {
+      if (!isCatalogFeatPickId(value) || seen.has(value)) continue
+      seen.add(value)
+      ids.push(value)
+    }
+  }
+  return ids
+}
+
 function catalogEntriesForAbility(
   customAbilities: CustomAbility[],
   catalogAbilityId: string,

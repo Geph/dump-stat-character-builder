@@ -22,6 +22,7 @@ export type ImportContentPreviewSectionKey =
   | "creatures"
   | "spells"
   | "equipment"
+  | "languages"
 
 export type ImportContentPreviewItem = {
   id: string
@@ -84,6 +85,7 @@ export function stripSkippedImportPreviewItems(
     creatures: keep("creatures", content.creatures),
     spells: keep("spells", content.spells),
     equipment: keep("equipment", content.equipment),
+    languages: keep("languages", content.languages),
   }
 }
 
@@ -431,6 +433,32 @@ function previewBackgrounds(content: ImportContent): ImportContentPreviewSection
   return { key: "backgrounds", label: "Backgrounds", items }
 }
 
+function previewLanguages(content: ImportContent): ImportContentPreviewSection | null {
+  const languages = content.languages
+  if (!languages?.length) return null
+
+  const items = languages.map((row, index) => {
+    const details: ImportContentPreviewDetail[] = []
+    if (row.pool) details.push({ label: "Pool", value: row.pool })
+    if (row.typical_speakers?.trim()) {
+      details.push({ label: "Speakers", value: row.typical_speakers.trim() })
+    }
+    if (row.script?.trim()) details.push({ label: "Script", value: row.script.trim() })
+    if (row.source?.trim()) details.push({ label: "Source", value: row.source.trim() })
+    return {
+      id: `language:${index}:${row.name}`,
+      name: row.name,
+      details,
+      badges: row.pool ? [row.pool] : ([] as string[]),
+      descriptionSnippet: snippet(row.description),
+      sectionKey: "languages" as const,
+      sourceIndex: index,
+    }
+  })
+
+  return { key: "languages", label: "Languages", items }
+}
+
 /** Structured preview rows in staged-import order. */
 export function collectImportContentPreview(
   content: ImportContent,
@@ -445,6 +473,7 @@ export function collectImportContentPreview(
     previewCreatures(content),
     previewSpells(content),
     previewEquipment(content),
+    previewLanguages(content),
   ].filter((section): section is ImportContentPreviewSection => section != null)
 
   if (!options?.sectionKeys) return sections

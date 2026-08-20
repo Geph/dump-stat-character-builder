@@ -191,6 +191,37 @@ describe("resolveCompendiumCardImageUrl", () => {
     expect(resolveCompendiumCardImageUrl(item, "classes")).toBe(item.card_image_url)
     vi.unstubAllGlobals()
   })
+
+  it("hides bundled default portraits when Midjourney graphics are disabled", () => {
+    const store = new Map<string, string>([
+      ["dump-stat-builder-layout", "visual"],
+      ["dumpstat:disable-default-midjourney-graphics", "1"],
+    ])
+    const storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+    }
+    vi.stubGlobal("window", { localStorage: storage })
+    vi.stubGlobal("localStorage", storage)
+    expect(
+      resolveCompendiumCardImageUrl(
+        { card_image_url: "/images/compendium/classes/fighter.png" },
+        "classes",
+      ),
+    ).toBeNull()
+    expect(
+      resolveCompendiumCardImageUrl(
+        { card_image_url: "https://example.com/custom.png" },
+        "classes",
+      ),
+    ).toBe("https://example.com/custom.png")
+    vi.unstubAllGlobals()
+  })
 })
 
 describe("bundled card art assignment under Compact Only", () => {
@@ -239,6 +270,31 @@ describe("bundled card art assignment under Compact Only", () => {
       { Elf: "/images/compendium/species/elf.png" },
     )
     expect(row.card_image_url).toBe("/images/compendium/species/elf.png")
+    vi.unstubAllGlobals()
+  })
+
+  it("does not assign bundled defaults when Midjourney graphics are disabled", async () => {
+    const { applySrdCardImage } = await import("@/lib/compendium/card-image")
+    const store = new Map<string, string>([
+      ["dumpstat:app-presentation-mode", "visual-compact"],
+      ["dumpstat:disable-default-midjourney-graphics", "1"],
+    ])
+    const storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value)
+      },
+      removeItem: (key: string) => {
+        store.delete(key)
+      },
+    }
+    vi.stubGlobal("window", { localStorage: storage })
+    vi.stubGlobal("localStorage", storage)
+    const row = applySrdCardImage(
+      { name: "Elf", source: "SRD" },
+      { Elf: "/images/compendium/species/elf.png" },
+    )
+    expect(row.card_image_url).toBeUndefined()
     vi.unstubAllGlobals()
   })
 })

@@ -1,3 +1,4 @@
+import { filterAvailableDefaultCardImageUrl } from "@/lib/compendium/available-card-art"
 import { withBasePath } from "@/lib/config/deploy-mode"
 import {
   isHostedDumpstatCardImageUrl,
@@ -95,6 +96,8 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Paladin", name: "Oath of the Noble Genies", slug: "oath-of-the-noble-genies" },
   { className: "Ranger", name: "Winter Walker", slug: "winter-walker" },
   { className: "Rogue", name: "Scion of the Three", slug: "scion-of-the-three" },
+  { className: "Sorcerer", name: "Spellfire Sorcery", slug: "spellfire-sorcery" },
+  { className: "Wizard", name: "Bladesinging", slug: "bladesinging" },
 
   // Eberron
   { className: "Artificer", name: "Alchemist", slug: "alchemist" },
@@ -115,6 +118,19 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Fighter", name: "Arcane Archer", slug: "arcane-archer" },
   { className: "Monk", name: "Mystic Arts", slug: "mystic-arts" },
   { className: "Monk", name: "Way of the Mystic Arts", slug: "mystic-arts" },
+  { className: "Warlock", name: "Vestige Patron", slug: "vestige-patron" },
+  { className: "Wizard", name: "Abjurer", slug: "abjurer" },
+  { className: "Wizard", name: "Conjurer", slug: "conjurer" },
+  { className: "Wizard", name: "Diviner", slug: "diviner" },
+  { className: "Wizard", name: "Enchanter", slug: "enchanter" },
+  { className: "Wizard", name: "Illusionist", slug: "illusionist" },
+  { className: "Wizard", name: "Necromancer", slug: "necromancer" },
+  { className: "Wizard", name: "Transmuter", slug: "transmuter" },
+
+  // PHB patrons / schools (remaining)
+  { className: "Warlock", name: "Archfey Patron", slug: "archfey-patron" },
+  { className: "Warlock", name: "Arch Fey Patron", slug: "archfey-patron" },
+  { className: "Warlock", name: "Great Old One Patron", slug: "great-old-one-patron" },
 
   // Ravenloft
   { className: "Artificer", name: "Reanimator", slug: "reanimator" },
@@ -122,6 +138,8 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Cleric", name: "Grave Domain", slug: "grave-domain" },
   { className: "Ranger", name: "Warden", slug: "warden" },
   { className: "Rogue", name: "Phantom", slug: "phantom" },
+  { className: "Sorcerer", name: "Shadow Sorcery", slug: "shadow-sorcery" },
+  { className: "Warlock", name: "Undead Patron", slug: "undead-patron" },
 
   // KibblesTasty Inventor
   { className: "Inventor", name: "Cursesmith", slug: "cursesmith" },
@@ -153,6 +171,7 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Occultist", name: "Hedge Mage", slug: "hedge-mage" },
   { className: "Occultist", name: "Oracle", slug: "oracle" },
   { className: "Occultist", name: "Shaman", slug: "shaman" },
+  { className: "Occultist", name: "Spiritualist", slug: "spiritualist" },
   { className: "Occultist", name: "Voidwatcher", slug: "voidwatcher" },
   { className: "Occultist", name: "Witch", slug: "witch" },
 
@@ -229,26 +248,34 @@ export function defaultSubclassCardImageUrl(
   const trimmed = subclassName.trim()
   if (!trimmed) return null
 
+  let resolved: string | null = null
   const cls = className?.trim()
   if (cls) {
     const lowerKey = subclassCardImageLookupKey(cls, trimmed).toLowerCase()
     for (const [key, url] of Object.entries(SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME)) {
-      if (key.toLowerCase() === lowerKey) return url
-    }
-    const lowerName = trimmed.toLowerCase()
-    for (const [key, url] of Object.entries(SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME)) {
-      const sep = key.indexOf("::")
-      if (sep < 0) continue
-      const mappedClass = key.slice(0, sep)
-      const mappedName = key.slice(sep + 2)
-      if (mappedName.toLowerCase() === lowerName && subclassCardParentClassMatches(cls, mappedClass)) {
-        return url
+      if (key.toLowerCase() === lowerKey) {
+        resolved = url
+        break
       }
     }
-    return null
+    if (!resolved) {
+      const lowerName = trimmed.toLowerCase()
+      for (const [key, url] of Object.entries(SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME)) {
+        const sep = key.indexOf("::")
+        if (sep < 0) continue
+        const mappedClass = key.slice(0, sep)
+        const mappedName = key.slice(sep + 2)
+        if (mappedName.toLowerCase() === lowerName && subclassCardParentClassMatches(cls, mappedClass)) {
+          resolved = url
+          break
+        }
+      }
+    }
+  } else {
+    resolved = SRD_SUBCLASS_CARD_IMAGES_BY_NAME[trimmed] ?? null
   }
 
-  return SRD_SUBCLASS_CARD_IMAGES_BY_NAME[trimmed] ?? null
+  return filterAvailableDefaultCardImageUrl(resolved)
 }
 
 function isUpgradeableDefaultCardImage(url: string): boolean {

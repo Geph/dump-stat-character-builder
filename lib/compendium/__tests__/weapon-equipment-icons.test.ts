@@ -96,13 +96,19 @@ describe("ability icon defaults", () => {
     expect(fs.existsSync(path.join(process.cwd(), "public/icons/psychic-waves.svg"))).toBe(true)
   })
 
-  it("keeps the generic ability default for non-discipline rows and prefers saved icons", () => {
+  it("uses the owning class icon when assigned, otherwise the generic ability default", () => {
     expect(
       getCompendiumItemIcon("abilities", {
         name: "Mind Leech",
         ability_role: "psionic_power",
       }),
     ).toBe("magic-trident")
+    expect(
+      getCompendiumItemIcon("abilities", {
+        name: "Force Buckler",
+        eligible_classes: ["Warmage"],
+      }),
+    ).toBe("hypersonic-bolt")
     expect(
       getCompendiumItemIcon("abilities", {
         name: "Psychokinesis Discipline",

@@ -102,6 +102,37 @@ describe("applyUsesRest", () => {
     expect(blocked.used).toBe(5)
     expect(blocked.rechargeCapsUsed).toBeUndefined()
   })
+
+  it("applies class-level recharge overrides", () => {
+    const uses = {
+      type: "ability_modifier" as const,
+      abilityModifier: "WIS" as const,
+      recharges: [
+        { rest: "short_rest" as const, amount: 1 },
+        { rest: "long_rest" as const },
+      ],
+      rechargeOverrides: [
+        {
+          atClassLevel: 10,
+          recharges: [
+            { rest: "short_rest" as const },
+            { rest: "long_rest" as const },
+          ],
+        },
+      ],
+    }
+    expect(applyUsesRest(4, uses, "short_rest", 4, { classLevel: 9 }).used).toBe(3)
+    expect(applyUsesRest(4, uses, "short_rest", 4, { classLevel: 10 }).used).toBe(0)
+  })
+
+  it("restores counted special resources instead of skipping them", () => {
+    const uses = {
+      type: "special" as const,
+      atLevelTable: [{ level: 14, count: 2 }],
+      recharges: [{ rest: "short_rest" as const }],
+    }
+    expect(applyUsesRest(2, uses, "short_rest", 2, { classLevel: 14 }).used).toBe(0)
+  })
 })
 
 describe("applySheetRest", () => {

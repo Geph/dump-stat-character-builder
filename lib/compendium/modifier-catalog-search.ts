@@ -1,8 +1,5 @@
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
-
-function entryHaystack(entry: ModifierCatalogEntry): string {
-  return `${entry.name ?? ""} ${entry.summary ?? ""} ${entry.group ?? ""}`.toLowerCase()
-}
+import { searchItems } from "@/lib/search/ranked-search"
 
 /** Higher scores rank earlier in search results. */
 export function modifierCatalogSearchScore(entry: ModifierCatalogEntry, query: string): number {
@@ -27,7 +24,11 @@ export function filterModifierCatalogEntries(
 ): ModifierCatalogEntry[] {
   const q = query.trim().toLowerCase()
   if (!q) return entries
-  return entries
-    .filter((entry) => entryHaystack(entry).includes(q))
-    .sort((a, b) => modifierCatalogSearchScore(b, q) - modifierCatalogSearchScore(a, q))
+  return searchItems(entries, q, {
+    name: (entry) => entry.name,
+    fields: [
+      { name: "summary", value: (entry) => entry.summary, weight: 0.5 },
+      { name: "group", value: (entry) => entry.group, weight: 0.25 },
+    ],
+  })
 }

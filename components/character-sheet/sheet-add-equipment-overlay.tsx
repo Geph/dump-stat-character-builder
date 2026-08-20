@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useDeferredValue, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Check, Coins, Plus, Search, X } from "lucide-react"
+import { Check, Coins, Plus, X } from "lucide-react"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { MagicEquipmentBadges } from "@/components/character-sheet/magic-equipment-badges"
 import {
@@ -23,6 +23,8 @@ import { formatEquipmentCost, getEquipmentCostGp } from "@/lib/builder/equipment
 import { paginateList } from "@/lib/builder/picker-pagination"
 import { usePickerPageSize } from "@/hooks/use-picker-page-size"
 import type { Equipment } from "@/lib/types"
+import { SearchBox } from "@/components/search/search-box"
+import { rankSearchResults } from "@/lib/search/ranked-search"
 
 export type AddEquipmentOptions = {
   deductCost: boolean
@@ -48,6 +50,7 @@ export function SheetAddEquipmentOverlay({
 }: SheetAddEquipmentOverlayProps) {
   const pageSize = usePickerPageSize("dense")
   const [search, setSearch] = useState("")
+  const deferredSearch = useDeferredValue(search)
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [magicKindFilter, setMagicKindFilter] = useState<"all" | "magic" | "mundane">("all")
   const [magicCategoryFilter, setMagicCategoryFilter] = useState("all")
@@ -83,7 +86,7 @@ export function SheetAddEquipmentOverlay({
 
   const equipmentGroups = useMemo(() => {
     const available = catalog.filter((item) => !ownedSet.has(item.id))
-    const searched = filterEquipmentList(available, search)
+    const searched = filterEquipmentList(available, deferredSearch)
     const byCategory =
       categoryFilter === "all"
         ? searched
@@ -91,7 +94,7 @@ export function SheetAddEquipmentOverlay({
     const byMagic = filterEquipmentByMagicKind(byCategory, magicKindFilter)
     const filtered = filterEquipmentByMagicCategory(byMagic, magicCategoryFilter)
     return groupEquipmentByCategory(filtered)
-  }, [catalog, ownedSet, search, categoryFilter, magicKindFilter, magicCategoryFilter])
+  }, [catalog, ownedSet, deferredSearch, categoryFilter, magicKindFilter, magicCategoryFilter])
 
   const pendingBaseOptions = useMemo(() => {
     if (!pendingItem) return []
@@ -217,16 +220,34 @@ export function SheetAddEquipmentOverlay({
             ) : (
               <>
                 <div className="p-4 space-y-3 border-b border-border shrink-0">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <input
-                      type="search"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search equipment..."
-                      className="w-full pl-9 pr-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    />
-                  </div>
+                  <SearchBox
+                    value={search}
+                    onChange={setSearch}
+                    suggestions={rankSearchResults(
+                      catalog.filter((item) => !ownedSet.has(item.id)),
+                      deferredSearch,
+                      {
+                        name: (item) => item.name,
+                        fields: [
+                          { name: "category", value: (item) => item.category, weight: 1.3 },
+                          { name: "rarity", value: (item) => item.rarity, weight: 1.1 },
+                          { name: "description", value: (item) => item.description, weight: 0.35 },
+                        ],
+                        limit: 8,
+                      },
+                    ).map((match) => ({
+                      id: match.item.id,
+                      label: match.item.name,
+                      detail: [match.item.category, match.item.rarity].filter(Boolean).join(" · "),
+                      item: match.item,
+                      matchKind: match.kind,
+                    }))}
+                    onSelect={(suggestion) => setSearch(suggestion.label)}
+                    scope="sheet:add-equipment"
+                    placeholder="Search equipment…"
+                    ariaLabel="Search equipment to add"
+                    inputClassName="border bg-muted"
+                  />
                   <div className="flex flex-wrap gap-2">
                     <select
                       value={categoryFilter}

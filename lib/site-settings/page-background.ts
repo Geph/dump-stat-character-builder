@@ -1,4 +1,5 @@
 import type { AppThemeId } from "@/lib/themes/app-themes"
+import { areDefaultMidjourneyGraphicsDisabled } from "@/lib/site-settings/default-midjourney-graphics"
 import { getThemePageBackgroundAsset } from "@/lib/site-settings/theme-page-backgrounds"
 
 /** Custom full-page background graphic (stored in localStorage as a data URL). */
@@ -13,13 +14,13 @@ export const PAGE_BG_ACTIVE_ATTR = "data-page-background"
 /** Portrait tile — 2:3 width:height. */
 export const PAGE_BG_ASPECT_LABEL = "2:3 portrait"
 
-export const PAGE_BG_RECOMMENDED_WIDTH = 1200
+export const PAGE_BG_RECOMMENDED_WIDTH = 800
 
-export const PAGE_BG_RECOMMENDED_HEIGHT = 1800
+export const PAGE_BG_RECOMMENDED_HEIGHT = 1200
 
-export const MAX_PAGE_BG_FILE_BYTES = 4 * 1024 * 1024
+export const MAX_PAGE_BG_FILE_BYTES = 2 * 1024 * 1024
 
-export const MAX_PAGE_BG_FILE_MB = 4
+export const MAX_PAGE_BG_FILE_MB = 2
 
 export const MAX_PAGE_BG_DATA_URL_LENGTH =
   Math.ceil(MAX_PAGE_BG_FILE_BYTES * (4 / 3)) + 128
@@ -87,6 +88,7 @@ export function readPageBackgroundFile(file: File): Promise<string> {
 export function resolvePageBackgroundUrl(themeId: AppThemeId): string | null {
   const custom = getCustomPageBackground()
   if (custom) return custom
+  if (areDefaultMidjourneyGraphicsDisabled()) return null
   return getThemePageBackgroundAsset(themeId)
 }
 

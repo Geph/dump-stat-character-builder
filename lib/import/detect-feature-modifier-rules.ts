@@ -1918,7 +1918,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     confidence: "high",
     scope: "full",
     test:
-      /\bonce\b[^.]{0,80}?regain(?:ing)?\s+(?:(?:all\s+)?(?:its|the)\s+uses?|the\s+ability\s+to\s+do\s+so)\s+after\s+a\s+(short\s+or\s+long|long|short)\s+rest\b/i,
+      /\bonce\b[^.]{0,120}?regain(?:ing)?\s+(?:(?:all\s+)?(?:its|the)\s+uses?|the\s+ability\s+to\s+(?:do\s+so|use\s+it(?:\s+again)?))\s+after\s+(?:completing\s+)?a\s+(short\s+or\s+long|long|short)\s+rest\b/i,
     build: (match, ctx) => {
       const uses: UsesConfig = {
         type: "fixed",
@@ -2036,6 +2036,12 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       if (!name || /\bfeat\b/i.test(name)) return null
       return grantCreatureInstance([name])
     },
+  },
+  {
+    id: "grant.metamagic",
+    confidence: "high",
+    test: /\blearn\s+one\s+metamagic\s+option\s+of\s+your\s+choice(?:\s+from\s+the\s+sorcerer\s+class)?\b/i,
+    build: () => grantFeatInstance(["Metamagic"], "Metamagic option"),
   },
   {
     id: "grant.fighting_style",

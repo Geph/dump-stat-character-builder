@@ -3,6 +3,7 @@ import {
   buildGatedClassResourceRowsForSubclass,
   filterCompendiumClassResourcesBySubclasses,
   gatedClassResourcesUnlockedBySubclass,
+  isClassResourceUnlockedForSubclasses,
   isGatedClassResourceUnlockedForClass,
 } from "@/lib/compendium/subclass-gated-class-resources"
 import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-defaults"
@@ -83,6 +84,7 @@ describe("subclass-gated class resources", () => {
       resource_key: "superiority_dice",
       name: "Superiority Dice",
       source: "Tasha's",
+      prerequisite_rules: [{ category: "other", value: "Subclass: Battle Master" }],
     })
 
     const rampageRows = buildGatedClassResourceRowsForSubclass(
@@ -97,6 +99,60 @@ describe("subclass-gated class resources", () => {
       name: "Rampage Die",
       uses: { type: "special", dieType: "d4" },
     })
+  })
+
+  it("uses persisted subclass ownership for arbitrary imported resources", () => {
+    const resource = { id: "runes_marked", subclassName: "Runesmith" }
+    expect(isClassResourceUnlockedForSubclasses(resource, "Inventor", ["Runesmith"])).toBe(true)
+    expect(isClassResourceUnlockedForSubclasses(resource, "Inventor", ["Gadgetsmith"])).toBe(false)
+
+    const rows = [
+      {
+        class_id: "inventor",
+        resource_key: "runes_marked",
+        prerequisite_rules: [{ category: "other" as const, value: "Subclass: Runesmith" }],
+      },
+    ]
+    expect(
+      filterCompendiumClassResourcesBySubclasses(rows, { inventor: "Inventor" }, [
+        { class_id: "inventor", name: "Gadgetsmith" },
+      ]),
+    ).toEqual([])
+    expect(
+      filterCompendiumClassResourcesBySubclasses(rows, { inventor: "Inventor" }, [
+        { class_id: "inventor", name: "Runesmith" },
+      ]),
+    ).toEqual(rows)
+  })
+
+  it("backfills legacy imported ownership in compendium filtering", () => {
+    const rows = [{ class_id: "witch", resource_key: "remedy_dice" }]
+    expect(
+      filterCompendiumClassResourcesBySubclasses(rows, { witch: "Witch" }, [
+        { class_id: "witch", name: "Black Magic" },
+      ]),
+    ).toEqual([])
+    expect(
+      filterCompendiumClassResourcesBySubclasses(rows, { witch: "Witch" }, [
+        { class_id: "witch", name: "White Magic" },
+      ]),
+    ).toEqual(rows)
+  })
+
+  it("matches the shipped Acrobat subclass and preserves Momentum combat semantics", () => {
+    const [momentum] = gatedClassResourcesUnlockedBySubclass("Dancer", "Acrobat")
+    expect(momentum).toMatchObject({
+      id: "momentum",
+      subclassName: "Acrobat",
+      uses: {
+        type: "at_level",
+        atLevelTable: [
+          { level: 3, count: 1 },
+          { level: 14, count: 3 },
+        ],
+      },
+    })
+    expect(momentum?.uses.recharges).toBeUndefined()
   })
 
   it("treats unloaded gated keys as locked for a class", () => {

@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Check, Coins, Info, Search } from "lucide-react"
+import { useDeferredValue, useMemo, useState } from "react"
+import { Check, Coins, Info } from "lucide-react"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { filterEquipmentByMagicKind, filterEquipmentList } from "@/lib/compendium/equipment-display"
 import { MagicEquipmentBadges } from "@/components/character-sheet/magic-equipment-badges"
@@ -13,6 +13,8 @@ import { getEquipmentCostGp, formatEquipmentCost } from "@/lib/builder/equipment
 import { paginateList } from "@/lib/builder/picker-pagination"
 import { usePickerPageSize } from "@/hooks/use-picker-page-size"
 import type { Equipment } from "@/lib/types"
+import { SearchBox } from "@/components/search/search-box"
+import { rankSearchResults } from "@/lib/search/ranked-search"
 
 type EquipmentShoppingPanelProps = {
   equipment: Equipment[]
@@ -42,6 +44,7 @@ export function EquipmentShoppingPanel({
   const pageSize = usePickerPageSize("dense")
   const [categoryPages, setCategoryPages] = useState<Record<string, number>>({})
   const [magicKindFilter, setMagicKindFilter] = useState<"all" | "magic" | "mundane">("mundane")
+  const deferredEquipmentSearch = useDeferredValue(equipmentSearch)
 
   const categoryOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -57,14 +60,14 @@ export function EquipmentShoppingPanel({
   }, [equipment])
 
   const equipmentGroups = useMemo(() => {
-    const searched = filterEquipmentList(equipment, equipmentSearch)
+    const searched = filterEquipmentList(equipment, deferredEquipmentSearch)
     const byCategory =
       equipmentFilterCategory === "all"
         ? searched
         : searched.filter((item) => (item.category?.trim() || "Other") === equipmentFilterCategory)
     const filtered = filterEquipmentByMagicKind(byCategory, magicKindFilter)
     return groupEquipmentByCategory(filtered)
-  }, [equipment, equipmentSearch, equipmentFilterCategory, magicKindFilter])
+  }, [equipment, deferredEquipmentSearch, equipmentFilterCategory, magicKindFilter])
 
   const goldRemaining = totalGoldBudget - goldSpent
 
@@ -88,19 +91,38 @@ export function EquipmentShoppingPanel({
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="relative min-w-0 flex-1 sm:min-w-[12rem]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search equipment to buy..."
-            value={equipmentSearch}
-            onChange={(e) => {
-              onEquipmentSearchChange(e.target.value)
-              setCategoryPages({})
-            }}
-            className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-          />
-        </div>
+        <SearchBox
+          value={equipmentSearch}
+          onChange={(value) => {
+            onEquipmentSearchChange(value)
+            setCategoryPages({})
+          }}
+          suggestions={rankSearchResults(equipment, deferredEquipmentSearch, {
+            name: (item) => item.name,
+            fields: [
+              { name: "category", value: (item) => item.category, weight: 1.3 },
+              { name: "subcategory", value: (item) => item.subcategory, weight: 1.2 },
+              { name: "rarity", value: (item) => item.rarity, weight: 1.1 },
+              { name: "description", value: (item) => item.description, weight: 0.35 },
+            ],
+            limit: 8,
+          }).map((match) => ({
+            id: match.item.id,
+            label: match.item.name,
+            detail: [match.item.category, match.item.rarity].filter(Boolean).join(" · "),
+            item: match.item,
+            matchKind: match.kind,
+          }))}
+          onSelect={(suggestion) => {
+            onEquipmentSearchChange(suggestion.label)
+            setCategoryPages({})
+          }}
+          scope="builder:equipment"
+          placeholder="Search equipment to buy…"
+          ariaLabel="Search equipment to buy"
+          className="flex-1 sm:min-w-[12rem]"
+          inputClassName="border"
+        />
         {categoryOptions.length > 0 && (
           <>
             <select

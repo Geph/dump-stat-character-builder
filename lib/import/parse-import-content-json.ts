@@ -17,6 +17,7 @@ const IMPORT_CONTENT_KEYS = [
   "spells",
   "feats",
   "equipment",
+  "languages",
   "abilities",
   "import_proposals",
   "card_art",
@@ -39,6 +40,7 @@ function countImportRows(content: ImportContent): number {
     (content.spells?.length ?? 0) +
     (content.feats?.length ?? 0) +
     (content.equipment?.length ?? 0) +
+    (content.languages?.length ?? 0) +
     (content.abilities?.length ?? 0) +
     (content.creatures?.length ?? 0) +
     (content.import_proposals?.class_resources?.length ?? 0) +

@@ -119,7 +119,8 @@ export function orderImportContentsForMerge(contents: ImportContent[]): ImportCo
       (content.spells?.length ?? 0) > 0 ||
       (content.feats?.length ?? 0) > 0 ||
       (content.creatures?.length ?? 0) > 0 ||
-      (content.equipment?.length ?? 0) > 0
+      (content.equipment?.length ?? 0) > 0 ||
+      (content.languages?.length ?? 0) > 0
     if (hasLibrary && !hasClassChapter) return 0
     if (hasLibrary && hasClassChapter) return 1
     if (hasClassChapter) return 2
@@ -172,6 +173,12 @@ export function combineImportContents(contents: ImportContent[]): ImportContent 
         merged.equipment,
         content.equipment,
       ) as unknown as ImportContent["equipment"]
+    }
+    if (content.languages?.length) {
+      merged.languages = mergeArrayByName(
+        merged.languages,
+        content.languages,
+      ) as unknown as ImportContent["languages"]
     }
     if (content.abilities?.length) {
       merged.abilities = mergeArrayByName(merged.abilities, content.abilities) as unknown as ImportContent["abilities"]

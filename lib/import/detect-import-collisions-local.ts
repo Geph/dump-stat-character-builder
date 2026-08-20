@@ -20,6 +20,7 @@ const COLLISION_TABLES: ImportCollisionKind[] = [
   "spell",
   "background",
   "ability",
+  "language",
 ]
 
 const TABLE_BY_KIND: Record<ImportCollisionKind, CompendiumTable> = {
@@ -29,6 +30,7 @@ const TABLE_BY_KIND: Record<ImportCollisionKind, CompendiumTable> = {
   spell: "spells",
   background: "backgrounds",
   ability: "custom_abilities",
+  language: "languages",
 }
 
 function applyFilters(rows: Record<string, unknown>[], filters: Filter[]): Record<string, unknown>[] {

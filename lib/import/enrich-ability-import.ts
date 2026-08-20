@@ -19,6 +19,7 @@ import {
   specialAttackModifierFromPowerDescription,
 } from "@/lib/import/parse-special-attack-from-power"
 import { isModifierRedundantAgainst } from "@/lib/import/detect-feature-modifiers"
+import { enrichManipulateMagicAbility } from "@/lib/compendium/enrich-manipulate-magic"
 import type { Feature } from "@/lib/types"
 
 function stripHtml(text: string): string {
@@ -239,7 +240,9 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
     modifierRefs: synced.modifierRefs,
   }
 
-  return applySpecializationAlternateEffectsChoice(enrichedRow)
+  return applySpecializationAlternateEffectsChoice(
+    enrichManipulateMagicAbility(enrichedRow),
+  )
 }
 
 export function enrichAbilityImportRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {

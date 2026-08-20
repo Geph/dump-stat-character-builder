@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Coins, Info, Pin, Plus, Search } from "lucide-react"
+import { useDeferredValue, useMemo, useState } from "react"
+import { Coins, Info, Pin, Plus } from "lucide-react"
 import {
   DEFAULT_ATTUNEMENT_SLOTS,
   isAttunableItem,
@@ -24,6 +24,8 @@ import { isLightWeapon } from "@/lib/compendium/two-weapon-fighting"
 import { MagicEquipmentBadges } from "@/components/character-sheet/magic-equipment-badges"
 import type { Equipment } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { SearchBox } from "@/components/search/search-box"
+import { rankSearchResults } from "@/lib/search/ranked-search"
 
 const EQUIPMENT_FILTER_OPTIONS: { value: EquipmentSheetFilter; label: string }[] = [
   { value: "all", label: "All items" },
@@ -119,13 +121,14 @@ export function SheetEquipmentPanel({
   onShowDetails,
 }: SheetEquipmentPanelProps) {
   const [categoryFilter, setCategoryFilter] = useState<EquipmentSheetFilter>("all")
+  const deferredSearchQuery = useDeferredValue(searchQuery)
   const filtered = useMemo(() => {
-    const bySearch = filterEquipmentList(equipment, searchQuery)
+    const bySearch = filterEquipmentList(equipment, deferredSearchQuery)
     const byCategory = bySearch.filter((item) =>
       matchesEquipmentSheetFilter(item, categoryFilter, pinnedEquipmentIds),
     )
     return orderEquipmentWithPins(byCategory, pinnedEquipmentIds)
-  }, [equipment, searchQuery, categoryFilter, pinnedEquipmentIds])
+  }, [equipment, deferredSearchQuery, categoryFilter, pinnedEquipmentIds])
   const attunedCount = attunedItemIds.length
   const slotCap = maxAttunementSlots || DEFAULT_ATTUNEMENT_SLOTS
 
@@ -149,16 +152,30 @@ export function SheetEquipmentPanel({
         </div>
         {equipment.length > 0 ? (
           <>
-            <div className="relative min-w-[8rem] flex-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => onSearchQueryChange(e.target.value)}
-                placeholder="Search equipment..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
-              />
-            </div>
+            <SearchBox
+              value={searchQuery}
+              onChange={onSearchQueryChange}
+              suggestions={rankSearchResults(equipment, deferredSearchQuery, {
+                name: (item) => item.name,
+                fields: [
+                  { name: "category", value: (item) => item.category, weight: 1.3 },
+                  { name: "rarity", value: (item) => item.rarity, weight: 1.1 },
+                ],
+                limit: 8,
+              }).map((match) => ({
+                id: match.item.id,
+                label: match.item.name,
+                detail: [match.item.category, match.item.rarity].filter(Boolean).join(" · "),
+                item: match.item,
+                matchKind: match.kind,
+              }))}
+              onSelect={(suggestion) => onSearchQueryChange(suggestion.label)}
+              scope="sheet:equipment"
+              placeholder="Search equipment…"
+              ariaLabel="Search owned equipment"
+              className="min-w-[8rem] flex-1"
+              inputClassName="border bg-muted py-1.5 text-xs"
+            />
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value as EquipmentSheetFilter)}

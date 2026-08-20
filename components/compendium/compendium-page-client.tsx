@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useDeferredValue } from "react"
 import dynamic from "next/dynamic"
 import { useSearchParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -145,6 +145,13 @@ import {
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 import { rewriteLegacyFlatSubclassCardImageUrl } from "@/lib/compendium/subclass-card-images-defaults"
 import { enrichSubclassDisplayList } from "@/lib/compendium/enrich-subclass-display"
+import { SearchBox, type SearchSuggestion } from "@/components/search/search-box"
+import {
+  compendiumSearchResultDetail,
+  rankCompendiumRows,
+  searchCompendiumRows,
+  type SearchableCompendiumRow,
+} from "@/lib/search/compendium-search"
 
 type ContentType = CompendiumContentType
 
@@ -256,6 +263,7 @@ export default function CompendiumPageClient() {
   const [activeTab, setActiveTab] = useState<ContentType>("classes")
   const [spellListDialogOpen, setSpellListDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const deferredSearchQuery = useDeferredValue(searchQuery)
   const [content, setContent] = useState<Record<ContentType, unknown[]>>({
     species: [],
     classes: [],
@@ -332,7 +340,26 @@ export default function CompendiumPageClient() {
     if (tab && isCompendiumContentType(tab)) {
       setActiveTab(tab)
     }
+    setSearchQuery(searchParams.get("q") ?? "")
   }, [searchParams])
+
+  const changeActiveTab = (tab: ContentType) => {
+    setActiveTab(tab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tab", tab)
+    if (searchQuery.trim()) params.set("q", searchQuery.trim())
+    router.replace(`/compendium?${params.toString()}`, { scroll: false })
+  }
+
+  useEffect(() => {
+    const query = deferredSearchQuery.trim()
+    if ((searchParams.get("q") ?? "") === query) return
+    const params = new URLSearchParams(searchParams.toString())
+    if (query) params.set("q", query)
+    else params.delete("q")
+    params.set("tab", activeTab)
+    router.replace(`/compendium?${params.toString()}`, { scroll: false })
+  }, [activeTab, deferredSearchQuery, router, searchParams])
 
   useEffect(() => {
     setSourceFilter("all")
@@ -426,13 +453,7 @@ export default function CompendiumPageClient() {
         .from(tableName)
         .select("*")
         .order("name")
-        .limit(
-          isEquipmentBrowserTab(activeTab)
-            ? 500
-            : activeTab === "spells" || activeTab === "feats" || activeTab === "abilities"
-              ? 5000
-              : 100,
-        )
+        .limit(Math.max(tabCounts[activeTab] ?? 0, 5000))
       
       let rows = asCompendiumRows(data)
       if (activeTab === "abilities") {
@@ -499,7 +520,7 @@ export default function CompendiumPageClient() {
     }
     
     fetchActiveTabContent()
-  }, [activeTab])
+  }, [activeTab, tabCounts])
 
   useEffect(() => {
     if (activeTab !== "backgrounds") return
@@ -547,7 +568,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
   }, [activeTab, content, creatureTypeFilter])
 
   const filteredContent = useMemo(() => {
-    const query = searchQuery.toLowerCase()
+    const query = deferredSearchQuery.trim()
     const classResourceRows =
       activeTab === "class_resources"
         ? filterCompendiumClassResourcesBySubclasses(
@@ -561,15 +582,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     const rows = sourceRows.filter((item) => {
       if (activeTab === "class_resources") {
         const resource = item as ClassResourceRow
-        const className = classNamesById[resource.class_id] ?? ""
-        const haystack = `${resource.name} ${resource.resource_key} ${className}`.toLowerCase()
-        if (!haystack.includes(query)) return false
         if (classResourceFilterClassId !== "all" && resource.class_id !== classResourceFilterClassId) {
           return false
         }
         return true
       }
-      if (!item.name?.toLowerCase().includes(query)) return false
       if (activeTab === "abilities") {
         const ability = item as {
           ability_role?: string | null
@@ -664,7 +681,13 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       return true
     })
 
-    return dedupeCompendiumBrowseRows(activeTab, rows)
+    const searched = searchCompendiumRows(
+      rows as SearchableCompendiumRow[],
+      query,
+      activeTab,
+      classNamesById,
+    )
+    return dedupeCompendiumBrowseRows(activeTab, searched)
   }, [
     activeTab,
     backgroundFilterAbilities,
@@ -678,13 +701,43 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     sourceFilter,
     languageFilterPool,
     magicItemFilterCategory,
-    searchQuery,
+    deferredSearchQuery,
     spellFilterClass,
     spellFilterLevel,
     spellFilterSchool,
     subclassesForClasses,
     toolFilterGroup,
   ])
+
+  const autocompleteSuggestions = useMemo<SearchSuggestion<SearchableCompendiumRow>[]>(() => {
+    if (!deferredSearchQuery.trim()) return []
+    return rankCompendiumRows(
+      filteredContent as SearchableCompendiumRow[],
+      deferredSearchQuery,
+      activeTab,
+      classNamesById,
+      8,
+    ).map((match) => ({
+      id: String(match.item.id ?? `${activeTab}:${match.item.name}`),
+      label: match.item.name,
+      detail: compendiumSearchResultDetail(match.item, activeTab, classNamesById),
+      item: match.item,
+      matchKind: match.kind,
+    }))
+  }, [activeTab, classNamesById, deferredSearchQuery, filteredContent])
+
+  const searchCorrection = useMemo(() => {
+    if (filteredContent.length > 0 || deferredSearchQuery.trim().length < 4) return null
+    const match = rankCompendiumRows(
+      (content[activeTab] ?? []) as SearchableCompendiumRow[],
+      deferredSearchQuery,
+      activeTab,
+      classNamesById,
+      1,
+      0.55,
+    )[0]
+    return match?.kind === "fuzzy" ? match.item.name : null
+  }, [activeTab, classNamesById, content, deferredSearchQuery, filteredContent.length])
 
   const equipmentData = content.equipment as unknown as Equipment[]
   const magicItemData = content.magic_items as unknown as Equipment[]
@@ -712,7 +765,10 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
 
   const classResourceGroups = useMemo(() => {
     if (activeTab !== "class_resources") return []
-    return groupClassResourcesByKey(filteredContent as ClassResourceRow[], classNamesById)
+    return groupClassResourcesByKey(
+      filteredContent as unknown as ClassResourceRow[],
+      classNamesById,
+    )
   }, [filteredContent, activeTab, classNamesById])
 
   const tableName = (tab: ContentType) =>
@@ -778,7 +834,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       .from(resolvedTable)
       .select("*")
       .order("name")
-      .limit(isEquipmentBrowserTab(activeTab) ? 500 : 100)
+      .limit(Math.max(tabCounts[activeTab] ?? 0, 5000))
     const rows = asCompendiumRows(data)
     if (isEquipmentBrowserTab(activeTab)) {
       const split = splitEquipmentByKind(asCompendiumRows(rows) as unknown as Equipment[])
@@ -836,12 +892,16 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
     void (async () => {
       try {
         const db = createClient()
+        let related = EMPTY_RELATED_CASCADE
         if (activeTab === "classes" || activeTab === "species") {
-          setClearRelated(await findRelatedFeatsAndCompanionsForSection(db, activeTab))
+          related = await findRelatedFeatsAndCompanionsForSection(db, activeTab)
         } else {
           const abilities = await findAttachedAbilitiesForSectionClear(db, activeTab)
-          setClearRelated({ ...EMPTY_RELATED_CASCADE, abilities })
+          related = { ...EMPTY_RELATED_CASCADE, abilities }
         }
+        setClearRelated(related)
+        // Class/species library rows often attach by name — offer clearing them by default.
+        if (related.abilities.length > 0) setIncludeClearAbilities(true)
       } catch (err) {
         console.error("[v0] Failed to load related cascade for clear:", err)
       } finally {
@@ -935,13 +995,19 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
         setContent((prev) => ({
           ...prev,
           feats: removedFeatIds.size
-            ? prev.feats.filter((row) => !removedFeatIds.has(row.id))
+            ? prev.feats.filter(
+                (row) => !removedFeatIds.has((row as { id?: string }).id ?? ""),
+              )
             : prev.feats,
           creatures: removedCreatureIds.size
-            ? prev.creatures.filter((row) => !removedCreatureIds.has(row.id))
+            ? prev.creatures.filter(
+                (row) => !removedCreatureIds.has((row as { id?: string }).id ?? ""),
+              )
             : prev.creatures,
           abilities: removedAbilityIds.size
-            ? prev.abilities.filter((row) => !removedAbilityIds.has(row.id))
+            ? prev.abilities.filter(
+                (row) => !removedAbilityIds.has((row as { id?: string }).id ?? ""),
+              )
             : prev.abilities,
         }))
       }
@@ -960,7 +1026,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
   const handleExportSection = async () => {
     const db = createClient()
     const resolvedTable = tableName(activeTab)
-    const { data } = await db.from(resolvedTable).select("*").order("name").limit(500)
+    const { data } = await db
+      .from(resolvedTable)
+      .select("*")
+      .order("name")
+      .limit(Math.max(tabCounts[activeTab] ?? 0, 5000))
     const exportRowsRaw = asCompendiumRows(data)
     if (!exportRowsRaw.length) return
 
@@ -1580,7 +1650,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
             <select
               id="compendium-mobile-tab-select"
               value={activeTab}
-              onChange={(event) => setActiveTab(event.target.value as ContentType)}
+              onChange={(event) => changeActiveTab(event.target.value as ContentType)}
               className="min-w-0 w-[60%] rounded-lg border-2 border-border bg-card px-2.5 py-2 text-sm font-semibold text-foreground focus:border-primary focus:outline-none max-sm:order-1 sm:hidden"
             >
               {tabs.map((tab) => (
@@ -1675,20 +1745,19 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               <Plus className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
               <span className="truncate">{newItemButtonLabels[activeTab]}</span>
             </Link>
-            <div
-              id="compendium-search"
-              className="relative min-w-0 flex-1 max-sm:order-5 sm:order-4 sm:w-36 sm:flex-none"
-            >
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground sm:left-3 sm:h-4 sm:w-4" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Search content"
-                className="w-full rounded-lg border-2 border-border bg-card py-2 pl-8 pr-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:border-primary focus:outline-none sm:pl-9 sm:pr-3"
-              />
-            </div>
+            <SearchBox
+              value={searchQuery}
+              onChange={setSearchQuery}
+              suggestions={autocompleteSuggestions}
+              onSelect={(suggestion) => {
+                setSearchQuery(suggestion.label)
+                setSelectedItem(suggestion.item)
+              }}
+              scope={`compendium:${activeTab}`}
+              placeholder={`Search ${tabs.find((tab) => tab.id === activeTab)?.label.toLowerCase() ?? "content"}…`}
+              ariaLabel={`Search ${tabs.find((tab) => tab.id === activeTab)?.label.toLowerCase() ?? "content"}`}
+              className="flex-1 max-sm:order-5 sm:order-4 sm:w-56 sm:flex-none"
+            />
           </div>
         </div>
 
@@ -1972,7 +2041,7 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => changeActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                 activeTab === tab.id
                   ? "bg-primary text-primary-foreground"
@@ -2381,6 +2450,15 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               <p className="text-muted-foreground">
                 {searchQuery ? "Try a different search term" : "Import content from the Import page"}
               </p>
+              {searchCorrection ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery(searchCorrection)}
+                  className="mt-3 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/15"
+                >
+                  Did you mean “{searchCorrection}”?
+                </button>
+              ) : null}
             </div>
           </div>
         ) : activeTab === "equipment" || activeTab === "magic_items" ? (
@@ -2454,8 +2532,23 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
               ? {
                   ...(selectedItem as ClassResourceRow),
                   name: `${classNamesById[(selectedItem as ClassResourceRow).class_id] ?? "Unknown"} · ${(selectedItem as ClassResourceRow).name}`,
+                  icon: getCompendiumItemIcon(
+                    activeTab,
+                    selectedItem as unknown as Record<string, unknown>,
+                  ),
                 }
-              : (selectedItem as { name: string; source?: string; icon?: string | null; card_image_url?: string | null })
+              : {
+                  ...(selectedItem as {
+                    name: string
+                    source?: string
+                    icon?: string | null
+                    card_image_url?: string | null
+                  }),
+                  icon: getCompendiumItemIcon(
+                    activeTab,
+                    selectedItem as unknown as Record<string, unknown>,
+                  ),
+                }
           }
           subtitle={
             activeTab === "spells"

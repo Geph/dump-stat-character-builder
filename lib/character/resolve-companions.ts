@@ -640,6 +640,7 @@ export function mergeCompanionState(
   ResolvedCompanion & {
     currentHp: number
     tempHp: number
+    ferocity: number
     displayName: string
     activeConditions: string[]
     polymorphActive: boolean
@@ -654,6 +655,7 @@ export function mergeCompanionState(
       ...companion,
       currentHp: Math.min(Math.max(0, currentHp), companion.maxHp),
       tempHp,
+      ferocity: Math.max(0, Math.floor(state?.ferocity ?? 0)),
       displayName: state?.customName?.trim() || companion.template.name,
       activeConditions: state?.activeConditions ?? [],
       polymorphActive: state?.polymorphActive ?? false,
@@ -666,6 +668,7 @@ export function companionStateFromResolved(
     ResolvedCompanion & {
       currentHp: number
       tempHp?: number
+      ferocity?: number
       displayName: string
       activeConditions?: string[]
       polymorphActive?: boolean
@@ -676,6 +679,7 @@ export function companionStateFromResolved(
     key: c.key,
     currentHp: c.currentHp,
     tempHp: (c.tempHp ?? 0) > 0 ? c.tempHp : null,
+    ferocity: (c.ferocity ?? 0) > 0 ? c.ferocity : null,
     customName: c.displayName !== c.template.name ? c.displayName : null,
     activeConditions: c.activeConditions?.length ? c.activeConditions : null,
     polymorphActive: c.polymorphActive ? true : null,

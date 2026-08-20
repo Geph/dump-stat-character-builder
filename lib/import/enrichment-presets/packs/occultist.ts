@@ -277,20 +277,43 @@ export function sanitizeOccultistImportContent(content: ImportContent): ImportCo
         custom_abilities: next.import_proposals.custom_abilities.map((ability) => {
           if (ability.ability_role !== "knack" && ability.ability_role != null) return ability
           const tradition = inferTraditionSource(ability.name ?? "", ability.prerequisite)
-          if (!tradition) {
-            return {
-              ...ability,
-              ability_role: ability.ability_role ?? "knack",
-              source_type: ability.source_type ?? "class",
-              source_name: ability.source_name || "Occultist",
-            }
+          const tagged = tradition
+            ? {
+                ...ability,
+                ability_role: ability.ability_role ?? "knack",
+                source_type: "subclass" as const,
+                source_name: tradition,
+              }
+            : {
+                ...ability,
+                ability_role: ability.ability_role ?? "knack",
+                source_type: ability.source_type ?? "class",
+                source_name: ability.source_name || "Occultist",
+              }
+          if (!/^manipulate magic$/i.test(tagged.name ?? "")) return tagged
+          const mechanics = Array.isArray((tagged as { mechanics?: unknown[] }).mechanics)
+            ? [...((tagged as { mechanics: unknown[] }).mechanics)]
+            : []
+          if (!mechanics.some((m) => asRecord(m)?.kind === "grant_feat")) {
+            mechanics.push({
+              kind: "grant_feat",
+              featCategories: ["Metamagic"],
+              featCount: 1,
+              sourcePhrase: "You learn one Metamagic option of your choice from the Sorcerer class.",
+              confidence: "high",
+            })
           }
-          return {
-            ...ability,
-            ability_role: ability.ability_role ?? "knack",
-            source_type: "subclass",
-            source_name: tradition,
+          if (!mechanics.some((m) => asRecord(m)?.kind === "uses")) {
+            mechanics.push({
+              kind: "uses",
+              usesFixed: 1,
+              usesRecharge: "long_rest",
+              sourcePhrase:
+                "You can use this Metamagic option once, regaining the ability to use it again after completing a long rest.",
+              confidence: "high",
+            })
           }
+          return { ...tagged, mechanics }
         }),
       },
     }
@@ -360,7 +383,7 @@ export const OCCULTIST_PRESETS: EnrichmentPreset[] = [
     operations: [
       {
         op: "appendDescription",
-        text: "Occult Rites use optionsSource class_knacks + class_resources.occult_rites_known (special). Swap one rite when you gain an Occultist level — not on a rest. Tradition-specific rites stay ability_role knack with source_type subclass / tradition name (Witch, Hedge Mage, Oracle, Shaman, Spiritualist, Voidwatcher); prerequisites still gate level/coven/mystery.",
+        text: "Occult Rites use optionsSource class_knacks + class_resources.occult_rites_known (special). Swap one rite when you gain an Occultist level — not on a rest. Tradition-specific rites stay ability_role knack with source_type subclass / tradition name (Witch, Hedge Mage, Oracle, Shaman, Spiritualist, Voidwatcher); prerequisites still gate level/coven/mystery. Hedge Mage Manipulate Magic grants one PHB Metamagic Options catalog pick (grant_feat Metamagic) — not a standalone metamagic knack.",
       },
     ],
   },

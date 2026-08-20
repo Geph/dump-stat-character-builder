@@ -4,20 +4,59 @@ import { resolveUsesAtLevel } from "@/lib/compendium/resolve-uses-config"
 import type { ClassResource, ClassResourceRow } from "@/lib/types"
 import { SRD_CREATOR_URL } from "@/lib/srd/source"
 
+export const CLASS_RESOURCE_SUBCLASS_PREFIX = "Subclass:"
+
+export function subclassNameFromClassResourcePrerequisites(
+  rules: ClassResourceRow["prerequisite_rules"] | null | undefined,
+): string | null {
+  for (const rule of rules ?? []) {
+    if (rule.category !== "other") continue
+    const value = rule.value.trim()
+    if (!value.toLowerCase().startsWith(CLASS_RESOURCE_SUBCLASS_PREFIX.toLowerCase())) continue
+    const name = value.slice(CLASS_RESOURCE_SUBCLASS_PREFIX.length).trim()
+    if (name) return name
+  }
+  return null
+}
+
+export function classResourcePrerequisitesForSubclass(
+  subclassName: string | null | undefined,
+  existing: ClassResourceRow["prerequisite_rules"] | null | undefined = null,
+): NonNullable<ClassResourceRow["prerequisite_rules"]> | null {
+  const name = subclassName?.trim()
+  const withoutSubclass = (existing ?? []).filter(
+    (rule) =>
+      rule.category !== "other" ||
+      !rule.value.trim().toLowerCase().startsWith(CLASS_RESOURCE_SUBCLASS_PREFIX.toLowerCase()),
+  )
+  if (!name) return withoutSubclass.length ? withoutSubclass : null
+  return [
+    ...withoutSubclass,
+    { category: "other" as const, value: `${CLASS_RESOURCE_SUBCLASS_PREFIX} ${name}` },
+  ]
+}
+
 export function rowToClassResource(
-  row: Pick<ClassResourceRow, "resource_key" | "name" | "description" | "uses">,
+  row: Pick<
+    ClassResourceRow,
+    "resource_key" | "name" | "description" | "uses" | "prerequisite_rules"
+  >,
 ): ClassResource {
   return {
     id: row.resource_key,
     name: row.name,
     description: row.description ?? undefined,
     uses: row.uses,
+    subclassName: subclassNameFromClassResourcePrerequisites(row.prerequisite_rules),
   }
 }
 
 export function resourcesForClass(
   classId: string,
-  rows: Pick<ClassResourceRow, "class_id" | "resource_key" | "name" | "description" | "uses">[],
+  rows: Pick<
+    ClassResourceRow,
+    "class_id" | "resource_key" | "name" | "description" | "uses" | "prerequisite_rules"
+  >[],
 ): ClassResource[] {
   return rows.filter((row) => row.class_id === classId).map(rowToClassResource)
 }

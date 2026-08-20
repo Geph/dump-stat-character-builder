@@ -70,6 +70,7 @@ function addDependent(
   excludeId?: string,
 ) {
   if (!rowId || rowId === excludeId) return
+  if (isProtectedSystemCompendiumItem(table, rowId)) return
   const key = `${table}:${rowId}`
   if (seen.has(key)) return
   seen.add(key)
@@ -81,17 +82,58 @@ function addDependent(
   })
 }
 
+function normalizeAttachKey(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function toAttachKeySet(keys: readonly string[]): Set<string> {
+  const out = new Set<string>()
+  for (const key of keys) {
+    const normalized = normalizeAttachKey(key)
+    if (normalized) out.add(normalized)
+  }
+  return out
+}
+
 async function addAttachedAbilities(
   db: DataClient,
   attachType: string,
-  attachId: string,
+  attachKeys: string | readonly string[],
   dependents: CompendiumToggleTarget[],
   seen: Set<string>,
 ) {
-  const { data: abilities } = await db.from("custom_abilities").select("id, name, attached_to_type, attached_to_id")
+  const keySet = toAttachKeySet(typeof attachKeys === "string" ? [attachKeys] : [...attachKeys])
+  if (!keySet.size) return
+
+  const { data: abilities } = await db
+    .from("custom_abilities")
+    .select("id, name, attached_to_type, attached_to_id, eligible_classes")
   for (const row of asCompendiumRows(abilities)) {
     if (row.attached_to_type !== attachType) continue
-    if (row.attached_to_id !== attachId) continue
+    const attachedId = typeof row.attached_to_id === "string" ? row.attached_to_id : ""
+    if (!attachedId || !keySet.has(normalizeAttachKey(attachedId))) continue
+    addDependent(dependents, seen, "custom_abilities", row.id as string, row.name as string)
+  }
+}
+
+async function addEligibleClassAbilities(
+  db: DataClient,
+  classNames: readonly string[],
+  dependents: CompendiumToggleTarget[],
+  seen: Set<string>,
+) {
+  const wanted = toAttachKeySet(classNames)
+  if (!wanted.size) return
+
+  const { data: abilities } = await db
+    .from("custom_abilities")
+    .select("id, name, eligible_classes")
+  for (const row of asCompendiumRows(abilities)) {
+    if (!Array.isArray(row.eligible_classes)) continue
+    const matches = row.eligible_classes.some(
+      (entry) => typeof entry === "string" && wanted.has(normalizeAttachKey(entry)),
+    )
+    if (!matches) continue
     addDependent(dependents, seen, "custom_abilities", row.id as string, row.name as string)
   }
 }
@@ -148,15 +190,29 @@ export async function findCompendiumDependents(
       }
     }
 
-    await addAttachedAbilities(db, "class", id, dependents, seen)
+    await addAttachedAbilities(db, "class", className ? [id, className] : [id], dependents, seen)
     for (const row of asCompendiumRows(subclasses)) {
-      await addAttachedAbilities(db, "subclass", row.id as string, dependents, seen)
+      const subclassKeys = [row.id as string]
+      if (typeof row.name === "string" && row.name.trim()) subclassKeys.push(row.name.trim())
+      await addAttachedAbilities(db, "subclass", subclassKeys, dependents, seen)
+    }
+    if (className) {
+      await addEligibleClassAbilities(db, [className], dependents, seen)
     }
     return dependents.sort((a, b) => a.name.localeCompare(b.name))
   }
 
   if (table === "subclasses") {
-    await addAttachedAbilities(db, "subclass", id, dependents, seen)
+    const { data: subclass } = await db.from("subclasses").select("name").eq("id", id).single()
+    const subclassRow = asCompendiumRow(subclass)
+    const subclassName = typeof subclassRow?.name === "string" ? subclassRow.name : null
+    await addAttachedAbilities(
+      db,
+      "subclass",
+      subclassName ? [id, subclassName] : [id],
+      dependents,
+      seen,
+    )
     return dependents.sort((a, b) => a.name.localeCompare(b.name))
   }
 
@@ -180,7 +236,13 @@ export async function findCompendiumDependents(
         addDependent(dependents, seen, "feats", row.id as string, row.name as string, id)
       }
     }
-    await addAttachedAbilities(db, "species", id, dependents, seen)
+    await addAttachedAbilities(
+      db,
+      "species",
+      speciesName ? [id, speciesName] : [id],
+      dependents,
+      seen,
+    )
     return dependents.sort((a, b) => a.name.localeCompare(b.name))
   }
 

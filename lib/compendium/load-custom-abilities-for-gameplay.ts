@@ -1,4 +1,5 @@
 import { filterEnabled } from "@/lib/compendium/compendium-enabled"
+import { enrichManipulateMagicAbilities } from "@/lib/compendium/enrich-manipulate-magic"
 import { enrichRowsWithModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { SYSTEM_OPTION_CATALOG_IDS } from "@/lib/compendium/system-option-catalogs"
 import type { DataClient } from "@/lib/db/client"
@@ -27,12 +28,14 @@ export async function loadCustomAbilitiesForGameplay(
     byId.set(row.id as string, row as unknown as Record<string, unknown>)
   }
 
-  return filterEnabled(
-    enrichRowsWithModifierRefs([...byId.values()] as { enabled?: number | boolean | null; show_in_builder?: boolean; id?: string }[]),
-  ).filter((ability) => {
-    if ((SYSTEM_OPTION_CATALOG_IDS as readonly string[]).includes(ability.id as string)) {
-      return true
-    }
-    return ability.show_in_builder !== false
-  }) as CustomAbility[]
+  return enrichManipulateMagicAbilities(
+    filterEnabled(
+      enrichRowsWithModifierRefs([...byId.values()] as { enabled?: number | boolean | null; show_in_builder?: boolean; id?: string }[]),
+    ).filter((ability) => {
+      if ((SYSTEM_OPTION_CATALOG_IDS as readonly string[]).includes(ability.id as string)) {
+        return true
+      }
+      return ability.show_in_builder !== false
+    }) as CustomAbility[],
+  )
 }

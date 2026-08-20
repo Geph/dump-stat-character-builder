@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { MainNav } from "@/components/main-nav"
 import { createClient } from "@/lib/db/client"
-import { Plus, Search, X } from "lucide-react"
+import { Plus, X } from "lucide-react"
 import {
   CompendiumEditorPanel,
 } from "@/components/compendium/compendium-editor-section"
@@ -31,6 +31,9 @@ import {
   normalizeBackgroundProficiencies,
   type BackgroundProficiencies,
 } from "@/lib/compendium/background-proficiencies"
+import { SearchBox } from "@/components/search/search-box"
+import { rankSearchResults, searchItems } from "@/lib/search/ranked-search"
+import { spellAliasLookupKeys } from "@/lib/compendium/spell-name-aliases"
 import { LinkedModifiersEditor } from "@/components/compendium/linked-modifiers-editor"
 import { StartingEquipmentGroupsEditor } from "@/components/compendium/starting-equipment-groups-editor"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
@@ -118,7 +121,9 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
   const [equipInput, setEquipInput] = useState("")
   const [equipQty, setEquipQty] = useState(1)
   const [originFeats, setOriginFeats] = useState<{ id: string; name: string }[]>([])
-  const [allSpells, setAllSpells] = useState<{ id: string; name: string; level: number }[]>([])
+  const [allSpells, setAllSpells] = useState<
+    { id: string; name: string; level: number; school: string }[]
+  >([])
   const [spellSearch, setSpellSearch] = useState("")
   const [characterLevelPick, setCharacterLevelPick] = useState(1)
   const router = useRouter()
@@ -154,8 +159,14 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
   useEffect(() => {
     const fetchSpells = async () => {
       const db = createClient()
-      const { data } = await db.from("spells").select("id, name, level").order("level").order("name")
-      setAllSpells(asCompendiumRows<{ id: string; name: string; level: number }>(data))
+      const { data } = await db
+        .from("spells")
+        .select("id, name, level, school")
+        .order("level")
+        .order("name")
+      setAllSpells(
+        asCompendiumRows<{ id: string; name: string; level: number; school: string }>(data),
+      )
     }
     fetchSpells()
   }, [])
@@ -375,10 +386,13 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
     })
   }
 
-  const filteredSpellsForGrant = allSpells.filter((spell) => {
-    const q = spellSearch.trim().toLowerCase()
-    if (!q) return true
-    return spell.name.toLowerCase().includes(q)
+  const filteredSpellsForGrant = searchItems(allSpells, spellSearch, {
+    name: (spell) => spell.name,
+    aliases: (spell) => spellAliasLookupKeys(spell.name),
+    fields: [
+      { name: "school", value: (spell) => spell.school, weight: 1.3 },
+      { name: "level", value: (spell) => `level ${spell.level}`, weight: 1.1 },
+    ],
   })
 
   const grantedSpellLevelKeys = Object.keys(form.granted_spells).sort(
@@ -641,16 +655,33 @@ export default function BackgroundEditorPage({ id }: { id: string }) {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-foreground mb-2">Search spells</label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <input
-                        type="text"
-                        value={spellSearch}
-                        onChange={(e) => setSpellSearch(e.target.value)}
-                        placeholder="Filter by name..."
-                        className="w-full pl-10 pr-4 py-3 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
+                    <SearchBox
+                      value={spellSearch}
+                      onChange={setSpellSearch}
+                      suggestions={rankSearchResults(allSpells, spellSearch, {
+                        name: (spell) => spell.name,
+                        aliases: (spell) => spellAliasLookupKeys(spell.name),
+                        fields: [
+                          { name: "school", value: (spell) => spell.school, weight: 1.3 },
+                          { name: "level", value: (spell) => `level ${spell.level}` },
+                        ],
+                        limit: 8,
+                      }).map((match) => ({
+                        id: match.item.id,
+                        label: match.item.name,
+                        detail: `${match.item.level === 0 ? "Cantrip" : `Level ${match.item.level}`} · ${match.item.school}`,
+                        item: match.item,
+                        matchKind: match.kind,
+                      }))}
+                      onSelect={(suggestion) => {
+                        setSpellSearch(suggestion.label)
+                        addGrantedSpell(suggestion.item.id)
+                      }}
+                      scope="background-editor:spells"
+                      placeholder="Filter spells…"
+                      ariaLabel="Search spells"
+                      inputClassName="py-3"
+                    />
                   </div>
                 </div>
                 <select

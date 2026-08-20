@@ -12,6 +12,13 @@ import {
 import { SUBCLASS_GATED_CLASS_RESOURCE_KEYS } from "@/lib/compendium/subclass-gated-class-resources"
 
 export type ClassResourceDisplayMode = "tracker" | "static" | "hidden"
+export type ClassResourceSemanticKind =
+  | "pool"
+  | "choice_count"
+  | "limit"
+  | "die_profile"
+  | "combat_state"
+  | "menu"
 
 /** Die-size lookup columns — kept for mechanics but never shown on the sheet. */
 export const HIDDEN_CLASS_RESOURCE_IDS = new Set([
@@ -26,13 +33,18 @@ export const ACTION_PANEL_CLASS_RESOURCE_IDS = new Set(["second_wind"])
 /** Only show in the Resources column when subclass/content spends this pool. */
 export const SUBCLASS_SPEND_GATED_CLASS_RESOURCE_IDS = SUBCLASS_GATED_CLASS_RESOURCE_KEYS
 
+function isGenericCombatStateTracker(resourceId: string): boolean {
+  return /^(?:momentum|grudge_battle_die|adrenaline_battle_die)$/.test(resourceId)
+}
+
 export function shouldShowClassResourceOnSheet(
   resourceId: string,
   spendKeys: ReadonlySet<string>,
 ): boolean {
-  if (SUBCLASS_SPEND_GATED_CLASS_RESOURCE_IDS.has(resourceId) && !spendKeys.has(resourceId)) {
-    return false
-  }
+  // Ownership is filtered before sheet entries are built. Do not hide an owned
+  // pool merely because its spends live in custom abilities rather than features.
+  void resourceId
+  void spendKeys
   return true
 }
 
@@ -87,6 +99,7 @@ export function deriveClassResourceDisplay(
 ): ClassResourceDisplayMode {
   if (resource.display) return resource.display
   if (HIDDEN_CLASS_RESOURCE_IDS.has(resource.id)) return "hidden"
+  if (isGenericCombatStateTracker(resource.id)) return "tracker"
 
   if (hasRecharges(resource.uses)) return "tracker"
   if (spendKeys.has(resource.id)) return "tracker"
@@ -96,12 +109,45 @@ export function deriveClassResourceDisplay(
   return "static"
 }
 
+export function deriveClassResourceSemanticKind(
+  resource: ClassResource,
+  spendKeys: ReadonlySet<string> = new Set(),
+): ClassResourceSemanticKind {
+  const key = resource.id.toLowerCase()
+  if (resource.uses.type === "unlimited") return "menu"
+  if (
+    /(?:momentum|ferocity|balance_of_power|rampage_die|grudge_battle_die|adrenaline_battle_die)/.test(
+      key,
+    )
+  ) {
+    return "combat_state"
+  }
+  if (resource.uses.dieType || resource.uses.dieSidesByLevel?.length) return "die_profile"
+  if (
+    /(?:_known|_formula|formulas|discoveries|upgrades|manifestations|occult_rites|hexes|grand_hexes|plans_known|replicated_magic_items)/.test(
+      key,
+    )
+  ) {
+    return "choice_count"
+  }
+  if (
+    resource.uses.recharges?.length ||
+    resource.uses.recharge ||
+    resource.uses.rechargeOnInitiative ||
+    spendKeys.has(resource.id)
+  ) {
+    return "pool"
+  }
+  return "limit"
+}
+
 export function resolveStaticResourceLabel(
   resource: ClassResource,
   classLevel: number,
   ctx: ResolveUsesContext = {},
 ): string | null {
   const uses = resource.uses
+  if (uses.type === "unlimited") return "Unlimited"
   if (uses.type === "special") {
     const table = uses.atLevelTable ?? uses.dieSidesByLevel
     if (table?.length) {

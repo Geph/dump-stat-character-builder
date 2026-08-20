@@ -131,6 +131,7 @@ import {
 import { getPointPoolSpellcasting } from "@/lib/character/point-pool-spellcasting"
 import {
   metamagicOptionsForCharacter,
+  manipulateMagicCatalogPickIds,
   mortalMetamagicOptionsFromFeatures,
   resolveSpellCastCost,
 } from "@/lib/character/resolve-spell-cast-cost"
@@ -151,7 +152,7 @@ import { SheetRollHistoryProvider } from "@/components/character-sheet/sheet-rol
 import { ManualRollTrigger } from "@/components/character-sheet/manual-roll-trigger"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import { collectClassResourceSpendKeys } from "@/lib/compendium/class-resource-display"
-import { isGatedClassResourceUnlockedForClass } from "@/lib/compendium/subclass-gated-class-resources"
+import { isClassResourceUnlockedForSubclasses } from "@/lib/compendium/subclass-gated-class-resources"
 import {
   ClassResourceStaticDisplay,
   partitionResourceTrackerEntries,
@@ -177,6 +178,7 @@ import { featureChoiceKey } from "@/lib/builder/choices"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { collectSelectedCustomAbilityNames } from "@/lib/builder/picked-custom-abilities"
+import { catalogFeatPickIdsFromPicks } from "@/lib/builder/catalog-feat-options"
 import { collectKnownDisciplineNames } from "@/lib/builder/aggregate-psionic-talents"
 import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
@@ -1725,9 +1727,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       const subclassNames = entry.subclass?.name ? [entry.subclass.name] : []
       const resources = resolveClassResourcesForClass(entry.class)
       for (const resource of resources) {
-        if (resource.uses.type === "unlimited" || resource.uses.type === "class_resource") continue
+        if (resource.uses.type === "class_resource") continue
         if (resource.id === "spell_slots") continue
-        if (!isGatedClassResourceUnlockedForClass(resource.id, className, subclassNames)) {
+        if (!isClassResourceUnlockedForSubclasses(resource, className, subclassNames)) {
           continue
         }
         const id = `${entry.row.class_id}_${resource.id}`
@@ -1789,11 +1791,23 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     for (const entry of classDetails) {
       if (!entry.class) continue
       for (const resource of resolveClassResourcesForClass(entry.class)) {
-        byId.set(resource.id, resource)
+        byId.set(`${entry.row.class_id}_${resource.id}`, resource)
       }
     }
     return byId
   }, [classDetails])
+
+  const hasFerocityMechanic = useMemo(
+    () =>
+      classDetails.some(
+        (entry) =>
+          entry.class &&
+          resolveClassResourcesForClass(entry.class).some(
+            (resource) => resource.id === "ferocity",
+          ),
+      ),
+    [classDetails],
+  )
 
   const { spendableResourceEntries, staticResourceEntries } = useMemo(() => {
     const { spendable, static: staticEntries } = partitionResourceTrackerEntries(
@@ -1977,16 +1991,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   )
 
   const metamagicOptions = useMemo(() => {
+    const featIds = [
+      ...(character?.feat_ids ?? []),
+      ...characterFeats.map((feat) => feat.id),
+      ...(originFeat ? [originFeat.id] : []),
+      ...catalogFeatPickIdsFromPicks(featureChoicePicks),
+    ]
     const fromFeats = metamagicOptionsForCharacter({
-      featIds: [
-        ...(character?.feat_ids ?? []),
-        ...characterFeats.map((feat) => feat.id),
-        ...(originFeat ? [originFeat.id] : []),
-      ],
+      featIds,
       feats: [...characterFeats, ...(originFeat ? [originFeat] : [])],
-      customAbilities: sheetCustomAbilities,
+      customAbilities,
       selectedCustomAbilityNames: sheetCustomAbilities.map((ability) => ability.name),
       spellLevel: selectedSpell?.level ?? 1,
+      manipulateMagicPickIds: manipulateMagicCatalogPickIds(featureChoicePicks),
     })
     const fromMortal = mortalMetamagicOptionsFromFeatures(
       classDetails.flatMap((entry) => [
@@ -2006,9 +2023,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     character?.feat_ids,
     characterFeats,
     originFeat,
+    customAbilities,
     sheetCustomAbilities,
     selectedSpell?.level,
     classDetails,
+    featureChoicePicks,
   ])
 
   const selectedMetamagic = useMemo(
@@ -2793,6 +2812,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           key: row.key,
           currentHp: row.currentHp,
           tempHp: row.tempHp > 0 ? row.tempHp : null,
+          ferocity: row.ferocity > 0 ? row.ferocity : null,
           customName: row.displayName !== row.template.name ? row.displayName : null,
           activeConditions: row.activeConditions.length ? row.activeConditions : null,
           polymorphActive: row.polymorphActive ? true : null,
@@ -2843,6 +2863,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           key: groupKey,
           currentHp: existing?.currentHp ?? null,
           tempHp: existing?.tempHp ?? null,
+          ferocity: existing?.ferocity ?? null,
           customName: existing?.customName ?? null,
           activeConditions: existing?.activeConditions ?? null,
           polymorphActive: existing?.polymorphActive ?? null,
@@ -4996,6 +5017,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             usedById={usedResourcesById}
                             onUsedChange={setUsedResourcesById}
                             resolveContext={usesResolveContext}
+                            spellSlotTables={spellSlotTables}
+                            usedSpellSlotsByKey={usedSpellSlotsByKey}
+                            onUsedSpellSlotsChange={setUsedSpellSlotsByKey}
                           />
                         )}
                         {staticResourceEntries.length > 0 && (
@@ -5407,6 +5431,68 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             patchCompanionState(companion.key, { polymorphActive: active })
                           }
                         />
+                        {hasFerocityMechanic && !companion.polymorph ? (
+                          <div className="rounded-lg border border-border bg-muted/20 p-2.5 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs font-bold text-foreground">Ferocity</p>
+                              <span className="text-sm font-black tabular-nums">
+                                {companion.ferocity}
+                              </span>
+                            </div>
+                            {companion.ferocity >= 10 ? (
+                              <p className="text-[10px] font-semibold text-destructive">
+                                Rampage check: DC {5 + companion.ferocity}
+                              </p>
+                            ) : null}
+                            <div className="flex flex-wrap gap-1.5">
+                              <button
+                                type="button"
+                                disabled={companion.ferocity <= 0}
+                                onClick={() =>
+                                  patchCompanionState(companion.key, {
+                                    ferocity: Math.max(0, companion.ferocity - 1),
+                                  })
+                                }
+                                className="rounded border border-border px-2 py-1 text-[10px] font-semibold disabled:opacity-40"
+                              >
+                                Spend 1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  patchCompanionState(companion.key, {
+                                    ferocity: companion.ferocity + 1,
+                                  })
+                                }
+                                className="rounded border border-border px-2 py-1 text-[10px] font-semibold"
+                              >
+                                +1 nearby hostile
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  patchCompanionState(companion.key, {
+                                    ferocity:
+                                      companion.ferocity + Math.floor(Math.random() * 4) + 1,
+                                  })
+                                }
+                                className="rounded border border-border px-2 py-1 text-[10px] font-semibold"
+                              >
+                                Roll +1d4
+                              </button>
+                              <button
+                                type="button"
+                                disabled={companion.ferocity <= 0}
+                                onClick={() =>
+                                  patchCompanionState(companion.key, { ferocity: 0 })
+                                }
+                                className="rounded border border-border px-2 py-1 text-[10px] font-semibold disabled:opacity-40"
+                              >
+                                Reset
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                         {/astral construct/i.test(companion.template.name) ? (
                           <CompanionAttackRedirect
                             companionName={companion.displayName}

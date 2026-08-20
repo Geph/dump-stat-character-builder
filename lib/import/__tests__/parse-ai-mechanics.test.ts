@@ -596,6 +596,29 @@ describe("aiMechanicsToDetections", () => {
     }
   })
 
+  it("preserves variable class-resource spend caps", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "uses",
+          classResourceKey: "charnel_touch",
+          classResourceCostMode: "up_to_proficiency_bonus",
+          sourcePhrase: "expend Charnel Touch points up to your proficiency bonus",
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Charnel Touch" },
+    )
+    const uses = detections[0]?.instance.characteristics?.[0]
+    expect(uses?.type).toBe("uses")
+    if (uses?.type === "uses") {
+      expect(uses.uses).toMatchObject({
+        type: "class_resource",
+        classResourceKey: "charnel_touch",
+        classResourceCostMode: "up_to_proficiency_bonus",
+      })
+    }
+  })
+
   it("wires requiresSheetToggle on damage modifiers from AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [

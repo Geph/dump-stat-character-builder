@@ -52,6 +52,7 @@ export function summarizeImportPreview(content: ImportContent): string {
     species: content.species?.length ?? 0,
     backgrounds: content.backgrounds?.length ?? 0,
     equipment: content.equipment?.length ?? 0,
+    languages: content.languages?.length ?? 0,
     card_art: content.card_art?.length ?? 0,
   })
     .filter(([, count]) => count > 0)

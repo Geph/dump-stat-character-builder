@@ -124,6 +124,18 @@ function sampleOccultist(): ImportContent {
           source_name: "Occultist",
           prerequisite: "Mystery of Fire",
         },
+        {
+          proposal_id: "hedgemage_rite_manipulate_magic",
+          name: "Manipulate Magic",
+          ability_role: "knack",
+          definition: "Hedge Mage Rite. Borrow a Sorcerer Metamagic option.",
+          description:
+            "<p>You learn one Metamagic option of your choice from the Sorcerer class. You can use this Metamagic option once, regaining the ability to use it again after completing a long rest. When using it this way, you use it as if you expended 3 or less sorcery points.</p><p>You can use it again before completing a long rest by expending a spell slot of a level equal to the number of sorcery points the Metamagic would cost to use.</p>",
+          source_type: "subclass",
+          source_name: "Hedge Mage",
+          prerequisite: "5th-level Hedge Mage",
+          level_requirement: 5,
+        },
       ],
     },
   } as unknown as ImportContent
@@ -170,6 +182,19 @@ describe("Occultist enrichment sanitize", () => {
     expect(
       sanitized.import_proposals?.custom_abilities?.find((a) => a.name === "Revelation of Fire"),
     ).toMatchObject({ source_type: "subclass", source_name: "Oracle" })
+
+    const manipulate = sanitized.import_proposals?.custom_abilities?.find(
+      (a) => a.name === "Manipulate Magic",
+    ) as { source_name?: string; mechanics?: { kind?: string; featCategories?: string[] }[] }
+    expect(manipulate).toMatchObject({
+      source_type: "subclass",
+      source_name: "Hedge Mage",
+      ability_role: "knack",
+    })
+    expect(manipulate.mechanics?.some((m) => m.kind === "grant_feat" && m.featCategories?.includes("Metamagic"))).toBe(
+      true,
+    )
+    expect(manipulate.mechanics?.some((m) => m.kind === "uses")).toBe(true)
 
     const witchMagic = sanitized.subclasses
       ?.find((s) => s.name === "Witch")

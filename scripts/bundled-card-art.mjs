@@ -1,6 +1,7 @@
 /**
- * Card art that may be committed / pushed: SRD, Kibbles Tasty, and Mage Hand Press.
- * Other origin folders (PHB, Eberron, Ravenloft, Faerûn, …) optimize locally and stay gitignored.
+ * Card art that may be committed / pushed: SRD, Kibbles Tasty, Mage Hand Press,
+ * plus all species portraits (original graphics). Other setting backgrounds /
+ * class art optimize locally and stay gitignored.
  */
 
 const BUNDLED_CARD_SOURCE_ORIGINS = new Set([
@@ -44,23 +45,6 @@ const BUNDLED_BACKGROUND_FILES = new Set([
   "sage.png",
   "soldier.png",
   "tinker.png",
-])
-
-const BUNDLED_SPECIES_FILES = new Set([
-  "augmented.png",
-  "awakened-undead.png",
-  "dragonborn.png",
-  "dwarf.png",
-  "elf.png",
-  "farling.png",
-  "gnome.png",
-  "goliath.png",
-  "halfling.png",
-  "human.png",
-  "ironwrought.png",
-  "orc.png",
-  "tiefling.png",
-  "warped.png",
 ])
 
 /** Nested `{class}/{slug}.png` for SRD subclasses (Kibbles class folders are allow-all). */
@@ -107,8 +91,8 @@ export function isBundledPublicCardArtPath(repoRelative) {
   if (classes) return BUNDLED_CLASS_FILES.has(classes[1])
   const backgrounds = n.match(/^public\/images\/compendium\/backgrounds\/([^/]+)$/)
   if (backgrounds) return BUNDLED_BACKGROUND_FILES.has(backgrounds[1])
-  const species = n.match(/^public\/images\/compendium\/species\/([^/]+)$/)
-  if (species) return BUNDLED_SPECIES_FILES.has(species[1])
+  // All species portraits are original / safe to ship (not copyrighted book scans).
+  if (n.startsWith("public/images/compendium/species/") && n.endsWith(".png")) return true
   const subclass = n.match(/^public\/images\/compendium\/subclasses\/(.+)$/)
   if (subclass) {
     const rest = subclass[1]

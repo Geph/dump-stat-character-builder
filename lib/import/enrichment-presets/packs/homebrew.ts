@@ -1206,6 +1206,15 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
       { op: "setActivation", activation: { action: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
+        op: "setLimitedUses",
+        uses: {
+          type: "class_resource",
+          classResourceKey: "charnel_touch",
+          classResourceAmount: 5,
+          classResourceCostMode: "up_to_proficiency_bonus",
+        },
+      },
+      {
         op: "appendDescription",
         text: "Spend from class_resources.charnel_touch (5 × Necromancer level, long rest). Per-use cap is 5 × Proficiency Bonus — track spend amount play-time.",
       },

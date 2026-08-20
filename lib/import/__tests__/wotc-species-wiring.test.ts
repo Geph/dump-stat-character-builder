@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
+import { SPECIES_CARD_IMAGES_BY_NAME } from "@/lib/compendium/species-card-images-defaults"
 import { hasHomebrewFixture, homebrewFixturePath } from "./homebrew-fixture-path"
 
 const FIXTURE = "wotc-species"
@@ -127,6 +128,39 @@ describe("WOTC species wiring", () => {
     expect(
       (lorwynLineage?.choices?.options ?? []).every((o) => (o.linkedModifiers?.length ?? 0) > 0),
     ).toBe(true)
+
+    const eberronAasimar = enriched.species?.find((s) => s.name === "Aasimar (Eberron)")
+    const aasimarLineage = (eberronAasimar?.traits as TraitRow[] | undefined)?.find(
+      (t) => t.name === "Aasimar Lineage",
+    )
+    expect((aasimarLineage?.choices?.options ?? []).map((o) => o.name)).toEqual([
+      "Fernian",
+      "Mabaran",
+    ])
+    expect(
+      (aasimarLineage?.choices?.options ?? []).every((o) => (o.linkedModifiers?.length ?? 0) > 0),
+    ).toBe(true)
+    expect(JSON.stringify(aasimarLineage?.choices?.options?.[0]?.linkedModifiers)).toMatch(
+      /Fire|Produce Flame/i,
+    )
+    expect(JSON.stringify(aasimarLineage?.choices?.options?.[1]?.linkedModifiers)).toMatch(
+      /Toll the Dead|Radiant/i,
+    )
+
+    const revelation = (eberronAasimar?.traits as TraitRow[] | undefined)?.find(
+      (t) => t.name === "Celestial Revelation",
+    )
+    expect((revelation?.choices?.options ?? []).map((o) => o.name)).toEqual([
+      "Heavenly Wings",
+      "Inner Radiance",
+      "Inner Darkness",
+      "Necrotic Shroud",
+    ])
+    const innerRadiance = (revelation?.choices?.options ?? []).find((o) => o.name === "Inner Radiance")
+    const innerDarkness = (revelation?.choices?.options ?? []).find((o) => o.name === "Inner Darkness")
+    expect(JSON.stringify(innerRadiance?.linkedModifiers)).toMatch(/Fire/i)
+    expect(JSON.stringify(innerDarkness?.linkedModifiers)).toMatch(/Necrotic/i)
+    expect(SPECIES_CARD_IMAGES_BY_NAME["Aasimar (Eberron)"]).toMatch(/aasimar-eberron/)
 
     const flamekin = enriched.species?.find((s) => s.name === "Flamekin")
     expect((flamekin?.traits as TraitRow[] | undefined)?.map((t) => t.name)).toEqual([

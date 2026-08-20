@@ -25,6 +25,7 @@ import {
 import type { Feature, UsesConfig } from "@/lib/types"
 import { enrichImportedWeaponMasteryFromColumn } from "@/lib/compendium/weapon-mastery-choice"
 import { classNamesFuzzyMatch, classNamesMatch } from "@/lib/import/resolve-parent-class"
+import { classResourcePrerequisitesForSubclass } from "@/lib/compendium/class-resource-rows"
 
 function resourceBelongsToClass(resourceClassName: string, className: string): boolean {
   return (
@@ -363,7 +364,10 @@ export function buildClassResourceRowsForClass(
       resource_key: remapImportedResourceKey(className, resource.resource_key),
       name: resource.name,
       description: resource.description ?? null,
-      prerequisite_rules: resource.prerequisite_rules ?? null,
+      prerequisite_rules: classResourcePrerequisitesForSubclass(
+        resource.subclass_name,
+        resource.prerequisite_rules,
+      ),
       uses: resource.uses,
       source,
     })

@@ -29,7 +29,9 @@ describe("bundled card art allowlist", () => {
       false,
     )
     expect(isBundledPublicCardArtPath("public/images/compendium/classes/artificer.png")).toBe(false)
-    expect(isBundledPublicCardArtPath("public/images/compendium/species/warforged.png")).toBe(false)
+    expect(isBundledPublicCardArtPath("public/images/compendium/species/warforged.png")).toBe(true)
+    expect(isBundledPublicCardArtPath("public/images/compendium/species/aasimar-eberron.png")).toBe(true)
     expect(isBundledPublicCardArtPath("public/images/compendium/backgrounds/noble.png")).toBe(false)
+    expect(isBundledPublicCardArtPath("public/images/compendium/backgrounds/acolyte.png")).toBe(true)
   })
 })

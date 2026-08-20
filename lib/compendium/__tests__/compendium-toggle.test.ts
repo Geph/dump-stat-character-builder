@@ -61,6 +61,25 @@ describe("findCompendiumDependents", () => {
                 attached_to_type: "subclass",
                 attached_to_id: "sub-1",
               },
+              {
+                id: "a3",
+                name: "Named Class Knack",
+                attached_to_type: "class",
+                attached_to_id: "Inventor",
+              },
+              {
+                id: "a4",
+                name: "Named Subclass Trick",
+                attached_to_type: "subclass",
+                attached_to_id: "Golemsmith",
+              },
+              {
+                id: "a5",
+                name: "Eligible Library",
+                attached_to_type: null,
+                attached_to_id: null,
+                eligible_classes: ["Inventor"],
+              },
             ],
             error: null,
           }),
@@ -71,9 +90,12 @@ describe("findCompendiumDependents", () => {
     const dependents = await findCompendiumDependents(db as never, "classes", "class-1")
     expect(dependents.map((d) => d.name).sort()).toEqual([
       "Class Upgrade",
+      "Eligible Library",
       "Golem Chassis",
       "Golemsmith",
       "Inventor Adept",
+      "Named Class Knack",
+      "Named Subclass Trick",
     ])
   })
 

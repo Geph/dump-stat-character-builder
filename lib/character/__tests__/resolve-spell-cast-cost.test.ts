@@ -77,6 +77,44 @@ describe("metamagicOptionsForCharacter", () => {
     })
     expect(options.some((row) => row.name === "Twinned Spell" && row.cost === 3)).toBe(true)
   })
+
+  it("does not treat Manipulate Magic itself as a Metamagic option", () => {
+    const options = metamagicOptionsForCharacter({
+      featIds: [],
+      feats: [],
+      customAbilities: [
+        {
+          id: "rite",
+          name: "Manipulate Magic",
+          ability_role: "knack",
+          description:
+            "<p>You learn one Metamagic option of your choice from the Sorcerer class. You can use this Metamagic option once, regaining the ability to use it again after completing a long rest.</p>",
+        } as import("@/lib/types").CustomAbility,
+      ],
+      selectedCustomAbilityNames: ["Manipulate Magic"],
+    })
+    expect(options.some((row) => row.name === "Manipulate Magic")).toBe(false)
+  })
+
+  it("zeros sorcery-point cost for Manipulate Magic catalog picks", () => {
+    const pickId = buildCatalogFeatPickId(METAMAGIC_OPTIONS_CATALOG_ID, "cat_metamagic_0")
+    const options = metamagicOptionsForCharacter({
+      featIds: [pickId],
+      feats: [],
+      customAbilities: [
+        {
+          id: METAMAGIC_OPTIONS_CATALOG_ID,
+          name: "Metamagic Options",
+          modifier_catalog: buildDefaultMetamagicOptions(),
+        } as import("@/lib/types").CustomAbility,
+      ],
+      manipulateMagicPickIds: [pickId],
+      spellLevel: 1,
+    })
+    const option = options.find((row) => row.id === pickId)
+    expect(option?.costSource).toBe("manipulate_magic")
+    expect(option?.cost).toBe(0)
+  })
 })
 
 describe("resolveSpellCastCost", () => {

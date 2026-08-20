@@ -79,6 +79,7 @@ import {
   syncCardArtEntriesFromContent,
 } from "@/lib/import/apply-card-art-import"
 import {
+  applyUpdateMergesToLanguageRows,
   applyUpdateMergesToNamedRows,
   filterNewResourceRows,
   findExistingSubclassRow,
@@ -569,6 +570,32 @@ export async function persistImportedContent(
     await upsertByName("equipment", equipment)
     breakdown.equipment = sanitized.equipment.length
     totalImported += sanitized.equipment.length
+  }
+
+  if (sanitized.languages?.length) {
+    let languageRows = sanitized.languages.map((row) =>
+      stampSource(
+        {
+          ...row,
+          pool: row.pool === "rare" ? "rare" : "standard",
+          description: row.description ?? null,
+          typical_speakers: row.typical_speakers ?? null,
+          script: row.script ?? null,
+          icon: row.icon ?? null,
+        },
+        source,
+      ),
+    )
+    if (options.updateExistingNames?.language?.length) {
+      languageRows = applyUpdateMergesToLanguageRows(
+        languageRows,
+        await listRows("languages"),
+        options.updateExistingNames.language,
+      )
+    }
+    await upsertByName("languages", languageRows)
+    breakdown.languages = sanitized.languages.length
+    totalImported += sanitized.languages.length
   }
 
   if ((sanitized as ImportContentWithAbilities).abilities?.length) {

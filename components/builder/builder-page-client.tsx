@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue } from "react"
 import dynamic from "next/dynamic"
 import { motion, AnimatePresence } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
@@ -17,6 +17,9 @@ import {
   pickEnabledId,
 } from "@/lib/compendium/compendium-enabled"
 import { useRouter } from "next/navigation"
+import { SearchBox } from "@/components/search/search-box"
+import { rankSearchResults, searchItems } from "@/lib/search/ranked-search"
+import { spellAliasLookupKeys } from "@/lib/compendium/spell-name-aliases"
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -196,7 +199,7 @@ import {
   groupCatalogFeatPickSlots,
   readCatalogFeatPicksFromSlots,
 } from "@/lib/builder/catalog-feat-pick-groups"
-import { getFeatPickSlots } from "@/lib/builder/class-feat-features"
+import { getCustomAbilityFeatPickSlots, getFeatPickSlots } from "@/lib/builder/class-feat-features"
 import {
   filterPreferredSourceReplacements,
   preferredSourcesFromClasses,
@@ -428,6 +431,10 @@ export default function BuilderPageClient() {
   const [backgroundSourceFilter, setBackgroundSourceFilter] = useState("all")
   const [backgroundPickerPage, setBackgroundPickerPage] = useState(0)
   const [spellSearch, setSpellSearch] = useState("")
+  const deferredClassSearch = useDeferredValue(classSearch)
+  const deferredSpeciesSearch = useDeferredValue(speciesSearch)
+  const deferredBackgroundSearch = useDeferredValue(backgroundSearch)
+  const deferredSpellSearch = useDeferredValue(spellSearch)
   const [equipmentSearch, setEquipmentSearch] = useState("")
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState("all")
   const [spellFilterLevelByClassId, setSpellFilterLevelByClassId] = useState<Record<string, string>>({})
@@ -1046,14 +1053,23 @@ export default function BuilderPageClient() {
     ? activeClassLevels.reduce((sum, cl) => sum + cl.level, 0)
       : character.level
 
-  const featPickSlots = getFeatPickSlots(
-    activeClassLevels,
-    classes,
-    modifierCatalog,
-    totalLevel,
-    subclasses,
-    subclassByClassId,
-  )
+  const featPickSlots = [
+    ...getFeatPickSlots(
+      activeClassLevels,
+      classes,
+      modifierCatalog,
+      totalLevel,
+      subclasses,
+      subclassByClassId,
+    ),
+    ...getCustomAbilityFeatPickSlots({
+      classLevels: activeClassLevels,
+      classes,
+      catalog: modifierCatalog,
+      customAbilities,
+      featureChoicePicks,
+    }),
+  ]
   const preferredFeatSources = useMemo(
     () =>
       preferredSourcesFromClasses(
@@ -1113,6 +1129,8 @@ export default function BuilderPageClient() {
         species: selectedSpecies,
         speciesTraitPicks,
         background: selectedBackground,
+        customAbilities,
+        featureChoicePicks,
       }),
     [
       activeClassLevels,
@@ -1124,6 +1142,8 @@ export default function BuilderPageClient() {
       selectedSpecies,
       speciesTraitPicks,
       selectedBackground,
+      customAbilities,
+      featureChoicePicks,
     ],
   )
   const maxLevelFeatPickSlotKeys = useMemo(
@@ -1137,6 +1157,8 @@ export default function BuilderPageClient() {
         species: selectedSpecies,
         speciesTraitPicks,
         background: selectedBackground,
+        customAbilities,
+        featureChoicePicks,
       }),
     [
       activeClassLevels,
@@ -1147,6 +1169,8 @@ export default function BuilderPageClient() {
       selectedSpecies,
       speciesTraitPicks,
       selectedBackground,
+      customAbilities,
+      featureChoicePicks,
     ],
   )
   const ownedFeatIds = useMemo(
@@ -2157,7 +2181,13 @@ export default function BuilderPageClient() {
                 backgroundOption: selectedBackgroundStartingOption,
               }),
         spell_ids: filterEnabledIds(allSpellIds, spells),
-        feat_ids: filterEnabledIds(ownedFeatIds, feats),
+        feat_ids: [
+          ...filterEnabledIds(
+            ownedFeatIds.filter((id) => !isCatalogFeatPickId(id)),
+            feats,
+          ),
+          ...ownedFeatIds.filter(isCatalogFeatPickId),
+        ],
         feat_choice_picks: featChoicePicks,
         feature_choice_picks: featureChoicePicks,
         modifier_player_picks: modifierPlayerPicks,
@@ -3016,16 +3046,33 @@ export default function BuilderPageClient() {
                 <p className={`${pageFloatingHintClass} mb-4`}>Your class determines your combat abilities and special features.</p>
                 
                 {/* Search */}
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Search classes..."
-                    value={classSearch}
-                    onChange={(e) => setClassSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-                  />
-                </div>
+                <SearchBox
+                  value={classSearch}
+                  onChange={setClassSearch}
+                  suggestions={rankSearchResults(classes, deferredClassSearch, {
+                    name: (cls) => cls.name,
+                    fields: [
+                      { name: "description", value: (cls) => cls.description, weight: 0.35 },
+                      { name: "source", value: (cls) => cls.source, weight: 0.9 },
+                      { name: "primary ability", value: (cls) => cls.primary_ability, weight: 1.2 },
+                    ],
+                    limit: 8,
+                  }).map((match) => ({
+                    id: match.item.id,
+                    label: match.item.name,
+                    detail: [match.item.primary_ability?.join("/"), match.item.source]
+                      .filter(Boolean)
+                      .join(" · "),
+                    item: match.item,
+                    matchKind: match.kind,
+                  }))}
+                  onSelect={(suggestion) => setClassSearch(suggestion.label)}
+                  scope="builder:classes"
+                  placeholder="Search classes…"
+                  ariaLabel="Search classes"
+                  className="mb-4"
+                  inputClassName="border"
+                />
                 
                 {cardViewMode !== "cinematic" ? (
                   <p className={`${pageFloatingHintClass} text-xs mb-2`}>
@@ -3034,9 +3081,14 @@ export default function BuilderPageClient() {
                 ) : null}
 
                 {(() => {
-                  const filteredClasses = classes.filter((cls) =>
-                    cls.name.toLowerCase().includes(classSearch.toLowerCase()),
-                  )
+                  const filteredClasses = searchItems(classes, deferredClassSearch, {
+                    name: (cls) => cls.name,
+                    fields: [
+                      { name: "description", value: (cls) => cls.description, weight: 0.35 },
+                      { name: "source", value: (cls) => cls.source },
+                      { name: "primary ability", value: (cls) => cls.primary_ability },
+                    ],
+                  })
                   const {
                     items: visibleClasses,
                     pageCount: classPageCount,
@@ -3865,21 +3917,41 @@ export default function BuilderPageClient() {
                   <p className={`${pageFloatingHintClass} mb-3`}>Your species grants unique traits and abilities.</p>
                   
                   {/* Search */}
-                  <div className="relative mb-3">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <input
-                      type="text"
-                      placeholder="Search species..."
-                      value={speciesSearch}
-                      onChange={(e) => setSpeciesSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-                    />
-                  </div>
+                  <SearchBox
+                    value={speciesSearch}
+                    onChange={setSpeciesSearch}
+                    suggestions={rankSearchResults(species, deferredSpeciesSearch, {
+                      name: (item) => item.name,
+                      fields: [
+                        { name: "description", value: (item) => item.description, weight: 0.35 },
+                        { name: "source", value: (item) => item.source },
+                        { name: "creature type", value: (item) => item.creature_type, weight: 1.3 },
+                      ],
+                      limit: 8,
+                    }).map((match) => ({
+                      id: match.item.id,
+                      label: match.item.name,
+                      detail: [match.item.creature_type, match.item.source].filter(Boolean).join(" · "),
+                      item: match.item,
+                      matchKind: match.kind,
+                    }))}
+                    onSelect={(suggestion) => setSpeciesSearch(suggestion.label)}
+                    scope="builder:species"
+                    placeholder="Search species…"
+                    ariaLabel="Search species"
+                    className="mb-3"
+                    inputClassName="border"
+                  />
                   
                   {(() => {
-                    const filteredSpecies = species.filter((sp) =>
-                      sp.name.toLowerCase().includes(speciesSearch.toLowerCase()),
-                    )
+                    const filteredSpecies = searchItems(species, deferredSpeciesSearch, {
+                      name: (item) => item.name,
+                      fields: [
+                        { name: "description", value: (item) => item.description, weight: 0.35 },
+                        { name: "source", value: (item) => item.source },
+                        { name: "creature type", value: (item) => item.creature_type },
+                      ],
+                    })
                     const {
                       items: visibleSpecies,
                       pageCount: speciesPageCount,
@@ -4206,16 +4278,32 @@ export default function BuilderPageClient() {
                   
                   {/* Search + source filter */}
                   <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="relative min-w-0 flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <input
-                        type="text"
-                        placeholder="Search backgrounds..."
-                        value={backgroundSearch}
-                        onChange={(e) => setBackgroundSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
+                    <SearchBox
+                      value={backgroundSearch}
+                      onChange={setBackgroundSearch}
+                      suggestions={rankSearchResults(backgrounds, deferredBackgroundSearch, {
+                        name: (item) => item.name,
+                        fields: [
+                          { name: "description", value: (item) => item.description, weight: 0.35 },
+                          { name: "source", value: (item) => item.source },
+                          { name: "skills", value: (item) => item.skill_proficiencies, weight: 1.2 },
+                          { name: "feat", value: (item) => item.feat_granted, weight: 1.1 },
+                        ],
+                        limit: 8,
+                      }).map((match) => ({
+                        id: match.item.id,
+                        label: match.item.name,
+                        detail: [match.item.feat_granted, match.item.source].filter(Boolean).join(" · "),
+                        item: match.item,
+                        matchKind: match.kind,
+                      }))}
+                      onSelect={(suggestion) => setBackgroundSearch(suggestion.label)}
+                      scope="builder:backgrounds"
+                      placeholder="Search backgrounds…"
+                      ariaLabel="Search backgrounds"
+                      className="flex-1"
+                      inputClassName="border"
+                    />
                     {(() => {
                       const sourceOptions = [
                         ...new Set(
@@ -4247,15 +4335,26 @@ export default function BuilderPageClient() {
                   </div>
                   
                   {(() => {
-                    const filteredBackgrounds = backgrounds.filter((bg) => {
-                      if (
+                    const sourceFilteredBackgrounds = backgrounds.filter(
+                      (bg) =>
+                        !(
                         backgroundSourceFilter !== "all" &&
                         (bg.source?.trim() || "Custom") !== backgroundSourceFilter
-                      ) {
-                        return false
-                      }
-                      return bg.name.toLowerCase().includes(backgroundSearch.toLowerCase())
-                    })
+                        ),
+                    )
+                    const filteredBackgrounds = searchItems(
+                      sourceFilteredBackgrounds,
+                      deferredBackgroundSearch,
+                      {
+                        name: (item) => item.name,
+                        fields: [
+                          { name: "description", value: (item) => item.description, weight: 0.35 },
+                          { name: "source", value: (item) => item.source },
+                          { name: "skills", value: (item) => item.skill_proficiencies },
+                          { name: "feat", value: (item) => item.feat_granted },
+                        ],
+                      },
+                    )
                     const {
                       items: visibleBackgrounds,
                       pageCount: backgroundPageCount,
@@ -5286,7 +5385,7 @@ export default function BuilderPageClient() {
                       // Magical Secrets / Divine Soul etc. grant access to extra class spell
                       // lists. These expand prepared (level 1+) spells, not cantrips.
                       const extraSpellLists = aggregatedCharacteristics.spellListAccess
-                      const availableSpells = spells
+                      const classAvailableSpells = spells
                         .filter((s) => {
                           if (s.level === 0) return s.classes?.includes(casterClass.name)
                           if (s.level > maxSpellLevel) return false
@@ -5298,7 +5397,19 @@ export default function BuilderPageClient() {
                         .filter(
                           (s) => !alreadyKnownSpellIds.has(s.id) || classSpellIds.includes(s.id),
                         )
-                        .filter((s) => s.name.toLowerCase().includes(spellSearch.toLowerCase()))
+                      const availableSpells = searchItems(
+                        classAvailableSpells,
+                        deferredSpellSearch,
+                        {
+                          name: (spell) => spell.name,
+                          aliases: (spell) => spellAliasLookupKeys(spell.name),
+                          fields: [
+                            { name: "school", value: (spell) => spell.school, weight: 1.3 },
+                            { name: "classes", value: (spell) => spell.classes, weight: 1.1 },
+                            { name: "description", value: (spell) => spell.description, weight: 0.35 },
+                          ],
+                        },
+                      )
 
                       const spellsByLevel: Record<number, typeof availableSpells> = {}
                       availableSpells.forEach((s) => {
@@ -5385,20 +5496,40 @@ export default function BuilderPageClient() {
                                 ) : null}
                               </>
                             ) : null}
-                            <div className="relative min-w-[12rem] flex-1">
-                              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                              <input
-                                type="search"
-                                placeholder="Search spells…"
-                                value={spellSearch}
-                                onChange={(e) => {
-                                  setSpellSearch(e.target.value)
-                                  setSpellLevelPages({})
-                                }}
-                                className="w-full rounded-xl border-2 border-border bg-card py-2 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-                                aria-label={`Search ${casterClass.name} spells`}
-                              />
-                            </div>
+                            <SearchBox
+                              value={spellSearch}
+                              onChange={(value) => {
+                                setSpellSearch(value)
+                                setSpellLevelPages({})
+                              }}
+                              suggestions={rankSearchResults(
+                                classAvailableSpells,
+                                deferredSpellSearch,
+                                {
+                                  name: (spell) => spell.name,
+                                  aliases: (spell) => spellAliasLookupKeys(spell.name),
+                                  fields: [
+                                    { name: "school", value: (spell) => spell.school, weight: 1.3 },
+                                    { name: "classes", value: (spell) => spell.classes, weight: 1.1 },
+                                  ],
+                                  limit: 8,
+                                },
+                              ).map((match) => ({
+                                id: match.item.id,
+                                label: match.item.name,
+                                detail: `${match.item.level === 0 ? "Cantrip" : `Level ${match.item.level}`} · ${match.item.school}`,
+                                item: match.item,
+                                matchKind: match.kind,
+                              }))}
+                              onSelect={(suggestion) => {
+                                setSpellSearch(suggestion.label)
+                                setSpellLevelPages({})
+                              }}
+                              scope={`builder:spells:${casterClass.id}`}
+                              placeholder="Search spells…"
+                              ariaLabel={`Search ${casterClass.name} spells`}
+                              className="min-w-[12rem] flex-1"
+                            />
                           </div>
 
                           <div className="space-y-4">

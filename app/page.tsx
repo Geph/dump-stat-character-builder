@@ -21,6 +21,10 @@ import {
   getCustomHeroBackground,
   HERO_BG_CHANGE_EVENT,
 } from "@/lib/site-settings/hero-background"
+import {
+  getCustomLibraryBackground,
+  LIBRARY_BG_CHANGE_EVENT,
+} from "@/lib/site-settings/library-background"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
 import {
   getLastCharacterId,
@@ -97,7 +101,7 @@ type LibraryStats = {
 
 export default function HomePage() {
   const router = useRouter()
-  const { isCompactOnly } = useAppPresentationMode()
+  const { isCompactOnly, hideDefaultMidjourneyGraphics } = useAppPresentationMode()
   const [stats, setStats] = useState<LibraryStats>({
     classes: 0, species: 0, backgrounds: 0, spells: 0, feats: 0, subclasses: 0, equipment: 0,
   })
@@ -105,6 +109,7 @@ export default function HomePage() {
   // Fixed initial image so SSR and hydration match; randomize after mount unless custom.
   const [heroBg, setHeroBg] = useState(HERO_ROTATING_IMAGES[0])
   const [customHeroBg, setCustomHeroBg] = useState<string | null>(null)
+  const [customLibraryBg, setCustomLibraryBg] = useState<string | null>(null)
 
   useEffect(() => {
     const syncHero = () => {
@@ -114,12 +119,22 @@ export default function HomePage() {
         setHeroBg(HERO_ROTATING_IMAGES[Math.floor(Math.random() * HERO_ROTATING_IMAGES.length)])
       }
     }
+    const syncLibrary = () => setCustomLibraryBg(getCustomLibraryBackground())
     syncHero()
+    syncLibrary()
     window.addEventListener(HERO_BG_CHANGE_EVENT, syncHero)
-    return () => window.removeEventListener(HERO_BG_CHANGE_EVENT, syncHero)
+    window.addEventListener(LIBRARY_BG_CHANGE_EVENT, syncLibrary)
+    return () => {
+      window.removeEventListener(HERO_BG_CHANGE_EVENT, syncHero)
+      window.removeEventListener(LIBRARY_BG_CHANGE_EVENT, syncLibrary)
+    }
   }, [])
 
-  const heroBackgroundUrl = customHeroBg ?? heroBg
+  const showDefaultHomePhotos = !isCompactOnly && !hideDefaultMidjourneyGraphics
+  const heroBackgroundUrl = customHeroBg ?? (showDefaultHomePhotos ? heroBg : null)
+  const libraryBackgroundUrl =
+    customLibraryBg ?? (showDefaultHomePhotos ? LIBRARY_STATS_BACKGROUND : null)
+  const showFeatureCardImages = showDefaultHomePhotos
 
   useEffect(() => {
     if (!isResumeLastCharacterEnabled() || !isWelcomeSplashSuppressed()) return
@@ -181,20 +196,20 @@ export default function HomePage() {
           id="hero-section"
           className={cn(
             "relative overflow-hidden pt-[170px] pb-20 px-4",
-            isCompactOnly && "bg-gradient-to-b from-primary/15 via-card-lighter to-background",
+            !heroBackgroundUrl && "bg-gradient-to-b from-primary/15 via-card-lighter to-background",
           )}
           style={
-            isCompactOnly
-              ? undefined
-              : {
+            heroBackgroundUrl
+              ? {
                   backgroundImage: `url(${heroBackgroundUrl})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center top",
                   backgroundRepeat: "no-repeat",
                 }
+              : undefined
           }
         >
-          {!isCompactOnly ? (
+          {heroBackgroundUrl ? (
             <>
               <div className="absolute inset-0 bg-background/50 pointer-events-none" />
               <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
@@ -297,7 +312,7 @@ export default function HomePage() {
                     href={feature.href}
                     className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card/75 backdrop-blur text-center transition-all hover:-translate-y-1 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
-                    {!isCompactOnly ? (
+                    {showFeatureCardImages ? (
                       <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-muted">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -317,7 +332,7 @@ export default function HomePage() {
                       </div>
                     )}
                     <div className="flex flex-col items-center p-6">
-                      {!isCompactOnly ? (
+                      {showFeatureCardImages ? (
                         <h3
                           className="mb-2 text-lg font-bold text-foreground group-hover:text-primary transition-colors"
                           style={{ fontFamily: "var(--font-display)" }}
@@ -339,20 +354,20 @@ export default function HomePage() {
           id="library-stats-section"
           className={cn(
             "py-20 px-4 border-t border-border relative overflow-hidden",
-            isCompactOnly && "bg-gradient-to-b from-card-lighter to-background",
+            !libraryBackgroundUrl && "bg-gradient-to-b from-card-lighter to-background",
           )}
           style={
-            isCompactOnly
-              ? undefined
-              : {
-                  backgroundImage: `url(${LIBRARY_STATS_BACKGROUND})`,
+            libraryBackgroundUrl
+              ? {
+                  backgroundImage: `url(${libraryBackgroundUrl})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
                   backgroundRepeat: "no-repeat",
                 }
+              : undefined
           }
         >
-          {!isCompactOnly ? (
+          {libraryBackgroundUrl ? (
             <div className="absolute inset-0 bg-background/55 pointer-events-none" />
           ) : null}
           <div className="max-w-5xl mx-auto relative z-10">

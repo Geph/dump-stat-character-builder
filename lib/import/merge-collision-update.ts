@@ -75,6 +75,43 @@ export function applyUpdateMergesToNamedRows(
   })
 }
 
+/**
+ * Language catalog Update merges: keep id/enabled, prefer incoming flavor fields
+ * (description, speakers, script, pool, source) so setting packs can enrich SRD rows.
+ */
+export function mergeLanguageRowForUpdate(
+  existing: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+): Record<string, unknown> {
+  const next = mergeRowForUpdate(existing, incoming)
+  next.description = firstFilled(incoming.description, existing.description)
+  next.typical_speakers = firstFilled(incoming.typical_speakers, existing.typical_speakers)
+  next.script = firstFilled(incoming.script, existing.script)
+  next.pool = firstFilled(incoming.pool, existing.pool)
+  next.source = firstFilled(incoming.source, existing.source)
+  return next
+}
+
+export function applyUpdateMergesToLanguageRows(
+  incoming: Record<string, unknown>[],
+  existing: Record<string, unknown>[],
+  updateNames: ReadonlySet<string> | readonly string[] | undefined,
+): Record<string, unknown>[] {
+  const names = new Set(
+    [...(updateNames ?? [])].map((name) => name.trim().toLowerCase()).filter(Boolean),
+  )
+  if (!names.size) return incoming
+  const existingByName = new Map(
+    existing.map((row) => [nameKey(row.name), row] as const).filter(([key]) => Boolean(key)),
+  )
+  return incoming.map((row) => {
+    const key = nameKey(row.name)
+    if (!names.has(key)) return row
+    const prev = existingByName.get(key)
+    return prev ? mergeLanguageRowForUpdate(prev, row) : row
+  })
+}
+
 export function shouldMergeClassResources(
   className: string,
   updateClassNames: ReadonlySet<string> | readonly string[] | undefined,

@@ -4,6 +4,7 @@ export const IMPORT_CONTENT_TYPE_HINTS = [
   { value: "subclasses", label: "Subclasses only (parent already imported)" },
   { value: "species", label: "Species" },
   { value: "backgrounds", label: "Backgrounds" },
+  { value: "languages", label: "Languages" },
   { value: "spells", label: "Spells" },
   { value: "feats", label: "Feats, Fighting Styles, Boons" },
   { value: "creatures", label: "Creatures & Companions" },

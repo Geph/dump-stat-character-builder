@@ -25,6 +25,7 @@ describe("resolveClassResourcesForClass", () => {
         resource_key: "exploit_dice",
         name: "Exploit Dice",
         description: null,
+        prerequisite_rules: [{ category: "other", value: "Subclass: Way of the Brawler" }],
         uses: resources[0].uses,
         icon: null,
         source: "Custom",
@@ -39,7 +40,49 @@ describe("resolveClassResourcesForClass", () => {
     )
     expect(resolved).toHaveLength(1)
     expect(resolved[0]?.id).toBe("exploit_dice")
+    expect(resolved[0]?.subclassName).toBe("Way of the Brawler")
     expect(resolved[0]?.uses.dieSidesByLevel).toContainEqual({ level: 2, count: 6 })
+  })
+
+  it("normalizes subclass_name on embedded seed resources", () => {
+    const resolved = resolveClassResourcesForClass({
+      id: "cls-inventor",
+      name: "Inventor",
+      class_resources: [
+        {
+          id: "runes_marked",
+          name: "Runes Marked",
+          uses: { type: "special", atLevelTable: [{ level: 3, count: 2 }] },
+          subclass_name: "Runesmith",
+        } as ClassResource,
+      ],
+    })
+    expect(resolved[0]?.subclassName).toBe("Runesmith")
+  })
+
+  it("backfills subclass ownership on legacy table rows", () => {
+    const resolved = resolveClassResourcesForClass(
+      { id: "cls-witch", name: "Witch", class_resources: null },
+      [
+        {
+          id: "remedy",
+          class_id: "cls-witch",
+          resource_key: "remedy_dice",
+          name: "Remedy Dice",
+          description: null,
+          uses: {
+            type: "at_level",
+            atLevelMode: "multiply_level",
+            atLevelTable: [{ level: 1, count: 1 }],
+          },
+          icon: null,
+          source: "Mage Hand Press",
+          creator_url: null,
+          created_at: "",
+        },
+      ],
+    )
+    expect(resolved[0]?.subclassName).toBe("White Magic")
   })
 
   it("falls back to SRD defaults when no homebrew resources exist", () => {

@@ -59,7 +59,25 @@ describe("subclass card images", () => {
     expect(defaultSubclassCardImageUrl("Cartographer", "Artificer")).toMatch(
       /\/images\/compendium\/subclasses\/artificer\/cartographer\.png$/,
     )
-    expect(defaultSubclassCardImageUrl("Shadow Sorcery", "Sorcerer")).toBeNull()
+    expect(defaultSubclassCardImageUrl("Shadow Sorcery", "Sorcerer")).toMatch(
+      /sorcerer\/shadow-sorcery\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Undead Patron", "Warlock")).toMatch(
+      /warlock\/undead-patron\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Spellfire Sorcery", "Sorcerer")).toMatch(
+      /sorcerer\/spellfire-sorcery\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Bladesinging", "Wizard")).toMatch(
+      /wizard\/bladesinging\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Archfey Patron", "Warlock")).toMatch(
+      /warlock\/archfey-patron\.png$/,
+    )
+    expect(defaultSubclassCardImageUrl("Abjurer", "Wizard")).toMatch(/wizard\/abjurer\.png$/)
+    expect(defaultSubclassCardImageUrl("Vestige Patron", "Warlock")).toMatch(
+      /warlock\/vestige-patron\.png$/,
+    )
   })
 
   it("maps dropped PHB subclass sources by class and name", () => {
@@ -139,6 +157,9 @@ describe("subclass card images", () => {
     expect(defaultSubclassCardImageUrl("Shaman", "Occultist")).toMatch(
       /\/images\/compendium\/subclasses\/occultist\/shaman\.png$/,
     )
+    expect(defaultSubclassCardImageUrl("Spiritualist", "Occultist")).toMatch(
+      /\/images\/compendium\/subclasses\/occultist\/spiritualist\.png$/,
+    )
   })
 
   it("scopes Reanimator to Artificer and skips unmapped names", () => {
@@ -149,7 +170,9 @@ describe("subclass card images", () => {
     expect(defaultSubclassCardImageUrl("Phantom", "Rogue")).toMatch(
       /\/images\/compendium\/subclasses\/rogue\/phantom\.png$/,
     )
-    expect(defaultSubclassCardImageUrl("Undead Patron", "Warlock")).toBeNull()
+    expect(defaultSubclassCardImageUrl("Undead Patron", "Warlock")).toMatch(
+      /\/images\/compendium\/subclasses\/warlock\/undead-patron\.png$/,
+    )
   })
 
   it("ships an optimized image file for every bundled subclass", () => {

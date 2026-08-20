@@ -380,6 +380,8 @@ export interface ClassResource {
   name: string
   description?: string
   uses: UsesConfig
+  /** Owning subclass for subclass-granted resources. Omit for base-class resources. */
+  subclassName?: string | null
   /** Override sheet display; derived from spendability when unset. */
   display?: "tracker" | "static" | "hidden"
 }
@@ -667,6 +669,10 @@ export interface UsesConfig {
   classResourceKey?: string
   /** When type is class_resource — uses spent per activation (default: 1) */
   classResourceAmount?: number
+  /** Variable per-activation spend cap for resource-powered actions. */
+  classResourceCostMode?: "fixed" | "up_to_proficiency_bonus" | "up_to_ability_modifier"
+  /** Ability used when classResourceCostMode is up_to_ability_modifier. */
+  classResourceCostAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA"
   /**
    * Shared spend bucket across features that draw from the same self-contained
    * pool (e.g. Innate Sorcery + Abyssal Rupture). When set, sheet tracking uses

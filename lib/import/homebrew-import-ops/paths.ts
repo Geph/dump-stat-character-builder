@@ -53,9 +53,11 @@ export function resolveHomebrewImportJsonPath(name: string): string | null {
   if (!target || !existsSync(root)) return null
 
   const rootHit = join(root, target)
-  if (existsSync(rootHit)) {
+  const rootHitJson = target.endsWith(".json") ? null : join(root, `${target}.json`)
+  for (const candidate of [rootHit, rootHitJson]) {
+    if (!candidate || !existsSync(candidate)) continue
     try {
-      if (statSync(rootHit).isFile()) return rootHit
+      if (statSync(candidate).isFile()) return candidate
     } catch {
       /* ignore */
     }
@@ -80,7 +82,12 @@ export function resolveHomebrewImportJsonPath(name: string): string | null {
       } catch {
         continue
       }
-      if (st.isFile() && entry === target) return full
+      if (
+        st.isFile() &&
+        (entry === target || (!target.endsWith(".json") && entry === `${target}.json`))
+      ) {
+        return full
+      }
       if (st.isDirectory()) queue.push({ dir: full, depth: depth + 1 })
     }
   }

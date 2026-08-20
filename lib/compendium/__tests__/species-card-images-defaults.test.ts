@@ -20,6 +20,8 @@ describe("species card images", () => {
         "Aasimar (2014)",
         "Aasimar (2022)",
         "Aasimar (2024)",
+        "Aasimar (Eberron)",
+        "Aasimar-Eberron",
         "Air Genasi",
         "Astral Elf",
         "Augmented",

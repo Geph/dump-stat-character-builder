@@ -708,6 +708,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: [
       "You can create an illusory duplicate in this way once, regaining its use after a long rest.",
       "You can cast it once without expending any psi points, regaining the ability to do so after a long rest.",
+      "You can use this Metamagic option once, regaining the ability to use it again after completing a long rest.",
     ],
     mechanicsKind: "uses",
     notes: 'usesFixed: 1 + usesRecharge from the rest type. Kibbles-style once + regain phrasing.',
@@ -918,6 +919,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     mechanicsKind: "weapon_reach_modifier",
     notes:
       "Self reach bonus for melee/unarmed; appliesToUnarmedStrike defaults true. Prefer mechanics[] weapon_reach_modifier when already extracted.",
+  },
+  {
+    ruleId: "grant.metamagic",
+    trigger: "description",
+    catalog: "cat_char_grant_feat",
+    examples: [
+      "You learn one Metamagic option of your choice from the Sorcerer class.",
+    ],
+    mechanicsKind: "grant_feat",
+    notes:
+      'featCategories: ["Metamagic"] — Hedge Mage Manipulate Magic and similar one-option grants. Uses the PHB Metamagic Options catalog, not Alternate Sorcerer knacks.',
   },
   {
     ruleId: "grant.fighting_style",

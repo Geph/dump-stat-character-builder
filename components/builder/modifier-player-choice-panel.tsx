@@ -19,6 +19,9 @@ import {
   type ModifierPlayerChoiceSlot,
 } from "@/lib/builder/modifier-player-choices"
 import type { Spell } from "@/lib/types"
+import { SearchBox } from "@/components/search/search-box"
+import { rankSearchResults, searchItems } from "@/lib/search/ranked-search"
+import { spellAliasLookupKeys } from "@/lib/compendium/spell-name-aliases"
 
 type ModifierPlayerChoicePanelProps = {
   sourceKey: string
@@ -83,9 +86,14 @@ function SpellGrantPicker({
     )
   }
 
-  const filtered = availableSpells.filter((spell) =>
-    spell.name.toLowerCase().includes(filter.toLowerCase()),
-  )
+  const filtered = searchItems(availableSpells, filter, {
+    name: (spell) => spell.name,
+    aliases: (spell) => spellAliasLookupKeys(spell.name),
+    fields: [
+      { name: "school", value: (spell) => spell.school, weight: 1.3 },
+      { name: "classes", value: (spell) => spell.classes, weight: 1.1 },
+    ],
+  })
   const pageSize = isSmScreen ? Math.max(filtered.length, 1) : mobilePageSize
   const { items: visibleSpells, pageCount, safePage } = paginateList(filtered, page, pageSize)
 
@@ -114,12 +122,27 @@ function SpellGrantPicker({
           {listClass} list · {slot.spellLevel === 0 ? "Cantrips" : `Level ${slot.spellLevel}`}
         </p>
       )}
-      <input
-        type="text"
+      <SearchBox
         value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        placeholder="Filter spells..."
-        className="w-full mb-3 px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        onChange={setFilter}
+        suggestions={rankSearchResults(availableSpells, filter, {
+          name: (spell) => spell.name,
+          aliases: (spell) => spellAliasLookupKeys(spell.name),
+          fields: [{ name: "school", value: (spell) => spell.school, weight: 1.3 }],
+          limit: 8,
+        }).map((match) => ({
+          id: match.item.id,
+          label: match.item.name,
+          detail: `${match.item.level === 0 ? "Cantrip" : `Level ${match.item.level}`} · ${match.item.school}`,
+          item: match.item,
+          matchKind: match.kind,
+        }))}
+        onSelect={(suggestion) => setFilter(suggestion.label)}
+        scope={`modifier-spells:${slot.slotKey}`}
+        placeholder="Filter spells…"
+        ariaLabel={`Search ${slot.label} spells`}
+        className="mb-3"
+        inputClassName="border text-sm"
       />
       {filtered.length === 0 ? (
         <p className="text-xs text-muted-foreground">No spells match this filter.</p>

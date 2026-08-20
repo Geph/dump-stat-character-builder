@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { readdir } from "fs/promises"
 import { join } from "path"
 import { categorizeIcons, ICON_CATEGORIES } from "@/lib/icons/categories"
+import { searchItems } from "@/lib/search/ranked-search"
 
 type IconCache = {
   icons: string[]
@@ -33,9 +34,10 @@ export async function GET(request: NextRequest) {
     const data = await loadIcons()
 
     if (search) {
-      const icons = data.icons
-        .filter((name) => name.toLowerCase().includes(search))
-        .slice(0, 240)
+      const icons = searchItems(data.icons, search, {
+        name: (name) => name.replace(/[-_]/g, " "),
+        limit: 240,
+      })
       return NextResponse.json({ icons, search })
     }
 

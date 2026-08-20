@@ -1,11 +1,14 @@
+import { filterAvailableDefaultCardImageUrl } from "@/lib/compendium/available-card-art"
 import { withBasePath } from "@/lib/config/deploy-mode"
 
 const bundledBackgroundCardImage = (slug: string) =>
   withBasePath(`/images/compendium/backgrounds/${slug}.png`)
 
 /**
- * Bundled background card art under public/images/compendium/backgrounds/.
+ * Background card art under public/images/compendium/backgrounds/.
  * Only names with masters in `scripts/background-card-sources` are mapped — never remote hosts.
+ * PHB / Eberron / Ravenloft / Planescape art applies on import when present locally;
+ * GitHub only ships SRD + Kibbles backgrounds (see bundled-card-art allowlist).
  */
 export const SRD_BACKGROUND_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Acolyte: bundledBackgroundCardImage("acolyte"),
@@ -55,6 +58,16 @@ export const SRD_BACKGROUND_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Wayfarer: bundledBackgroundCardImage("wayfarer"),
 }
 
+const BACKGROUND_CARD_IMAGES_BY_NAME_LOWER = new Map(
+  Object.entries(SRD_BACKGROUND_CARD_IMAGES_BY_NAME).map(([name, url]) => [name.toLowerCase(), url]),
+)
+
 export function defaultBackgroundCardImageUrl(backgroundName: string): string | null {
-  return SRD_BACKGROUND_CARD_IMAGES_BY_NAME[backgroundName.trim()] ?? null
+  const trimmed = backgroundName.trim()
+  if (!trimmed) return null
+  const mapped =
+    SRD_BACKGROUND_CARD_IMAGES_BY_NAME[trimmed] ??
+    BACKGROUND_CARD_IMAGES_BY_NAME_LOWER.get(trimmed.toLowerCase()) ??
+    null
+  return filterAvailableDefaultCardImageUrl(mapped)
 }

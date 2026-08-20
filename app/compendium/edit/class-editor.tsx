@@ -289,6 +289,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
         const db = createClient()
         const related = await findRelatedFeatsAndCompanions(db, "classes", id)
         setRelatedCascade(related)
+        if (related.abilities.length > 0) setIncludeRelatedAbilities(true)
       } catch (err) {
         console.error("[v0] Failed to load related cascade targets:", err)
       } finally {

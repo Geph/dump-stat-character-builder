@@ -2,9 +2,9 @@ import type { RestType, UsesConfig } from "@/lib/types"
 import {
   getRechargeAmount,
   getRechargeAmountOnInitiative,
+  getEffectiveRechargeRules,
   getRestRechargeRules,
   hasInitiativeRecharge,
-  isRestRechargeEnabled,
   resolveRechargeRuleAmount,
 } from "@/lib/compendium/normalize-uses-config"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
@@ -40,9 +40,14 @@ export function applyUsesRest(
     if (rechargeAmount == null) return { used: 0 }
     return { used: Math.max(0, currentUsed - rechargeAmount) }
   }
-  if (!isRestRechargeEnabled(uses, rest)) return { used: currentUsed }
-
-  const rule = getRestRechargeRules(uses).find((entry) => entry.rest === rest)
+  const effectiveRules =
+    options?.classLevel == null
+      ? getRestRechargeRules(uses)
+      : getEffectiveRechargeRules(uses, options.classLevel).filter(
+          (rule): rule is Extract<typeof rule, { rest: RestType }> => "rest" in rule,
+        )
+  const rule = effectiveRules.find((entry) => entry.rest === rest)
+  if (!rule) return { used: currentUsed }
   if (rule?.maxPerLongRest != null && rule.maxPerLongRest > 0) {
     const usedCaps = options?.rechargeCapsUsed ?? 0
     if (usedCaps >= rule.maxPerLongRest) return { used: currentUsed }
@@ -149,7 +154,6 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
   const nextResources = { ...usedResourcesById }
   const nextRechargeCaps = { ...rechargeCapsByResourceId }
   for (const entry of resourceEntries) {
-    if (entry.uses.type === "special") continue
     const max = resolveUsesAtLevel(entry.uses, entry.classLevel, resolveContext)
     if (max == null || max <= 0) continue
     const current = nextResources[entry.id] ?? 0

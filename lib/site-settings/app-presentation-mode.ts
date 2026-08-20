@@ -1,3 +1,5 @@
+import { areDefaultMidjourneyGraphicsDisabled } from "@/lib/site-settings/default-midjourney-graphics"
+
 /** Splash choice: full visual experience vs compact text-only presentation. */
 export type AppPresentationMode = "visual-compact" | "compact-only"
 
@@ -43,7 +45,8 @@ let bundledCardArtAssignmentOverride: boolean | null = null
 
 export function shouldAssignBundledCardArt(): boolean {
   if (bundledCardArtAssignmentOverride != null) return bundledCardArtAssignmentOverride
-  return areCompendiumImagesEnabled()
+  if (!areCompendiumImagesEnabled()) return false
+  return !areDefaultMidjourneyGraphicsDisabled()
 }
 
 /** Run seed/import work with an explicit card-art assignment policy (for server routes). */

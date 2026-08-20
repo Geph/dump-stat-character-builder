@@ -7,6 +7,7 @@ export type ImportStageId =
   | "feats"
   | "spells"
   | "equipment"
+  | "languages"
   | "proposals"
 
 export type ImportStage = {
@@ -24,6 +25,7 @@ export const IMPORT_STAGE_PREVIEW_KEYS: Record<ImportStageId, readonly string[]>
   feats: ["feats"],
   spells: ["spells"],
   equipment: ["equipment"],
+  languages: ["languages"],
   proposals: [],
 }
 
@@ -32,6 +34,7 @@ export const IMPORT_STAGE_COLLISION_KINDS: Record<ImportStageId, readonly Import
   feats: ["feat"],
   spells: ["spell"],
   equipment: [],
+  languages: ["language"],
   proposals: ["ability"],
 }
 
@@ -44,6 +47,7 @@ export const IMPORT_STAGE_CARD_ART_SECTIONS: Record<
   feats: [],
   spells: ["spells"],
   equipment: ["equipment"],
+  languages: [],
   proposals: ["abilities"],
 }
 
@@ -161,6 +165,17 @@ export function buildImportStages(content: ImportContent): ImportStage[] {
       description: "Weapons, armor, and gear from the document.",
       counts: { equipment: equipmentCount },
       total: equipmentCount,
+    })
+  }
+
+  const languageCount = content.languages?.length ?? 0
+  if (languageCount > 0) {
+    stages.push({
+      id: "languages",
+      label: "Languages",
+      description: "Standard and rare language catalog rows (including setting overrides).",
+      counts: { languages: languageCount },
+      total: languageCount,
     })
   }
 

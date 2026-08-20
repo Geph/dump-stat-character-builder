@@ -89,6 +89,8 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
     "Focus on species[] with traits[] (name, description; isChoice + choices when applicable). For Remains / Animating Force / Modular Design / Augmented Abilities / Warped Gift style tables: put the FULL option body in each choices.options[].description (not only a name list on the parent). Include nested sub-picks as nested isChoice when the source requires them (e.g. climb vs swim, pick two natural weapons). Language columns → fixed languages as \"You know Sylvan\" / \"You can speak, read, and write Infernal\" (or Language: Matching Remains / Any as prose). Classic darkvision prose is fine (\"see in dim light within N feet… darkness as if it were dim light\") or say \"You have darkvision within N feet\". Template species (Augmented / Warped) may use size: null when size comes from the modified origin. Optional GM variants stay separate traits marked optional — do not merge them into the default trait set. Awakened Undead Remains feats go in feats[] when the source lists them under the species chapter.",
   backgrounds:
     "Focus on backgrounds[] with skill_proficiencies, tool_proficiencies / proficiencies.languages, starting_equipment_groups for Choose A/B (one group with description + options[{label,items}], never a flat [{label,items}] array), prerequisite_rules for campaign gates, feat_granted, ability_bonuses, optional source, and feature. Classic packages without Choose A/B: use starting_equipment + starting_gold. When the source says \"belt pouch containing N gp\", include a Belt Pouch item AND starting_gold: N (do not drop the pouch). Prefer quantity on the item over parenthetical counts in the name. For Dark Gift backgrounds keep feat_granted phrasing like \"Choose one Dark Gift feat\" or \"Survivor or a Dark Gift feat of your choice\" (never collapse the or-choice; never null out Dark Gift-only grants when ASI is present). For a fixed skill plus a faction/unrestricted fallback, include \"One skill of your choice\" in skill_proficiencies and preserve the faction table in description. ability_bonuses keys must be only strength|dexterity|constitution|intelligence|wisdom|charisma (never invent keys like desktop). Keep skill/tool/language choice phrasing (Dump Stat wires pickers). Legacy pre-2024 backgrounds (no Ability Scores / Origin Feat lines) use ability_bonuses: null and feat_granted: null — do NOT invent Old Hand or other feats from a separate crafting-feats chapter that only says \"provided by some backgrounds\". Assign each Feature to the background whose tools/theme it matches (PDF column flow often misplaces features).",
+  languages:
+    "Focus on languages[] catalog rows for the Languages compendium tab. Each row needs name plus optional description, pool (\"standard\" | \"rare\"), typical_speakers, script, and source. Use pool \"standard\" for common/regional trade tongues and \"rare\" for planar, dead, psychic, or specialized dialects. When the source updates an existing SRD language (e.g. Goblin or Giant in Eberron), keep the exact name so Dump Stat's collision UI can Update the row. Do not invent unrelated content types.",
   spells:
     "Focus on spells[] with level, school, casting_time, range, components, duration, concentration, description. Preserve novel/homebrew schools as written (e.g. Duromancy, Chronomancy, Void Magic, Blood Magic / Sangromancy); do not invent schools for ordinary SRD spells.",
   feats: "Focus on feats[] with category (Origin, Dark Gift, General, Fighting Style, Epic Boon, Planar Pact) when known. Ravenloft Dark Gifts → Dark Gift, never Planar Pact. When a feat's benefit comes from a table the player picks a row of (plane/legacy/patron → resistance + cantrip), emit isChoice with one option per row named exactly as the first column, put only that row's benefits in the option description, and leave the sentence that applies to every row on the feat itself — a \"your spellcasting ability for it is Intelligence, Wisdom, or Charisma\" clause becomes one feat-level spellcasting_ability mechanic, not a copy on each option. Well-known PHB/Planescape feats have name-matched presets, so empty mechanics[] beats a partial guess.",
@@ -293,6 +295,28 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
           { name: "Pack horse", quantity: 1 },
         ],
         feature: { name: "Tinker", description: "You can repair devices." },
+      },
+    ],
+  },
+  languages: {
+    languages: [
+      {
+        name: "Quori",
+        pool: "rare",
+        description:
+          "The hypnotic, alien language of the Inspired and the entities of Dal Quor, vital for psychic intrigue.",
+        typical_speakers: "Inspired, quori, psychic agents of Sarlona",
+        script: null,
+        source: "Eberron",
+      },
+      {
+        name: "Goblin",
+        pool: "standard",
+        description:
+          "Dhakaani dialect essential for exploring ancient ruins, understanding martial traditions, and interacting with the goblinoids of Droaam or Darguun.",
+        typical_speakers: "Goblinoids of Droaam and Darguun; Dhakaani ruin explorers",
+        script: "Dwarvish",
+        source: "Eberron",
       },
     ],
   },

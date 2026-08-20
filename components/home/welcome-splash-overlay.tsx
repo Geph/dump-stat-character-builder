@@ -79,7 +79,7 @@ const VERSION_OPTIONS: VersionOption[] = [
   {
     id: "no-ai",
     title: "No AI Whatsoever",
-    description: "I don't want to use anything related to AI whatsoever",
+    description: "I don't want to use anything related to AI",
     href: "https://en.wikipedia.org/wiki/Applications_of_artificial_intelligence",
     imageSrc: NO_AI_SPLASH_IMAGE,
     imageBackgroundClass: "bg-white",
@@ -305,20 +305,20 @@ export function WelcomeSplashOverlay() {
                 </SwipeVisualPicker>
               </section>
 
-              <label className="mt-4 flex shrink-0 cursor-pointer justify-center px-1 sm:mt-5">
-                <span className="inline-flex max-w-full items-start gap-2.5 text-center">
+              <label className="mt-4 flex shrink-0 cursor-pointer flex-col items-center px-1 sm:mt-5">
+                <span className="inline-flex items-center gap-[1ch]">
                   <input
                     type="checkbox"
                     checked={dontShowAgain}
                     onChange={(event) => setDontShowAgain(event.target.checked)}
-                    className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary"
+                    className="size-4 shrink-0 rounded border-border accent-primary"
                   />
                   <span className="text-sm leading-snug text-muted-foreground">
                     Don&apos;t show this again
-                    <span className="mt-0.5 block text-xs text-muted-foreground/80">
-                      You can turn this back on in Settings → Options.
-                    </span>
                   </span>
+                </span>
+                <span className="mt-0.5 text-center text-xs text-muted-foreground/80">
+                  You can turn this back on in Settings → Options.
                 </span>
               </label>
             </div>

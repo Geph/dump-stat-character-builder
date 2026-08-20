@@ -4,6 +4,7 @@ import {
   applyAbilityScoreOverrides,
 } from "@/lib/character/apply-characteristic-runtime"
 import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
+import { catalogFeatPickIdsFromPicks } from "@/lib/builder/catalog-feat-options"
 import {
   inferClassSkillPicks,
   inferSpellPicksByClassId,
@@ -1145,7 +1146,12 @@ export function buildInputsFromSavedCharacter(params: {
     speciesTraitPicks: builderPicks.species_trait_picks ?? {},
     featChoicePicks: character.feat_choice_picks ?? {},
     modifierPlayerPicks: character.modifier_player_picks ?? {},
-    selectedFeatIds: character.feat_ids ?? [],
+    selectedFeatIds: [
+      ...new Set([
+        ...(character.feat_ids ?? []),
+        ...catalogFeatPickIdsFromPicks(character.feature_choice_picks),
+      ]),
+    ],
     grantedFeatIds: [],
     featSelectionEntries: [],
     extraSkillProficiencies: character.skill_proficiencies ?? [],

@@ -7,6 +7,7 @@ export function maxOutputTokensForImport(contentTypeHint?: string | null): numbe
       return 4096
     case "species":
     case "backgrounds":
+    case "languages":
     case "feats":
       return 3072
     case "spells":

@@ -1,12 +1,14 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Check, Info, Search } from "lucide-react"
+import { useDeferredValue, useMemo, useState } from "react"
+import { Check, Info } from "lucide-react"
 import { GameIcon } from "@/components/game-icon-picker"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { normalizeFeatCategory } from "@/lib/builder/feat-selection"
 import { cn } from "@/lib/utils"
 import type { Feat } from "@/lib/types"
+import { SearchBox } from "@/components/search/search-box"
+import { rankSearchResults, searchItems } from "@/lib/search/ranked-search"
 
 type FeatPickGalleryProps = {
   feats: Feat[]
@@ -33,6 +35,7 @@ export function FeatPickGallery({
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [sourceFilter, setSourceFilter] = useState("all")
+  const deferredSearch = useDeferredValue(search)
 
   const categoryOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -52,8 +55,7 @@ export function FeatPickGallery({
   }, [feats])
 
   const filteredFeats = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return feats.filter((feat) => {
+    const faceted = feats.filter((feat) => {
       if (
         categoryFilter !== "all" &&
         normalizeFeatCategory(feat.category) !== categoryFilter
@@ -63,11 +65,18 @@ export function FeatPickGallery({
       if (sourceFilter !== "all" && (feat.source?.trim() || "") !== sourceFilter) {
         return false
       }
-      if (!query) return true
-      const haystack = `${feat.name} ${feat.prerequisite ?? ""} ${feat.description ?? ""} ${feat.source ?? ""}`.toLowerCase()
-      return haystack.includes(query)
+      return true
     })
-  }, [feats, search, categoryFilter, sourceFilter])
+    return searchItems(faceted, deferredSearch, {
+      name: (feat) => feat.name,
+      fields: [
+        { name: "category", value: (feat) => feat.category, weight: 1.3 },
+        { name: "prerequisite", value: (feat) => feat.prerequisite, weight: 1.1 },
+        { name: "source", value: (feat) => feat.source },
+        { name: "description", value: (feat) => feat.description, weight: 0.35 },
+      ],
+    })
+  }, [feats, deferredSearch, categoryFilter, sourceFilter])
 
   const filterSelectClass =
     "rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
@@ -82,17 +91,33 @@ export function FeatPickGallery({
     <div className="space-y-2">
       {showFilters && selectedId == null && feats.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-0 w-full max-w-[11rem] flex-1 basis-[9rem] sm:max-w-[13rem]">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search feats…"
-              className="w-full rounded-lg border border-border bg-background py-2 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-              aria-label="Search feats"
-            />
-          </div>
+          <SearchBox
+            value={search}
+            onChange={setSearch}
+            suggestions={rankSearchResults(feats, deferredSearch, {
+              name: (feat) => feat.name,
+              fields: [
+                { name: "category", value: (feat) => feat.category, weight: 1.3 },
+                { name: "prerequisite", value: (feat) => feat.prerequisite, weight: 1.1 },
+                { name: "source", value: (feat) => feat.source },
+              ],
+              limit: 8,
+            }).map((match) => ({
+              id: match.item.id,
+              label: match.item.name,
+              detail: [normalizeFeatCategory(match.item.category), match.item.source]
+                .filter(Boolean)
+                .join(" · "),
+              item: match.item,
+              matchKind: match.kind,
+            }))}
+            onSelect={(suggestion) => setSearch(suggestion.label)}
+            scope="builder:feats"
+            placeholder="Search feats…"
+            ariaLabel="Search feats"
+            className="w-full max-w-[11rem] flex-1 basis-[9rem] sm:max-w-[13rem]"
+            inputClassName="border"
+          />
           {categoryOptions.length > 1 ? (
             <div className="flex shrink-0 items-center gap-2">
               <label className={filterLabelClass}>Type</label>

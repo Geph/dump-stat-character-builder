@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ChevronDown, ImageIcon, Search, X } from "lucide-react"
+import { ChevronDown, ImageIcon, X } from "lucide-react"
 import type { ImportContent } from "@/lib/import/content-schema"
 import {
   CLASS_CARD_ASPECT_CLASS,
@@ -16,6 +16,8 @@ import {
 } from "@/lib/import/import-card-art"
 import { normalizeCardImageUrl } from "@/lib/compendium/card-image"
 import { cn } from "@/lib/utils"
+import { SearchBox } from "@/components/search/search-box"
+import { rankSearchResults, searchItems } from "@/lib/search/ranked-search"
 
 type ImportCardArtPanelProps = {
   content: ImportContent
@@ -152,15 +154,13 @@ export function ImportCardArtPanel({
   if (!targets.length) return null
 
   const filledCount = countImportCardArtUrls(value)
-  const normalizedQuery = query.trim().toLowerCase()
-  const filteredTargets = normalizedQuery
-    ? targets.filter(
-        (target) =>
-          target.name.toLowerCase().includes(normalizedQuery) ||
-          target.sectionLabel.toLowerCase().includes(normalizedQuery) ||
-          target.detail?.toLowerCase().includes(normalizedQuery),
-      )
-    : targets
+  const filteredTargets = searchItems(targets, query, {
+    name: (target) => target.name,
+    fields: [
+      { name: "type", value: (target) => target.sectionLabel, weight: 1.3 },
+      { name: "detail", value: (target) => target.detail, weight: 1 },
+    ],
+  })
 
   const grouped = filteredTargets.reduce<Record<string, typeof filteredTargets>>((acc, target) => {
     const group = acc[target.sectionLabel] ?? []
@@ -205,16 +205,29 @@ export function ImportCardArtPanel({
       {expanded ? (
         <div className="border-t border-border px-4 pb-4 pt-3 space-y-4">
           {targets.length > 8 ? (
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Filter by name or type…"
-                className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
+            <SearchBox
+              value={query}
+              onChange={setQuery}
+              suggestions={rankSearchResults(targets, query, {
+                name: (target) => target.name,
+                fields: [
+                  { name: "type", value: (target) => target.sectionLabel, weight: 1.3 },
+                  { name: "detail", value: (target) => target.detail },
+                ],
+                limit: 8,
+              }).map((match) => ({
+                id: match.item.key,
+                label: match.item.name,
+                detail: [match.item.sectionLabel, match.item.detail].filter(Boolean).join(" · "),
+                item: match.item,
+                matchKind: match.kind,
+              }))}
+              onSelect={(suggestion) => setQuery(suggestion.label)}
+              scope="import:card-art"
+              placeholder="Filter by name or type…"
+              ariaLabel="Search card art targets"
+              inputClassName="border"
+            />
           ) : null}
 
           {filteredTargets.length === 0 ? (

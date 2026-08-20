@@ -74,6 +74,39 @@ export function applySpellSlotToResourceRestore(params: {
   return { nextUses, nextSlots: slots, applied: true }
 }
 
+/** Sheet-state variant: spell slots and resources are represented as used counts. */
+export function applyUsedSpellSlotToResourceRestore(params: {
+  slotTotalsByLevel: number[]
+  usedSlotsByLevel: number[]
+  minSpellLevel: number
+  resourceUsed: number
+  restores: number
+}): {
+  nextUsedSlots: number[]
+  nextResourceUsed: number
+  spentSlotLevel: number | null
+} {
+  const nextUsedSlots = [...params.usedSlotsByLevel]
+  for (
+    let index = Math.max(0, params.minSpellLevel - 1);
+    index < params.slotTotalsByLevel.length;
+    index += 1
+  ) {
+    if ((nextUsedSlots[index] ?? 0) >= (params.slotTotalsByLevel[index] ?? 0)) continue
+    nextUsedSlots[index] = (nextUsedSlots[index] ?? 0) + 1
+    return {
+      nextUsedSlots,
+      nextResourceUsed: Math.max(0, params.resourceUsed - Math.max(1, params.restores)),
+      spentSlotLevel: index + 1,
+    }
+  }
+  return {
+    nextUsedSlots: params.usedSlotsByLevel,
+    nextResourceUsed: params.resourceUsed,
+    spentSlotLevel: null,
+  }
+}
+
 /** Apply class-resource → resource-pool conversion (e.g. Hemoreagent-style). */
 export function applyResourceToResourceRestore(params: {
   sourceUsed: number
@@ -95,15 +128,15 @@ export function applyResourceToResourceRestore(params: {
       applied: false,
     }
   }
-  const headroom = params.targetMax - params.targetUsed
-  if (headroom <= 0) {
+  const spentTargetUses = Math.min(params.targetMax, Math.max(0, params.targetUsed))
+  if (spentTargetUses <= 0) {
     return {
       nextSourceUsed: params.sourceUsed,
       nextTargetUsed: params.targetUsed,
       applied: false,
     }
   }
-  const gain = Math.min(headroom, Math.max(1, params.restores))
+  const gain = Math.min(spentTargetUses, Math.max(1, params.restores))
   return {
     nextSourceUsed: params.sourceUsed + params.sourceAmount,
     nextTargetUsed: Math.max(0, params.targetUsed - gain),

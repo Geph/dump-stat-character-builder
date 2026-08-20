@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { deriveClassResourceDisplay, shouldShowClassResourceOnSheet } from "@/lib/compendium/class-resource-display"
+import {
+  deriveClassResourceDisplay,
+  deriveClassResourceSemanticKind,
+  shouldShowClassResourceOnSheet,
+} from "@/lib/compendium/class-resource-display"
 import type { ClassResource } from "@/lib/types"
 
 const emptySpendKeys = new Set<string>()
@@ -98,13 +102,46 @@ describe("deriveClassResourceDisplay", () => {
   })
 })
 
+describe("deriveClassResourceSemanticKind", () => {
+  it("separates choice counts, combat state, menus, and scaling dice", () => {
+    expect(
+      deriveClassResourceSemanticKind({
+        id: "discoveries_known",
+        name: "Discoveries Known",
+        uses: { type: "at_level", atLevelTable: [{ level: 2, count: 1 }] },
+      }),
+    ).toBe("choice_count")
+    expect(
+      deriveClassResourceSemanticKind({
+        id: "adrenaline_battle_die",
+        name: "Adrenaline Die",
+        uses: { type: "special", atLevelTable: [{ level: 3, count: 1 }] },
+      }),
+    ).toBe("combat_state")
+    expect(
+      deriveClassResourceSemanticKind({
+        id: "guardian_tactics",
+        name: "Guardian Tactics",
+        uses: { type: "unlimited" },
+      }),
+    ).toBe("menu")
+    expect(
+      deriveClassResourceSemanticKind({
+        id: "dance_die",
+        name: "Dance Die",
+        uses: { type: "special", dieType: "d6" },
+      }),
+    ).toBe("die_profile")
+  })
+})
+
 describe("shouldShowClassResourceOnSheet", () => {
   it("shows fighter class resources in the Resources column", () => {
     expect(shouldShowClassResourceOnSheet("second_wind", emptySpendKeys)).toBe(true)
   })
 
-  it("gates superiority dice to subclasses that spend them", () => {
-    expect(shouldShowClassResourceOnSheet("superiority_dice", emptySpendKeys)).toBe(false)
+  it("does not re-gate resources after ownership filtering", () => {
+    expect(shouldShowClassResourceOnSheet("superiority_dice", emptySpendKeys)).toBe(true)
     expect(shouldShowClassResourceOnSheet("superiority_dice", new Set(["superiority_dice"]))).toBe(
       true,
     )

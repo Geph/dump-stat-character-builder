@@ -2,9 +2,11 @@ import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
 import { SRD_CLASS_CARD_BLURBS } from "@/lib/srd/class-card-blurbs"
 
+import { filterAvailableDefaultCardImageUrl } from "@/lib/compendium/available-card-art"
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import { isCommonModifiersCatalogAbility } from "@/lib/compendium/modifier-catalog"
 import { areCompendiumImagesEnabled, shouldAssignBundledCardArt } from "@/lib/site-settings/app-presentation-mode"
+import { areDefaultMidjourneyGraphicsDisabled } from "@/lib/site-settings/default-midjourney-graphics"
 import { getBuilderLayout } from "@/lib/site-settings/builder-layout"
 import { isSrdSource } from "@/lib/srd/source"
 
@@ -76,7 +78,16 @@ export function rewriteLegacyDumpstatCardImageUrl(url: string): string {
 }
 
 export function getCompendiumCardImageUrl(item: CompendiumCardVisual): string | null {
-  return normalizeCardImageUrl(item.card_image_url)
+  const url = normalizeCardImageUrl(item.card_image_url)
+  if (!url) return null
+  if (
+    areDefaultMidjourneyGraphicsDisabled() &&
+    (isBundledCompendiumCardImagePath(url) || isHostedDumpstatCardImageUrl(url))
+  ) {
+    return null
+  }
+  // PHB / setting portraits only render when present locally (not on GitHub seed clones).
+  return filterAvailableDefaultCardImageUrl(url)
 }
 
 /** Compendium tabs that may show card background art in browse/detail surfaces. */
@@ -161,7 +172,9 @@ export function applySrdCardImage(
     }
     return existing ? { ...row, card_image_url: existing } : row
   }
-  const card_image_url = defaults[String(row.name ?? "").trim()] ?? null
+  const card_image_url = filterAvailableDefaultCardImageUrl(
+    defaults[String(row.name ?? "").trim()] ?? null,
+  )
   if (existing && !isUpgradeableDefaultCardImage(existing)) {
     return { ...row, card_image_url: existing }
   }
@@ -175,6 +188,10 @@ export function applySrdCardImage(
   if (existing && isHostedDumpstatCardImageUrl(existing)) {
     return { ...row, card_image_url: null }
   }
+  // Drop stale local-only defaults when the file is not on this install.
+  if (existing && isBundledCompendiumCardImagePath(existing) && !filterAvailableDefaultCardImageUrl(existing)) {
+    return { ...row, card_image_url: null }
+  }
   return existing ? { ...row, card_image_url: existing } : row
 }
 
@@ -183,6 +200,7 @@ export function applySrdCardImage(
  * Source labels are ignored so Ravenloft/Planescape rows mis-tagged as PHB still match.
  * Leftover dumpstat hosts outside `/dumpstat/images/` are replaced by a local default or cleared.
  * Compact Only skips assigning bundled defaults (and clears upgradeable URLs).
+ * Local-only portraits (PHB, Eberron, …) assign only when the optimized file exists here.
  */
 export function applyBundledCardImage(
   row: Record<string, unknown>,
@@ -195,12 +213,17 @@ export function applyBundledCardImage(
     }
     return existing ? { ...row, card_image_url: existing } : row
   }
-  const card_image_url = defaults[String(row.name ?? "").trim()] ?? null
+  const card_image_url = filterAvailableDefaultCardImageUrl(
+    defaults[String(row.name ?? "").trim()] ?? null,
+  )
   if (existing && !isUpgradeableDefaultCardImage(existing)) {
     return { ...row, card_image_url: existing }
   }
   if (card_image_url) return { ...row, card_image_url }
   if (existing && isHostedDumpstatCardImageUrl(existing)) {
+    return { ...row, card_image_url: null }
+  }
+  if (existing && isBundledCompendiumCardImagePath(existing) && !filterAvailableDefaultCardImageUrl(existing)) {
     return { ...row, card_image_url: null }
   }
   return existing ? { ...row, card_image_url: existing } : row

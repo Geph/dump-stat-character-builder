@@ -1,4 +1,5 @@
 import type { ClassResource } from "@/lib/types"
+import { classResourcePrerequisitesForSubclass } from "@/lib/compendium/class-resource-rows"
 
 const SHORT_OR_LONG_REST = [{ rest: "short_rest" as const }, { rest: "long_rest" as const }]
 
@@ -132,10 +133,14 @@ const DANCER_MOMENTUM: ClassResource = {
   name: "Momentum",
   description:
     "Tokens gained while Dancing (leave reach / move 15 ft). Expend for +Dance Die damage. Deadly Momentum raises the cap to 3 and tokens no longer expire at end of turn.",
+  subclassName: "Acrobat",
   uses: {
-    type: "fixed",
-    fixedAmount: 3,
-    recharges: [{ rest: "long_rest" }],
+    type: "at_level",
+    atLevelMode: "tier",
+    atLevelTable: [
+      { level: 3, count: 1 },
+      { level: 14, count: 3 },
+    ],
   },
 }
 
@@ -181,7 +186,7 @@ export const SUBCLASS_GATED_CLASS_RESOURCES: SubclassGatedResource[] = [
   },
   {
     className: "Dancer",
-    subclassMatchers: ["momentum", "deadly momentum"],
+    subclassMatchers: ["acrobat", "momentum", "deadly momentum"],
     resource: DANCER_MOMENTUM,
   },
   {
@@ -193,6 +198,45 @@ export const SUBCLASS_GATED_CLASS_RESOURCES: SubclassGatedResource[] = [
 
 export function normalizeSubclassNameForGate(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+}
+
+const LEGACY_SUBCLASS_RESOURCE_OWNERS: Array<{
+  className: RegExp
+  resourceKey: string
+  subclassName: string
+}> = [
+  { className: /^alchemist$/i, resourceKey: "spell_dynamos", subclassName: "Dynamo Engineer" },
+  { className: /^inventor$/i, resourceKey: "runes_marked", subclassName: "Runesmith" },
+  { className: /^alternate monk$/i, resourceKey: "exploit_dice", subclassName: "Way of the Brawler" },
+  { className: /^alternate monk$/i, resourceKey: "exploits_known", subclassName: "Way of the Brawler" },
+  { className: /^alternate monk$/i, resourceKey: "exploit_degree", subclassName: "Way of the Brawler" },
+  { className: /^alternate ranger$/i, resourceKey: "exploit_dice", subclassName: "Bounty Hunter" },
+  { className: /^alternate ranger$/i, resourceKey: "exploits_known", subclassName: "Bounty Hunter" },
+  { className: /^alternate ranger$/i, resourceKey: "exploit_degree", subclassName: "Bounty Hunter" },
+  { className: /^alternate rogue$/i, resourceKey: "divine_favor", subclassName: "Avenger" },
+  { className: /^alternate rogue$/i, resourceKey: "divine_limit", subclassName: "Avenger" },
+  { className: /^craftsman$/i, resourceKey: "charge_points", subclassName: "Thunderlords' Guild" },
+  { className: /^dancer$/i, resourceKey: "momentum", subclassName: "Acrobat" },
+  { className: /^vagabond$/i, resourceKey: "mage_brand_max_slot_level", subclassName: "Mage Brand" },
+  { className: /^vagabond$/i, resourceKey: "grudge_battle_die", subclassName: "Rōnin" },
+  { className: /^vagabond$/i, resourceKey: "adrenaline_battle_die", subclassName: "Adrenaline Junkie" },
+  { className: /^vagabond$/i, resourceKey: "hound_battle_dice", subclassName: "Houndmaster" },
+  { className: /warden/i, resourceKey: "battle_dice", subclassName: "Grey Watchman" },
+  { className: /^warmage$/i, resourceKey: "battle_dice", subclassName: "House of Kings" },
+  { className: /^warmage$/i, resourceKey: "dice_of_fate", subclassName: "House of Dice" },
+  { className: /^witch$/i, resourceKey: "remedy_dice", subclassName: "White Magic" },
+]
+
+/** Backfill ownership for rows persisted before subclass metadata was retained. */
+export function inferLegacyClassResourceSubclass(
+  className: string,
+  resourceKey: string,
+): string | null {
+  return (
+    LEGACY_SUBCLASS_RESOURCE_OWNERS.find(
+      (entry) => entry.resourceKey === resourceKey && entry.className.test(className),
+    )?.subclassName ?? null
+  )
 }
 
 function matchesSubclassGate(subclassName: string, matchers: string[]): boolean {
@@ -232,9 +276,34 @@ export function isGatedClassResourceUnlockedForClass(
   )
 }
 
+/** Prefer persisted resource ownership, falling back to legacy key/class gates. */
+export function isClassResourceUnlockedForSubclasses(
+  resource: Pick<ClassResource, "id" | "subclassName">,
+  className: string,
+  subclassNames: readonly string[],
+): boolean {
+  const owner = resource.subclassName?.trim()
+  if (owner) {
+    const ownerNormalized = normalizeSubclassNameForGate(owner)
+    return subclassNames.some((name) => {
+      const actual = normalizeSubclassNameForGate(name)
+      return (
+        actual === ownerNormalized ||
+        actual.includes(ownerNormalized) ||
+        ownerNormalized.includes(actual)
+      )
+    })
+  }
+  return isGatedClassResourceUnlockedForClass(resource.id, className, subclassNames)
+}
+
 /** Hide subclass-only pools in the Class Resources tab until unlockers are loaded. */
 export function filterCompendiumClassResourcesBySubclasses<
-  T extends { class_id: string; resource_key: string },
+  T extends {
+    class_id: string
+    resource_key: string
+    prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
+  },
 >(
   rows: T[],
   classNamesById: Record<string, string>,
@@ -248,10 +317,23 @@ export function filterCompendiumClassResourcesBySubclasses<
   }
 
   return rows.filter((row) => {
-    if (!isSubclassGatedClassResourceKey(row.resource_key)) return true
     const className = classNamesById[row.class_id] ?? ""
     const names = subclassNamesByClassId.get(row.class_id) ?? []
-    return isGatedClassResourceUnlockedForClass(row.resource_key, className, names)
+    const ownerRule = row.prerequisite_rules?.find(
+      (rule) => rule.category === "other" && /^subclass:/i.test(rule.value.trim()),
+    )
+    const persistedSubclassName =
+      ownerRule?.category === "other"
+        ? ownerRule.value.replace(/^subclass:\s*/i, "").trim()
+        : null
+    const subclassName =
+      persistedSubclassName ??
+      inferLegacyClassResourceSubclass(className, row.resource_key)
+    return isClassResourceUnlockedForSubclasses(
+      { id: row.resource_key, subclassName },
+      className,
+      names,
+    )
   })
 }
 
@@ -278,6 +360,7 @@ export function buildGatedClassResourceRowsForSubclass(
     resource_key: resource.id,
     name: resource.name,
     description: resource.description ?? "",
+    prerequisite_rules: classResourcePrerequisitesForSubclass(subclassName),
     uses: resource.uses,
     source,
   }))

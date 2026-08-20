@@ -45,6 +45,7 @@ import {
   type PersistImportOptions,
 } from "@/lib/import/persist-import-options"
 import {
+  applyUpdateMergesToLanguageRows,
   applyUpdateMergesToNamedRows,
   filterNewResourceRows,
   findExistingSubclassRow,
@@ -512,6 +513,32 @@ export async function persistImportedContentLocal(
     await upsertByNameLocal("equipment", equipment)
     breakdown.equipment = sanitized.equipment.length
     totalImported += sanitized.equipment.length
+  }
+
+  if (sanitized.languages?.length) {
+    let languageRows = sanitized.languages.map((row) =>
+      stampSource(
+        {
+          ...row,
+          pool: row.pool === "rare" ? "rare" : "standard",
+          description: row.description ?? null,
+          typical_speakers: row.typical_speakers ?? null,
+          script: row.script ?? null,
+          icon: row.icon ?? null,
+        },
+        source,
+      ),
+    )
+    if (options.updateExistingNames?.language?.length) {
+      languageRows = applyUpdateMergesToLanguageRows(
+        languageRows,
+        await listRowsLocal("languages"),
+        options.updateExistingNames.language,
+      )
+    }
+    await upsertByNameLocal("languages", languageRows)
+    breakdown.languages = sanitized.languages.length
+    totalImported += sanitized.languages.length
   }
 
   if ((sanitized as ImportContentWithAbilities).abilities?.length) {

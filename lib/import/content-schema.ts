@@ -895,6 +895,10 @@ const UsesConfigImportSchema = z.object({
   useShareKey: z.string().optional(),
   classResourceKey: z.string().optional(),
   classResourceAmount: z.number().optional(),
+  classResourceCostMode: z
+    .enum(["fixed", "up_to_proficiency_bonus", "up_to_ability_modifier"])
+    .optional(),
+  classResourceCostAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).optional(),
   dieType: z.enum(["d4", "d6", "d8", "d10", "d12", "d20"]).nullable().optional(),
   dieSidesByLevel: z.array(UsesAtLevelImportSchema).optional(),
   rechargeOnInitiative: z.union([z.boolean(), z.number()]).optional(),
@@ -911,6 +915,19 @@ export const ClassResourceImportSchema = z.object({
   description: z.string().nullable().optional(),
   prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   uses: UsesConfigImportSchema,
+})
+
+/** Compendium language catalog row (standard / rare pools). */
+export const LanguageImportSchema = z.object({
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  pool: z.enum(["standard", "rare"]).optional(),
+  typical_speakers: z.string().nullable().optional(),
+  script: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
+  icon: z.string().nullable().optional(),
+  accent_color: z.string().nullable().optional(),
+  card_image_url: z.string().nullable().optional(),
 })
 
 export const ProposedClassResourceImportSchema = ClassResourceImportSchema.extend({
@@ -969,6 +986,7 @@ export function buildImportContentSchema(options?: { includeAbilities?: boolean 
     feats: z.array(FeatImportSchema).optional(),
     creatures: z.array(CreatureImportSchema).optional(),
     equipment: z.array(EquipmentImportSchema).optional(),
+    languages: z.array(LanguageImportSchema).optional(),
     import_proposals: ImportProposalsSchema.optional(),
     /** Map public image URLs onto existing compendium rows (Images from URL import). */
     card_art: z.array(CardArtImportEntrySchema).optional(),

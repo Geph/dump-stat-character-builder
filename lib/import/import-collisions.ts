@@ -2,7 +2,14 @@ import type { ImportContent } from "@/lib/import/content-schema"
 import { isCardArtOnlyImport } from "@/lib/import/apply-card-art-import"
 import { slugClassPrefix } from "@/lib/import/third-party-resources"
 
-export type ImportCollisionKind = "class" | "feat" | "species" | "spell" | "background" | "ability"
+export type ImportCollisionKind =
+  | "class"
+  | "feat"
+  | "species"
+  | "spell"
+  | "background"
+  | "ability"
+  | "language"
 
 export type ImportCollision = {
   id: string
@@ -28,6 +35,7 @@ const COLLISION_TABLES: { kind: ImportCollisionKind; key: keyof ImportContent }[
   { kind: "spell", key: "spells" },
   { kind: "background", key: "backgrounds" },
   { kind: "ability", key: "abilities" },
+  { kind: "language", key: "languages" },
 ]
 
 function collisionId(kind: ImportCollisionKind, name: string): string {
@@ -241,6 +249,7 @@ const CONTENT_KEY_BY_KIND: Record<ImportCollisionKind, keyof ImportContent> = {
   spell: "spells",
   background: "backgrounds",
   ability: "abilities",
+  language: "languages",
 }
 
 /** Drop rows the user chose not to import for a name collision. */
@@ -341,6 +350,13 @@ export function applyImportRenames(content: ImportContent, renameMap: ImportRena
     next.backgrounds = content.backgrounds.map((row) => ({
       ...row,
       name: renamedName("background", row.name, renameMap),
+    }))
+  }
+
+  if (content.languages?.length) {
+    next.languages = content.languages.map((row) => ({
+      ...row,
+      name: renamedName("language", row.name, renameMap),
     }))
   }
 

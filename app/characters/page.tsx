@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useDeferredValue } from "react"
 import { motion } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
 import { pageHeaderStatBadgeClass, pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Plus, User, Trash2, Search, Pencil, Download, Upload, Users, ArrowUp } from "lucide-react"
+import { Plus, User, Trash2, Pencil, Download, Upload, Users, ArrowUp } from "lucide-react"
 import { LevelUpWizard } from "@/components/character-sheet/level-up-wizard"
 import Link from "next/link"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
@@ -39,6 +39,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { SearchBox } from "@/components/search/search-box"
+import { rankSearchResults, searchItems } from "@/lib/search/ranked-search"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
@@ -52,6 +54,7 @@ export default function CharactersPage() {
   const [characters, setCharacters] = useState<CharacterWithRelations[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const deferredSearchQuery = useDeferredValue(searchQuery)
   const [filterClass, setFilterClass] = useState("all")
   const [filterSpecies, setFilterSpecies] = useState("all")
   const [filterLevel, setFilterLevel] = useState("all")
@@ -123,13 +126,20 @@ export default function CharactersPage() {
   )
 
   const filteredCharacters = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    const list = characters.filter((c) => {
-      if (q && !c.name.toLowerCase().includes(q)) return false
+    const faceted = characters.filter((c) => {
       if (filterClass !== "all" && (c.classes?.name ?? "") !== filterClass) return false
       if (filterSpecies !== "all" && (c.species?.name ?? "") !== filterSpecies) return false
       if (filterLevel !== "all" && c.level !== Number(filterLevel)) return false
       return true
+    })
+    const list = searchItems(faceted, deferredSearchQuery, {
+      name: (character) => character.name,
+      fields: [
+        { name: "class", value: (character) => character.classes?.name, weight: 1.4 },
+        { name: "species", value: (character) => character.species?.name, weight: 1.3 },
+        { name: "background", value: (character) => character.backgrounds?.name, weight: 1.1 },
+        { name: "level", value: (character) => `level ${character.level}`, weight: 1 },
+      ],
     })
 
     return [...list].sort((a, b) => {
@@ -137,7 +147,7 @@ export default function CharactersPage() {
       const tb = new Date(b.created_at).getTime()
       return createdSort === "newest" ? tb - ta : ta - tb
     })
-  }, [characters, searchQuery, filterClass, filterSpecies, filterLevel, createdSort])
+  }, [characters, deferredSearchQuery, filterClass, filterSpecies, filterLevel, createdSort])
 
   const hasActiveFilters =
     searchQuery.trim() !== "" ||
@@ -356,16 +366,32 @@ export default function CharactersPage() {
 
         {!loading && characters.length > 0 && (
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-            <div className="relative min-w-0 w-full sm:max-w-md sm:flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="search"
-                placeholder="Search by name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-card border-2 border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-              />
-            </div>
+            <SearchBox
+              value={searchQuery}
+              onChange={setSearchQuery}
+              suggestions={rankSearchResults(characters, deferredSearchQuery, {
+                name: (character) => character.name,
+                fields: [
+                  { name: "class", value: (character) => character.classes?.name, weight: 1.4 },
+                  { name: "species", value: (character) => character.species?.name, weight: 1.3 },
+                ],
+                limit: 8,
+              }).map((match) => ({
+                id: match.item.id,
+                label: match.item.name,
+                detail: [match.item.classes?.name, match.item.species?.name]
+                  .filter(Boolean)
+                  .join(" · "),
+                item: match.item,
+                matchKind: match.kind,
+              }))}
+              onSelect={(suggestion) => setSearchQuery(suggestion.label)}
+              scope="characters"
+              placeholder="Search characters…"
+              ariaLabel="Search characters"
+              className="w-full sm:max-w-md sm:flex-1"
+              inputClassName="py-3"
+            />
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
               <select
                 value={filterClass}

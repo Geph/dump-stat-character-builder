@@ -95,6 +95,12 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
     const content = enrich()
     const charnel = content.classes?.[0]?.features?.find((f) => f.name === "Charnel Touch") as Feature | undefined
     expect(charnel?.activation?.action).toBe(true)
+    expect(charnel?.limitedUses).toMatchObject({
+      type: "class_resource",
+      classResourceKey: "charnel_touch",
+      classResourceAmount: 5,
+      classResourceCostMode: "up_to_proficiency_bonus",
+    })
 
     const dark = content.classes?.[0]?.features?.find((f) => f.name === "Dark Arcana") as Feature | undefined
     expect(dark?.activation?.bonusAction).toBe(true)

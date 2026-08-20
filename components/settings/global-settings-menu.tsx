@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { Settings, ExternalLink, Bug, LayoutGrid, Sparkles, Trash2 } from "lucide-react"
+import { useState } from "react"
+import { Settings, ExternalLink, Bug, LayoutGrid, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { useAppTheme, APP_THEMES } from "@/components/providers/app-theme-provider"
 import {
@@ -19,24 +19,15 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { HeroBackgroundSettings } from "@/components/settings/hero-background-settings"
-import { PageBackgroundSettings } from "@/components/settings/page-background-settings"
+import { SiteGraphicsSettings } from "@/components/settings/site-graphics-settings"
 import { useBuilderLayout } from "@/components/settings/use-builder-layout"
 import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
+import { useDefaultMidjourneyGraphics } from "@/components/settings/use-default-midjourney-graphics"
 import { useGmDashboardNav } from "@/components/settings/use-gm-dashboard-nav"
 import { useResumeLastCharacter } from "@/components/settings/use-resume-last-character"
 import { useManualSkillAbility } from "@/components/settings/use-manual-skill-ability"
 import { useWelcomeSplashSuppress } from "@/components/settings/use-welcome-splash-suppress"
-import {
-  getCustomHeroBackground,
-  HERO_BG_CHANGE_EVENT,
-  setCustomHeroBackground,
-} from "@/lib/site-settings/hero-background"
-import {
-  hasCustomPageBackground,
-  PAGE_BG_CHANGE_EVENT,
-  setCustomPageBackground,
-} from "@/lib/site-settings/page-background"
+import { useSearchAutocomplete } from "@/components/settings/use-search-autocomplete"
 import { cn } from "@/lib/utils"
 
 const GITHUB_ISSUES_URL = "https://github.com/Geph/dump-stat-character-builder/issues"
@@ -63,37 +54,17 @@ export function GlobalSettingsMenu() {
   const { theme, setTheme } = useAppTheme()
   const { layout: builderLayout, setLayout: setBuilderLayout } = useBuilderLayout()
   const { isCompactOnly } = useAppPresentationMode()
+  const { disabled: hideDefaultMidjourney, setDisabled: setHideDefaultMidjourney } =
+    useDefaultMidjourneyGraphics()
   const { enabled: gmDashboardNavEnabled, setEnabled: setGmDashboardNavEnabled } = useGmDashboardNav()
   const { enabled: resumeLastCharacter, setEnabled: setResumeLastCharacter } = useResumeLastCharacter()
   const { enabled: manualSkillAbility, setEnabled: setManualSkillAbility } = useManualSkillAbility()
+  const { enabled: searchAutocomplete, setEnabled: setSearchAutocomplete } =
+    useSearchAutocomplete()
   const { suppressed: hideWelcomeSplash, setSuppressed: setHideWelcomeSplash } =
     useWelcomeSplashSuppress()
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
-  const [hasCustomGraphics, setHasCustomGraphics] = useState(false)
-
-  const refreshCustomGraphics = useCallback(() => {
-    setHasCustomGraphics(Boolean(getCustomHeroBackground()) || hasCustomPageBackground())
-  }, [])
-
-  useEffect(() => {
-    if (!open) return
-    refreshCustomGraphics()
-    const onChange = () => refreshCustomGraphics()
-    window.addEventListener(HERO_BG_CHANGE_EVENT, onChange)
-    window.addEventListener(PAGE_BG_CHANGE_EVENT, onChange)
-    return () => {
-      window.removeEventListener(HERO_BG_CHANGE_EVENT, onChange)
-      window.removeEventListener(PAGE_BG_CHANGE_EVENT, onChange)
-    }
-  }, [open, refreshCustomGraphics])
-
-  const clearAllCustomGraphics = () => {
-    setCustomHeroBackground(null)
-    setCustomPageBackground(null)
-    setHasCustomGraphics(false)
-    setStatus("Cleared custom hero and page backgrounds")
-  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -132,7 +103,7 @@ export function GlobalSettingsMenu() {
             </TabsList>
           </div>
 
-          <div className="max-h-[min(70vh,32rem)] overflow-y-auto px-6 py-4">
+          <div className="max-h-[min(70vh,32rem)] overflow-y-auto px-6 py-4 lg:max-h-[min(80vh,42rem)]">
             <TabsContent value="theme" className="mt-0 space-y-3">
               <div>
                 <p className="text-sm font-semibold text-foreground">Card layout</p>
@@ -215,41 +186,63 @@ export function GlobalSettingsMenu() {
 
             <TabsContent value="graphics" className="mt-0 space-y-4">
               {!isCompactOnly ? (
-                <>
-                  <HeroBackgroundSettings onStatus={setStatus} />
-                  <div className="border-t border-border pt-4">
-                    <PageBackgroundSettings onStatus={setStatus} />
-                  </div>
-                  <div className="border-t border-border pt-4">
-                    <p className="text-sm font-semibold text-foreground">Reset graphics</p>
-                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                      Remove custom hero and page backgrounds stored in this browser. Theme defaults
-                      stay available.
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 gap-2 text-destructive hover:text-destructive"
-                      disabled={!hasCustomGraphics}
-                      onClick={clearAllCustomGraphics}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete all custom graphics
-                    </Button>
-                  </div>
-                </>
+                <SiteGraphicsSettings onStatus={setStatus} />
               ) : (
                 <p className="text-xs text-muted-foreground">
                   Background graphics are hidden in Compact Only mode. Choose Visual + Compact on the
                   home page splash to re-enable them.
                 </p>
               )}
+              <div className="border-t border-border pt-4">
+                <p className="text-sm font-semibold text-foreground">
+                  Disable default Midjourney graphics
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                  Hides bundled portraits automatically attached to seeded or imported content (SRD,
+                  PHB, Ravenloft, and similar). Home page photos go blank unless you uploaded
+                  replacements above. Your own custom card art stays.
+                </p>
+                <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                  <input
+                    type="checkbox"
+                    checked={hideDefaultMidjourney}
+                    onChange={(event) => {
+                      setHideDefaultMidjourney(event.target.checked)
+                      setStatus(
+                        event.target.checked
+                          ? "Default Midjourney graphics hidden"
+                          : "Default Midjourney graphics enabled",
+                      )
+                    }}
+                    className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary"
+                  />
+                  <span className="text-sm leading-snug text-foreground">
+                    Hide bundled default graphics
+                  </span>
+                </label>
+              </div>
             </TabsContent>
 
             <TabsContent value="options" className="mt-0 space-y-6">
               <div>
                 <p className="text-sm font-semibold text-foreground">Navigation</p>
+                <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                  <input
+                    type="checkbox"
+                    checked={searchAutocomplete}
+                    onChange={(event) => setSearchAutocomplete(event.target.checked)}
+                    className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary"
+                  />
+                  <span className="text-sm leading-snug">
+                    <span className="font-semibold text-foreground">
+                      Show autocomplete suggestions
+                    </span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      Shows ranked matches and recent searches while typing. Turn this off to keep
+                      search fields as plain text filters.
+                    </span>
+                  </span>
+                </label>
                 <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-3">
                   <input
                     type="checkbox"

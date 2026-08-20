@@ -15,6 +15,7 @@ const COLLISION_TABLES: ImportCollisionKind[] = [
   "spell",
   "background",
   "ability",
+  "language",
 ]
 
 const TABLE_BY_KIND: Record<ImportCollisionKind, CompendiumTable | "characters"> = {
@@ -24,6 +25,7 @@ const TABLE_BY_KIND: Record<ImportCollisionKind, CompendiumTable | "characters">
   spell: "spells",
   background: "backgrounds",
   ability: "custom_abilities",
+  language: "languages",
 }
 
 /** Load compendium names for import collision detection. */

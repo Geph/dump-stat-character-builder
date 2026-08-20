@@ -14,7 +14,15 @@ import { COMPENDIUM_TABLES, resolveTable } from "@/lib/db/tables"
 describe("buildImportCollisions", () => {
   it("maps collision kinds to valid compendium tables", async () => {
     const { fetchExistingForImportCollisions } = await import("@/lib/import/fetch-import-collisions")
-    const kinds: ImportCollisionKind[] = ["class", "feat", "species", "spell", "background", "ability"]
+    const kinds: ImportCollisionKind[] = [
+      "class",
+      "feat",
+      "species",
+      "spell",
+      "background",
+      "ability",
+      "language",
+    ]
     const tableByKind: Record<ImportCollisionKind, string> = {
       class: "classes",
       feat: "feats",
@@ -22,6 +30,7 @@ describe("buildImportCollisions", () => {
       spell: "spells",
       background: "backgrounds",
       ability: "custom_abilities",
+      language: "languages",
     }
     for (const kind of kinds) {
       const table = resolveTable(tableByKind[kind]) ?? tableByKind[kind]

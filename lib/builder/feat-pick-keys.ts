@@ -1,8 +1,8 @@
 import { getBackgroundFeatPickSlots } from "@/lib/builder/background-feat-options"
-import { getFeatPickSlots } from "@/lib/builder/class-feat-features"
+import { getCustomAbilityFeatPickSlots, getFeatPickSlots } from "@/lib/builder/class-feat-features"
 import { getSpeciesFeatPickSlots } from "@/lib/builder/species-feat-options"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
-import type { Background, DndClass, Species, Subclass } from "@/lib/types"
+import type { Background, CustomAbility, DndClass, Species, Subclass } from "@/lib/types"
 
 /** All feat-pick slot keys that could exist for this build (used to prune stale feat picks only). */
 export function collectFeatPickSlotKeys(params: {
@@ -15,6 +15,9 @@ export function collectFeatPickSlotKeys(params: {
   species?: Species
   speciesTraitPicks: Record<string, string[]>
   background?: Background
+  customAbilities?: CustomAbility[]
+  featureChoicePicks?: Record<string, string[]>
+  includeUnselectedCustomAbilityGrants?: boolean
 }): Set<string> {
   const keys = new Set<string>()
 
@@ -26,6 +29,17 @@ export function collectFeatPickSlotKeys(params: {
     params.subclasses,
     params.subclassByClassId,
   )) {
+    keys.add(slot.key)
+  }
+
+  for (const slot of getCustomAbilityFeatPickSlots({
+    classLevels: params.classLevels,
+    classes: params.classes,
+    catalog: params.catalog,
+    customAbilities: params.customAbilities ?? [],
+    featureChoicePicks: params.featureChoicePicks,
+    includeUnselected: params.includeUnselectedCustomAbilityGrants,
+  })) {
     keys.add(slot.key)
   }
 
@@ -64,6 +78,7 @@ export function collectMaxLevelFeatPickSlotKeys(
     ...params,
     classLevels: maxClassLevels,
     totalLevel: maxTotal,
+    includeUnselectedCustomAbilityGrants: true,
   })
 
   if (params.species?.traits) {

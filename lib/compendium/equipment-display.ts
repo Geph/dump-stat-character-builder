@@ -1,4 +1,5 @@
 import type { Equipment } from "@/lib/types"
+import { normalizeSearchText, searchItems } from "@/lib/search/ranked-search"
 import { propertiesToStringArray } from "@/lib/compendium/equipment-properties"
 import { equipmentRequiresAttunement, isMagicItem } from "@/lib/compendium/equipment-attunement"
 import {
@@ -134,25 +135,24 @@ export function getMagicItemCategoryOptions(items: Equipment[]): string[] {
 }
 
 export function filterEquipmentList(items: Equipment[], query: string): Equipment[] {
-  const trimmed = query.trim().toLowerCase()
-  const filtered = !trimmed
-    ? items
-    : items.filter((item) => {
-        const haystack = [
-          item.name,
-          item.category,
-          item.subcategory ?? "",
-          item.description ?? "",
-          item.rarity ?? "",
-          item.magic_item_category ?? "",
-          item.base_equipment_filter?.replace(/_/g, " ") ?? "",
-        ]
-          .join(" ")
-          .toLowerCase()
-        return haystack.includes(trimmed)
-      })
-
-  return [...filtered].sort((a, b) => a.name.localeCompare(b.name))
+  if (!normalizeSearchText(query)) {
+    return [...items].sort((a, b) => a.name.localeCompare(b.name))
+  }
+  return searchItems(items, query, {
+    name: (item) => item.name,
+    fields: [
+      { name: "category", value: (item) => item.category, weight: 1.4 },
+      { name: "subcategory", value: (item) => item.subcategory, weight: 1.3 },
+      { name: "rarity", value: (item) => item.rarity, weight: 1.2 },
+      { name: "magic item category", value: (item) => item.magic_item_category, weight: 1.2 },
+      {
+        name: "base equipment",
+        value: (item) => item.base_equipment_filter?.replace(/_/g, " "),
+        weight: 1.1,
+      },
+      { name: "description", value: (item) => item.description, weight: 0.35 },
+    ],
+  })
 }
 
 export type EquipmentSheetFilter =

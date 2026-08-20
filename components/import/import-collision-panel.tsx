@@ -25,6 +25,7 @@ const KIND_LABELS: Record<ImportCollision["kind"], string> = {
   spell: "Spell",
   background: "Background",
   ability: "Ability",
+  language: "Language",
 }
 
 function defaultResolution(collision: ImportCollision): ImportCollisionResolution {

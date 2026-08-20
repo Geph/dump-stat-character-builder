@@ -1261,6 +1261,99 @@ const SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
     ],
   },
 
+  // —— Aasimar (Eberron) lineages + revelation options ——
+  "Aasimar (Eberron)::Aasimar Lineage::Fernian": {
+    linkedModifiers: [
+      damageResistance(["Fire", "Necrotic"], "Fernian Resistance"),
+      spellcastingAbilityChoice("fernian_aasimar_ability", "Flame Bearer spellcasting ability"),
+      spellsKnownFixed(
+        "fernian_flame_bearer",
+        [{ name: "Produce Flame", unlocksAtLevel: 1 }],
+        "Flame Bearer — Produce Flame",
+      ),
+    ],
+  },
+  "Aasimar (Eberron)::Aasimar Lineage::Mabaran": {
+    linkedModifiers: [
+      damageResistance(["Necrotic", "Radiant"], "Celestial Resistance"),
+      spellcastingAbilityChoice("mabaran_aasimar_ability", "Herald of Death spellcasting ability"),
+      spellsKnownFixed(
+        "mabaran_herald_of_death",
+        [{ name: "Toll the Dead", unlocksAtLevel: 1 }],
+        "Herald of Death — Toll the Dead",
+      ),
+    ],
+  },
+  /** Fernian Inner Radiance: Fire aura damage instead of Radiant. */
+  "Aasimar (Eberron)::Celestial Revelation::Inner Radiance": {
+    linkedModifiers: [
+      charInstance("modinst_fernian_inner_radiance_aura", AURA_CATALOG_ID, [
+        {
+          id: modId("fernian_inner_radiance_aura"),
+          type: "aura",
+          radiusFeet: 10,
+          affectsSelf: true,
+          affectsAllies: false,
+          label: "Bright Light 10 ft., Dim Light 10 ft. beyond",
+        },
+      ]),
+      charInstance("modinst_fernian_inner_radiance_damage", TURN_START_TRIGGER_CATALOG_ID, [
+        {
+          id: modId("fernian_inner_radiance_damage"),
+          type: "turn_start_trigger",
+          effect: {
+            catalogRefId: EXTRA_DAMAGE_ON_HIT_CATALOG_ID,
+            activation: {
+              effects: [
+                {
+                  id: modId("fernian_inner_radiance_damage_fx"),
+                  kind: "extra_damage_on_hit",
+                  bonusConfig: { mode: "proficiency" },
+                  effectDamageTypes: ["Fire"],
+                },
+              ],
+            },
+          },
+          label: "End of turn: Fire damage equal to PB in 10 ft. (Fernian)",
+        },
+      ]),
+    ],
+  },
+  "Aasimar (Eberron)::Celestial Revelation::Inner Darkness": {
+    linkedModifiers: [
+      charInstance("modinst_inner_darkness_aura", AURA_CATALOG_ID, [
+        {
+          id: modId("inner_darkness_aura"),
+          type: "aura",
+          radiusFeet: 20,
+          affectsSelf: true,
+          affectsAllies: false,
+          label: "Reduce Bright Light to Dim Light in 20 ft.",
+        },
+      ]),
+      charInstance("modinst_inner_darkness_damage", TURN_START_TRIGGER_CATALOG_ID, [
+        {
+          id: modId("inner_darkness_damage"),
+          type: "turn_start_trigger",
+          effect: {
+            catalogRefId: EXTRA_DAMAGE_ON_HIT_CATALOG_ID,
+            activation: {
+              effects: [
+                {
+                  id: modId("inner_darkness_damage_fx"),
+                  kind: "extra_damage_on_hit",
+                  bonusConfig: { mode: "proficiency" },
+                  effectDamageTypes: ["Necrotic"],
+                },
+              ],
+            },
+          },
+          label: "End of turn: Necrotic damage equal to PB in 10 ft.",
+        },
+      ]),
+    ],
+  },
+
   "Shifter::Shifting::Beasthide": {
     linkedModifiers: [
       fxInstance("modinst_beasthide_thp", FEAT_MODIFIER_CATALOG.grantTempHp, {

@@ -71,6 +71,7 @@ function grantFeatLabel(entry: ModifierCatalogEntry | undefined, refId: string, 
       if (only === "General") return "General Feat"
       if (only === "Epic Boon") return "Epic Boon"
       if (only === "Fighting Style") return "Fighting Style"
+      if (only === "Metamagic") return "Metamagic option"
     }
     return `${entry.name} (${categories.join(", ")})`
   }

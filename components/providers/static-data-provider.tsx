@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { ensureLocalAvailableCardArtLoaded } from "@/lib/compendium/available-card-art"
 import { isStaticDeploy } from "@/lib/config/deploy-mode"
 import { ensureLocalSrdSeed } from "@/lib/data/local-seed"
 import { pageHeaderSubtitleClass } from "@/lib/compendium/editor-field-styles"
@@ -8,10 +9,11 @@ import { pageHeaderSubtitleClass } from "@/lib/compendium/editor-field-styles"
 const SEED_TIMEOUT_MS = 45_000
 
 /**
- * On first visit in static mode, seeds IndexedDB with bundled SRD content.
+ * Loads local-only card-art availability, then (in static mode) seeds IndexedDB.
+ * Manifest must load before seed so PHB/setting portraits assign only when present.
  */
 export function StaticDataProvider({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(!isStaticDeploy())
+  const [ready, setReady] = useState(false)
   const [seedError, setSeedError] = useState<string | null>(null)
   const [seedAttempt, setSeedAttempt] = useState(0)
 
@@ -23,6 +25,8 @@ export function StaticDataProvider({ children }: { children: React.ReactNode }) 
     }, SEED_TIMEOUT_MS)
 
     try {
+      await ensureLocalAvailableCardArtLoaded()
+      if (signal.aborted) return
       await ensureLocalSrdSeed()
       if (!signal.aborted) setSeedError(null)
     } catch (e) {
@@ -37,11 +41,18 @@ export function StaticDataProvider({ children }: { children: React.ReactNode }) 
   }, [])
 
   useEffect(() => {
-    if (!isStaticDeploy()) return
     setReady(false)
     setSeedError(null)
     const controller = new AbortController()
-    void runSeed(controller.signal)
+
+    if (isStaticDeploy()) {
+      void runSeed(controller.signal)
+      return () => controller.abort()
+    }
+
+    void ensureLocalAvailableCardArtLoaded().finally(() => {
+      if (!controller.signal.aborted) setReady(true)
+    })
     return () => controller.abort()
   }, [seedAttempt, runSeed])
 

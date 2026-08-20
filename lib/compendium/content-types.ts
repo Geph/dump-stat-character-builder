@@ -1,4 +1,6 @@
+import { defaultAbilityIconForItem } from "@/lib/compendium/ability-icons-defaults"
 import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
+import { defaultCreatureIconForItem } from "@/lib/compendium/creature-icons-defaults"
 import { defaultSubclassIconForName } from "@/lib/compendium/subclass-icons-defaults"
 import { weaponIconSlug } from "@/lib/compendium/weapon-icons"
 import { SRD_ARMOR_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
@@ -89,12 +91,13 @@ export function getCompendiumItemIcon(
     const subclassIcon = defaultSubclassIconForName(String(item.name ?? ""), className)
     if (subclassIcon) return subclassIcon
   }
+  if (tab === "creatures") {
+    const creatureIcon = defaultCreatureIconForItem(item)
+    if (creatureIcon) return creatureIcon
+  }
   if (tab === "abilities") {
-    const role =
-      typeof item.ability_role === "string" ? item.ability_role.trim().toLowerCase() : ""
-    if (role === "discipline" || /\bdiscipline\b/i.test(String(item.name ?? ""))) {
-      return "psychic-waves"
-    }
+    const abilityIcon = defaultAbilityIconForItem(item)
+    if (abilityIcon) return abilityIcon
   }
   if (
     (tab === "equipment" || tab === "magic_items") &&

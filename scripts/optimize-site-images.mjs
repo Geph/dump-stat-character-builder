@@ -8,7 +8,7 @@ import {
   parseSubclassSourceBasename,
   stripCopySuffix,
 } from "./card-source-layout.mjs"
-import { isBundledPublicCardArtPath } from "./bundled-card-art.mjs"
+import { isBundledCardSourceOrigin, isBundledPublicCardArtPath, cardSourceOriginFromRelative } from "./bundled-card-art.mjs"
 
 const ROOT = path.resolve(import.meta.dirname, "..")
 const ASSETS = process.env.PAGE_BG_SOURCES ?? path.join(ROOT, "scripts", "page-bg-sources")
@@ -127,7 +127,16 @@ function walkImageFiles(sourcesDir, onFile) {
       }
       const ext = path.extname(entry.name).toLowerCase()
       if (!EXTENSIONS.includes(ext)) continue
-      onFile({ full, ext, base: entry.name.slice(0, -ext.length) })
+      const relative = path.relative(sourcesDir, full).replace(/\\/g, "/")
+      const origin = cardSourceOriginFromRelative(relative)
+      onFile({
+        full,
+        ext,
+        base: entry.name.slice(0, -ext.length),
+        relative,
+        origin,
+        originRank: isBundledCardSourceOrigin(origin) ? 0 : 1,
+      })
     }
   }
   walk(sourcesDir)
@@ -142,24 +151,26 @@ function pickBetter(prev, next, rankNext, rankPrev) {
   return false
 }
 
-/** Flat class masters: `barbarian.png`, `Warden-Kibbles.png`. */
+/** Flat class masters: `barbarian.png`, `Warden-Kibbles.png`. Prefer SRD/Kibbles over `extra/`. */
 function discoverCardSlugs(sourcesDir) {
   if (!fs.existsSync(sourcesDir)) return []
   const sourceRank = (sourceSlug) => (sourceSlug.endsWith("-2024") ? 0 : 1)
   const byOutputSlug = new Map()
 
-  walkImageFiles(sourcesDir, ({ full, ext, base }) => {
+  walkImageFiles(sourcesDir, ({ full, ext, base, originRank }) => {
     const outputSlug = flattenSourceBasenameToSlug(base)
     if (!outputSlug) return
     const lowerBase = base.toLowerCase()
     const prev = byOutputSlug.get(outputSlug)
+    const nextRank = originRank * 10 + sourceRank(lowerBase)
+    const prevRank = prev ? prev.originRank * 10 + sourceRank(prev.sourceSlug) : 99
     if (
       !prev ||
-      sourceRank(lowerBase) < sourceRank(prev.sourceSlug) ||
-      (sourceRank(lowerBase) === sourceRank(prev.sourceSlug) &&
+      nextRank < prevRank ||
+      (nextRank === prevRank &&
         extensionRank(ext) < extensionRank(path.extname(prev.path).toLowerCase()))
     ) {
-      byOutputSlug.set(outputSlug, { path: full, sourceSlug: lowerBase })
+      byOutputSlug.set(outputSlug, { path: full, sourceSlug: lowerBase, originRank })
     }
   })
 
@@ -171,20 +182,23 @@ function discoverCardSlugs(sourcesDir) {
 /**
  * Origin folders + Title Case names (`PHB/Artisan.png`, `Air Genasi.png`, `Dragonborn (1).png`).
  * Output is always a flat slug — origin folders are organization only.
+ * Bundled origins (SRD / kibbles) win over PHB / MotM / extra when slugs collide.
  */
 function discoverFlatCardSlugs(sourcesDir) {
   if (!fs.existsSync(sourcesDir)) return []
   const sourceRank = (sourceSlug) => (sourceSlug.endsWith("-2024") ? 0 : 1)
   const byOutputSlug = new Map()
 
-  walkImageFiles(sourcesDir, ({ full, ext, base }) => {
+  walkImageFiles(sourcesDir, ({ full, ext, base, originRank }) => {
     const outputSlug = flattenSourceBasenameToSlug(base)
     if (!outputSlug) return
     // Rank on the pre-alias slug so `aasimar-2024` still beats a plain `aasimar`.
     const raw = kebabSlug(stripCopySuffix(base))
     const prev = byOutputSlug.get(outputSlug)
-    if (pickBetter(prev, { ext }, sourceRank(raw), prev ? sourceRank(prev.sourceSlug) : 99)) {
-      byOutputSlug.set(outputSlug, { path: full, sourceSlug: raw })
+    const nextRank = originRank * 10 + sourceRank(raw)
+    const prevRank = prev ? prev.originRank * 10 + sourceRank(prev.sourceSlug) : 99
+    if (pickBetter(prev, { ext }, nextRank, prevRank)) {
+      byOutputSlug.set(outputSlug, { path: full, sourceSlug: raw, originRank })
     }
   })
 
@@ -195,12 +209,13 @@ function discoverFlatCardSlugs(sourcesDir) {
 
 /**
  * Origin folders + `Class Remainder.png` (`PHB/Bard Dance.png` → bard/college-of-dance).
+ * Prefer SRD / kibbles over `extra/` when the same subclass slug appears in both.
  */
 function discoverSubclassCardSlugs(sourcesDir) {
   if (!fs.existsSync(sourcesDir)) return []
   const byOutputSlug = new Map()
 
-  walkImageFiles(sourcesDir, ({ full, ext, base }) => {
+  walkImageFiles(sourcesDir, ({ full, ext, base, originRank }) => {
     const parsed = parseSubclassSourceBasename(base)
     if (!parsed) {
       console.warn(`  − skip unrecognized subclass source: ${base}`)
@@ -208,8 +223,13 @@ function discoverSubclassCardSlugs(sourcesDir) {
     }
     const outputSlug = `${parsed.classSlug}/${parsed.itemSlug}`
     const prev = byOutputSlug.get(outputSlug)
-    if (!prev || extensionRank(ext) < extensionRank(path.extname(prev.path).toLowerCase())) {
-      byOutputSlug.set(outputSlug, { path: full })
+    if (
+      !prev ||
+      originRank < prev.originRank ||
+      (originRank === prev.originRank &&
+        extensionRank(ext) < extensionRank(path.extname(prev.path).toLowerCase()))
+    ) {
+      byOutputSlug.set(outputSlug, { path: full, originRank })
     }
   })
 
@@ -356,10 +376,39 @@ async function encodeCardBatch(
   }
   if (entries.length > 0) {
     console.log(
-      `  → ${bundled} bundled (SRD / Kibbles / Mage Hand Press) · ${localOnly} local-only (gitignored)`,
+      `  → ${bundled} bundled for GitHub · ${localOnly} local-only (gitignored)`,
     )
   }
   return missing
+}
+
+/** Gitignored list of non-bundled optimized portraits present on this machine. */
+function writeLocalAvailableCardArtManifest() {
+  const compendiumRoot = path.join(ROOT, "public", "images", "compendium")
+  const paths = []
+  if (fs.existsSync(compendiumRoot)) {
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          walk(full)
+          continue
+        }
+        if (!/\.png$/i.test(entry.name)) continue
+        const repoRel = path.relative(ROOT, full).replace(/\\/g, "/")
+        if (isBundledPublicCardArtPath(repoRel)) continue
+        paths.push(path.relative(compendiumRoot, full).replace(/\\/g, "/"))
+      }
+    }
+    walk(compendiumRoot)
+  }
+  paths.sort((a, b) => a.localeCompare(b))
+  const out = path.join(compendiumRoot, "local-available-card-art.json")
+  fs.mkdirSync(compendiumRoot, { recursive: true })
+  fs.writeFileSync(out, `${JSON.stringify({ generatedBy: "images:optimize", paths }, null, 2)}\n`)
+  console.log(
+    `\nLocal-available card art manifest → ${path.relative(ROOT, out)} (${paths.length} local-only paths)`,
+  )
 }
 
 fs.mkdirSync(PAGE_BG_OUT, { recursive: true })
@@ -499,6 +548,8 @@ missing += await encodeCardBatch(
   CARD_HEIGHT,
   discoverSpellCardSlugs,
 )
+
+writeLocalAvailableCardArtManifest()
 
 if (missing > 0) {
   process.exitCode = 1

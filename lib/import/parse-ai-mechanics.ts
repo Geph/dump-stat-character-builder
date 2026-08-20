@@ -1323,6 +1323,12 @@ function buildFromMechanic(
                 type: "class_resource",
                 classResourceKey: mechanic.classResourceKey,
                 classResourceAmount: mechanic.classResourceCost ?? 1,
+                ...(mechanic.classResourceCostMode
+                  ? { classResourceCostMode: mechanic.classResourceCostMode }
+                  : {}),
+                ...(mechanic.classResourceCostAbility
+                  ? { classResourceCostAbility: mechanic.classResourceCostAbility }
+                  : {}),
               }
             : {
                 type: "fixed",

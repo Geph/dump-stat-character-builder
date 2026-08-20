@@ -649,7 +649,7 @@ Track bugs and feature ideas in [GitHub Issues](https://github.com/Geph/v0-dump-
 
 ## Local card art (optional)
 
-The public repo only ships card art for **SRD 5.2.1**, **Kibbles Tasty**, and **Mage Hand Press**. Other portraits (Player’s Handbook, Eberron, Ravenloft, Faerûn, and similar) can still run on *your* copy of the app; they are not committed or pushed.
+The public repo ships card art for **SRD 5.2.1**, **Kibbles Tasty**, **Mage Hand Press**, and **all species portraits** (original graphics). Setting-book **backgrounds** and some class/subclass art (Player’s Handbook, Eberron, Ravenloft, Faerûn, and similar) can still run on *your* copy of the app when present locally; those files are not committed or pushed.
 
 ### Drop masters, then optimize
 
@@ -659,18 +659,18 @@ The public repo only ships card art for **SRD 5.2.1**, **Kibbles Tasty**, and **
 |-------------|------------------|------------------|
 | `scripts/subclass-card-sources/` | `{Class} {Remainder}.png` (e.g. `SRD/Cleric Life.png`, `kibbles/Psion Knowing.png`) | `public/images/compendium/subclasses/{class}/{slug}.png` at 771×1024 |
 | `scripts/class-card-sources/` | `{slug}.png` (e.g. `Kibbles/inventor.png`) | `public/images/compendium/classes/{slug}.png` at 771×1024 |
-| `scripts/species-card-sources/` | Title Case or kebab-case basename | `public/images/compendium/species/{slug}.png` at 771×1024 |
+| `scripts/species-card-sources/` | Title Case or kebab-case basename | `public/images/compendium/species/{slug}.png` at 771×1024 (**all ship on GitHub**) |
 | `scripts/background-card-sources/` | Title Case or kebab-case basename | `public/images/compendium/backgrounds/{slug}.png` at 1680×720 |
 | `scripts/spell-card-sources/` | Title Case basename | `public/images/compendium/spells/{slug}.png` at 771×1024 |
 | `scripts/page-bg-sources/` | Theme / hero / feature basenames | `public/images/page-backgrounds/`, `hero/`, `features/`, `welcome-splash/` |
 
-2. Use these **origin folder names** when you want GitHub-eligible art (after optimize):
+2. Use these **origin folder names** when you want GitHub-eligible class/subclass/background art (after optimize):
 
 - `SRD/` (spell cantrips may use `srd cantrips/`)
 - `kibbles/`
 - `magehandpress/` (also `mage-hand-press/` or `mhp/`)
 
-Anything else (`PHB/`, `eberron/`, `ravenloft/`, `faerun/`, `WotC/`, …) is compressed for local use only.
+Anything else (`PHB/`, `eberron/`, `ravenloft/`, `faerun/`, `WotC/`, …) is compressed for local use for backgrounds and most class art. **Species** masters from any origin folder optimize to `public/images/compendium/species/` and are safe to commit.
 
 3. Run:
 
@@ -678,11 +678,13 @@ Anything else (`PHB/`, `eberron/`, `ravenloft/`, `faerun/`, `WotC/`, …) is com
 pnpm images:optimize
 ```
 
-The script tags local-only outputs as `[local-only, not for GitHub]`. Do **not** `git add` those files. `.gitignore` already excludes them. After optimize, only commit new or updated files under the bundled origins (SRD / Kibbles / Mage Hand Press).
+The script tags local-only outputs as `[local-only, not for GitHub]` and writes a gitignored `public/images/compendium/local-available-card-art.json` so the app only assigns those portraits when the files exist on this machine. Do **not** `git add` local-only PNGs or that manifest. `.gitignore` already excludes them. After optimize, commit bundled SRD / Kibbles / Mage Hand Press outputs **and** species portraits; leave PHB/setting backgrounds untracked.
+
+On a fresh GitHub clone, species art is present; PHB and setting-book **background** defaults stay unset until you optimize those masters locally — no broken image URLs.
 
 4. Map display names in the matching `lib/compendium/*-card-images-defaults.ts` file so import and compendium browse pick up the portrait.
 
-Masters in `scripts/*-card-sources/` stay gitignored (they are large). Keep a local backup of those folders; cloning the repo does not restore PHB-style sources.
+Masters in `scripts/*-card-sources/` stay gitignored (they are large). Keep a local backup of those folders; cloning the repo does not restore PHB-style background sources.
 
 ---
 

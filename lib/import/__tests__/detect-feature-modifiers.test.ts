@@ -199,6 +199,22 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "learn one Metamagic option (Manipulate Magic)",
+      text:
+        "You learn one Metamagic option of your choice from the Sorcerer class. You can use this Metamagic option once, regaining the ability to use it again after completing a long rest.",
+      ruleId: "grant.metamagic",
+      assert: (detections) => {
+        const grant = detections.find((row) => row.ruleId === "grant.metamagic")
+        expect(grant?.instance.catalogRefId).toBe("cat_char_grant_feat")
+        const char = grant?.instance.characteristics?.[0]
+        expect(char?.type).toBe("grant_feat")
+        if (char?.type === "grant_feat") {
+          expect(char.featCategories).toEqual(["Metamagic"])
+        }
+        expect(detections.some((row) => row.ruleId === "uses.once_regain_after_rest")).toBe(true)
+      },
+    },
+    {
       label: "ranged critical hit scaling",
       text:
         "Your attack rolls with Ranged weapons can score a Critical Hit on a roll of 19 or 20 on the d20. At level 9, your attack rolls with Ranged weapons score a Critical Hit on a roll of 18–20. At level 17, they score a Critical Hit on a roll of 17–20.",

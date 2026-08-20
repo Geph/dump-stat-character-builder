@@ -34,6 +34,7 @@ import {
 } from "@/lib/character/effect-target-policy"
 import { applyAllyEffectLocally } from "@/lib/character/apply-ally-effect"
 import { applyPartyHealEffect } from "@/lib/character/apply-party-heal"
+import { applyResourceToResourceRestore } from "@/lib/character/resource-conversion"
 import { defaultSheetPlayState } from "@/lib/character/sheet-play-state"
 import {
   resolveFeatureEffectHealAmount,
@@ -387,6 +388,7 @@ function ActionDetailOverlay({
   empoweredPsionicsBonus = 0,
   onMarkDamageDealt,
   onBankBalanceOfPower,
+  onRestoreUseByResource,
   allyCandidates = [],
   healContext = null,
   playerNoteValues = {},
@@ -423,6 +425,7 @@ function ActionDetailOverlay({
   empoweredPsionicsBonus?: number
   onMarkDamageDealt?: () => void
   onBankBalanceOfPower?: (amount: number) => void
+  onRestoreUseByResource?: () => string | null
   allyCandidates?: PartyAllyCandidate[]
   healContext?: HealResolveContext | null
   playerNoteValues?: Record<string, string[]>
@@ -432,6 +435,7 @@ function ActionDetailOverlay({
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
   const [step, setStep] = useState<"detail" | "roll" | "target">("detail")
   const [useFeedback, setUseFeedback] = useState<string | null>(null)
+  const [resourceSpendAmount, setResourceSpendAmount] = useState(1)
   const [pendingHealEffects, setPendingHealEffects] = useState<FeatureEffect[]>([])
   const [applyingHeal, setApplyingHeal] = useState(false)
   const menuOptions = (action.menuOptions ?? []).filter(
@@ -467,7 +471,24 @@ function ActionDetailOverlay({
     (menuOptions.length === 0 ? null : menuOptions[0]?.hitDiceCost ?? null)
   const hitDiceNeeded = hitDiceCost != null && hitDiceCost > 0 ? hitDiceCost : 0
 
-  const chargeExhausted = usage != null && usage.used >= usage.max
+  const resourceCostMode = action.limitedUses?.classResourceCostMode ?? "fixed"
+  const configuredResourceCost = Math.max(1, action.limitedUses?.classResourceAmount ?? 1)
+  const resourceSpendCap =
+    resourceCostMode === "up_to_proficiency_bonus"
+      ? Math.max(1, (resolveContext.proficiencyBonus ?? 2) * configuredResourceCost)
+      : resourceCostMode === "up_to_ability_modifier"
+        ? Math.max(
+            1,
+            resolveContext.abilityModifiers?.[
+              action.limitedUses?.classResourceCostAbility ?? "CHA"
+            ] ?? 0,
+          ) * configuredResourceCost
+        : configuredResourceCost
+  const resourceSpend =
+    resourceCostMode === "fixed"
+      ? configuredResourceCost
+      : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
+  const chargeExhausted = usage != null && usage.max - usage.used < resourceSpend
   const canAffordPsi = psiCost <= availablePsiPoints && (psiLimit == null || psiCost <= psiLimit)
   const canAffordHitDice = hitDiceNeeded <= 0 || hitDiceNeeded <= hitDiceRemaining
   const canUse =
@@ -483,6 +504,7 @@ function ActionDetailOverlay({
     setAugmentSelections([])
     setStep("detail")
     setUseFeedback(null)
+    setResourceSpendAmount(1)
     setSelectedMenuOption(menuOptions[0]?.name ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the opened action changes
   }, [action.id])
@@ -500,7 +522,7 @@ function ActionDetailOverlay({
 
     const spendViaAugments = psiCost > 0
     if (usage && !spendViaAugments) {
-      usage.setUsed(usage.used + 1)
+      usage.setUsed(usage.used + resourceSpend)
     }
     if (spendViaAugments) {
       onSpendPsi(psiCost)
@@ -1003,10 +1025,48 @@ function ActionDetailOverlay({
             </div>
 
             <div className="sticky bottom-0 space-y-2 border-t border-border bg-card/95 p-4 backdrop-blur-sm">
+              {usage && action.classResourceKey && resourceCostMode !== "fixed" ? (
+                <label className="flex items-center justify-between gap-3 text-xs font-semibold text-foreground">
+                  Resource spend
+                  <input
+                    type="number"
+                    min={1}
+                    max={Math.min(resourceSpendCap, usage.max - usage.used)}
+                    value={resourceSpendAmount}
+                    onChange={(event) =>
+                      setResourceSpendAmount(
+                        Math.max(
+                          1,
+                          Math.min(
+                            resourceSpendCap,
+                            usage.max - usage.used,
+                            Number(event.target.value),
+                          ),
+                        ),
+                      )
+                    }
+                    className="h-8 w-20 rounded border border-border bg-background px-2 text-center"
+                  />
+                </label>
+              ) : null}
               {useFeedback ? (
                 <p className="rounded-lg bg-primary/10 px-3 py-2 text-center text-xs font-semibold text-primary">
                   {useFeedback}
                 </p>
+              ) : null}
+              {usage?.used && action.limitedUses?.restoreByResource && onRestoreUseByResource ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const feedback = onRestoreUseByResource()
+                    setUseFeedback(feedback)
+                  }}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-muted"
+                >
+                  Spend {action.limitedUses.restoreByResource.resourceAmount ?? 1}{" "}
+                  {action.limitedUses.restoreByResource.resourceKey.replace(/_/g, " ")} to restore{" "}
+                  {action.limitedUses.restoreByResource.restores} use
+                </button>
               ) : null}
               {incapacitated ? (
                 <p className="text-xs text-destructive">Incapacitated — you cannot use this now.</p>
@@ -1029,6 +1089,7 @@ function ActionDetailOverlay({
                 className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Use {action.name}
+                {usage && action.classResourceKey ? ` (${resourceSpend} ${usage.resourceName ?? "resource"})` : ""}
                 {hitDiceNeeded > 0 ? ` (${hitDiceNeeded} HD)` : ""}
                 {psiCost > 0 ? ` (${psiCost} psi)` : ""}
               </button>
@@ -1163,6 +1224,46 @@ export function SheetActionsPanel({
     })
   }
 
+  const restoreActionUseByResource = (
+    action: SheetActionEntry,
+    usage: ActionUsage | null,
+  ): string | null => {
+    const conversion = action.limitedUses?.restoreByResource
+    if (!conversion || !usage || !onResourceUsedChange) return "Restore unavailable"
+    const source =
+      (action.classId
+        ? resourceById.get(`${action.classId}_${conversion.resourceKey}`)
+        : null) ??
+      resourceEntries.find(
+        (entry) =>
+          entry.id === conversion.resourceKey ||
+          entry.id.endsWith(`_${conversion.resourceKey}`),
+      )
+    if (!source) return `${conversion.resourceKey.replace(/_/g, " ")} resource not found`
+    const sourceMax =
+      resolveUsesAtLevel(source.uses, source.classLevel, resolveContext) ?? 0
+    const sourceUsed = usedResourcesById[source.id] ?? 0
+    const sourceAmount = Math.max(1, conversion.resourceAmount ?? 1)
+    const result = applyResourceToResourceRestore({
+      sourceUsed,
+      sourceMax,
+      sourceAmount,
+      targetUsed: usage.used,
+      targetMax: usage.max,
+      restores: conversion.restores,
+    })
+    if (!result.applied) {
+      return usage.used <= 0 ? "No spent uses to restore" : "Not enough resource remaining"
+    }
+
+    onResourceUsedChange({
+      ...usedResourcesById,
+      [source.id]: result.nextSourceUsed,
+    })
+    usage.setUsed(result.nextTargetUsed)
+    return `Restored ${Math.min(usage.used, Math.max(1, conversion.restores))} use`
+  }
+
   const grouped: Record<ActionEconomyKind, SheetActionEntry[]> = {
     action: [],
     bonus: [],
@@ -1255,7 +1356,13 @@ export function SheetActionsPanel({
                     </div>
                     {usage && usesClassResource ? (
                       <span className="text-[10px] tabular-nums text-muted-foreground">
-                        Costs {entry.limitedUses?.classResourceAmount ?? 1}
+                        Costs{" "}
+                        {entry.limitedUses?.classResourceCostMode === "up_to_proficiency_bonus"
+                          ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}PB`
+                          : entry.limitedUses?.classResourceCostMode ===
+                              "up_to_ability_modifier"
+                            ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}${entry.limitedUses.classResourceCostAbility ?? "ability"} mod`
+                            : entry.limitedUses?.classResourceAmount ?? 1}
                         {usage.resourceName ? ` ${usage.resourceName}` : ""}
                       </span>
                     ) : usage ? (
@@ -1312,6 +1419,9 @@ export function SheetActionsPanel({
             empoweredPsionicsBonus={empoweredPsionicsBonus}
             onMarkDamageDealt={onMarkDamageDealt}
             onBankBalanceOfPower={onBankBalanceOfPower}
+            onRestoreUseByResource={() =>
+              restoreActionUseByResource(openAction, usageFor(openAction))
+            }
             allyCandidates={allyCandidates}
             healContext={healContext}
             playerNoteValues={playerNoteValues}
