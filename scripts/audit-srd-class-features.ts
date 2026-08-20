@@ -6,7 +6,13 @@ import { enrichClassFeatureWithModifierPresets } from "../lib/compendium/enrich-
 import type { Feature } from "../lib/types"
 
 function featureHasModifiers(feature: Feature): boolean {
-  return Boolean(feature.linkedModifiers?.length || feature.modifierRefs?.length)
+  if (feature.linkedModifiers?.length || feature.modifierRefs?.length) return true
+  // Choice shells like Divine Order / Blessed Strikes carry their mechanics on options.
+  return Boolean(
+    feature.choices?.options?.some(
+      (option) => (option.linkedModifiers?.length ?? 0) > 0 || (option.modifierRefs?.length ?? 0) > 0,
+    ),
+  )
 }
 
 function stripHtml(text: string): string {
