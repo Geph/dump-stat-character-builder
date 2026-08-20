@@ -78,6 +78,7 @@ Use null for optional fields you do not have data for.
 Omit top-level arrays for content types not present (or set them to null); use [] only when the source contains that type but yields zero valid entries.
 Do NOT output linkedModifiers or modifierRefs — Dump Stat wires Common Modifiers at import from description phrasing (and optional mechanics[]) on features, traits, feats, equipment, and abilities.
 Optionally add mechanics[] on features, traits, feats, or abilities for explicit modifier hints when phrasing is non-standard (see Common Modifier wiring).
+Use concise, stable source keys instead of full WotC book titles: "phb", "motm", "eberron", "ravenloft", "lorwyn", "spelljammer", or "planescape". Use "spelljammer" for Astral Adventurer's Guide species; use "planescape" only for actual Planescape material. Keep other publishers' source labels concise and consistent across every row from the same product.
 When extracting from a PDF, add source_page (integer, 1-based PDF page) on features[], traits[], spells[], feats[], and abilities[] when identifiable. Omit when unknown.`
 
 const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = {
@@ -86,7 +87,7 @@ const CONTENT_TYPE_JSON_FOCUS: Partial<Record<ImportContentTypeHint, string>> = 
   subclasses:
     "Use this focus only when adding archetypes to a parent class that is already in the compendium (or when the user explicitly asked for subclasses alone). Prefer extracting a full class chapter with content type Class + subclasses instead — core class and archetypes in one JSON. Focus on subclasses[] with class_name matching the parent classes[].name exactly, features[] by level for EVERY archetype named in the chapter (do not omit optional/appendix minds), and spell tables in feature descriptions when present. When a feature offers mutually exclusive subtype spell lists (Circle of the Land land types, similar circles/domains), emit isChoice + one option per subtype with that subtype's HTML spell table in the option description. For Elemental Mind Primordial Aspect, emit new_toggles with primordial_aspect_cold, primordial_aspect_fire, and primordial_aspect_lightning — never a single primordial_aspect key.",
   species:
-    "Focus on species[] with traits[] (name, description; isChoice + choices when applicable). For Remains / Animating Force / Modular Design / Augmented Abilities / Warped Gift style tables: put the FULL option body in each choices.options[].description (not only a name list on the parent). Include nested sub-picks as nested isChoice when the source requires them (e.g. climb vs swim, pick two natural weapons). Language columns → fixed languages as \"You know Sylvan\" / \"You can speak, read, and write Infernal\" (or Language: Matching Remains / Any as prose). Classic darkvision prose is fine (\"see in dim light within N feet… darkness as if it were dim light\") or say \"You have darkvision within N feet\". Template species (Augmented / Warped) may use size: null when size comes from the modified origin. Optional GM variants stay separate traits marked optional — do not merge them into the default trait set. Awakened Undead Remains feats go in feats[] when the source lists them under the species chapter.",
+    "Focus on species[] with source, creature_type, size/size_options, and traits[] (name, description; isChoice + choices when applicable). Set every species source to a concise stable key; for WotC use only phb, motm, eberron, ravenloft, lorwyn, spelljammer, or planescape (Astral Adventurer's Guide is spelljammer, not planescape). For Remains / Animating Force / Modular Design / Augmented Abilities / Warped Gift style tables: put the FULL option body in each choices.options[].description (not only a name list on the parent). Include nested sub-picks as nested isChoice when the source requires them (e.g. climb vs swim, pick two natural weapons). For a constrained proficiency choice, mechanics[] MUST include both choiceCount and the complete allowed list: skills for skill choices and tools for tool choices; omit the list only when literally any skill/tool is allowed. When species spells let the player choose Intelligence, Wisdom, or Charisma, add a spellcasting_ability mechanic with spellcastingAbilityOptions: [\"intelligence\", \"wisdom\", \"charisma\"]—do not omit the player choice or select one arbitrarily. Never emit an empty damageTypes list for a resistance determined by another choice—model the ancestry/lineage as isChoice and put the concrete resistance on each option, or preserve the dependency in prose for named presets. Regional additions that only one culture receives (for example Shadowmoor Darkvision) must be a regional choice/option, never an unconditional trait on every member of the species. Language columns → fixed languages as \"You know Sylvan\" / \"You can speak, read, and write Infernal\" (or Language: Matching Remains / Any as prose). Classic darkvision prose is fine (\"see in dim light within N feet… darkness as if it were dim light\") or say \"You have darkvision within N feet\". Template species (Augmented / Warped) may use size: null when size comes from the modified origin. Optional GM variants stay separate traits marked optional — do not merge them into the default trait set. Awakened Undead Remains feats go in feats[] when the source lists them under the species chapter.",
   backgrounds:
     "Focus on backgrounds[] with skill_proficiencies, tool_proficiencies / proficiencies.languages, starting_equipment_groups for Choose A/B (one group with description + options[{label,items}], never a flat [{label,items}] array), prerequisite_rules for campaign gates, feat_granted, ability_bonuses, optional source, and feature. Classic packages without Choose A/B: use starting_equipment + starting_gold. When the source says \"belt pouch containing N gp\", include a Belt Pouch item AND starting_gold: N (do not drop the pouch). Prefer quantity on the item over parenthetical counts in the name. For Dark Gift backgrounds keep feat_granted phrasing like \"Choose one Dark Gift feat\" or \"Survivor or a Dark Gift feat of your choice\" (never collapse the or-choice; never null out Dark Gift-only grants when ASI is present). For a fixed skill plus a faction/unrestricted fallback, include \"One skill of your choice\" in skill_proficiencies and preserve the faction table in description. ability_bonuses keys must be only strength|dexterity|constitution|intelligence|wisdom|charisma (never invent keys like desktop). Keep skill/tool/language choice phrasing (Dump Stat wires pickers). Legacy pre-2024 backgrounds (no Ability Scores / Origin Feat lines) use ability_bonuses: null and feat_granted: null — do NOT invent Old Hand or other feats from a separate crafting-feats chapter that only says \"provided by some backgrounds\". Assign each Feature to the background whose tools/theme it matches (PDF column flow often misplaces features).",
   languages:
@@ -154,6 +155,7 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
       {
         name: "Fighter",
         description: "A master of weapons and armor.",
+        card_blurb: "A versatile martial master of weapons, armor, and battlefield tactics.",
         hit_die: 10,
         primary_ability: ["Strength", "Dexterity"],
         saving_throws: ["Strength", "Constitution"],
@@ -190,6 +192,7 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
       {
         name: "Fighter",
         description: null,
+        card_blurb: "A versatile martial master of weapons, armor, and battlefield tactics.",
         hit_die: 10,
         primary_ability: ["Strength", "Dexterity"],
         saving_throws: ["Strength", "Constitution"],
@@ -205,6 +208,7 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         name: "Champion",
         class_name: "Fighter",
         description: "A simple martial subclass.",
+        card_blurb: "A focused warrior who relies on athletic excellence and devastating critical hits.",
         features: [
           {
             level: 3,
@@ -230,6 +234,7 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
         name: "Champion",
         class_name: "Fighter",
         description: "A simple martial subclass.",
+        card_blurb: "A focused warrior who relies on athletic excellence and devastating critical hits.",
         features: [
           {
             level: 3,
@@ -244,7 +249,9 @@ export const IMPORT_JSON_TEMPLATES: Record<ImportContentTypeHint, object> = {
     species: [
       {
         name: "Elf",
+        source: "phb",
         description: "An agile people of otherworldly grace.",
+        creature_type: "Humanoid",
         speed: 30,
         size: "Medium",
         traits: [{ name: "Darkvision", description: "You can see in dim light within 60 feet." }],

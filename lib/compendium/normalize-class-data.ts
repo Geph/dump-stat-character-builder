@@ -6,6 +6,51 @@ import { enrichSrdClassRow } from "@/lib/compendium/enrich-srd-classes"
 import bundledClasses from "@/lib/srd/seed-data/classes.json"
 import { isSrdSource } from "@/lib/srd/source"
 
+const PLAYER_FACING_GUIDANCE_BOUNDARIES = [
+  "Inventor Specialization is the subclass unlock.",
+  "Specialization Upgrade uses optionsSource",
+  "KibblesTasty Inventor is an Intelligence half caster",
+  "Runes Marked is class_resources.",
+  "Warden Bond is the subclass unlock",
+  "Primal Manifestations use optionsSource",
+  "Dump Stat sets endurance_dice",
+  "Endurance Dice column",
+  "KibblesTasty Occultist is a Wisdom full caster",
+  "Occult Rites use optionsSource",
+  "Occult Tradition is the subclass unlock",
+] as const
+
+export function stripInternalClassFeatureGuidance(description: string): string {
+  let cutAt = description.length
+  for (const marker of PLAYER_FACING_GUIDANCE_BOUNDARIES) {
+    const index = description.indexOf(marker)
+    if (index >= 0) cutAt = Math.min(cutAt, index)
+  }
+  if (cutAt === description.length) return description
+  const paragraphStart = description.lastIndexOf("<p", cutAt)
+  if (paragraphStart >= 0 && /^<p[^>]*>\s*$/i.test(description.slice(paragraphStart, cutAt))) {
+    cutAt = paragraphStart
+  }
+  return description.slice(0, cutAt).trim()
+}
+
+function sanitizeClassFeatureDescriptions<T>(row: T): T {
+  const features = (row as { features?: unknown }).features
+  if (!Array.isArray(features)) return row
+  return {
+    ...row,
+    features: features.map((feature) => {
+      if (!feature || typeof feature !== "object") return feature
+      const record = feature as Record<string, unknown>
+      if (typeof record.description !== "string") return feature
+      return {
+        ...record,
+        description: stripInternalClassFeatureGuidance(record.description),
+      }
+    }),
+  }
+}
+
 function normalizeEquipmentItems(raw: unknown): { name: string; quantity: number }[] {
   if (!Array.isArray(raw)) return []
   return raw
@@ -106,6 +151,8 @@ export function enrichClassesList<
     if (isSrdSource(row.source)) {
       return enrichSrdClassRow(enriched as unknown as Record<string, unknown>) as T
     }
+
+    enriched = sanitizeClassFeatureDescriptions(enriched)
 
     const withIcon = (() => {
       const existingIcon = (enriched as { icon?: unknown }).icon

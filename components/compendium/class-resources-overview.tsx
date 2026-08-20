@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronDown, Copy, Edit, Gauge } from "lucide-react"
@@ -39,11 +39,17 @@ export function ClassResourcesOverview({
   copyingId = null,
 }: ClassResourcesOverviewProps) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  const detailRef = useRef<HTMLDivElement | null>(null)
 
   const expandedGroup = useMemo(
     () => groups.find((group) => group.resourceKey === expandedKey) ?? null,
     [groups, expandedKey],
   )
+
+  useEffect(() => {
+    if (!expandedGroup || !detailRef.current) return
+    detailRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" })
+  }, [expandedGroup])
 
   const toggleGroup = (resourceKey: string) => {
     setExpandedKey((current) => (current === resourceKey ? null : resourceKey))
@@ -67,6 +73,53 @@ export function ClassResourcesOverview({
           </button>
         )}
       </div>
+
+      <AnimatePresence mode="wait">
+        {expandedGroup && (
+          <motion.div
+            key={expandedGroup.resourceKey}
+            ref={detailRef}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+            className={cn(pageOverlayPanelClass, "p-4 space-y-4")}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-black text-foreground">{expandedGroup.label}</h2>
+              <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded-full font-mono">
+                {expandedGroup.resourceKey}
+              </span>
+            </div>
+
+            {(() => {
+              const variants = variantGroupsWithinResource(expandedGroup, classNamesById)
+              return variants.map((variant, index) => (
+                <div key={`${expandedGroup.resourceKey}-${index}`} className="space-y-2">
+                  {expandedGroup.items.length > 1 && variants.length > 1 && (
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {variant.usesLabel}
+                    </p>
+                  )}
+                  <div className="divide-y divide-border rounded-xl border border-border bg-background overflow-hidden">
+                    {variant.items.map((row) => (
+                      <ResourceVariantRow
+                        key={row.id}
+                        row={row}
+                        className={classNamesById[row.class_id] ?? "Unknown class"}
+                        onSelect={() => onSelect(row)}
+                        onToggleEnabled={(enabled) => onToggleEnabled(row, enabled)}
+                        onCopy={onCopy ? () => onCopy(row) : undefined}
+                        copying={copyingId === row.id}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))
+            })()}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {groups.map((group) => {
@@ -132,52 +185,6 @@ export function ClassResourcesOverview({
           )
         })}
       </div>
-
-      <AnimatePresence mode="wait">
-        {expandedGroup && (
-          <motion.div
-            key={expandedGroup.resourceKey}
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18 }}
-            className={cn(pageOverlayPanelClass, "p-4 space-y-4")}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-black text-foreground">{expandedGroup.label}</h2>
-              <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded-full font-mono">
-                {expandedGroup.resourceKey}
-              </span>
-            </div>
-
-            {(() => {
-              const variants = variantGroupsWithinResource(expandedGroup, classNamesById)
-              return variants.map((variant, index) => (
-                <div key={`${expandedGroup.resourceKey}-${index}`} className="space-y-2">
-                  {expandedGroup.items.length > 1 && variants.length > 1 && (
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {variant.usesLabel}
-                    </p>
-                  )}
-                  <div className="divide-y divide-border rounded-xl border border-border bg-background overflow-hidden">
-                    {variant.items.map((row) => (
-                      <ResourceVariantRow
-                        key={row.id}
-                        row={row}
-                        className={classNamesById[row.class_id] ?? "Unknown class"}
-                        onSelect={() => onSelect(row)}
-                        onToggleEnabled={(enabled) => onToggleEnabled(row, enabled)}
-                        onCopy={onCopy ? () => onCopy(row) : undefined}
-                        copying={copyingId === row.id}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))
-            })()}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }

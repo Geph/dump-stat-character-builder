@@ -44,6 +44,13 @@ function traitHasWiring(trait: TraitRow): boolean {
 describe("WOTC species wiring", () => {
   const skip = !hasHomebrewFixture(FIXTURE)
 
+  it.skipIf(skip)("uses canonical short source keys", () => {
+    const path = homebrewFixturePath(FIXTURE)!
+    const parsed = parseImportContentJson(readFileSync(path, "utf8"))!
+    const sources = [...new Set((parsed.species ?? []).map((species) => species.source))].sort()
+    expect(sources).toEqual(["eberron", "lorwyn", "motm", "phb", "ravenloft", "spelljammer"])
+  })
+
   it.skipIf(skip)("wires nearly all traits after import enrichment", () => {
     const path = homebrewFixturePath(FIXTURE)!
     const enriched = enrichImportContentModifiers(parseImportContentJson(readFileSync(path, "utf8"))!)
@@ -77,6 +84,61 @@ describe("WOTC species wiring", () => {
     )
     expect(JSON.stringify(sentry?.linkedModifiers)).toMatch(/rest_replacement|magical_sleep/i)
     expect(JSON.stringify(specialized?.linkedModifiers)).toMatch(/tool_proficiencies/)
+  })
+
+  it.skipIf(skip)("preserves constrained skill pools and curated compound traits", () => {
+    const path = homebrewFixturePath(FIXTURE)!
+    const enriched = enrichImportContentModifiers(parseImportContentJson(readFileSync(path, "utf8"))!)
+    const species = (name: string) => enriched.species?.find((row) => row.name === name)
+    const trait = (speciesName: string, traitName: string) =>
+      (species(speciesName)?.traits as TraitRow[] | undefined)?.find((row) => row.name === traitName)
+
+    const naturalAffinity = JSON.stringify(trait("Centaur", "Natural Affinity")?.linkedModifiers)
+    expect(naturalAffinity).toMatch(/Animal Handling/)
+    expect(naturalAffinity).toMatch(/Medicine/)
+    expect(naturalAffinity).toMatch(/Nature/)
+    expect(naturalAffinity).toMatch(/Survival/)
+    expect(naturalAffinity).toMatch(/"allowAnySkill":false/)
+
+    expect(JSON.stringify(trait("Aasimar (2024)", "Healing Hands")?.linkedModifiers)).toMatch(
+      /healing_dice_pool/,
+    )
+    expect(JSON.stringify(trait("Aasimar (2024)", "Celestial Revelation")?.linkedModifiers)).toMatch(
+      /on_hit_trigger/,
+    )
+    expect(JSON.stringify(trait("Changeling (2024)", "Shape-Shifter")?.linkedModifiers)).toMatch(
+      /creature_size/,
+    )
+
+    const dualMind = JSON.stringify(trait("Kalashtar", "Dual Mind")?.linkedModifiers)
+    expect(dualMind).toMatch(/Wisdom/)
+    expect(dualMind).toMatch(/Charisma/)
+    expect(JSON.stringify(trait("Kalashtar", "Severed from Dreams")?.linkedModifiers)).toMatch(
+      /Dream/,
+    )
+
+    const versatility = JSON.stringify(trait("Khoravar", "Skill Versatility")?.linkedModifiers)
+    expect(versatility).toMatch(/skills/)
+    expect(versatility).toMatch(/tool_proficiencies/)
+    expect(versatility).toMatch(/sharedChoiceGroup/)
+
+    const gnomishCunning = JSON.stringify(trait("Gnome", "Gnomish Cunning")?.linkedModifiers)
+    expect(gnomishCunning).toMatch(/Intelligence/)
+    expect(gnomishCunning).toMatch(/Wisdom/)
+    expect(gnomishCunning).toMatch(/Charisma/)
+
+    const vampiricBite = JSON.stringify(trait("Dhampir", "Vampiric Bite")?.linkedModifiers)
+    expect(vampiricBite).toMatch(/unarmed_strike_damage/)
+    expect(vampiricBite).toMatch(/constitution/)
+
+    const windCaller = JSON.stringify(trait("Aarakocra", "Wind Caller")?.linkedModifiers)
+    expect(windCaller).toMatch(/spellcasting_ability/)
+    expect(windCaller).toMatch(/abilityOptions/)
+
+    const aasimar = species("Aasimar (2024)") as
+      | { linkedModifiers?: unknown[]; linked_modifiers?: unknown[] }
+      | undefined
+    expect(JSON.stringify(aasimar?.linkedModifiers ?? aasimar?.linked_modifiers)).toMatch(/languages/)
   })
 
   it.skipIf(skip)("wires Size and lineage/symbiont choice options", () => {
@@ -177,5 +239,22 @@ describe("WOTC species wiring", () => {
     const giant = (goliath?.traits as TraitRow[] | undefined)?.find((t) => t.name === "Giant Ancestry")
     const cloud = (giant?.choices?.options ?? []).find((o) => o.name === "Cloud's Jaunt")
     expect((cloud?.linkedModifiers?.length ?? 0) > 0).toBe(true)
+
+    for (const speciesName of ["Lorwyn Fairy", "Kithkin"]) {
+      const regionalSpecies = enriched.species?.find((s) => s.name === speciesName)
+      const regionalOrigin = (regionalSpecies?.traits as TraitRow[] | undefined)?.find(
+        (t) => t.name === "Regional Origin",
+      )
+      expect((regionalOrigin?.choices?.options ?? []).map((o) => o.name)).toEqual([
+        "Lorwyn",
+        "Shadowmoor",
+      ])
+      expect(JSON.stringify(regionalOrigin?.choices?.options?.[0]?.linkedModifiers)).not.toMatch(
+        /darkvision/i,
+      )
+      expect(JSON.stringify(regionalOrigin?.choices?.options?.[1]?.linkedModifiers)).toMatch(
+        /darkvision/i,
+      )
+    }
   })
 })

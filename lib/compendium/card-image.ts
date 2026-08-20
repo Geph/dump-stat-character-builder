@@ -1,6 +1,7 @@
 import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
 import { SRD_CLASS_CARD_BLURBS } from "@/lib/srd/class-card-blurbs"
+import { KIBBLES_CLASS_CARD_BLURBS } from "@/lib/seed-packs/kibbles-tasty/class-card-blurbs"
 
 import { filterAvailableDefaultCardImageUrl } from "@/lib/compendium/available-card-art"
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
@@ -345,6 +346,9 @@ export function getCompendiumCardBlurb(item: CompendiumCardVisual): string {
   }
   if (item.name && SRD_CLASS_CARD_BLURBS[item.name]) {
     return SRD_CLASS_CARD_BLURBS[item.name]
+  }
+  if (item.name && KIBBLES_CLASS_CARD_BLURBS[item.name]) {
+    return KIBBLES_CLASS_CARD_BLURBS[item.name]
   }
   return compendiumCardBlurb(item.description)
 }

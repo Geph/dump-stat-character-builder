@@ -63,6 +63,9 @@ export function normalizeSpellImportRow(raw: RawSpellRow): NonNullable<ImportCon
 
   return {
     name: String(raw.name ?? "").trim(),
+    ...(typeof raw.source === "string" && raw.source.trim()
+      ? { source: raw.source.trim() }
+      : {}),
     level,
     school: typeof raw.school === "string" && raw.school.trim() ? raw.school.trim() : "Unknown",
     casting_time: typeof raw.casting_time === "string" ? raw.casting_time : null,

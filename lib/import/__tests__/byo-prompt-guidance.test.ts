@@ -46,6 +46,25 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("mutually exclusive spell lists")
   })
 
+  it("requires concise class and subclass card blurbs", () => {
+    for (const contentType of ["classes", "subclasses"] as const) {
+      const prompt = buildByoExtractionPrompt(contentType)
+      expect(prompt).toContain("Always emit card_blurb")
+      expect(prompt).toContain("120 characters or fewer")
+      expect(prompt).toContain("player-facing summary")
+      expect(prompt).toContain("How it feels to play")
+      expect(prompt).toContain("core gameplay loop")
+    }
+  })
+
+  it("preserves species provenance, regional choices, and spellcasting ability picks", () => {
+    const prompt = buildByoExtractionPrompt("species")
+    expect(prompt).toContain("source, creature_type, size/size_options")
+    expect(prompt).toContain('spellcastingAbilityOptions: ["intelligence", "wisdom", "charisma"]')
+    expect(prompt).toContain("regional choice/option")
+    expect(prompt).toContain("skills for skill choices")
+  })
+
   it("scopes feat isChoice to ability-catalog picks, not grant_feat milestones", () => {
     expect(CHOICE_EXTRACTION_HINT).toContain("do NOT use isChoice")
     expect(CHOICE_EXTRACTION_HINT).toContain("grant_feat")

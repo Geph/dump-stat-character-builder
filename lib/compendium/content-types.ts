@@ -3,7 +3,12 @@ import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
 import { defaultCreatureIconForItem } from "@/lib/compendium/creature-icons-defaults"
 import { defaultSubclassIconForName } from "@/lib/compendium/subclass-icons-defaults"
 import { weaponIconSlug } from "@/lib/compendium/weapon-icons"
-import { SRD_ARMOR_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
+import {
+  SRD_ARMOR_ICONS_BY_NAME,
+  SRD_BACKGROUND_ICONS_BY_NAME,
+  SRD_FEAT_ICONS_BY_NAME,
+  SRD_SPECIES_ICONS_BY_NAME,
+} from "@/lib/compendium/srd-item-icons-defaults"
 
 export type CompendiumContentType =
   | "species"
@@ -90,6 +95,18 @@ export function getCompendiumItemIcon(
       ""
     const subclassIcon = defaultSubclassIconForName(String(item.name ?? ""), className)
     if (subclassIcon) return subclassIcon
+  }
+  if (tab === "feats") {
+    const featIcon = SRD_FEAT_ICONS_BY_NAME[String(item.name ?? "").trim()]
+    if (featIcon) return featIcon
+  }
+  if (tab === "species") {
+    const speciesIcon = SRD_SPECIES_ICONS_BY_NAME[String(item.name ?? "").trim()]
+    if (speciesIcon) return speciesIcon
+  }
+  if (tab === "backgrounds") {
+    const backgroundIcon = SRD_BACKGROUND_ICONS_BY_NAME[String(item.name ?? "").trim()]
+    if (backgroundIcon) return backgroundIcon
   }
   if (tab === "creatures") {
     const creatureIcon = defaultCreatureIconForItem(item)

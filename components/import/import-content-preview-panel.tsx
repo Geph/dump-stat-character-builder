@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import type { ImportContent } from "@/lib/import/content-schema"
 import {
   collectImportContentPreview,
+  groupImportContentPreviewBySource,
   importContentPreviewLimit,
   importPreviewItemSkipKey,
   type ImportContentPreviewItem,
@@ -38,6 +39,8 @@ type ImportContentPreviewPanelProps = {
   /** Soft-skip keys (`section:index`) — independent of collision skip. */
   skippedKeys?: ReadonlySet<string>
   onSkippedKeysChange?: (next: Set<string>) => void
+  /** Source used for rows without their own source label. */
+  defaultSource?: string
 }
 
 const SECTION_ICONS: Record<string, typeof BookOpen> = {
@@ -264,10 +267,15 @@ export function ImportContentPreviewPanel({
   onRenameItem,
   skippedKeys,
   onSkippedKeysChange,
+  defaultSource,
 }: ImportContentPreviewPanelProps) {
   const sections = useMemo(
     () => collectImportContentPreview(content, sectionKeys ? { sectionKeys } : undefined),
     [content, sectionKeys],
+  )
+  const sourceGroups = useMemo(
+    () => groupImportContentPreviewBySource(sections, defaultSource),
+    [defaultSource, sections],
   )
 
   const handleToggleSkip = (item: ImportContentPreviewItem) => {
@@ -283,6 +291,23 @@ export function ImportContentPreviewPanel({
   if (!sections.length && !visibleSummary && !showModifierReviewHint) return null
 
   const singleSection = sections.length === 1
+  const multipleSources = sourceGroups.length > 1
+  const renderSections = (
+    visibleSections: ImportContentPreviewSection[],
+    keyPrefix = "",
+  ) =>
+    visibleSections.map((section) => (
+      <PreviewSection
+        key={`${keyPrefix}${section.key}`}
+        section={section}
+        bare={embedded && visibleSections.length === 1}
+        cardArtUrls={cardArtUrls}
+        onCardArtChange={onCardArtChange}
+        onRenameItem={onRenameItem}
+        skippedKeys={skippedKeys}
+        onToggleSkip={onSkippedKeysChange ? handleToggleSkip : undefined}
+      />
+    ))
   const body = (
     <>
       {!embedded ? (
@@ -315,18 +340,35 @@ export function ImportContentPreviewPanel({
 
       {sections.length > 0 ? (
         <div className={embedded ? "space-y-2" : "space-y-3"}>
-          {sections.map((section) => (
-            <PreviewSection
-              key={section.key}
-              section={section}
-              bare={embedded && singleSection}
-              cardArtUrls={cardArtUrls}
-              onCardArtChange={onCardArtChange}
-              onRenameItem={onRenameItem}
-              skippedKeys={skippedKeys}
-              onToggleSkip={onSkippedKeysChange ? handleToggleSkip : undefined}
-            />
-          ))}
+          {multipleSources
+            ? sourceGroups.map((group) => (
+                <section
+                  key={group.source}
+                  className="space-y-3 rounded-xl border border-primary/25 bg-primary/[0.03] p-3"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 className="font-semibold text-foreground">{group.source}</h3>
+                    <span className="text-xs text-muted-foreground">
+                      {group.itemCount} item{group.itemCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {renderSections(group.sections, `${group.source}:`)}
+                  </div>
+                </section>
+              ))
+            : sections.map((section) => (
+                <PreviewSection
+                  key={section.key}
+                  section={section}
+                  bare={embedded && singleSection}
+                  cardArtUrls={cardArtUrls}
+                  onCardArtChange={onCardArtChange}
+                  onRenameItem={onRenameItem}
+                  skippedKeys={skippedKeys}
+                  onToggleSkip={onSkippedKeysChange ? handleToggleSkip : undefined}
+                />
+              ))}
         </div>
       ) : null}
     </>

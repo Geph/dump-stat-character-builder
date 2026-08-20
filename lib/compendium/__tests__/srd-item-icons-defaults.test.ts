@@ -42,6 +42,23 @@ describe("SRD item icon defaults", () => {
     expect(row.icon).toBe(SRD_FEAT_ICONS_BY_NAME.Tough)
   })
 
+  it("exposes curated feat icons in compendium browse when DB icon is empty", async () => {
+    const { getCompendiumItemIcon } = await import("@/lib/compendium/content-types")
+    expect(
+      getCompendiumItemIcon("feats", { name: "Lucky", icon: null, source: "Player's Handbook" }),
+    ).toBe("clover")
+    expect(
+      getCompendiumItemIcon("feats", {
+        name: "Scion of the Outer Planes",
+        icon: null,
+        source: "Planescape",
+      }),
+    ).toBe("knocked-out-stars")
+    expect(
+      getCompendiumItemIcon("feats", { name: "Unknown Homebrew Feat", icon: null }),
+    ).toBe("mighty-force")
+  })
+
   it("maps bundled background icons on seed enrich", () => {
     const [row] = normalizeBackgroundRows([
       {

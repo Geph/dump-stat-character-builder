@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 import { buildImportCollisions } from "@/lib/import/import-collisions"
 import { collectImportContentPreview } from "@/lib/import/import-content-preview"
@@ -7,21 +6,23 @@ import { buildImportStages } from "@/lib/import/import-staging"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import { summarizeImportPreview } from "@/lib/import/prepare-import"
 import { applyUpdateMergesToLanguageRows } from "@/lib/import/merge-collision-update"
+import {
+  hasHomebrewFixture,
+  homebrewFixturePath,
+} from "@/lib/import/__tests__/homebrew-fixture-path"
 
-const WORKING_IMPORT_JSON = resolve(
-  process.cwd(),
-  "..",
-  "dump stat working files",
-  "import-json",
+const hasLanguageFixtures = hasHomebrewFixture(
+  "eberron-languages.json",
+  "wotc-languages.json",
 )
 
-describe("languages import", () => {
+describe.runIf(hasLanguageFixtures)("languages import", () => {
   it("parses eberron and wotc language packs", () => {
     const eberron = parseImportContentJson(
-      readFileSync(resolve(WORKING_IMPORT_JSON, "eberron", "eberron-languages.json"), "utf8"),
+      readFileSync(homebrewFixturePath("eberron-languages.json")!, "utf8"),
     )
     const wotc = parseImportContentJson(
-      readFileSync(resolve(WORKING_IMPORT_JSON, "wotc-languages.json"), "utf8"),
+      readFileSync(homebrewFixturePath("wotc-languages.json")!, "utf8"),
     )
 
     expect(eberron?.languages?.map((row) => row.name)).toEqual([
@@ -38,7 +39,7 @@ describe("languages import", () => {
 
   it("stages languages, previews them, and detects SRD name collisions for Update merges", () => {
     const content = parseImportContentJson(
-      readFileSync(resolve(WORKING_IMPORT_JSON, "eberron", "eberron-languages.json"), "utf8"),
+      readFileSync(homebrewFixturePath("eberron-languages.json")!, "utf8"),
     )!
     expect(buildImportStages(content).map((stage) => stage.id)).toEqual(["languages"])
     expect(summarizeImportPreview(content)).toContain("4 languages")

@@ -122,9 +122,7 @@ function BlockedActionButton({
           aria-label={title}
           className="inline-flex cursor-not-allowed rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
           onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
         >
           {children}
         </span>
@@ -136,10 +134,15 @@ function BlockedActionButton({
         className="w-[min(22rem,calc(100vw-2rem))] border-destructive/40 bg-card text-foreground p-4 shadow-xl z-[110]"
         onOpenAutoFocus={(event) => event.preventDefault()}
         onCloseAutoFocus={(event) => event.preventDefault()}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
       >
-        <ProceedBlockerBanner blockers={blockers} heading={heading} onJump={onJump} />
+        <ProceedBlockerBanner
+          blockers={blockers}
+          heading={heading}
+          onJump={(blocker) => {
+            setOpen(false)
+            onJump?.(blocker)
+          }}
+        />
       </PopoverContent>
     </Popover>
   )

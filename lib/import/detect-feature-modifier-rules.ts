@@ -2838,16 +2838,25 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "spellcasting.ability",
     confidence: "high",
     test:
-      /\b(Intelligence|Wisdom|Charisma)(?:,\s*(?:Intelligence|Wisdom|Charisma))*\s+is your spellcasting ability\b/i,
+      /\b((?:Intelligence|Wisdom|Charisma)(?:,\s*(?:Intelligence|Wisdom|Charisma))*(?:,?\s+or\s+(?:Intelligence|Wisdom|Charisma))?)\s+is (?:your|the) spellcasting ability\b/i,
     build: (match, ctx) => {
-      const ability = parseAbilityWord(match[1])
+      const abilities = [...new Set(
+        (match[1].match(/Intelligence|Wisdom|Charisma/gi) ?? [])
+          .map(parseAbilityWord)
+          .filter((ability): ability is AbilityScoreKey => ability != null),
+      )]
+      const ability = abilities[0]
       if (!ability) return null
       return charInstance(newInstanceId(), characteristicCatalogRefId("spellcasting_ability"), [
         {
           id: modId(instanceKey(ctx, "spellcasting")),
           type: "spellcasting_ability",
           ability,
-          label: `${match[1]} spellcasting`,
+          ...(abilities.length > 1 ? { abilityOptions: abilities } : {}),
+          label:
+            abilities.length > 1
+              ? `${abilities.map(titleCaseWords).join(", ")} spellcasting choice`
+              : `${match[1]} spellcasting`,
         },
       ])
     },

@@ -119,6 +119,15 @@ function hasCharacteristicType(
   )
 }
 
+function appendDescriptionOnce(description: string | null | undefined, text: string): string {
+  const current = description ?? ""
+  const marker = `\n\n${text}`
+  const escapedMarker = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const collapsed = current.replace(new RegExp(`(?:${escapedMarker}){2,}`, "g"), marker)
+  if (collapsed.includes(text)) return collapsed.trim()
+  return `${collapsed}${marker}`.trim()
+}
+
 function applyOperations(
   feature: FeatureLike,
   operations: EnrichmentOperation[],
@@ -131,7 +140,7 @@ function applyOperations(
       case "appendDescription":
         next = {
           ...next,
-          description: `${next.description ?? ""}\n\n${operation.text}`.trim(),
+          description: appendDescriptionOnce(next.description, operation.text),
         }
         break
       case "appendDescriptionTemplate": {
@@ -144,7 +153,7 @@ function applyOperations(
           .replaceAll("{{resource_label}}", prefixed.replace(/_/g, " "))
         next = {
           ...next,
-          description: `${next.description ?? ""}\n\n${text}`.trim(),
+          description: appendDescriptionOnce(next.description, text),
         }
         break
       }

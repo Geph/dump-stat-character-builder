@@ -160,6 +160,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   grant_custom_ability: "Feats & choices",
   feature_choice_count_bonus: "Feats & choices",
   feature_choice_option_grant: "Feats & choices",
+  subclass_unlock: "Feats & choices",
   equipment_and_magic_items: "Equipment & items",
   player_note: "Equipment & items",
   catalog_option: "Feats & choices",

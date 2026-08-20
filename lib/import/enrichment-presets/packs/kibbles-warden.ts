@@ -243,53 +243,5 @@ export function sanitizeKibblesWardenImportContent(content: ImportContent): Impo
   return next
 }
 
-export const KIBBLES_WARDEN_PRESETS: EnrichmentPreset[] = [
-  {
-    id: "kibbles_warden.class.warden_bond",
-    pack: "kibbles_warden",
-    target: "class_feature",
-    match: { className: /warden/i, name: /^warden bond$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Warden Bond is the subclass unlock (Elemental Soul, Beasthide, Elderheart, Stoneblood, Sunwatcher, Ironbound, Dreadwing, Timetwister, Astral Guardian, Bone Binder). Short blurb only — bond features live in subclasses[] with class_name Warden. Do not emit stub isChoice options naming each bond, and do not emit \"Warden Bond Feature\" rows as base-class features.",
-      },
-    ],
-  },
-  {
-    id: "kibbles_warden.class.primal_manifestations",
-    pack: "kibbles_warden",
-    target: "class_feature",
-    match: { className: /warden/i, name: /^primal manifestations$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Primal Manifestations use optionsSource class_knacks + class_resources.primal_manifestations (special; never primal_manifestations_known). Swap one manifestation when you gain a Warden level — swappableOnRest false. Emit each manifestation as import_proposals.custom_abilities with ability_role knack. Distinct from Mage Hand Press Warden (Interrupt / Survive).",
-      },
-    ],
-  },
-  {
-    id: "kibbles_warden.class.empowered_endurance",
-    pack: "kibbles_warden",
-    target: "class_feature",
-    match: { className: /warden/i, name: /^empowered endurance$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Dump Stat sets endurance_dice uses.rechargeOnInitiative: 1 when this feature is present (regain one die on Initiative if none remain). Do not set initiative recharge from the level table alone.",
-      },
-    ],
-  },
-  {
-    id: "kibbles_warden.class.endurance_dice",
-    pack: "kibbles_warden",
-    target: "class_feature",
-    match: { className: /warden/i, name: /^endurance dice$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Endurance Dice column → class_resources.endurance_dice (at_level pool + dieSidesByLevel). Also emit endurance_die_size as a special die-size resource (d8→d10→d12). Not Mage Hand Press Interrupt.",
-      },
-    ],
-  },
-]
+// Structural import guidance belongs in the extraction prompt/registry, never player-facing prose.
+export const KIBBLES_WARDEN_PRESETS: EnrichmentPreset[] = []

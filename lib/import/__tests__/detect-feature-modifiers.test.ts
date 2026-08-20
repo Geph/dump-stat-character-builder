@@ -409,6 +409,19 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "spellcasting ability choice",
+      text: "Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells.",
+      ruleId: "spellcasting.ability",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "spellcasting.ability")?.instance
+            .characteristics?.[0],
+          "spellcasting_ability",
+        )
+        expect(char?.abilityOptions).toEqual(["intelligence", "wisdom", "charisma"])
+      },
+    },
+    {
       label: "ritual-only named spells",
       text: "You can cast the Beast Sense and Speak with Animals spells but only as Rituals. Wisdom is your spellcasting ability for them.",
       ruleId: "spell.can_cast_named",

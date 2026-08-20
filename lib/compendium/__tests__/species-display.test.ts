@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { formatSpeciesSizeDisplay, formatSpeciesSpeedDisplay } from "@/lib/compendium/species-display"
+import {
+  formatSpeciesSizeDisplay,
+  formatSpeciesSpeedDisplay,
+  isSpeciesSizeChoiceTrait,
+} from "@/lib/compendium/species-display"
 
 describe("species display", () => {
   it("joins multiple size options", () => {
@@ -13,6 +17,23 @@ describe("species display", () => {
 
   it("falls back to a single size", () => {
     expect(formatSpeciesSizeDisplay({ size: "Medium", size_options: null })).toBe("Medium")
+  })
+
+  it("detects Size choice traits used as the duplicate picker", () => {
+    expect(
+      isSpeciesSizeChoiceTrait({
+        name: "Size",
+        isChoice: true,
+        choices: { options: [{ name: "Medium" }, { name: "Small" }] },
+      }),
+    ).toBe(true)
+    expect(
+      isSpeciesSizeChoiceTrait({
+        name: "Celestial Revelation",
+        isChoice: true,
+        choices: { options: [{ name: "Radiant Soul" }, { name: "Radiant Consumption" }] },
+      }),
+    ).toBe(false)
   })
 
   it("formats walking speed only", () => {

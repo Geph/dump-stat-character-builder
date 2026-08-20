@@ -81,18 +81,22 @@ describe("weapon equipment icon defaults", () => {
 })
 
 describe("ability icon defaults", () => {
-  it("defaults Psion disciplines to psychic-waves", () => {
+  it("defaults Psion disciplines to the Psion class icon when owned", () => {
     expect(
       getCompendiumItemIcon("abilities", {
         name: "Psychokinesis Discipline",
         ability_role: "discipline",
+        source_type: "class",
+        source_name: "Psion",
       }),
-    ).toBe("psychic-waves")
+    ).toBe("rear-aura")
     expect(
       getCompendiumItemIcon("abilities", {
         name: "Enhancement Discipline",
+        source_type: "class",
+        source_name: "Psion",
       }),
-    ).toBe("psychic-waves")
+    ).toBe("rear-aura")
     expect(fs.existsSync(path.join(process.cwd(), "public/icons/psychic-waves.svg"))).toBe(true)
   })
 

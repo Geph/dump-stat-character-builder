@@ -183,6 +183,35 @@ describe("aiMechanicsToDetections", () => {
     expect(detections[0]?.instance.catalogRefId).toBe("cat_char_skills")
   })
 
+  it("preserves the allowed pool for constrained skill choices", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "skills",
+          skills: ["animal handling", "medicine", "nature", "survival"],
+          choiceCount: 1,
+          sourcePhrase: "Choose one of Animal Handling, Medicine, Nature, or Survival.",
+        },
+      ],
+      {
+        contentKind: "species_trait",
+        sourceName: "Centaur",
+        featureName: "Natural Affinity",
+      },
+    )
+    const skill = detections[0]?.instance.characteristics?.[0]
+    expect(skill?.type).toBe("skills")
+    if (skill?.type !== "skills") throw new Error("Expected skills characteristic")
+    expect(skill.allowAnySkill).toBe(false)
+    expect(skill.choiceCount).toBe(1)
+    expect(skill.entries.map((entry) => entry.skill)).toEqual([
+      "Animal Handling",
+      "Medicine",
+      "Nature",
+      "Survival",
+    ])
+  })
+
   it("drops invalid AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [{ kind: "ac" }],
@@ -205,6 +234,25 @@ describe("aiMechanicsToDetections", () => {
     expect(detections).toHaveLength(1)
     expect(detections[0]?.ruleId).toBe("ai.spellcasting_ability")
     expect(detections[0]?.instance.characteristics?.[0]?.type).toBe("spellcasting_ability")
+  })
+
+  it("builds a player spellcasting ability choice from AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "spellcasting_ability",
+          spellcastingAbilityOptions: ["intelligence", "wisdom", "charisma"],
+          sourcePhrase: "Choose Intelligence, Wisdom, or Charisma.",
+        },
+      ],
+      { contentKind: "species_trait", sourceName: "Aarakocra", featureName: "Wind Caller" },
+    )
+    const characteristic = detections[0]?.instance.characteristics?.[0]
+    expect(characteristic?.type).toBe("spellcasting_ability")
+    if (characteristic?.type !== "spellcasting_ability") {
+      throw new Error("Expected spellcasting ability characteristic")
+    }
+    expect(characteristic.abilityOptions).toEqual(["intelligence", "wisdom", "charisma"])
   })
 
   it("builds creature-type damage from AI mechanics", () => {

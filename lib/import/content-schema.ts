@@ -1,4 +1,5 @@
 import { z } from "zod"
+import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { AI_MECHANIC_KINDS } from "@/lib/import/common-modifiers-import-hints"
 
 export { AI_MECHANIC_KINDS } from "@/lib/import/common-modifiers-import-hints"
@@ -197,6 +198,7 @@ export const ImportMechanicSchema = z.object({
   alwaysPrepared: z.boolean().optional(),
   castAsRitual: z.boolean().optional(),
   spellcastingAbility: z.enum(ABILITY_SCORE_KEYS).optional(),
+  spellcastingAbilityOptions: z.array(z.enum(ABILITY_SCORE_KEYS)).optional(),
   attunementTotal: z.number().optional(),
   attunementBonus: z.number().optional(),
   targetCreatureTypes: z.array(z.string()).optional(),
@@ -389,6 +391,11 @@ export const ChoiceOptionsSchema = z.object({
       description: z.string(),
       prerequisite: z.string().nullable().optional(),
       repeatable: z.boolean().nullable().optional(),
+      linkedModifiers: z
+        .array(z.record(z.unknown()))
+        .transform((value) => value as LinkedModifierInstance[])
+        .optional(),
+      modifierRefs: z.array(z.string()).optional(),
     }),
   ),
   optionsSource: z
@@ -439,6 +446,12 @@ export const ClassFeatureSchema = z.object({
   companion_stat_block: z.record(z.unknown()).nullable().optional(),
   /** Names of Creatures & Companions this feature grants (resolve from creatures table). */
   companion_creature_names: z.array(z.string()).nullable().optional(),
+  linkedModifiers: z
+    .array(z.record(z.unknown()))
+    .transform((value) => value as LinkedModifierInstance[])
+    .optional(),
+  modifierRefs: z.array(z.string()).optional(),
+  importModifierMeta: z.array(z.record(z.unknown())).optional(),
   sheetDisplay: z
     .object({
       abilitiesActions: z.boolean().optional(),
@@ -491,6 +504,7 @@ export const ClassSpellcastingImportSchema = z.object({
 export const SubclassImportSchema = z.object({
   name: z.string(),
   class_name: z.string(),
+  source: z.string().nullable().optional(),
   description: z.string().nullable(),
   prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
   card_image_url: z.string().nullable().optional(),
@@ -507,6 +521,7 @@ export const SubclassImportSchema = z.object({
 
 export const FeatImportSchema = z.object({
   name: z.string(),
+  source: z.string().nullable().optional(),
   description: z.string().nullable(),
   prerequisite: z.string().nullable().optional(),
   prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
@@ -551,6 +566,7 @@ export const CREATURE_COMPANION_IMPORT_HINT = `For creatures[] (companions, summ
 
 export const SpellImportSchema = z.object({
   name: z.string(),
+  source: z.string().nullable().optional(),
   card_image_url: z.string().nullable().optional(),
   level: z.number(),
   school: z.string(),
@@ -768,6 +784,7 @@ The same ability is sometimes introduced twice in a source — once as a brief g
 
 export const EquipmentImportSchema = z.object({
   name: z.string(),
+  source: z.string().nullable().optional(),
   card_image_url: z.string().nullable().optional(),
   category: z.string(),
   subcategory: z.string().nullable(),
@@ -969,9 +986,12 @@ export function buildImportContentSchema(options?: { includeAbilities?: boolean 
       .array(
         z.object({
           name: z.string(),
+          source: z.string().nullable().optional(),
           card_image_url: z.string().nullable().optional(),
           description: z.string().nullable(),
           prerequisite_rules: z.array(PrerequisiteRuleSchema).nullable().optional(),
+          creature_type: z.string().nullable().optional(),
+          size_options: z.array(z.enum(["Small", "Medium"])).nullable().optional(),
           speed: z.number().nullable(),
           size: z.string().nullable(),
           traits: z.array(SpeciesTraitSchema),
@@ -1014,6 +1034,14 @@ import { COMMON_MODIFIERS_IMPORT_HINT } from "@/lib/import/common-modifiers-impo
 
 export const MECHANICS_IMPORT_HINT = COMMON_MODIFIERS_IMPORT_HINT
 
+export const CARD_BLURB_IMPORT_HINT = `For every class and subclass:
+- Always emit card_blurb as a separate, player-facing summary derived from the full description.
+- Keep card_blurb at 120 characters or fewer so it fits in two lines on builder cards and detail heroes.
+- Write card_blurb as a "How it feels to play" sentence: use active, player-facing language and summarize the core gameplay loop.
+- Favor what the player repeatedly does in play (control, protect, bargain, build, transform, etc.), not lore or a list of class features.
+- Do not copy progression instructions, prerequisites, level tables, or importer/editor guidance.
+- Keep the full source prose in description. card_blurb supplements description and never replaces or truncates it.`
+
 export const CHOICE_EXTRACTION_HINT = `When content requires a player to choose between fixed options (species lineage/ancestry/legacy, fighting style options listed by name, skill from a list, etc.):
 - Set isChoice: true on the trait or class feature (use null when not a choice)
 - Populate choices with { category, count, options: [{ name, description }] } or null when not applicable
@@ -1043,6 +1071,7 @@ When the header says "Dark Gift Feat", set category to "Dark Gift" (never "Plana
 For well-known PHB feats (Alert, Tough, Magic Initiate, Archery, War Caster, etc.), prefer omitting mechanics[] when unsure — name-matched presets apply on load. Partial wrong mechanics (e.g. vision without visionType blindsight, grant_feat on ASI, empty damage_roll_modifiers) are worse than none.`
 
 export const SUBCLASS_IMPORT_HINT = `For subclasses:
+- Every subclasses[] row must include a concise card_blurb (120 characters or fewer) summarizing that subclass's fantasy and play style.
 - Prefer importing archetypes with the parent class (content type Class + subclasses): put every archetype in subclasses[] in the same JSON as classes[]. Use a Subclasses-only pass only when adding to a class already in the compendium, or when the user explicitly asks for subclasses alone.
 - Set class_name to the exact parent class name as it appears in the source (e.g. "Druid", "Fighter", "Sorcerer", "Psion") — must match classes[].name when importing with the class
 - Third-party subclass names (Psionic Archetype, Circle, Oath, Patron, etc.) still use the subclasses array

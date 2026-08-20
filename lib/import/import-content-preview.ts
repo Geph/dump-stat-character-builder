@@ -27,6 +27,8 @@ export type ImportContentPreviewSectionKey =
 export type ImportContentPreviewItem = {
   id: string
   name: string
+  /** Per-row source used to split mixed-source review lists. */
+  source?: string
   details: ImportContentPreviewDetail[]
   badges: string[]
   descriptionSnippet?: string
@@ -46,6 +48,12 @@ export type ImportContentPreviewSection = {
   key: ImportContentPreviewSectionKey
   label: string
   items: ImportContentPreviewItem[]
+}
+
+export type ImportContentPreviewSourceGroup = {
+  source: string
+  sections: ImportContentPreviewSection[]
+  itemCount: number
 }
 
 const PREVIEW_LIMIT = 16
@@ -476,9 +484,72 @@ export function collectImportContentPreview(
     previewLanguages(content),
   ].filter((section): section is ImportContentPreviewSection => section != null)
 
-  if (!options?.sectionKeys) return sections
+  const classSources = new Map(
+    (content.classes ?? [])
+      .map((row) => [row.name.trim().toLowerCase(), row.source?.trim()] as const)
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && entry[1])),
+  )
+  const withSources = sections.map((section) => ({
+    ...section,
+    items: section.items.map((item) => {
+      const rows = (content as unknown as Record<string, unknown[]>)[section.key]
+      const row = rows?.[item.sourceIndex] as Record<string, unknown> | undefined
+      const direct = typeof row?.source === "string" ? row.source.trim() : ""
+      if (direct) return { ...item, source: direct }
+
+      if (section.key === "subclasses") {
+        const parent = typeof row?.class_name === "string" ? row.class_name.trim().toLowerCase() : ""
+        const inherited = classSources.get(parent)
+        if (inherited) return { ...item, source: inherited }
+      }
+      if (section.key === "spells" && Array.isArray(row?.classes)) {
+        const inherited = [
+          ...new Set(
+            row.classes
+              .filter((name): name is string => typeof name === "string")
+              .map((name) => classSources.get(name.trim().toLowerCase()))
+              .filter((source): source is string => Boolean(source)),
+          ),
+        ]
+        if (inherited.length === 1) return { ...item, source: inherited[0] }
+      }
+      return item
+    }),
+  }))
+
+  if (!options?.sectionKeys) return withSources
   const allowed = new Set(options.sectionKeys)
-  return sections.filter((section) => allowed.has(section.key))
+  return withSources.filter((section) => allowed.has(section.key))
+}
+
+export function groupImportContentPreviewBySource(
+  sections: ImportContentPreviewSection[],
+  fallbackSource = "Custom",
+): ImportContentPreviewSourceGroup[] {
+  const fallback = fallbackSource.trim() || "Custom"
+  const groups = new Map<string, ImportContentPreviewSection[]>()
+
+  for (const section of sections) {
+    for (const item of section.items) {
+      const source = item.source?.trim() || fallback
+      const groupedSections = groups.get(source) ?? []
+      let groupedSection = groupedSections.find((candidate) => candidate.key === section.key)
+      if (!groupedSection) {
+        groupedSection = { ...section, items: [] }
+        groupedSections.push(groupedSection)
+      }
+      groupedSection.items.push(item)
+      groups.set(source, groupedSections)
+    }
+  }
+
+  return [...groups.entries()]
+    .map(([source, groupedSections]) => ({
+      source,
+      sections: groupedSections,
+      itemCount: groupedSections.reduce((sum, section) => sum + section.items.length, 0),
+    }))
+    .sort((a, b) => a.source.localeCompare(b.source))
 }
 
 export function importContentPreviewLimit(): number {

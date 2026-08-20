@@ -2,6 +2,7 @@ import {
   extractPrerequisiteFromDescription,
   parseMinimumLevelFromPrerequisite,
 } from "@/lib/builder/choice-prerequisite"
+import { applyDefaultAbilityIcon } from "@/lib/compendium/ability-icons-defaults"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import { syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { enrichAbilityPsionicAugments } from "@/lib/import/normalize-ability-import"
@@ -240,8 +241,10 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
     modifierRefs: synced.modifierRefs,
   }
 
-  return applySpecializationAlternateEffectsChoice(
-    enrichManipulateMagicAbility(enrichedRow),
+  return applyDefaultAbilityIcon(
+    applySpecializationAlternateEffectsChoice(
+      enrichManipulateMagicAbility(enrichedRow),
+    ),
   )
 }
 

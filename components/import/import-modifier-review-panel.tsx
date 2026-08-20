@@ -2,8 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { ModifierWiringRegistryCoverageLine } from "@/components/import/modifier-wiring-registry-coverage-line"
-import type { ImportModifierReviewRow } from "@/lib/import/import-modifier-previews"
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Link2, Sparkles, X } from "lucide-react"
+import type {
+  ImportModifierPreviewEntry,
+  ImportModifierReviewRow,
+} from "@/lib/import/import-modifier-previews"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, Link2, Sparkles, X } from "lucide-react"
 
 type ImportModifierReviewPanelProps = {
   rows: ImportModifierReviewRow[]
@@ -40,6 +50,8 @@ function SourceGroupCard({
   items: ImportModifierReviewRow[]
   onRemoveModifier?: (previewId: string) => void
 }) {
+  const [selectedModifier, setSelectedModifier] = useState<ImportModifierPreviewEntry | null>(null)
+
   return (
     <li className="rounded-lg border border-border/70 bg-muted/15 px-3 py-2">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -96,15 +108,33 @@ function SourceGroupCard({
                       className={`inline-flex max-w-full items-start gap-1 rounded-full border px-2.5 py-1 text-xs ${CONFIDENCE_STYLES[entry.confidence]}`}
                       title={entry.matchedPhrase}
                     >
-                      <span className="min-w-0">
+                      <button
+                        type="button"
+                        disabled={entry.confidence === "high"}
+                        aria-label={
+                          entry.confidence === "high"
+                            ? undefined
+                            : `Explain ${entry.summary} modifier`
+                        }
+                        className={`inline-flex min-w-0 items-start gap-1 text-left ${
+                          entry.confidence === "high"
+                            ? "cursor-default"
+                            : "cursor-pointer rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        }`}
+                        onClick={() => setSelectedModifier(entry)}
+                      >
+                        <span className="min-w-0">
                         <span className="font-medium">{entry.summary}</span>
                         <span className="ml-1 opacity-80">
                           · {SOURCE_LABELS[entry.source]} · {entry.confidence}
                         </span>
-                      </span>
-                      {entry.source === "ai" ? (
-                        <Sparkles className="mt-0.5 h-3 w-3 shrink-0 opacity-70" aria-hidden />
-                      ) : null}
+                        </span>
+                        {entry.source === "ai" ? (
+                          <Sparkles className="mt-0.5 h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                        ) : entry.confidence !== "high" ? (
+                          <Info className="mt-0.5 h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                        ) : null}
+                      </button>
                       {onRemoveModifier ? (
                         <button
                           type="button"
@@ -139,6 +169,59 @@ function SourceGroupCard({
           </li>
         ))}
       </ul>
+      <Dialog
+        open={selectedModifier != null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedModifier(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedModifier?.summary}</DialogTitle>
+            <DialogDescription>
+              Why this modifier was auto-wired to {selectedModifier?.featureName}.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedModifier ? (
+            <div className="space-y-4 text-sm">
+              <div>
+                <p className="font-medium text-foreground">What it does</p>
+                <p className="mt-1 text-muted-foreground">
+                  Adds the <span className="font-medium text-foreground">{selectedModifier.summary}</span>{" "}
+                  common modifier to this feature, so the character builder can apply the rule
+                  automatically.
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-foreground">Why it matched</p>
+                <blockquote className="mt-1 rounded-md border-l-2 border-primary/50 bg-muted/40 px-3 py-2 text-muted-foreground">
+                  {selectedModifier.matchedPhrase}
+                </blockquote>
+                <p className="mt-2 text-muted-foreground">
+                  {selectedModifier.source === "ai"
+                    ? "The imported mechanics supplied this match through AI-assisted analysis."
+                    : selectedModifier.source === "foundry_effect"
+                      ? "This match came from structured Foundry Active Effect data."
+                      : "The phrase-matching detector recognized this wording in the feature description."}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium text-foreground">
+                  Confidence: <span className="capitalize">{selectedModifier.confidence}</span>
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  {selectedModifier.confidence === "medium"
+                    ? "The wording is a likely match, but it may be context-dependent. Review it before saving."
+                    : "The wording is ambiguous or only partially matched. Verify that this effect reflects the source rule."}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Detection rule: <code>{selectedModifier.ruleId}</code>
+              </p>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </li>
   )
 }

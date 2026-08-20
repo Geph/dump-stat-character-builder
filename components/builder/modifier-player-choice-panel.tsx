@@ -6,6 +6,7 @@ import { ToolGroupedChoices } from "@/components/builder/tool-grouped-choices"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { useFeatSpellGrantPickerPageSize, useIsSmPickerScreen } from "@/hooks/use-picker-page-size"
 import { paginateList } from "@/lib/builder/picker-pagination"
+import { builderChoiceTargetId } from "@/lib/builder/proceed-blockers"
 import {
   filterMagicInitiateSpellListSlotOptions,
   isMagicInitiateSourceLabel,
@@ -324,6 +325,7 @@ export function ModifierPlayerChoicePanel({
         return (
           <MultiSelectChoices
             key={slot.slotKey}
+            id={builderChoiceTargetId(slot.sourceLabel, slot.label)}
             title={slot.label}
             hint={
               slot.kind === "skill_or_tool" && !slot.grantsExpertise

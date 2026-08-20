@@ -606,7 +606,7 @@ function enrichFeatureChoices(
     }
   }
 
-  return next
+  return migrateFeatureOptionPickers(next)
 }
 
 type ClassSpellcastingContext = {

@@ -16,6 +16,10 @@ export function asBuilderBlockers(messages: string[], stepId: number): BuilderBl
 
 export function inferBlockerTarget(message: string, stepId: number): string | undefined {
   const text = message.toLowerCase()
+  const modifierChoice = message.match(/^([^:]+):\s*(.+?)\s+\(\d+\/\d+\)/)
+  if (modifierChoice && /\blanguage(s)?\b/i.test(modifierChoice[2])) {
+    return builderChoiceTargetId(modifierChoice[1], modifierChoice[2])
+  }
   if (text.includes("name") && (text.includes("details") || stepId === BUILDER_STEP_IDS.DETAILS)) {
     return "builder-details-name"
   }
@@ -40,6 +44,10 @@ export function slugAnchor(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
+}
+
+export function builderChoiceTargetId(sourceLabel: string, choiceLabel: string): string {
+  return `builder-choice-${slugAnchor(sourceLabel)}-${slugAnchor(choiceLabel)}`
 }
 
 export function scrollToBuilderTarget(targetId: string | undefined): void {

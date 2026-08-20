@@ -1,5 +1,8 @@
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
-import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import {
+  syncModifierRefs,
+  type LinkedModifierInstance,
+} from "@/lib/compendium/linked-modifiers"
 import type { Feature, FeatureChoice } from "@/lib/types"
 
 /**
@@ -114,10 +117,11 @@ export function migrateFeatureOptionPickers(feature: Feature): Feature {
 
   if (!foundPicker) return feature
 
-  return {
+  return syncModifierRefs({
     ...feature,
     isChoice: true,
     choices: choice,
     linkedModifiers: nextLinked,
-  }
+    modifierRefs: nextLinked.map((instance) => instance.catalogRefId),
+  })
 }

@@ -4,6 +4,7 @@ import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 import { getSpellSlotTable } from "@/lib/compendium/spell-slots"
+import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import {
   hasHomebrewFixture,
   homebrewFixturePath,
@@ -17,7 +18,7 @@ function loadFixture(name: string) {
 }
 
 function featureChars(feature: {
-  linkedModifiers?: { characteristics?: { type: string }[]; activation?: { effects?: { kind: string }[] } }[]
+  linkedModifiers?: LinkedModifierInstance[]
   isChoice?: boolean
 }) {
   const types = (feature.linkedModifiers ?? []).flatMap((m) => (m.characteristics ?? []).map((c) => c.type))

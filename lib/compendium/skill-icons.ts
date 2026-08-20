@@ -15,11 +15,11 @@ const SKILL_ICON_BY_NAME: Record<string, string> = {
   Investigation: "magnifying-glass",
   Medicine: "health-potion",
   Nature: "oak-leaf",
-  Perception: "eyeball",
+  Perception: "spyglass",
   Performance: "theater-curtains",
   Persuasion: "public-speaker",
   Religion: "church",
-  "Sleight of Hand": "assassin-pocket",
+  "Sleight of Hand": "robber-hand",
   Stealth: "ninja-mask",
   Survival: "camping-tent",
 }

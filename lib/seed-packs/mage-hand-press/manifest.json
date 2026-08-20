@@ -2,7 +2,7 @@
   "id": "mage-hand-press",
   "label": "Mage Hand Press",
   "source": "Mage Hand Press",
-  "version": "2026-08-18",
+  "version": "2026-08-20",
   "files": [
     "magehandpress-alchemist-class.json",
     "magehandpress-captain-class.json",
@@ -22,7 +22,6 @@
   "notes": [
     "Subclasses filtered to the free allowlist only.",
     "Dancer class file was not present in Drive import-json at build time.",
-    "Gunslinger: free subclass \"Pistolero\" not found in source JSON",
     "Necromancer: free subclass \"Cyberghoul\" not found in source JSON"
   ]
 }

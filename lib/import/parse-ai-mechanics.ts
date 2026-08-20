@@ -98,8 +98,9 @@ function usesRechargesFromImport(
   }
   if (recharge === "short_rest") return [{ rest: "short_rest" }]
   if (recharge === "both") {
-    // Common 2024/MHP pattern: regain 1 on a Short Rest, all on a Long Rest.
-    return [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }]
+    // Short OR Long Rest recovers all expended uses (War Priest, 2024 PHB).
+    // "Regain 1 on a Short Rest" is a separate phrase-detection path — do not encode it here.
+    return [{ rest: "short_rest" }, { rest: "long_rest" }]
   }
   return [{ rest: "long_rest" }]
 }
@@ -913,6 +914,7 @@ function buildFromMechanic(
   switch (mechanic.kind) {
     case "skills": {
       if (mechanic.choiceCount && mechanic.choiceCount > 0) {
+        const skills = mechanic.skills?.map(titleCaseWords).filter(Boolean) ?? []
         return {
           ruleId: "ai.skills.choice",
           confidence: aiConfidence(mechanic),
@@ -921,8 +923,8 @@ function buildFromMechanic(
             {
               id: modId(instanceKey(ctx, "skills_choice")),
               type: "skills",
-              entries: [],
-              allowAnySkill: true,
+              entries: skills.map((skill) => ({ skill, expertise: false })),
+              allowAnySkill: skills.length === 0,
               choiceCount: mechanic.choiceCount,
             },
           ]),
@@ -1428,7 +1430,10 @@ function buildFromMechanic(
     }
     case "spellcasting_ability": {
       const ability = mechanic.spellcastingAbility
-      if (!ability) return null
+      const abilityOptions = mechanic.spellcastingAbilityOptions ?? []
+      if (!ability && !abilityOptions.length) return null
+      const defaultAbility = ability ?? abilityOptions[0]
+      if (!defaultAbility) return null
       return {
         ruleId: "ai.spellcasting_ability",
         confidence: aiConfidence(mechanic),
@@ -1437,8 +1442,13 @@ function buildFromMechanic(
           {
             id: modId(instanceKey(ctx, "spell_ability")),
             type: "spellcasting_ability",
-            ability,
-            label: mechanic.spellChoiceLabel ?? `${ability} spellcasting`,
+            ability: defaultAbility,
+            ...(abilityOptions.length ? { abilityOptions } : {}),
+            label:
+              mechanic.spellChoiceLabel ??
+              (abilityOptions.length
+                ? `${abilityOptions.map(titleCaseWords).join(", ")} spellcasting choice`
+                : `${defaultAbility} spellcasting`),
             ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
           },
         ]),

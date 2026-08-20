@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   collectImportContentPreview,
+  groupImportContentPreviewBySource,
   stripSkippedImportPreviewItems,
 } from "@/lib/import/import-content-preview"
 import type { ImportContent } from "@/lib/import/content-schema"
@@ -67,6 +68,45 @@ describe("collectImportContentPreview", () => {
     const items = sections.find((section) => section.key === "subclasses")?.items ?? []
     expect(items.map((item) => item.name)).toEqual(["Alpha Path", "Zebra Path"])
     expect(items.map((item) => item.sourceIndex)).toEqual([1, 0])
+  })
+
+  it("groups mixed class imports by row source and inherits source for subclasses", () => {
+    const content = {
+      classes: [
+        { name: "Inventor", source: "Kibbles Tasty", hit_die: 8, features: [] },
+        { name: "Warmage", source: "Mage Hand Press", hit_die: 8, features: [] },
+      ],
+      subclasses: [
+        { name: "Warsmith", class_name: "Inventor", features: [] },
+        { name: "House of Kings", class_name: "Warmage", features: [] },
+      ],
+    } as unknown as ImportContent
+
+    const sections = collectImportContentPreview(content)
+    const groups = groupImportContentPreviewBySource(sections)
+
+    expect(groups.map((group) => group.source)).toEqual(["Kibbles Tasty", "Mage Hand Press"])
+    expect(groups[0]?.sections.flatMap((section) => section.items.map((item) => item.name))).toEqual([
+      "Inventor",
+      "Warsmith",
+    ])
+    expect(groups[1]?.sections.flatMap((section) => section.items.map((item) => item.name))).toEqual([
+      "Warmage",
+      "House of Kings",
+    ])
+  })
+
+  it("keeps a single fallback-source group for source-less imports", () => {
+    const content = {
+      feats: [{ name: "Alert", description: "Always ready." }],
+    } as unknown as ImportContent
+
+    const groups = groupImportContentPreviewBySource(
+      collectImportContentPreview(content),
+      "Custom Book",
+    )
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.source).toBe("Custom Book")
   })
 })
 

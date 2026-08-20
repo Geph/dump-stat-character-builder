@@ -102,8 +102,10 @@ import { getClassDetailBaseFeatures } from "@/lib/builder/class-detail-features"
 import { subclassFeatureTitleRows } from "@/lib/builder/subclass-detail-display"
 import { getClassComplexityHeroBadge, getClassDetailHeroBadges } from "@/lib/builder/class-detail-badges"
 import {
+  findSpeciesSizeChoiceTraitIndex,
   formatSpeciesSizeDisplay,
   formatSpeciesSpeedDisplay,
+  isSpeciesSizeChoiceTrait,
 } from "@/lib/compendium/species-display"
 import {
   portraitDetailBadge,
@@ -424,8 +426,10 @@ export default function BuilderPageClient() {
   
   // Search state for each step
   const [classSearch, setClassSearch] = useState("")
+  const [classSourceFilter, setClassSourceFilter] = useState("all")
   const [classPickerPage, setClassPickerPage] = useState(0)
   const [speciesSearch, setSpeciesSearch] = useState("")
+  const [speciesSourceFilter, setSpeciesSourceFilter] = useState("all")
   const [speciesPickerPage, setSpeciesPickerPage] = useState(0)
   const [backgroundSearch, setBackgroundSearch] = useState("")
   const [backgroundSourceFilter, setBackgroundSourceFilter] = useState("all")
@@ -680,11 +684,11 @@ export default function BuilderPageClient() {
 
   useEffect(() => {
     setClassPickerPage(0)
-  }, [classSearch])
+  }, [classSearch, classSourceFilter])
 
   useEffect(() => {
     setSpeciesPickerPage(0)
-  }, [speciesSearch])
+  }, [speciesSearch, speciesSourceFilter])
 
   useEffect(() => {
     setBackgroundPickerPage(0)
@@ -1029,6 +1033,28 @@ export default function BuilderPageClient() {
   const selectedClass = classes.find(c => c.id === character.class_id)
   const selectedSpecies = species.find(s => s.id === character.species_id)
   const selectedBackground = backgrounds.find(b => b.id === character.background_id)
+
+  // Dedicated size_options control is the only Size UI; keep the Size trait pick in sync
+  // so option linkedModifiers (creature size) still apply.
+  useEffect(() => {
+    if (!selectedSpecies || (selectedSpecies.size_options?.length ?? 0) <= 1) return
+    const sizeTraitIndex = findSpeciesSizeChoiceTraitIndex(selectedSpecies)
+    if (sizeTraitIndex < 0) return
+    const size = character.size ?? selectedSpecies.size ?? null
+    const key = String(sizeTraitIndex)
+    setSpeciesTraitPicks((prev) => {
+      if (!size) {
+        if (!(key in prev)) return prev
+        const next = { ...prev }
+        delete next[key]
+        return next
+      }
+      const current = prev[key] ?? []
+      if (current.length === 1 && current[0] === size) return prev
+      return { ...prev, [key]: [size] }
+    })
+  }, [selectedSpecies, character.size])
+
   const effectiveBackgroundFeatGranted = getEffectiveBackgroundFeatGranted(
     selectedBackground,
     featureChoicePicks,
@@ -3045,34 +3071,72 @@ export default function BuilderPageClient() {
                 <h2 className="text-2xl font-black text-foreground mb-2">Choose Class & Level</h2>
                 <p className={`${pageFloatingHintClass} mb-4`}>Your class determines your combat abilities and special features.</p>
                 
-                {/* Search */}
-                <SearchBox
-                  value={classSearch}
-                  onChange={setClassSearch}
-                  suggestions={rankSearchResults(classes, deferredClassSearch, {
-                    name: (cls) => cls.name,
-                    fields: [
-                      { name: "description", value: (cls) => cls.description, weight: 0.35 },
-                      { name: "source", value: (cls) => cls.source, weight: 0.9 },
-                      { name: "primary ability", value: (cls) => cls.primary_ability, weight: 1.2 },
-                    ],
-                    limit: 8,
-                  }).map((match) => ({
-                    id: match.item.id,
-                    label: match.item.name,
-                    detail: [match.item.primary_ability?.join("/"), match.item.source]
-                      .filter(Boolean)
-                      .join(" · "),
-                    item: match.item,
-                    matchKind: match.kind,
-                  }))}
-                  onSelect={(suggestion) => setClassSearch(suggestion.label)}
-                  scope="builder:classes"
-                  placeholder="Search classes…"
-                  ariaLabel="Search classes"
-                  className="mb-4"
-                  inputClassName="border"
-                />
+                {/* Search + source filter */}
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <SearchBox
+                    value={classSearch}
+                    onChange={setClassSearch}
+                    suggestions={rankSearchResults(
+                      classes.filter(
+                        (cls) =>
+                          classSourceFilter === "all" ||
+                          (cls.source?.trim() || "Custom") === classSourceFilter,
+                      ),
+                      deferredClassSearch,
+                      {
+                        name: (cls) => cls.name,
+                        fields: [
+                          { name: "description", value: (cls) => cls.description, weight: 0.35 },
+                          { name: "source", value: (cls) => cls.source, weight: 0.9 },
+                          { name: "primary ability", value: (cls) => cls.primary_ability, weight: 1.2 },
+                        ],
+                        limit: 8,
+                      },
+                    ).map((match) => ({
+                      id: match.item.id,
+                      label: match.item.name,
+                      detail: [match.item.primary_ability?.join("/"), match.item.source]
+                        .filter(Boolean)
+                        .join(" · "),
+                      item: match.item,
+                      matchKind: match.kind,
+                    }))}
+                    onSelect={(suggestion) => setClassSearch(suggestion.label)}
+                    scope="builder:classes"
+                    placeholder="Search classes…"
+                    ariaLabel="Search classes"
+                    className="flex-1"
+                    inputClassName="border"
+                  />
+                  {(() => {
+                    const sourceOptions = [
+                      ...new Set(
+                        classes.map((cls) => cls.source?.trim() || "Custom").filter(Boolean),
+                      ),
+                    ].sort((a, b) => a.localeCompare(b))
+                    if (sourceOptions.length <= 1) return null
+                    return (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                          Source
+                        </label>
+                        <select
+                          value={classSourceFilter}
+                          onChange={(e) => setClassSourceFilter(e.target.value)}
+                          className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none max-w-[14rem] w-full sm:w-auto"
+                          aria-label="Filter classes by source"
+                        >
+                          <option value="all">All sources</option>
+                          {sourceOptions.map((source) => (
+                            <option key={source} value={source}>
+                              {source}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )
+                  })()}
+                </div>
                 
                 {cardViewMode !== "cinematic" ? (
                   <p className={`${pageFloatingHintClass} text-xs mb-2`}>
@@ -3081,7 +3145,14 @@ export default function BuilderPageClient() {
                 ) : null}
 
                 {(() => {
-                  const filteredClasses = searchItems(classes, deferredClassSearch, {
+                  const sourceFilteredClasses = classes.filter(
+                    (cls) =>
+                      !(
+                        classSourceFilter !== "all" &&
+                        (cls.source?.trim() || "Custom") !== classSourceFilter
+                      ),
+                  )
+                  const filteredClasses = searchItems(sourceFilteredClasses, deferredClassSearch, {
                     name: (cls) => cls.name,
                     fields: [
                       { name: "description", value: (cls) => cls.description, weight: 0.35 },
@@ -3197,7 +3268,7 @@ export default function BuilderPageClient() {
                     <p
                       className={
                         cardViewMode === "cinematic"
-                          ? "text-[10px] font-bold uppercase tracking-[0.18em] text-white/55 max-sm:text-xs"
+                          ? "text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground max-sm:text-xs"
                           : "mb-2 text-xs font-bold uppercase text-muted-foreground"
                       }
                     >
@@ -3205,7 +3276,7 @@ export default function BuilderPageClient() {
                       <span
                         className={
                           cardViewMode === "cinematic"
-                            ? "ml-2 text-amber-400/90"
+                            ? "ml-2 text-primary"
                             : "ml-1 font-normal normal-case tracking-normal text-muted-foreground"
                         }
                       >
@@ -3916,35 +3987,82 @@ export default function BuilderPageClient() {
                   <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Species</h2>
                   <p className={`${pageFloatingHintClass} mb-3`}>Your species grants unique traits and abilities.</p>
                   
-                  {/* Search */}
-                  <SearchBox
-                    value={speciesSearch}
-                    onChange={setSpeciesSearch}
-                    suggestions={rankSearchResults(species, deferredSpeciesSearch, {
-                      name: (item) => item.name,
-                      fields: [
-                        { name: "description", value: (item) => item.description, weight: 0.35 },
-                        { name: "source", value: (item) => item.source },
-                        { name: "creature type", value: (item) => item.creature_type, weight: 1.3 },
-                      ],
-                      limit: 8,
-                    }).map((match) => ({
-                      id: match.item.id,
-                      label: match.item.name,
-                      detail: [match.item.creature_type, match.item.source].filter(Boolean).join(" · "),
-                      item: match.item,
-                      matchKind: match.kind,
-                    }))}
-                    onSelect={(suggestion) => setSpeciesSearch(suggestion.label)}
-                    scope="builder:species"
-                    placeholder="Search species…"
-                    ariaLabel="Search species"
-                    className="mb-3"
-                    inputClassName="border"
-                  />
+                  {/* Search + source filter */}
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <SearchBox
+                      value={speciesSearch}
+                      onChange={setSpeciesSearch}
+                      suggestions={rankSearchResults(
+                        species.filter(
+                          (item) =>
+                            speciesSourceFilter === "all" ||
+                            (item.source?.trim() || "Custom") === speciesSourceFilter,
+                        ),
+                        deferredSpeciesSearch,
+                        {
+                          name: (item) => item.name,
+                          fields: [
+                            { name: "description", value: (item) => item.description, weight: 0.35 },
+                            { name: "source", value: (item) => item.source },
+                            { name: "creature type", value: (item) => item.creature_type, weight: 1.3 },
+                          ],
+                          limit: 8,
+                        },
+                      ).map((match) => ({
+                        id: match.item.id,
+                        label: match.item.name,
+                        detail: [match.item.creature_type, match.item.source]
+                          .filter(Boolean)
+                          .join(" · "),
+                        item: match.item,
+                        matchKind: match.kind,
+                      }))}
+                      onSelect={(suggestion) => setSpeciesSearch(suggestion.label)}
+                      scope="builder:species"
+                      placeholder="Search species…"
+                      ariaLabel="Search species"
+                      className="flex-1"
+                      inputClassName="border"
+                    />
+                    {(() => {
+                      const sourceOptions = [
+                        ...new Set(
+                          species.map((item) => item.source?.trim() || "Custom").filter(Boolean),
+                        ),
+                      ].sort((a, b) => a.localeCompare(b))
+                      if (sourceOptions.length <= 1) return null
+                      return (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                            Source
+                          </label>
+                          <select
+                            value={speciesSourceFilter}
+                            onChange={(e) => setSpeciesSourceFilter(e.target.value)}
+                            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none max-w-[14rem] w-full sm:w-auto"
+                            aria-label="Filter species by source"
+                          >
+                            <option value="all">All sources</option>
+                            {sourceOptions.map((source) => (
+                              <option key={source} value={source}>
+                                {source}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )
+                    })()}
+                  </div>
                   
                   {(() => {
-                    const filteredSpecies = searchItems(species, deferredSpeciesSearch, {
+                    const sourceFilteredSpecies = species.filter(
+                      (item) =>
+                        !(
+                          speciesSourceFilter !== "all" &&
+                          (item.source?.trim() || "Custom") !== speciesSourceFilter
+                        ),
+                    )
+                    const filteredSpecies = searchItems(sourceFilteredSpecies, deferredSpeciesSearch, {
                       name: (item) => item.name,
                       fields: [
                         { name: "description", value: (item) => item.description, weight: 0.35 },
@@ -4066,6 +4184,13 @@ export default function BuilderPageClient() {
                       )}
                       {(selectedSpecies.traits ?? []).map((trait, index) => {
                         if (!trait.isChoice || !(trait.choices?.options?.length ?? 0)) return null
+                        // Size is handled by the dedicated size_options picker above.
+                        if (
+                          (selectedSpecies.size_options?.length ?? 0) > 1 &&
+                          isSpeciesSizeChoiceTrait(trait)
+                        ) {
+                          return null
+                        }
                         const choices = trait.choices!
                         return (
                           <MultiSelectChoices
@@ -4376,7 +4501,6 @@ export default function BuilderPageClient() {
                         />
                         <SwipeVisualPicker enabled={useSwipeVisualPicker} className={pickerGridClass}>
                           {visibleBackgrounds.map((bg) => {
-                        const grantedFeat = findBackgroundGrantedFeat(bg.feat_granted, feats)
                         const accent = getCompendiumItemAccentColor(bg as unknown as Record<string, unknown>)
                         const isSelected = character.background_id === bg.id
                         const selectBackground = () => {
@@ -4452,13 +4576,6 @@ export default function BuilderPageClient() {
                         item={bg}
                         subtitle={bg.source || "Custom"}
                         description={compendiumCardBlurb(bg.description, 100)}
-                        tags={
-                          grantedFeat || bg.feat_granted
-                            ? [{ label: `FEAT: ${grantedFeat?.name ?? bg.feat_granted}` }]
-                            : isLegacyBackground(bg)
-                              ? [{ label: "ORIGIN FEAT: your choice", emphasis: true }]
-                              : []
-                        }
                         accentColor={accent}
                         selected={isSelected}
                         size="md"
@@ -6473,7 +6590,13 @@ export default function BuilderPageClient() {
               enableCardImage
               heroLayout="balanced"
               subtitle={bg.source || "Custom"}
-              tags={bg.feat_granted ? [{ label: `FEAT: ${bg.feat_granted}`, emphasis: true }] : []}
+              tags={
+                bg.feat_granted
+                  ? [{ label: `FEAT: ${bg.feat_granted}`, emphasis: true }]
+                  : isLegacyBackground(bg)
+                    ? [{ label: "ORIGIN FEAT: your choice", emphasis: true }]
+                    : []
+              }
               accentColor={accent}
               detailScroll
             >

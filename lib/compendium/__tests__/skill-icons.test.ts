@@ -8,6 +8,8 @@ describe("skillIconSlug", () => {
   it("maps SRD skills to bundled icon slugs", () => {
     expect(skillIconSlug("Deception")).toBe("domino-mask")
     expect(skillIconSlug("Stealth")).toBe("ninja-mask")
+    expect(skillIconSlug("Sleight of Hand")).toBe("robber-hand")
+    expect(skillIconSlug("Perception")).toBe("spyglass")
   })
 
   it("prefers custom ability icon overrides", () => {

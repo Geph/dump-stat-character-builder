@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   defaultAbilityIconForItem,
   inferAbilityOwnerClassName,
+  stampAbilityDefaultIcons,
 } from "@/lib/compendium/ability-icons-defaults"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { HOMEBREW_CLASS_ICONS_BY_NAME, SRD_CLASS_ICONS_BY_NAME } from "@/lib/compendium/class-icons-defaults"
@@ -58,14 +59,51 @@ describe("ability icon defaults", () => {
     ).toBe(HOMEBREW_CLASS_ICONS_BY_NAME.Psion)
   })
 
-  it("keeps disciplines on psychic-waves and prefers saved icons", () => {
+  it("maps subclass-owned Kibbles abilities to their parent class icon", () => {
+    expect(
+      defaultAbilityIconForItem({
+        name: "Airburst Mine",
+        ability_role: "upgrade",
+        source_type: "subclass",
+        source_name: "Gadgetsmith",
+      }),
+    ).toBe(HOMEBREW_CLASS_ICONS_BY_NAME.Inventor)
+    expect(
+      defaultAbilityIconForItem({
+        name: "Animate Broom",
+        ability_role: "knack",
+        source_type: "subclass",
+        source_name: "Witch",
+      }),
+    ).toBe(HOMEBREW_CLASS_ICONS_BY_NAME.Occultist)
+    expect(
+      defaultAbilityIconForItem({
+        name: "Bone Construct",
+        source_type: "subclass",
+        source_name: "Bone Binder",
+      }),
+    ).toBe(HOMEBREW_CLASS_ICONS_BY_NAME.Warden)
+  })
+
+  it("keeps Mage Hand Press Witch class abilities on witch-flight", () => {
+    expect(
+      defaultAbilityIconForItem({
+        name: "Hex",
+        source_type: "class",
+        source_name: "Witch",
+      }),
+    ).toBe(HOMEBREW_CLASS_ICONS_BY_NAME.Witch)
+  })
+
+  it("uses the Psion class icon for owned disciplines", () => {
     expect(
       defaultAbilityIconForItem({
         name: "Psychokinesis Discipline",
         ability_role: "discipline",
-        eligible_classes: ["Psion"],
+        source_type: "class",
+        source_name: "Psion",
       }),
-    ).toBe("psychic-waves")
+    ).toBe(HOMEBREW_CLASS_ICONS_BY_NAME.Psion)
     expect(
       defaultAbilityIconForItem({
         name: "Blitz",
@@ -73,6 +111,15 @@ describe("ability icon defaults", () => {
         icon: "fire-silhouette",
       }),
     ).toBe("fire-silhouette")
+  })
+
+  it("keeps psychic-waves only for unowned discipline shells", () => {
+    expect(
+      defaultAbilityIconForItem({
+        name: "Psychokinesis Discipline",
+        ability_role: "discipline",
+      }),
+    ).toBe("psychic-waves")
   })
 
   it("does not guess a class icon for shared multi-class libraries", () => {
@@ -98,5 +145,23 @@ describe("ability icon defaults", () => {
         ability_role: "psionic_power",
       }),
     ).toBe("magic-trident")
+  })
+
+  it("stamps pack subclass parents onto ability icons", () => {
+    const stamped = stampAbilityDefaultIcons({
+      classes: [{ name: "Inventor" }],
+      subclasses: [{ name: "Gadgetsmith", class_name: "Inventor" }],
+      abilities: [
+        {
+          name: "Airburst Mine",
+          source_type: "subclass",
+          source_name: "Gadgetsmith",
+          ability_role: "upgrade",
+        },
+      ],
+    })
+    expect((stamped.abilities?.[0] as { icon?: string } | undefined)?.icon).toBe(
+      HOMEBREW_CLASS_ICONS_BY_NAME.Inventor,
+    )
   })
 })

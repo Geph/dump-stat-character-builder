@@ -413,16 +413,20 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
         ...species,
         traits: enrichTraits(species.traits as Trait[], species.name) as typeof species.traits,
       }
-      const withPresets = enrichCustomSpeciesRow({
-        ...withDetected,
-        source: (species as { source?: string | null }).source ?? "Custom",
-      })
+      const withPresets = enrichCustomSpeciesRow(
+        {
+          ...withDetected,
+          source: (species as { source?: string | null }).source ?? "Custom",
+        },
+        { preferExactPresets: true },
+      )
       return {
         ...withDetected,
+        ...withPresets,
         traits: (withPresets.traits as typeof species.traits) ?? withDetected.traits,
         size_options:
-          (withPresets.size_options as string[] | null | undefined) ??
-          (species as { size_options?: string[] | null }).size_options ??
+          (withPresets.size_options as typeof species.size_options) ??
+          species.size_options ??
           null,
       }
     })
@@ -583,6 +587,6 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
   const withSubclassSpells = enrichSubclassSpellTablesOnImport(withSpells)
 
   return hoistCompanionStatBlocksToCreatures(
-    applyImportEnrichmentPresets(enrichImportChoiceFeatures(withSubclassSpells)),
+    enrichImportChoiceFeatures(applyImportEnrichmentPresets(withSubclassSpells)),
   )
 }

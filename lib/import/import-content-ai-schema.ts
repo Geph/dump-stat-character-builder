@@ -21,6 +21,8 @@ const ChoiceOptionsAiSchema = z.object({
       description: z.string(),
       prerequisite: z.string().nullable(),
       repeatable: z.boolean().nullable(),
+      linkedModifiers: z.array(z.record(z.unknown())).nullable().optional(),
+      modifierRefs: z.array(z.string()).nullable().optional(),
     }),
   ),
   optionsSource: z
@@ -187,6 +189,9 @@ const ImportMechanicAiSchema = z.object({
   spellcastingAbility: z
     .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
     .nullable(),
+  spellcastingAbilityOptions: z
+    .array(z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]))
+    .nullable(),
   attunementTotal: z.number().nullable(),
   attunementBonus: z.number().nullable(),
   targetCreatureTypes: z.array(z.string()).nullable(),
@@ -334,6 +339,9 @@ const ClassFeatureAiSchema = z.object({
   choices: ChoiceOptionsAiSchema.nullable(),
   mechanics: z.array(ImportMechanicAiSchema).nullable(),
   basedOnSrdFeature: z.string().nullable(),
+  linkedModifiers: z.array(z.record(z.unknown())).nullable().optional(),
+  modifierRefs: z.array(z.string()).nullable().optional(),
+  importModifierMeta: z.array(z.record(z.unknown())).nullable().optional(),
 })
 
 const SpeciesTraitAiSchema = z.object({
@@ -590,6 +598,7 @@ const ClassAiSchema = z.object({
 const SubclassAiSchema = z.object({
   name: z.string(),
   class_name: z.string(),
+  source: z.string().nullable(),
   description: z.string().nullable(),
   card_blurb: z.string().max(120).nullable(),
   prerequisite_rules: z.array(PrerequisiteRuleAiSchema).nullable(),
@@ -600,8 +609,12 @@ const SubclassAiSchema = z.object({
 
 const SpeciesAiSchema = z.object({
   name: z.string(),
+  source: z.string().nullable(),
+  card_image_url: z.string().nullable(),
   description: z.string().nullable(),
   prerequisite_rules: z.array(PrerequisiteRuleAiSchema).nullable(),
+  creature_type: z.string().nullable(),
+  size_options: z.array(z.enum(["Small", "Medium"])).nullable(),
   speed: z.number().nullable(),
   size: z.string().nullable(),
   traits: z.array(SpeciesTraitAiSchema),
@@ -609,6 +622,7 @@ const SpeciesAiSchema = z.object({
 
 const FeatAiSchema = z.object({
   name: z.string(),
+  source: z.string().nullable(),
   description: z.string().nullable(),
   prerequisite: z.string().nullable(),
   prerequisite_rules: z.array(PrerequisiteRuleAiSchema).nullable(),
@@ -707,6 +721,7 @@ const CreatureAiSchema = z.object({
 
 const SpellAiSchema = z.object({
   name: z.string(),
+  source: z.string().nullable(),
   level: z.number(),
   school: z.string(),
   casting_time: z.string().nullable(),
@@ -774,6 +789,7 @@ const EquipmentPropertiesAiSchema = z.object({
 
 const EquipmentAiSchema = z.object({
   name: z.string(),
+  source: z.string().nullable(),
   category: z.string(),
   subcategory: z.string().nullable(),
   description: z.string().nullable(),
@@ -948,6 +964,8 @@ function normalizeChoiceOptions(
         description: option.description,
         prerequisite: option.prerequisite,
         repeatable: option.repeatable,
+        linkedModifiers: option.linkedModifiers,
+        modifierRefs: option.modifierRefs,
       }),
     ) as ImportChoiceOptions["options"],
     ...omitNull({
@@ -1047,6 +1065,9 @@ function normalizeFeatureLike(
     choices: normalizeChoiceOptions(feature.choices),
     mechanics: normalizeMechanics(feature.mechanics),
     basedOnSrdFeature: feature.basedOnSrdFeature ?? undefined,
+    linkedModifiers: feature.linkedModifiers,
+    modifierRefs: feature.modifierRefs,
+    importModifierMeta: feature.importModifierMeta,
   })
   return next as ImportContent["classes"] extends (infer T)[] | undefined
     ? T extends { features: (infer F)[] }
@@ -1128,8 +1149,12 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
   if (raw.species?.length) {
     content.species = raw.species.map((species) => ({
       name: species.name,
+      source: species.source,
+      card_image_url: species.card_image_url,
       description: species.description,
       prerequisite_rules: species.prerequisite_rules ?? undefined,
+      creature_type: species.creature_type,
+      size_options: species.size_options,
       speed: species.speed,
       size: species.size,
       traits: species.traits.map((trait) =>
@@ -1178,6 +1203,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
         prerequisite_rules: subclass.prerequisite_rules ?? undefined,
         features: subclass.features.map(normalizeFeatureLike),
         ...omitNull({
+          source: subclass.source,
           card_blurb: subclass.card_blurb,
           new_toggles: subclass.new_toggles?.length ? subclass.new_toggles : undefined,
         }),
@@ -1219,6 +1245,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
     content.feats = raw.feats.map((feat) =>
       omitNull({
         name: feat.name,
+        source: feat.source,
         description: feat.description,
         prerequisite: feat.prerequisite,
         prerequisite_rules: feat.prerequisite_rules,
@@ -1293,6 +1320,7 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
       coerceMagicEquipmentImportFields(
         omitNull({
           name: item.name,
+          source: item.source,
           category: item.category,
           subcategory: item.subcategory,
           description: item.description,

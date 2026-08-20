@@ -429,53 +429,5 @@ function isUpgradeSelectionFeature(name: string, description: string): boolean {
   return /\b(?:select|choose)\s+an?\s+upgrade\b/i.test(description)
 }
 
-export const INVENTOR_PRESETS: EnrichmentPreset[] = [
-  {
-    id: "inventor.class.specialization",
-    pack: "inventor",
-    target: "class_feature",
-    match: { className: /inventor/i, name: /^inventor specialization$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Inventor Specialization is the subclass unlock. Put specializations in top-level subclasses[] — do not nest under classes[0].subclasses and do not emit stub isChoice options naming each specialization. Do not emit \"Inventor Specialization feature\" placeholder rows at 3rd/5th/14th — those features live on the subclass.",
-      },
-    ],
-  },
-  {
-    id: "inventor.class.specialization_upgrade",
-    pack: "inventor",
-    target: "class_feature",
-    match: { className: /inventor/i, name: /^specialization upgrade$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Specialization Upgrade uses optionsSource class_upgrades + class_resources.upgrades (special choice count). Each upgrade is import_proposals.custom_abilities with ability_role upgrade; section headers are not ability rows. Generic Shield Proficiency / Tool Proficiency use source_type class / Inventor. Swap on level-up only (swappableOnRest false).",
-      },
-    ],
-  },
-  {
-    id: "inventor.class.spellcasting",
-    pack: "inventor",
-    target: "class_feature",
-    match: { className: /inventor/i, name: /^spellcasting$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "KibblesTasty Inventor is an Intelligence half caster with Spells Known (not prepared). Spells Known scales 3 at 2nd → 12 at 19th via incremental spellChoiceGrants. Distinct from Artificer prepared casting.",
-      },
-    ],
-  },
-  {
-    id: "inventor.subclass.runesmith_marks",
-    pack: "inventor",
-    target: "subclass_feature",
-    match: { className: /inventor/i, name: /^runic marks$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Runes Marked is class_resources.runes_marked (special + subclass_name Runesmith; 2→5). Not a spendable pool. Base runes live on Runic Effects; additional runes come from upgrades.",
-      },
-    ],
-  },
-]
+// Structural import guidance belongs in the extraction prompt/registry, never player-facing prose.
+export const INVENTOR_PRESETS: EnrichmentPreset[] = []

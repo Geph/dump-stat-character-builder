@@ -1,4 +1,7 @@
-import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import type {
+  CharacteristicModifier,
+  UnarmedStrikeDie,
+} from "@/lib/compendium/characteristic-modifiers"
 import { applyBundledCardImage } from "@/lib/compendium/card-image"
 import {
   lookupSrdSpeciesChoiceOptionPreset,
@@ -291,14 +294,19 @@ function speedAddWhileShifted(feet: number, label?: string) {
   ])
 }
 
-function unarmedStrike(die: string, damageType: string, label?: string) {
+function unarmedStrike(
+  die: string,
+  damageType: string,
+  label?: string,
+  ability: "strength" | "constitution" = "strength",
+) {
   return charInstance(`modinst_unarmed_${die}_${damageType}`, FEAT_MODIFIER_CATALOG.unarmedStrikeDamage, [
     {
       id: modId(`unarmed_${die}_${damageType}`),
       type: "unarmed_strike_damage",
-      die: die as "1d6",
+      die: die as UnarmedStrikeDie,
       damageType,
-      ability: "strength",
+      ability,
       label,
     },
   ])
@@ -631,6 +639,31 @@ const SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
     ],
   },
 
+  // —— Gnome ——
+  "Gnome::Gnomish Cunning": {
+    linkedModifiers: [
+      checkAdvantageSave("gnomish_cunning_int", { ability: "Intelligence" }),
+      checkAdvantageSave("gnomish_cunning_wis", { ability: "Wisdom" }),
+      checkAdvantageSave("gnomish_cunning_cha", { ability: "Charisma" }),
+    ],
+  },
+
+  // —— Dhampir ——
+  "Dhampir::Vampiric Bite": {
+    linkedModifiers: [
+      unarmedStrike(
+        "1d4",
+        "Piercing",
+        "Vampiric Bite: Unarmed Strike 1d4 + CON Piercing",
+        "constitution",
+      ),
+      usesPool(
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Vampiric Bite empowerment",
+      ),
+    ],
+  },
+
   // —— Reborn ——
   "Reborn::Strange Endurance": {
     linkedModifiers: [
@@ -900,6 +933,20 @@ const SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
       ),
     ],
   },
+  "Changeling::Shapechanger": {
+    linkedModifiers: [
+      charInstance("modinst_shapechanger_size", CREATURE_SIZE_CATALOG_ID, [
+        {
+          id: modId("shapechanger_size"),
+          type: "creature_size",
+          size: "Medium",
+          mode: "activatable",
+          label: "Toggle size Small or Medium while shapechanged",
+        },
+      ]),
+      specialNote("Action: change appearance and voice (Shapechanger)", "Shapechanger"),
+    ],
+  },
 
   // —— Kalashtar ——
   "Kalashtar::Dual Mind": {
@@ -1009,6 +1056,18 @@ const SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
 }
 
 const SPECIES_CHOICE_OPTION_PRESETS: Record<string, TraitPreset> = {
+  "Lorwyn Fairy::Regional Origin::Lorwyn": {
+    linkedModifiers: [specialNote("Lorwyn origin (no additional regional trait)", "Lorwyn Origin")],
+  },
+  "Lorwyn Fairy::Regional Origin::Shadowmoor": {
+    linkedModifiers: [vision(120, "darkvision", "Shadowmoor Darkvision 120 ft.")],
+  },
+  "Kithkin::Regional Origin::Lorwyn": {
+    linkedModifiers: [specialNote("Lorwyn origin (no additional regional trait)", "Lorwyn Origin")],
+  },
+  "Kithkin::Regional Origin::Shadowmoor": {
+    linkedModifiers: [vision(120, "darkvision", "Shadowmoor Darkvision 120 ft.")],
+  },
   "Reborn::Strange Endurance::Cold": {
     linkedModifiers: [damageResistance(["Cold"], "Strange Endurance — Cold")],
   },
@@ -1430,11 +1489,17 @@ function speciesNameAliases(speciesName: string): string[] {
   return aliases
 }
 
-function lookupTraitPreset(speciesName: string, traitName: string): TraitPreset | undefined {
+function lookupExactTraitPreset(speciesName: string, traitName: string): TraitPreset | undefined {
   for (const alias of speciesNameAliases(speciesName)) {
     const key = `${alias}::${traitName}`
     if (SPECIES_TRAIT_PRESETS[key]) return SPECIES_TRAIT_PRESETS[key]
   }
+  return undefined
+}
+
+function lookupTraitPreset(speciesName: string, traitName: string): TraitPreset | undefined {
+  const exact = lookupExactTraitPreset(speciesName, traitName)
+  if (exact) return exact
   return SHARED_TRAIT_PRESETS[traitName]
 }
 
@@ -1449,7 +1514,7 @@ function optionHasModifierConfig(option: {
   return Boolean(option.linkedModifiers?.length || option.modifierRefs?.length)
 }
 
-function lookupChoiceOptionPreset(
+function lookupExactChoiceOptionPreset(
   speciesName: string,
   traitName: string,
   optionName: string,
@@ -1458,7 +1523,16 @@ function lookupChoiceOptionPreset(
     const key = `${alias}::${traitName}::${optionName}`
     if (SPECIES_CHOICE_OPTION_PRESETS[key]) return SPECIES_CHOICE_OPTION_PRESETS[key]
   }
+  return undefined
+}
 
+function lookupChoiceOptionPreset(
+  speciesName: string,
+  traitName: string,
+  optionName: string,
+): TraitPreset | undefined {
+  const exact = lookupExactChoiceOptionPreset(speciesName, traitName, optionName)
+  if (exact) return exact
   // Size Medium/Small — shared across species that offer a size pick.
   if (traitName === "Size" && (optionName === "Medium" || optionName === "Small")) {
     return {
@@ -1478,11 +1552,19 @@ function sizeOptionsFromTraits(traits: Trait[]): string[] | undefined {
   return (["Small", "Medium"] as const).filter((size) => names.includes(size))
 }
 
-function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
+function applyPresetToTrait(
+  speciesName: string,
+  trait: Trait,
+  preferExactPresets = false,
+): Trait {
+  const exactPreset = lookupExactTraitPreset(speciesName, trait.name)
   const preset = lookupTraitPreset(speciesName, trait.name)
   let next = { ...trait }
 
-  if (preset?.linkedModifiers?.length && !traitHasModifierConfig(trait)) {
+  if (
+    preset?.linkedModifiers?.length &&
+    (!traitHasModifierConfig(trait) || (preferExactPresets && exactPreset === preset))
+  ) {
     const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers })
     next = {
       ...next,
@@ -1502,7 +1584,16 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
             trait.name ?? "",
             option.name ?? "",
           )
-          if (!optionPreset?.linkedModifiers?.length || optionHasModifierConfig(option)) {
+          const exactOptionPreset = lookupExactChoiceOptionPreset(
+            speciesName,
+            trait.name ?? "",
+            option.name ?? "",
+          )
+          if (
+            !optionPreset?.linkedModifiers?.length ||
+            (optionHasModifierConfig(option) &&
+              !(preferExactPresets && exactOptionPreset === optionPreset))
+          ) {
             return option
           }
           const synced = syncModifierRefs({ linkedModifiers: optionPreset.linkedModifiers })
@@ -1516,6 +1607,7 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
     }
   }
 
+  if (preferExactPresets && exactPreset) return next
   return enrichFeatureWithMechanicalDetection(next as unknown as Feature, {
     contentKind: "species_trait",
     sourceName: speciesName,
@@ -1535,7 +1627,10 @@ function withSpeciesCardImage(row: Record<string, unknown>): Record<string, unkn
 }
 
 /** Apply non-SRD species modifier presets when the species name matches the registry. */
-export function enrichCustomSpeciesRow(row: Record<string, unknown>): Record<string, unknown> {
+export function enrichCustomSpeciesRow(
+  row: Record<string, unknown>,
+  options?: { preferExactPresets?: boolean },
+): Record<string, unknown> {
   if (isSrdSource(row.source as string | null | undefined)) return row
   const speciesName = String(row.name ?? "")
 
@@ -1572,7 +1667,9 @@ export function enrichCustomSpeciesRow(row: Record<string, unknown>): Record<str
 
   if (!traits.length) return withSpeciesCardImage(next)
 
-  const enrichedTraits = traits.map((trait) => applyPresetToTrait(speciesName, trait))
+  const enrichedTraits = traits.map((trait) =>
+    applyPresetToTrait(speciesName, trait, options?.preferExactPresets),
+  )
   return withSpeciesCardImage({ ...next, traits: enrichedTraits })
 }
 

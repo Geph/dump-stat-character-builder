@@ -7,6 +7,8 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
+import { stampAbilityDefaultIcons } from "@/lib/compendium/ability-icons-defaults"
+import { applySubclassUnlockDefaults } from "@/lib/import/apply-subclass-unlock-defaults"
 import {
   applyProposalSelections,
   collectImportProposals,
@@ -342,8 +344,10 @@ function prepareFile(
   if (options.applyKibblesPresentation) {
     content = applyKibblesSpeciesBackgroundPresentation(content)
   }
+  content = applySubclassUnlockDefaults(content, source)
   content = stampSourceDeep(content, source)
   content = applyPackClassCollisionLabels(content, source)
+  content = stampAbilityDefaultIcons(content) as ImportContent
   return content
 }
 

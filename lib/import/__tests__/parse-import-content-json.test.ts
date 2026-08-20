@@ -11,6 +11,84 @@ describe("parseImportContentJson", () => {
     expect(content?.classes?.[0]?.features?.[0]?.name).toBe("Second Wind")
   })
 
+  it("preserves persisted class feature modifier links", () => {
+    const raw = JSON.stringify({
+      classes: [
+        {
+          ...(IMPORT_JSON_TEMPLATES.classes as { classes: object[] }).classes[0],
+          features: [
+            {
+              level: 3,
+              name: "Subclass",
+              description: "Choose a subclass for this class.",
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_subclass",
+                  catalogRefId: "cat_char_subclass_unlock",
+                  characteristics: [
+                    { id: "subclass_unlock", type: "subclass_unlock", label: "Subclass" },
+                  ],
+                },
+              ],
+              modifierRefs: ["cat_char_subclass_unlock"],
+              importModifierMeta: [],
+            },
+          ],
+        },
+      ],
+    })
+
+    const feature = parseImportContentJson(raw)?.classes?.[0]?.features?.[0]
+    expect(feature?.linkedModifiers?.[0]?.catalogRefId).toBe("cat_char_subclass_unlock")
+    expect(feature?.modifierRefs).toEqual(["cat_char_subclass_unlock"])
+  })
+
+  it("preserves per-row sources for mixed-source review", () => {
+    const content = parseImportContentJson(
+      JSON.stringify({
+        subclasses: [
+          {
+            name: "Warsmith",
+            class_name: "Inventor",
+            source: "Kibbles Tasty",
+            description: null,
+            features: [],
+          },
+        ],
+        feats: [{ name: "Marked", source: "Setting Book", description: "A sourced feat." }],
+        spells: [
+          {
+            name: "Spark",
+            source: "Spell Book",
+            level: 0,
+            school: "Evocation",
+            casting_time: "1 action",
+            range: "30 feet",
+            components: ["V"],
+            duration: "Instantaneous",
+            concentration: false,
+            description: "A spark.",
+            classes: [],
+          },
+        ],
+        equipment: [
+          {
+            name: "Maker's Tool",
+            source: "Gear Book",
+            category: "Tool",
+            subcategory: null,
+            description: "A tool.",
+          },
+        ],
+      }),
+    )
+
+    expect(content?.subclasses?.[0]?.source).toBe("Kibbles Tasty")
+    expect(content?.feats?.[0]?.source).toBe("Setting Book")
+    expect(content?.spells?.[0]?.source).toBe("Spell Book")
+    expect(content?.equipment?.[0]?.source).toBe("Gear Book")
+  })
+
   it("unwraps { type: import-content, content: ... }", () => {
     const raw = JSON.stringify({
       type: "import-content",

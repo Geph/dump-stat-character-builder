@@ -55,6 +55,7 @@ function optionKind(name: string): Exclude<KindFilter, "all"> | null {
 }
 
 type MultiSelectChoicesProps = {
+  id?: string
   title: string
   hint?: string
   options: ChoiceOption[]
@@ -134,6 +135,7 @@ function optionInfoText(
 }
 
 export function MultiSelectChoices({
+  id,
   title,
   hint,
   options,
@@ -366,7 +368,7 @@ export function MultiSelectChoices({
 
   return (
     <>
-      <div className="mt-4 p-4 bg-muted/40 rounded-xl border border-border">
+      <div id={id} className="mt-4 p-4 bg-muted/40 rounded-xl border border-border">
         <div className="flex items-center justify-between gap-2 mb-2">
           <h3 className="font-bold text-sm text-foreground">{title}</h3>
           <span className="text-xs text-muted-foreground">

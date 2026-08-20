@@ -29,7 +29,8 @@
         "srdFeatureId": "srd.subclass.barbarian.path-of-the-berserker.intimidating-presence.l14"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "Barbarians who walk the Path of the Berserker direct their Rage primarily toward violence."
   },
   {
     "class_name": "Bard",
@@ -61,7 +62,8 @@
         "srdFeatureId": "srd.subclass.bard.college-of-lore.peerless-skill.l14"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "The college's members gather in libraries and universities to share their lore with one another."
   },
   {
     "class_name": "Cleric",
@@ -99,7 +101,8 @@
         "srdFeatureId": "srd.subclass.cleric.life-domain.supreme-healing.l17"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "The Life Domain focuses on the positive energy that helps sustain all life in the multiverse."
   },
   {
     "class_name": "Druid",
@@ -137,7 +140,8 @@
         "srdFeatureId": "srd.subclass.druid.circle-of-the-land.natures-sanctuary.l14"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "The Circle of the Land comprises mystics and sages who safeguard ancient knowledge and rites."
   },
   {
     "class_name": "Fighter",
@@ -181,7 +185,8 @@
         "srdFeatureId": "srd.subclass.fighter.champion.survivor.l18"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A Champion focuses on the development of martial prowess in a relentless pursuit of victory."
   },
   {
     "class_name": "Monk",
@@ -213,7 +218,8 @@
         "srdFeatureId": "srd.subclass.monk.warrior-of-the-open-hand.quivering-palm.l17"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "They learn techniques to push and trip their opponents and manipulate their own energy to protect themselves from harm."
   },
   {
     "class_name": "Paladin",
@@ -251,7 +257,8 @@
         "srdFeatureId": "srd.subclass.paladin.oath-of-devotion.holy-nimbus.l20"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "The Oath of Devotion binds Paladins to the ideals of justice and order."
   },
   {
     "class_name": "Ranger",
@@ -289,7 +296,8 @@
         "srdFeatureId": "srd.subclass.ranger.hunter.superior-hunters-defense.l15"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "You stalk prey in the wilds and elsewhere, using your abilities as a Hunter to protect nature and people everywhere."
   },
   {
     "class_name": "Rogue",
@@ -327,7 +335,8 @@
         "srdFeatureId": "srd.subclass.rogue.thief.thiefs-reflexes.l17"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A mix of burglar, treasure hunter, and explorer, you are the epitome of an adventurer."
   },
   {
     "class_name": "Sorcerer",
@@ -365,7 +374,8 @@
         "srdFeatureId": "srd.subclass.sorcerer.draconic-sorcery.dragon-companion.l18"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "Perhaps an ancient dragon facing death bequeathed some of its magical power to you or your ancestor."
   },
   {
     "class_name": "Warlock",
@@ -403,7 +413,8 @@
         "srdFeatureId": "srd.subclass.warlock.fiend-patron.hurl-through-hell.l14"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "You might forge a bargain with a demon lord, an archdevil, or another fiend that is especially mighty."
   },
   {
     "class_name": "Wizard",
@@ -441,6 +452,7 @@
         "srdFeatureId": "srd.subclass.wizard.evoker.overchannel.l14"
       }
     ],
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "Some Evokers find employment in military forces, serving as artillery to blast armies from afar."
   }
 ]

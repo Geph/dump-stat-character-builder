@@ -76,6 +76,28 @@ export function formatSpeciesSizeDisplay(
   return String(species.size || unique[0] || "Medium")
 }
 
+const SPECIES_SIZE_CHOICE_NAMES = new Set(["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"])
+
+/** True when a trait is the Medium/Small-style size pick mirrored by `size_options`. */
+export function isSpeciesSizeChoiceTrait(trait: {
+  name?: string | null
+  isChoice?: boolean
+  choices?: { options?: Array<{ name?: string | null }> | null } | null
+}): boolean {
+  if (!trait.isChoice) return false
+  if (trait.name?.trim().toLowerCase() !== "size") return false
+  const options = trait.choices?.options ?? []
+  if (options.length < 2) return false
+  return options.every((option) => SPECIES_SIZE_CHOICE_NAMES.has(String(option.name ?? "").trim()))
+}
+
+export function findSpeciesSizeChoiceTraitIndex(
+  species: Pick<Species, "traits"> | null | undefined,
+): number {
+  if (!species?.traits?.length) return -1
+  return species.traits.findIndex((trait) => isSpeciesSizeChoiceTrait(trait))
+}
+
 export function formatSpeciesSpeedDisplay(speed: Species["speed"]): string {
   const entries = collectSpeciesSpeedEntries(speed)
   const walk = entries.find((entry) => entry.type === "walk")

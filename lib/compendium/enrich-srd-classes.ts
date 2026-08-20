@@ -19,7 +19,23 @@ import {
 } from "@/lib/compendium/linked-modifiers"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { defaultClassComplexityForName, isClassComplexity } from "@/lib/compendium/class-complexity"
+import { ensureSubclassUnlockFeature } from "@/lib/compendium/subclass-unlock-modifier"
 import type { Feature } from "@/lib/types"
+
+const SRD_SUBCLASS_FEATURE_NAMES: Record<string, string> = {
+  Barbarian: "Primal Path",
+  Bard: "Bard College",
+  Cleric: "Divine Domain",
+  Druid: "Druid Circle",
+  Fighter: "Martial Archetype",
+  Monk: "Monastic Tradition",
+  Paladin: "Sacred Oath",
+  Ranger: "Ranger Archetype",
+  Rogue: "Roguish Archetype",
+  Sorcerer: "Sorcerous Origin",
+  Warlock: "Otherworldly Patron",
+  Wizard: "Arcane Tradition",
+}
 
 function uniqueRefs(refs: string[]): string[] {
   return [...new Set(refs)]
@@ -172,7 +188,14 @@ function normalizeSpellcasting(raw: unknown): Record<string, unknown> | null {
 /** Apply SRD defaults: feat-granting modifier refs, icons, spellcasting starts_at. */
 export function enrichSrdClassRow(row: Record<string, unknown>): Record<string, unknown> {
   const name = String(row.name ?? "")
-  const features = injectClassProficiencyChoices(name, enrichFeatures(name, row.features))
+  const features = ensureSubclassUnlockFeature(
+    {
+      name,
+      features: injectClassProficiencyChoices(name, enrichFeatures(name, row.features)),
+    },
+    3,
+    SRD_SUBCLASS_FEATURE_NAMES[name] ?? "Subclass",
+  )
   const icon =
     typeof row.icon === "string" && row.icon.trim()
       ? row.icon.trim()

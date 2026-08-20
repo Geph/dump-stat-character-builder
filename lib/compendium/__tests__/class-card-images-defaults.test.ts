@@ -1,10 +1,22 @@
 import fs from "node:fs"
 import path from "node:path"
 import { describe, expect, it } from "vitest"
+import { isDefaultCardArtAvailable } from "@/lib/compendium/available-card-art"
 import { enrichSrdClassRow } from "@/lib/compendium/enrich-srd-classes"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { SRD_CLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/class-card-images-defaults"
 import { isBundledPublicCardArtPath, publicCardArtPathFromUrl } from "../../../scripts/bundled-card-art.mjs"
+
+function expectEnrichedCardArt(
+  actual: string | null | undefined,
+  mapped: string | undefined,
+) {
+  if (mapped && isDefaultCardArtAvailable(mapped)) {
+    expect(actual).toBe(mapped)
+  } else {
+    expect(actual ?? null).toBeNull()
+  }
+}
 
 const EXPECTED_CLASS_NAMES = [
   "Artificer",
@@ -84,11 +96,14 @@ describe("class card images", () => {
     const [warden] = enrichClassesList<ClassRow>([
       { name: "Warden (Kibbles Tasty)", source: "Kibbles Tasty", features: [] },
     ])
-    expect(psion.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Psion)
-    expect(artificer.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Artificer)
-    expect(inventor.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Inventor)
-    expect(occultist.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME.Occultist)
-    expect(warden.card_image_url).toBe(SRD_CLASS_CARD_IMAGES_BY_NAME["Warden (Kibbles Tasty)"])
+    expectEnrichedCardArt(psion.card_image_url, SRD_CLASS_CARD_IMAGES_BY_NAME.Psion)
+    expectEnrichedCardArt(artificer.card_image_url, SRD_CLASS_CARD_IMAGES_BY_NAME.Artificer)
+    expectEnrichedCardArt(inventor.card_image_url, SRD_CLASS_CARD_IMAGES_BY_NAME.Inventor)
+    expectEnrichedCardArt(occultist.card_image_url, SRD_CLASS_CARD_IMAGES_BY_NAME.Occultist)
+    expectEnrichedCardArt(
+      warden.card_image_url,
+      SRD_CLASS_CARD_IMAGES_BY_NAME["Warden (Kibbles Tasty)"],
+    )
   })
 
   it("preserves custom card art when already set", () => {

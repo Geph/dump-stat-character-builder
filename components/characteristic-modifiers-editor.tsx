@@ -3053,6 +3053,14 @@ function ModifierFields({
           </div>
         </div>
       )
+
+    case "subclass_unlock":
+      return (
+        <p className="text-xs text-muted-foreground">
+          The containing class feature&apos;s level controls when subclass selection appears in the
+          builder.
+        </p>
+      )
   }
 }
 

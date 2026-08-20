@@ -362,41 +362,5 @@ export function sanitizeOccultistImportContent(content: ImportContent): ImportCo
   return next
 }
 
-export const OCCULTIST_PRESETS: EnrichmentPreset[] = [
-  {
-    id: "occultist.class.spellcasting",
-    pack: "occultist",
-    target: "class_feature",
-    match: { className: /occultist/i, name: /^spellcasting$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "KibblesTasty Occultist is a Wisdom full caster with Spells Known (not prepared). Cantrips Known and Spells Known scale from the Occultist table via incremental spellChoiceGrants. Distinct from Mage Hand Press Witch and from Investigator's Occultist archetype (pact magic).",
-      },
-    ],
-  },
-  {
-    id: "occultist.class.occult_rites",
-    pack: "occultist",
-    target: "class_feature",
-    match: { className: /occultist/i, name: /^occult rites$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Occult Rites use optionsSource class_knacks + class_resources.occult_rites_known (special). Swap one rite when you gain an Occultist level — not on a rest. Tradition-specific rites stay ability_role knack with source_type subclass / tradition name (Witch, Hedge Mage, Oracle, Shaman, Spiritualist, Voidwatcher); prerequisites still gate level/coven/mystery. Hedge Mage Manipulate Magic grants one PHB Metamagic Options catalog pick (grant_feat Metamagic) — not a standalone metamagic knack.",
-      },
-    ],
-  },
-  {
-    id: "occultist.class.occult_tradition",
-    pack: "occultist",
-    target: "class_feature",
-    match: { className: /occultist/i, name: /^occult tradition$/i },
-    operations: [
-      {
-        op: "appendDescription",
-        text: "Occult Tradition is the subclass unlock (Witch, Hedge Mage, Oracle, Shaman, Spiritualist, Voidwatcher). Put traditions in top-level subclasses[] — do not nest under classes[0].subclasses and do not stub isChoice options naming each tradition.",
-      },
-    ],
-  },
-]
+// Structural import guidance belongs in the extraction prompt/registry, never player-facing prose.
+export const OCCULTIST_PRESETS: EnrichmentPreset[] = []

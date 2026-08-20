@@ -185,7 +185,8 @@
       }
     ],
     "spellcasting": null,
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A fierce warrior fueled by primal rage who excels in melee combat and absorbs punishment on the front line."
   },
   {
     "name": "Bard",
@@ -463,7 +464,8 @@
         }
       ]
     },
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A versatile performer whose magic inspires allies and manipulates foes through spell and skill."
   },
   {
     "name": "Cleric",
@@ -728,7 +730,8 @@
         }
       ]
     },
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A divine champion who channels holy power to heal, protect, and smite the forces of darkness."
   },
   {
     "name": "Druid",
@@ -1011,7 +1014,8 @@
         }
       ]
     },
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A guardian of nature who shapeshifts, commands the elements, and draws primal magic from the wild."
   },
   {
     "name": "Fighter",
@@ -1219,7 +1223,8 @@
       }
     ],
     "spellcasting": null,
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A master of weapons and armor who adapts to any martial role through training and tactical prowess."
   },
   {
     "name": "Monk",
@@ -1419,7 +1424,8 @@
       }
     ],
     "spellcasting": null,
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A martial artist who harnesses inner ki for unarmed strikes, speed, and supernatural defense."
   },
   {
     "name": "Paladin",
@@ -1727,7 +1733,8 @@
         }
       ]
     },
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A holy warrior bound by a sacred oath, combining martial might with divine spells and radiant smites."
   },
   {
     "name": "Ranger",
@@ -2044,7 +2051,8 @@
         }
       ]
     },
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A hardened scout and hunter skilled in wilderness survival, tracking, and fighting favored enemies."
   },
   {
     "name": "Rogue",
@@ -2242,7 +2250,8 @@
       }
     ],
     "spellcasting": null,
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A cunning expert in stealth and precision who strikes from the shadows with deadly efficiency."
   },
   {
     "name": "Sorcerer",
@@ -2494,7 +2503,8 @@
         }
       ]
     },
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A spellcaster born with innate magic, bending raw arcane power through force of personality."
   },
   {
     "name": "Warlock",
@@ -2751,7 +2761,8 @@
         }
       ]
     },
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A pact-bound spellcaster who wields otherworldly gifts granted by a powerful patron."
   },
   {
     "name": "Wizard",
@@ -3008,6 +3019,7 @@
         }
       ]
     },
-    "source": "D&D 5.5e SRD"
+    "source": "D&D 5.5e SRD",
+    "card_blurb": "A scholarly spellcaster who prepares a spellbook of arcane formulas to solve problems with studied magic."
   }
 ]

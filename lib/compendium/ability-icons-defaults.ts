@@ -12,6 +12,67 @@ function eligibleClassNames(item: Record<string, unknown>): string[] {
 }
 
 /**
+ * Subclass display names that are commonly used as ability `source_name` when
+ * `source_type` is `subclass`. Prefer this over treating the subclass name as a
+ * class (e.g. Occultist "Witch" must not pick up Mage Hand Press Witch's icon).
+ */
+export const ABILITY_SUBCLASS_PARENT_CLASS: Record<string, string> = {
+  // Kibbles'Tasty Inventor specializations
+  Gadgetsmith: "Inventor",
+  Golemsmith: "Inventor",
+  Infusionsmith: "Inventor",
+  Potionsmith: "Inventor",
+  Thundersmith: "Inventor",
+  Warsmith: "Inventor",
+  Fleshsmith: "Inventor",
+  Cursesmith: "Inventor",
+  Runesmith: "Inventor",
+  Relicsmith: "Inventor",
+  // Kibbles'Tasty Occultist occult mysteries
+  Witch: "Occultist",
+  "Hedge Mage": "Occultist",
+  Oracle: "Occultist",
+  Shaman: "Occultist",
+  Spiritualist: "Occultist",
+  Voidwatcher: "Occultist",
+  // Kibbles'Tasty Warden bonds (when abilities are subclass-scoped)
+  "Bone Binder": "Warden",
+  "Elemental Soul": "Warden",
+  Beasthide: "Warden",
+  Elderheart: "Warden",
+}
+
+function parentClassForSubclassName(subclassName: string): string | null {
+  const trimmed = subclassName.trim()
+  if (!trimmed) return null
+  const mapped = ABILITY_SUBCLASS_PARENT_CLASS[trimmed]
+  if (mapped) return mapped
+  // Case-insensitive fallback
+  const lower = trimmed.toLowerCase()
+  for (const [name, parent] of Object.entries(ABILITY_SUBCLASS_PARENT_CLASS)) {
+    if (name.toLowerCase() === lower) return parent
+  }
+  return null
+}
+
+function sourceTypeOf(item: Record<string, unknown>): string {
+  return (
+    trimString(item.source_type).toLowerCase() ||
+    trimString(item.attached_to_type).toLowerCase()
+  )
+}
+
+function sourceNameOf(item: Record<string, unknown>): string {
+  return (
+    trimString(item.source_name) ||
+    (sourceTypeOf(item) === "subclass" || sourceTypeOf(item) === "class"
+      ? trimString(item.attached_to_id)
+      : "") ||
+    ""
+  )
+}
+
+/**
  * Best-effort owning class label for a custom ability (import attachment, eligible list, or source).
  * Shared multi-class libraries return null so the generic ability icon stays.
  */
@@ -19,34 +80,57 @@ export function inferAbilityOwnerClassName(item: Record<string, unknown>): strin
   const eligible = eligibleClassNames(item)
   if (eligible.length === 1) return eligible[0]!
 
-  const attachType = trimString(item.attached_to_type).toLowerCase()
+  for (const key of ["parent_class_name", "class_name"] as const) {
+    const value = trimString(item[key])
+    if (value && defaultClassIconForName(value)) return value
+  }
+
+  const attachType = sourceTypeOf(item)
+  const sourceName = sourceNameOf(item)
+
+  // Subclass-owned libraries (Inventor upgrades, Occultist mystery knacks, …):
+  // resolve to the parent class before treating source_name as a class name.
+  if (attachType === "subclass" || attachType === "subclass_feature") {
+    const parent =
+      parentClassForSubclassName(sourceName) ||
+      parentClassForSubclassName(trimString(item.source_name))
+    if (parent && defaultClassIconForName(parent)) return parent
+  }
+
+  if (
+    (attachType === "class" || attachType === "class_feature") &&
+    sourceName &&
+    defaultClassIconForName(sourceName)
+  ) {
+    return sourceName
+  }
+
   const attachedId = trimString(item.attached_to_id)
   if (attachType === "class" && attachedId && defaultClassIconForName(attachedId)) {
     return attachedId
   }
 
-  for (const key of ["source_name", "class_name", "parent_class_name", "source"] as const) {
+  for (const key of ["source_name", "source"] as const) {
     const value = trimString(item[key])
     if (value && defaultClassIconForName(value)) return value
-  }
-
-  // Subclass-attached rows sometimes still name the parent in source text.
-  if (attachType === "subclass") {
-    for (const key of ["source", "source_name"] as const) {
-      const value = trimString(item[key])
-      if (value && defaultClassIconForName(value)) return value
-    }
   }
 
   return null
 }
 
 /**
- * Assigned icon wins. Otherwise owning-class icon (when resolvable), else null for the generic fallback.
+ * Assigned icon wins. Otherwise owning-class icon (when resolvable).
+ * Unowned disciplines fall back to psychic-waves; owned ones use the class icon.
  */
 export function defaultAbilityIconForItem(item: Record<string, unknown>): string | null {
   const assigned = trimString(item.icon)
   if (assigned) return assigned
+
+  const className = inferAbilityOwnerClassName(item)
+  if (className) {
+    const classIcon = defaultClassIconForName(className)
+    if (classIcon) return classIcon
+  }
 
   const role = trimString(item.ability_role).toLowerCase()
   const name = trimString(item.name)
@@ -54,8 +138,83 @@ export function defaultAbilityIconForItem(item: Record<string, unknown>): string
     return "psychic-waves"
   }
 
-  const className = inferAbilityOwnerClassName(item)
-  if (className) return defaultClassIconForName(className)
-
   return null
+}
+
+/** Stamp a resolved default icon onto an ability row when none is assigned. */
+export function applyDefaultAbilityIcon<T extends Record<string, unknown>>(row: T): T {
+  const assigned = trimString(row.icon)
+  if (assigned) return { ...row, icon: assigned }
+  const icon = defaultAbilityIconForItem(row)
+  if (!icon) return row
+  return { ...row, icon }
+}
+
+type AbilityIconStampContent = {
+  classes?: { name?: string | null }[] | null
+  subclasses?: { name?: string | null; class_name?: string | null }[] | null
+  abilities?: Record<string, unknown>[] | null
+  import_proposals?: {
+    custom_abilities?: Record<string, unknown>[] | null
+  } | null
+}
+
+/**
+ * Stamp owning-class icons onto ability rows using pack subclass→class context.
+ * Used by seed-pack builds so persisted/bundled rows keep the class icon after
+ * source_name is stripped at attach time.
+ */
+export function stampAbilityDefaultIcons<T extends AbilityIconStampContent>(content: T): T {
+  const subclassParents = new Map<string, string>()
+  for (const subclass of content.subclasses ?? []) {
+    const name = trimString(subclass.name)
+    const parent = trimString(subclass.class_name)
+    if (name && parent) subclassParents.set(name, parent)
+  }
+  const packClasses = (content.classes ?? [])
+    .map((row) => trimString(row.name))
+    .filter(Boolean)
+  const solePackClass = packClasses.length === 1 ? packClasses[0]! : null
+
+  const stamp = (row: Record<string, unknown>): Record<string, unknown> => {
+    if (trimString(row.icon)) return row
+    const sourceType = trimString(row.source_type).toLowerCase()
+    const sourceName = trimString(row.source_name)
+    let parent_class_name = trimString(row.parent_class_name) || undefined
+    if (!parent_class_name && (sourceType === "subclass" || sourceType === "subclass_feature")) {
+      parent_class_name =
+        subclassParents.get(sourceName) || parentClassForSubclassName(sourceName) || undefined
+    }
+    if (!parent_class_name && (sourceType === "class" || sourceType === "class_feature") && sourceName) {
+      parent_class_name = sourceName
+    }
+    if (!parent_class_name && solePackClass && !inferAbilityOwnerClassName(row)) {
+      parent_class_name = solePackClass
+    }
+    return applyDefaultAbilityIcon(
+      parent_class_name ? { ...row, parent_class_name } : row,
+    )
+  }
+
+  const abilities = Array.isArray(content.abilities)
+    ? content.abilities.map((row) => stamp(row))
+    : content.abilities
+  const proposals = content.import_proposals?.custom_abilities
+  const nextProposals = Array.isArray(proposals)
+    ? {
+        ...content.import_proposals,
+        custom_abilities: proposals.map((row) => stamp(row)),
+      }
+    : content.import_proposals
+
+  if (abilities === content.abilities && nextProposals === content.import_proposals) {
+    return content
+  }
+  return {
+    ...content,
+    ...(abilities !== content.abilities ? { abilities } : {}),
+    ...(nextProposals !== content.import_proposals
+      ? { import_proposals: nextProposals }
+      : {}),
+  }
 }

@@ -271,6 +271,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     hint: "Add named options to a feature choice pool (Projected Nightmares → Boundless Imagination)",
   },
   {
+    value: "subclass_unlock",
+    label: "Subclass Selection",
+    hint: "Marks the class feature level when the builder must choose a subclass or archetype",
+  },
+  {
     value: "equipment_and_magic_items",
     label: "Equipment & Magic Items",
     hint: "Create mundane gear or replicate magic item plans (Artificer)",
@@ -1294,6 +1299,11 @@ export interface FeatureChoiceOptionGrantCharacteristic extends CharacteristicMo
   options: { name: string; description: string }[]
 }
 
+/** Marks a class feature as the level where subclass/archetype selection unlocks. */
+export interface SubclassUnlockCharacteristic extends CharacteristicModifierBase {
+  type: "subclass_unlock"
+}
+
 export type CharacteristicModifier =
   | AbilityScoresCharacteristic
   | SkillsCharacteristic
@@ -1356,6 +1366,7 @@ export type CharacteristicModifier =
   | GrantCustomAbilityCharacteristic
   | FeatureChoiceCountBonusCharacteristic
   | FeatureChoiceOptionGrantCharacteristic
+  | SubclassUnlockCharacteristic
 
 export function createModifierId(): string {
   return `mod_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -1552,6 +1563,8 @@ export function createCharacteristicModifier(
       return { id, type, targetFeatureName: null, choiceCategory: null, bonus: 1, bonusFrom: null }
     case "feature_choice_option_grant":
       return { id, type, targetFeatureName: null, choiceCategory: null, options: [] }
+    case "subclass_unlock":
+      return { id, type, label: "Choose subclass" }
     case "equipment_and_magic_items":
       return { id, type, mode: "create_mundane", itemOptions: [], choiceCount: 1 }
     case "player_note":
@@ -2820,6 +2833,8 @@ export function aggregateCharacteristics(
         break
       case "feature_choice_option_grant":
         result.featureChoiceOptionGrants.push(mod)
+        break
+      case "subclass_unlock":
         break
     }
   }

@@ -36,11 +36,20 @@ describe("MHP free subclass allowlist", () => {
     )
   })
 
-  it("does not include non-free gunslinger subclasses (Pistolero absent from source)", () => {
+  it("includes all free gunslinger subclasses and excludes paid subclasses", () => {
     const names = (gunslinger.subclasses ?? []).map((sc: { name: string }) => sc.name)
-    expect(names.sort()).toEqual(["Deadeye", "Gun Tank"])
+    expect(names.sort()).toEqual(["Deadeye", "Gun Tank", "Pistolero"])
     expect(names).not.toContain("Musketeer")
-    expect(names).not.toContain("Pistolero")
+    const pistolero = (gunslinger.subclasses ?? []).find(
+      (sc: { name: string }) => sc.name === "Pistolero",
+    ) as { features?: Array<{ level: number; name: string }> } | undefined
+    expect(pistolero?.features?.map((feature) => [feature.level, feature.name])).toEqual([
+      [3, "Close-Quarters Shooting"],
+      [3, "Fan the Hammer [Maneuver]"],
+      [6, "Disarm"],
+      [10, "Showdown [Maneuver]"],
+      [14, "Bullet Time"],
+    ])
   })
 
   it("rejects paid-subclass abilities and paid-only Warmage house prereqs", () => {

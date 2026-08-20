@@ -106,14 +106,16 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
             if (!/^trinkets$/i.test(feature.name ?? "")) return feature
             // Pool tracker lives on class_resources.trinkets; options are auto-granted by subclass.
             const { isChoice: _dropChoice, choices: _dropChoices, ...rest } = feature
+            const note =
+              "Subclass Trinkets are known automatically when you choose your archetype (not a pick-N upgrades catalog). Activating a trinket expends uses from your Trinkets pool."
+            const description = feature.description ?? ""
+            const marker = `\n\n${note}`
+            const escapedMarker = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
             return {
               ...rest,
-              description: [
-                feature.description ?? "",
-                "Subclass Trinkets are known automatically when you choose your archetype (not a pick-N upgrades catalog). Activating a trinket expends uses from your Trinkets pool.",
-              ]
-                .filter(Boolean)
-                .join("\n\n")
+              description: description
+                .replace(new RegExp(`(?:${escapedMarker}){2,}`, "g"), marker)
+                .concat(description.includes(note) ? "" : marker)
                 .trim(),
             }
           }),

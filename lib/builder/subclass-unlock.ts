@@ -1,4 +1,5 @@
 import type { DndClass, Feature } from "@/lib/types"
+import { featureHasSubclassUnlockModifier } from "@/lib/compendium/subclass-unlock-modifier"
 
 /** SRD default when a class does not declare an earlier archetype/subclass gate. */
 export const DEFAULT_SUBCLASS_LEVEL = 3
@@ -6,11 +7,8 @@ export const DEFAULT_SUBCLASS_LEVEL = 3
 /** @deprecated Prefer DEFAULT_SUBCLASS_LEVEL or resolveSubclassUnlockLevel(cls). */
 export const SUBCLASS_LEVEL = DEFAULT_SUBCLASS_LEVEL
 
-const SUBCLASS_GATE_TEXT =
-  /\b(subclass|bard college|primal path|arcane tradition|divine domain|sacred oath|roguish archetype|martial archetype|druid circle|sorcerous origin|otherworldly patron|monastic tradition|wizard school|psionic archetype)\b/i
-
 const SUBCLASS_GATE_NAME =
-  /\b(subclass|college|path|tradition|domain|patron|archetype|circle|school|oath|philosophy|covenant|calling)\b/i
+  /^(?:.+\s+subclass|bard college|primal path|arcane tradition|divine domain|sacred oath|roguish archetype|martial archetype|druid circle|sorcerous origin|otherworldly patron|monastic tradition|wizard school|psionic archetype|inventor specialization|occult tradition|warden bond)$/i
 
 const SUBCLASS_CHOICE_CATEGORY =
   /\b(college|path|tradition|domain|patron|archetype|circle|school|oath|philosophy|way of|subclass|covenant|specialty|calling)\b/i
@@ -29,8 +27,7 @@ export function isSubclassFeatureGrant(feature: Feature): boolean {
 export function isSubclassUnlockFeature(feature: Feature): boolean {
   if (isSubclassFeatureGrant(feature)) return false
   const name = feature.name.trim()
-  const text = `${name} ${feature.description ?? ""}`
-  if (SUBCLASS_GATE_TEXT.test(text)) return true
+  if (featureHasSubclassUnlockModifier(feature)) return true
   if (SUBCLASS_GATE_NAME.test(name)) return true
   if (feature.isChoice && SUBCLASS_CHOICE_CATEGORY.test(feature.choices?.category ?? "")) {
     return true

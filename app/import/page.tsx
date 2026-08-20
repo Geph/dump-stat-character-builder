@@ -1278,6 +1278,7 @@ export default function ImportPage() {
                       key={`preview-${activeReviewStage?.id ?? "all"}`}
                       content={pendingImport.content}
                       previewSummary={pendingImport.previewSummary}
+                      defaultSource={pendingImport.materialSource}
                       sectionKeys={stagePreviewKeys}
                       hideSummary
                       embedded
@@ -1325,6 +1326,7 @@ export default function ImportPage() {
                 <ImportContentPreviewPanel
                   content={pendingImport.content}
                   previewSummary={pendingImport.previewSummary}
+                  defaultSource={pendingImport.materialSource}
                   showModifierReviewHint={modifierReviewRows.length > 0}
                   cardArtUrls={includeCardArt ? cardArtUrlMap : undefined}
                   onCardArtChange={includeCardArt ? setCardArtUrlMap : undefined}
