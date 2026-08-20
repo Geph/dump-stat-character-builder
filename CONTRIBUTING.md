@@ -82,6 +82,8 @@ Use the [Project Structure](README.md#project-structure) section in the README a
 
 Put **UI** in `app/` and `components/`, **business rules and calculations** in `lib/builder/` and `lib/compendium/`, and **rulebook-style content** in compendium seed data (`seed-data/`, rebuilt with `pnpm srd:build`) or custom entries edited through the compendium UI.
 
+GitHub-eligible class/subclass/background/species/spell/item art comes from `SRD/` source directories. Anything else should be compressed for local use only. Please do **not** `git add` PNGs or `public/images/compendium/local-available-card-art.json` for any copyrighted artworks. If you add art in your own new uniquely-named content folders in scripts or compendium they should remain uncommitted but still work.
+
 ## Code of conduct
 
 This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By participating, you agree to uphold it. To report concerns, [open a GitHub issue](https://github.com/Geph/dump-stat-character-builder/issues/new).
