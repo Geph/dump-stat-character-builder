@@ -695,7 +695,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     null,
   )
   const featureDragRef = useRef(featureDrag)
-  featureDragRef.current = featureDrag
+  useEffect(() => {
+    featureDragRef.current = featureDrag
+  }, [featureDrag])
   const [skillsInfoOpen, setSkillsInfoOpen] = useState(false)
   const [playStateSaveStatus, setPlayStateSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"

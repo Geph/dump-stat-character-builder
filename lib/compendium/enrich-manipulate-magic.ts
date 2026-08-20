@@ -54,7 +54,9 @@ function abilityHasLongRestUse(ability: AbilityLike): boolean {
   return linked.some((instance) =>
     (instance.characteristics ?? []).some((char) => {
       if (char.type !== "uses" || !char.uses) return false
-      return (char.uses.recharges ?? []).some((row) => row.rest === "long_rest")
+      return (char.uses.recharges ?? []).some(
+        (row) => "rest" in row && row.rest === "long_rest",
+      )
     }),
   )
 }

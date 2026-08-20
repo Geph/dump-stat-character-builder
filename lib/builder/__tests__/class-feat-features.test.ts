@@ -27,7 +27,9 @@ describe("getCustomAbilityFeatPickSlots", () => {
     const slots = getCustomAbilityFeatPickSlots({
       classLevels: [{ classId: occultist.id, level: 5 }],
       classes: [occultist],
-      catalog: [{ id: GRANT_FEAT_CATALOG_ID, name: "Grant Feat", characteristics: [] }],
+      catalog: [
+        { id: GRANT_FEAT_CATALOG_ID, name: "Grant Feat", group: "Other", characteristics: [] },
+      ],
       customAbilities: [manipulateMagicAbility()],
       featureChoicePicks: {
         [`${occultist.id}:L2:Occult Rites`]: ["Manipulate Magic"],

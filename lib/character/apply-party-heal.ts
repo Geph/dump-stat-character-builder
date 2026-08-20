@@ -46,7 +46,8 @@ export async function applyPartyHealEffect(params: {
   let companion: CharacterCompanionState | null = null
   let companionIndex = -1
   if (params.target.kind === "companion") {
-    companionIndex = companions.findIndex((entry) => entry.key === params.target.companionKey)
+    const companionTarget = params.target
+    companionIndex = companions.findIndex((entry) => entry.key === companionTarget.companionKey)
     if (companionIndex < 0) throw new Error("Companion not found on that character.")
     companion = { ...companions[companionIndex] }
   }

@@ -130,7 +130,7 @@ function pushTargets<T extends { name: string; card_image_url?: string | null }>
       name,
       detail: options?.detail?.(row),
       compendiumTab,
-      initialUrl: rowInitialUrl(section, row, { keepExistingUrl: options.keepExistingUrl }),
+      initialUrl: rowInitialUrl(section, row, { keepExistingUrl: options?.keepExistingUrl }),
     })
   })
 }

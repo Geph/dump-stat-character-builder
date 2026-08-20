@@ -48,7 +48,6 @@ describe("MHP free subclass allowlist", () => {
       isMhpBundledAbilityAllowed({
         source_type: "subclass",
         source_name: "Musketeer",
-        name: "Liar's Dice",
       }),
     ).toBe(false)
     expect(

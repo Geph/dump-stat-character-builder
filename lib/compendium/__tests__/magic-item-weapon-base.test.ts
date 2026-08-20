@@ -33,7 +33,7 @@ const quarterstaff = item({
   subcategory: "Simple Melee Weapons",
   damage: "1d6",
   damage_type: "Bludgeoning",
-  properties: { properties: ["Versatile"], mastery: "Topple" } as Equipment["properties"],
+  properties: { properties: ["Versatile"], mastery: "Topple" } as unknown as Equipment["properties"],
 })
 
 const mace = item({
@@ -145,14 +145,16 @@ describe("applyInferredMagicItemWeaponBases", () => {
       applyInferredMagicItemWeaponBases({
         name: "Staff of Frost",
         magic_item_category: "Staff",
-      }).base_equipment_names,
+      } as { name: string; magic_item_category: string; base_equipment_names?: string[] })
+        .base_equipment_names,
     ).toEqual(["Quarterstaff"])
     expect(
       applyInferredMagicItemWeaponBases({
         name: "Custom Staff",
         magic_item_category: "Staff",
         base_equipment_names: ["Spear"],
-      }).base_equipment_names,
+      } as { name: string; magic_item_category: string; base_equipment_names: string[] })
+        .base_equipment_names,
     ).toEqual(["Spear"])
   })
 })

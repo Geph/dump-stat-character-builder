@@ -465,10 +465,10 @@ export async function persistImportedContentLocal(
     let featsToWrite = featRows
     if (options.updateExistingNames?.feat?.length) {
       featsToWrite = applyUpdateMergesToNamedRows(
-        featRows,
+        featRows as unknown as Record<string, unknown>[],
         await listRowsLocal("feats"),
         options.updateExistingNames.feat,
-      )
+      ) as typeof featRows
     }
     await upsertByNameLocal("feats", featsToWrite)
 
@@ -531,10 +531,10 @@ export async function persistImportedContentLocal(
     )
     if (options.updateExistingNames?.language?.length) {
       languageRows = applyUpdateMergesToLanguageRows(
-        languageRows,
+        languageRows as unknown as Record<string, unknown>[],
         await listRowsLocal("languages"),
         options.updateExistingNames.language,
-      )
+      ) as typeof languageRows
     }
     await upsertByNameLocal("languages", languageRows)
     breakdown.languages = sanitized.languages.length
@@ -580,10 +580,10 @@ export async function persistImportedContentLocal(
     let abilitiesToWrite = abilityRows
     if (options.updateExistingNames?.ability?.length) {
       abilitiesToWrite = applyUpdateMergesToNamedRows(
-        abilityRows,
+        abilityRows as unknown as Record<string, unknown>[],
         await listRowsLocal("custom_abilities"),
         options.updateExistingNames.ability,
-      )
+      ) as typeof abilityRows
     }
     await upsertByNameLocal("custom_abilities", abilitiesToWrite)
     breakdown.abilities = abilitiesToWrite.length

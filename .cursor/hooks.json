@@ -3,7 +3,7 @@
   "hooks": {
     "stop": [
       {
-        "command": ".cursor/hooks/post-turn-verify.sh",
+        "command": "node .cursor/hooks/post-turn-verify.mjs",
         "timeout": 300,
         "loop_limit": 5
       }

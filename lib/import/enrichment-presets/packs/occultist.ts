@@ -313,7 +313,7 @@ export function sanitizeOccultistImportContent(content: ImportContent): ImportCo
               confidence: "high",
             })
           }
-          return { ...tagged, mechanics }
+          return { ...tagged, mechanics } as typeof ability
         }),
       },
     }
