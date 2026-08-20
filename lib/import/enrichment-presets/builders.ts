@@ -305,20 +305,31 @@ export function resolveRemapTarget(to: string, className: string): string {
   return to
 }
 
+/**
+ * Reagents recharge on three stacked rules: 1 back on every Short Rest (the Reagents feature),
+ * up to your INT modifier once per Long Rest (Reagent Synthesis), and a full refill on a Long Rest.
+ */
 export function enrichReagentResourceUses(uses: UsesConfig): UsesConfig {
   const recharges = [...(uses.recharges ?? [])]
+  const isRest = (rule: (typeof recharges)[number]) => rule.kind !== "real_time"
+  const hasBaseShortRest = recharges.some(
+    (rule) => isRest(rule) && rule.rest === "short_rest" && rule.maxPerLongRest == null,
+  )
+  if (!hasBaseShortRest) {
+    recharges.unshift({ rest: "short_rest", amount: 1 })
+  }
   const hasSynthesis = recharges.some(
-    (rule) => rule.kind !== "real_time" && rule.amountFormula === "ability_modifier",
+    (rule) => isRest(rule) && rule.amountFormula === "ability_modifier",
   )
   if (!hasSynthesis) {
-    recharges.unshift({
+    recharges.push({
       rest: "short_rest",
       amountFormula: "ability_modifier",
       amountFormulaAbility: "INT",
       maxPerLongRest: 1,
     })
   }
-  if (!recharges.some((rule) => rule.kind !== "real_time" && rule.rest === "long_rest")) {
+  if (!recharges.some((rule) => isRest(rule) && rule.rest === "long_rest")) {
     recharges.push({ rest: "long_rest" })
   }
   return { ...uses, recharges }

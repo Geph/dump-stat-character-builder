@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest"
 import { aggregateCharacteristics } from "@/lib/compendium/characteristic-modifiers"
 import { resolveRechargeRuleAmount } from "@/lib/compendium/normalize-uses-config"
+import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
+import {
+  formatEmpowerEffect,
+  resolveSpecialAttackEmpower,
+} from "@/lib/character/special-attack-empower"
+import { remapClassScopedResourceKey } from "@/lib/import/third-party-resources"
 import { aggregateBombFormulaOptions } from "@/lib/builder/aggregate-bomb-formulas"
+import { aggregateUpgradeOptions } from "@/lib/builder/upgrade-choices"
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import { enrichImportChoiceFeatures } from "@/lib/import/enrich-import-choices"
 import { enrichAlchemistFeatures } from "@/lib/import/enrichment-presets"
@@ -56,10 +63,8 @@ describe("Alchemist unified Bomb import", () => {
     expect(chars.filter((char) => char.type === "special_attack")).toHaveLength(2)
     expect(chars.some((char) => char.attackVariant === "attack")).toBe(true)
     expect(chars.some((char) => char.attackVariant === "explode")).toBe(true)
-    expect(bomb.uses).toMatchObject({
-      type: "class_resource",
-      classResourceKey: "reagents",
-    })
+    // Throwing a Bomb is free; Reagents are spent to prime it, via the special_attack rider.
+    expect(bomb.uses).toBeUndefined()
   })
 
   it("includes Prime Bomb linear scaling fields", () => {
@@ -157,6 +162,107 @@ describe("Alchemist choice pickers", () => {
     })
     expect(options.map((row) => row.name)).toEqual(["Acid Bomb"])
   })
+
+  it("lists Mage Hand Press formulas tagged as upgrades with source_name Alchemist", () => {
+    const customAbilities = [
+      {
+        id: "acid",
+        name: "Acid Bomb",
+        description: "Bomb deals Acid damage instead of Fire.",
+        ability_role: "upgrade",
+        attached_to_type: null,
+        attached_to_id: null,
+        source: "Mage Hand Press",
+        source_name: "Alchemist",
+      },
+      {
+        id: "cryo",
+        name: "Cryo Bomb",
+        description: "Bomb deals Cold damage instead of Fire.",
+        ability_role: "upgrade",
+        source: "Mage Hand Press",
+      },
+      {
+        id: "bomb",
+        name: "Bomb",
+        description: "Throw a bomb.",
+        ability_role: "alchemist_bomb",
+        attached_to_type: "class",
+        attached_to_id: "Alchemist",
+        source: "Mage Hand Press",
+      },
+    ] as CustomAbility[]
+    const options = aggregateBombFormulaOptions({
+      customAbilities,
+      classNames: ["Alchemist"],
+      classIds: ["alchemist-uuid"],
+      classLevel: 2,
+    })
+    expect(options.map((row) => row.name)).toEqual(["Acid Bomb", "Cryo Bomb"])
+
+    const featureOptions = resolveFeatureChoiceOptions(
+      {
+        level: 2,
+        name: "Bomb Formulas",
+        description: "Choose bomb formulas.",
+        isChoice: true,
+        choices: {
+          category: "Bomb Formula",
+          count: 1,
+          options: [],
+          optionsSource: "class_bomb_formulas",
+        },
+      },
+      {
+        customAbilities,
+        featureChoicePicks: {},
+        classNames: ["Alchemist"],
+        classIds: ["alchemist-uuid"],
+        classLevel: 2,
+      },
+    )
+    expect(featureOptions.map((row) => row.name)).toEqual(["Acid Bomb", "Cryo Bomb"])
+
+    expect(
+      aggregateUpgradeOptions({
+        customAbilities,
+        classNames: ["Alchemist"],
+        classLevel: 2,
+        selectedUpgradeNames: [],
+      }).map((row) => row.name),
+    ).toEqual([])
+  })
+
+  it("retags upgrade-tagged bomb formulas during Alchemist enrich", () => {
+    const enriched = enrichAlchemistFeatures({
+      import_proposals: {
+        custom_abilities: [
+          {
+            proposal_id: "acid_bomb",
+            name: "Acid Bomb",
+            definition: "Acid formula.",
+            description: "Bomb deals Acid damage instead of Fire.",
+            source_type: "class",
+            source_name: "Alchemist",
+            level_requirement: 2,
+            ability_role: "upgrade",
+          },
+          {
+            proposal_id: "alchemist_bomb",
+            name: "Bomb",
+            definition: "Unified Bomb attack.",
+            description: "Throw a bomb.",
+            source_type: "class",
+            source_name: "Alchemist",
+            ability_role: "upgrade",
+          },
+        ],
+      },
+    } as unknown as ImportContent)
+    const formulas = enriched.import_proposals?.custom_abilities ?? []
+    expect(formulas.find((row) => row.name === "Acid Bomb")?.ability_role).toBe("bomb_formula")
+    expect(formulas.find((row) => row.name === "Bomb")?.ability_role).toBe("alchemist_bomb")
+  })
 })
 
 describe("Alchemist craftable items and held cap", () => {
@@ -233,6 +339,52 @@ Antitoxin | 2 | 3
   })
 })
 
+describe("Alchemist Prime Bomb empower rider", () => {
+  const bombAttack = () => {
+    const enriched = enrichAlchemistFeatures({
+      import_proposals: { custom_abilities: [alchemistBombProposal] },
+    } as unknown as ImportContent)
+    const bomb = enriched.import_proposals?.custom_abilities?.[0] as Record<string, unknown>
+    const mods = bomb.linkedModifiers as { characteristics?: Record<string, unknown>[] }[]
+    return mods
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.attackVariant === "attack") as never
+  }
+
+  it("caps Reagents per use on the Prime Bomb column", () => {
+    const attack = bombAttack()
+    expect([1, 2, 4, 5, 8, 9, 12, 13, 16, 17, 20].map((level) =>
+      resolveSpecialAttackEmpower(attack, level)?.maxSpend,
+    )).toEqual([undefined, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5])
+  })
+
+  it("buys 1d10 damage per Reagent", () => {
+    expect(resolveSpecialAttackEmpower(bombAttack(), 9)).toMatchObject({
+      resourceKey: "reagents",
+      dicePerResource: 1,
+      dieSides: 10,
+      maxSpend: 3,
+    })
+    expect(formatEmpowerEffect(resolveSpecialAttackEmpower(bombAttack(), 9)!, 3)).toBe(
+      "+3d10 damage",
+    )
+  })
+
+  it("widens an Explode by 5 feet per Reagent", () => {
+    const enriched = enrichAlchemistFeatures({
+      import_proposals: { custom_abilities: [alchemistBombProposal] },
+    } as unknown as ImportContent)
+    const bomb = enriched.import_proposals?.custom_abilities?.[0] as Record<string, unknown>
+    const mods = bomb.linkedModifiers as { characteristics?: Record<string, unknown>[] }[]
+    const explode = mods
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.attackVariant === "explode") as never
+    const empower = resolveSpecialAttackEmpower(explode, 5)!
+    expect(empower.radiusFeetPerResource).toBe(5)
+    expect(formatEmpowerEffect(empower, 2)).toBe("+2d10 damage, radius up to +10 ft")
+  })
+})
+
 describe("Alchemist Reagent Synthesis recharge", () => {
   it("adds INT-mod short rest recharge capped once per long rest", () => {
     const enriched = enrichAlchemistFeatures({
@@ -276,6 +428,92 @@ describe("Alchemist Reagent Synthesis recharge", () => {
         { int: 3 },
       ),
     ).toBe(3)
+  })
+})
+
+describe("Alchemist Bomb Formulas and Discoveries pick counts", () => {
+  const enrichFeature = (name: string, level: number) => {
+    const enriched = enrichImportChoiceFeatures({
+      classes: [
+        {
+          name: "Alchemist",
+          features: [{ level, name, description: `${name} feature.` }],
+        },
+      ],
+    } as unknown as ImportContent)
+    return enriched.classes?.[0]?.features?.[0]
+  }
+
+  it("scales Bomb Formulas on the class Formulas column instead of a flat single pick", () => {
+    const choices = enrichFeature("Bomb Formulas", 2)?.choices
+    expect(choices?.choiceCountByLevel).toEqual([
+      { level: 2, count: 3 },
+      { level: 4, count: 4 },
+      { level: 8, count: 5 },
+      { level: 12, count: 6 },
+      { level: 16, count: 7 },
+      { level: 19, count: 8 },
+    ])
+
+    const counts = [2, 3, 4, 7, 8, 11, 12, 15, 16, 18, 19, 20].map((level) =>
+      resolveFeatureChoiceCount(choices!, level, "Alchemist", undefined, {
+        featureName: "Bomb Formulas",
+      }),
+    )
+    expect(counts).toEqual([3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8])
+  })
+
+  it("keeps formulas swappable on a long rest and on level-up", () => {
+    const choices = enrichFeature("Bomb Formulas", 2)?.choices
+    expect(choices).toMatchObject({
+      swappableOnRest: true,
+      swapRestType: "long",
+      swappableOnLevelUp: true,
+      optionsSource: "class_bomb_formulas",
+    })
+  })
+
+  it("grants one Discovery per singular Discovery feature, swappable on level-up", () => {
+    const choices = enrichFeature("Discovery", 5)?.choices
+    expect(choices).toMatchObject({
+      count: 1,
+      optionsSource: "class_discoveries",
+      swappableOnLevelUp: true,
+    })
+    // A cumulative resource lookup would multiply picks across the level 5/9/13/17 features.
+    expect(choices?.resourceKey).toBeUndefined()
+    expect(choices?.choiceCountByLevel).toBeUndefined()
+    expect(resolveFeatureChoiceCount(choices!, 17, "Alchemist")).toBe(1)
+  })
+
+  it("uses the cumulative table when one plural Discoveries feature owns every pick", () => {
+    const choices = enrichFeature("Discoveries", 5)?.choices
+    expect(
+      [5, 8, 9, 13, 17, 20].map((level) => resolveFeatureChoiceCount(choices!, level, "Alchemist")),
+    ).toEqual([1, 1, 2, 3, 4, 4])
+  })
+})
+
+describe("class-scoped resource keys", () => {
+  it("treats Reagents as Alchemist-owned", () => {
+    expect(remapClassScopedResourceKey("Alchemist", "reagents")).toBe("reagents")
+    expect(remapClassScopedResourceKey("Alchemist (Mage Hand Press)", "reagents")).toBe("reagents")
+    // The Inventor's reagent pouch is a gating item, not an Alchemist-style pool.
+    expect(remapClassScopedResourceKey("Inventor", "reagents")).toBe("inventor_reagents")
+  })
+
+  it("never infers a reagents pool from another class's prose", () => {
+    const proposals = collectImportProposals({
+      classes: [
+        {
+          name: "Inventor",
+          description:
+            "At 1st level, you've acquired a pouch of useful basic reagents. As long as you have this pouch you can use the potionsmith's features.",
+          features: [],
+        },
+      ],
+    } as unknown as ImportContent)
+    expect(proposals.classResources.map((row) => row.resourceKey)).not.toContain("reagents")
   })
 })
 
@@ -436,6 +674,54 @@ describe("enrichImportContentModifiers integration", () => {
       classLevel: 2,
     })
     expect(options.map((row) => row.name)).toEqual(["Acid Bomb"])
+  })
+
+  it("resolves bomb formulas attached by persisted class UUID", () => {
+    const feature = {
+      level: 2,
+      name: "Bomb Formulas",
+      isChoice: true,
+      choices: {
+        category: "Bomb Formula",
+        count: 1,
+        options: [],
+        resourceKey: "bomb_formulas_known",
+        optionsSource: "class_bomb_formulas" as const,
+      },
+    }
+    const options = resolveFeatureChoiceOptions(feature as unknown as import("@/lib/types").Feature, {
+      customAbilities: [
+        {
+          id: "acid",
+          name: "Acid Bomb",
+          ability_role: "bomb_formula",
+          attached_to_type: "class",
+          attached_to_id: "cls-alchemist-uuid",
+          source: "KibblesTasty",
+        } as CustomAbility,
+        {
+          id: "pack",
+          name: "Bomb Formulas",
+          ability_role: "bomb_formula",
+          attached_to_type: "class",
+          attached_to_id: "cls-alchemist-uuid",
+          source: "KibblesTasty",
+          choices: {
+            category: "Bomb Formula",
+            count: 1,
+            options: [
+              { name: "Frost Bomb", description: "Cold damage." },
+              { name: "Force Bomb", description: "Force damage." },
+            ],
+          },
+        } as CustomAbility,
+      ],
+      featureChoicePicks: {},
+      classNames: ["Alchemist"],
+      classIds: ["cls-alchemist-uuid"],
+      classLevel: 2,
+    })
+    expect(options.map((row) => row.name)).toEqual(["Acid Bomb", "Force Bomb", "Frost Bomb"])
   })
 })
 

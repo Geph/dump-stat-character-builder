@@ -10,20 +10,30 @@ import {
 import { cn } from "@/lib/utils"
 import { ChevronLeft, ChevronRight, Layers } from "lucide-react"
 
-export type ImportReviewPhase = "content" | "modifiers"
+export type ImportReviewPhase = "conflicts" | "content" | "card-art" | "modifiers"
 
 type ImportStagingPanelProps = {
   stages: ImportStage[]
   summary: string
   activeIndex: number
   phase: ImportReviewPhase
+  hasConflicts: boolean
+  hasCardArt: boolean
   hasModifiers: boolean
   onNext: () => void
   canNext: boolean
   onBack?: () => void
   canBack?: boolean
-  /** Content review / collisions / card art for the active stage. */
+  /** When false, hide the footer Next control (e.g. deferred to last-source row). */
+  showNextInFooter?: boolean
+  /** Right-side footer actions when Next is hidden (e.g. Confirm / Cancel on the last step). */
+  footerEnd?: ReactNode
+  /** Name-collision review (first step when this stage has conflicts). */
+  conflictsChildren?: ReactNode
+  /** Parsed content for the active stage. */
   contentChildren: ReactNode
+  /** Optional card-art review (Graphic mode only). */
+  cardArtChildren?: ReactNode
   /** Modifier wiring for the active stage (shown on the modifiers phase). */
   modifiersChildren?: ReactNode
 }
@@ -33,24 +43,71 @@ export function ImportStagingPanel({
   summary,
   activeIndex,
   phase,
+  hasConflicts,
+  hasCardArt,
   hasModifiers,
   onNext,
   canNext,
   onBack,
   canBack = false,
+  showNextInFooter = true,
+  footerEnd,
+  conflictsChildren,
   contentChildren,
+  cardArtChildren,
   modifiersChildren,
 }: ImportStagingPanelProps) {
   if (!stages.length) return null
 
   const safeIndex = Math.min(Math.max(activeIndex, 0), stages.length - 1)
   const stage = stages[safeIndex]
-  const phaseLabel = phase === "content" ? "Parsed content" : "Modifier wiring"
-  const showPhaseToggle = hasModifiers
-  const showFooter = canBack || canNext
+  const phaseTabs = [
+    ...(hasConflicts ? [{ id: "conflicts" as const, label: "Name conflicts" }] : []),
+    { id: "content" as const, label: "Content" },
+    ...(hasCardArt ? [{ id: "card-art" as const, label: "Card art" }] : []),
+    ...(hasModifiers ? [{ id: "modifiers" as const, label: "Modifiers" }] : []),
+  ]
+  const phaseLabel =
+    phase === "conflicts"
+      ? "name conflicts"
+      : phase === "content"
+        ? "Parsed content"
+        : phase === "card-art"
+          ? "Card art"
+          : "modifier wiring"
+  const showPhaseToggle = phaseTabs.length > 1
+  const showFooterNext = canNext && showNextInFooter
+  const showFooter = canBack || showFooterNext || Boolean(footerEnd)
+  const nextLabel =
+    phase === "conflicts"
+      ? "Next: review content"
+      : phase === "content" && hasCardArt
+        ? "Next: review card art"
+        : phase !== "modifiers" && hasModifiers
+          ? "Next: review modifier wiring"
+          : "Next stage"
+  const backLabel =
+    phase === "modifiers"
+      ? hasCardArt
+        ? "Back: card art"
+        : "Back: content"
+      : phase === "card-art"
+        ? "Back: content"
+        : phase === "content" && hasConflicts
+          ? "Back: name conflicts"
+          : "Previous stage"
+
+  const phaseBody =
+    phase === "conflicts"
+      ? conflictsChildren
+      : phase === "content"
+        ? contentChildren
+        : phase === "card-art"
+          ? cardArtChildren
+          : modifiersChildren
 
   return (
-    <div className={cn(pageOverlayPanelClass, "space-y-4 p-4 text-sm")}>
+    <div className={cn(pageOverlayPanelClass, "w-full space-y-4 p-4 text-sm")}>
       <div className="flex items-start gap-2">
         <Layers className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <div className="min-w-0 flex-1">
@@ -107,32 +164,23 @@ export function ImportStagingPanel({
           role="tablist"
           aria-label="Review phase"
         >
-          <span
-            className={cn(
-              "flex-1 rounded-md px-3 py-1.5 text-center text-xs font-semibold",
-              phase === "content"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground",
-            )}
-          >
-            1. Content
-          </span>
-          <span
-            className={cn(
-              "flex-1 rounded-md px-3 py-1.5 text-center text-xs font-semibold",
-              phase === "modifiers"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground",
-            )}
-          >
-            2. Modifiers
-          </span>
+          {phaseTabs.map((tab, index) => (
+            <span
+              key={tab.id}
+              className={cn(
+                "flex-1 rounded-md px-3 py-1.5 text-center text-xs font-semibold",
+                phase === tab.id
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground",
+              )}
+            >
+              {index + 1}. {tab.label}
+            </span>
+          ))}
         </div>
       ) : null}
 
-      <div className="space-y-4">
-        {phase === "content" ? contentChildren : modifiersChildren}
-      </div>
+      <div className="space-y-4">{phaseBody}</div>
 
       {showFooter ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
@@ -144,21 +192,21 @@ export function ImportStagingPanel({
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40"
               >
                 <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-                {phase === "modifiers" ? "Back: content" : "Previous stage"}
+                {backLabel}
               </button>
             ) : null}
           </div>
-          {canNext ? (
+          {showFooterNext ? (
             <button
               type="button"
               onClick={onNext}
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/25 transition-colors hover:bg-primary/90"
             >
-              {phase === "content" && hasModifiers
-                ? "Next: review modifier wiring"
-                : "Next stage"}
+              {nextLabel}
               <ChevronRight className="h-3.5 w-3.5" aria-hidden />
             </button>
+          ) : footerEnd ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">{footerEnd}</div>
           ) : (
             <span />
           )}

@@ -15,6 +15,10 @@ export const HERO_ROTATING_IMAGES = [
   hero("rotating-02.webp"),
   hero("rotating-03.webp"),
   hero("rotating-04.webp"),
+  hero("rotating-05.webp"),
+  hero("rotating-06.webp"),
+  hero("rotating-07.webp"),
+  hero("rotating-08.webp"),
 ] as const
 
 export const LIBRARY_STATS_BACKGROUND = withBasePath("/images/backgrounds/library-stats.jpeg")

@@ -4,6 +4,7 @@ import {
   applyImportCardArtUrls,
   buildInitialImportCardArtUrlMap,
   collectImportCardArtTargets,
+  fillBlankImportCardArtUrls,
   importCardArtTargetKey,
 } from "@/lib/import/import-card-art"
 
@@ -50,6 +51,16 @@ describe("import-card-art", () => {
     )
   })
 
+  it("omits content-preview soft-skipped rows from card art targets", () => {
+    const targets = collectImportCardArtTargets(content, {
+      skippedKeys: new Set([importCardArtTargetKey("species", 0)]),
+    })
+    expect(targets.map((target) => target.key)).toEqual([
+      importCardArtTargetKey("classes", 0),
+      importCardArtTargetKey("equipment", 1),
+    ])
+  })
+
   it("keeps Images from URL dumpstat art instead of treating it as an old WotC default", () => {
     const cardArtOnly: ImportContent = {
       card_art: [
@@ -82,6 +93,26 @@ describe("import-card-art", () => {
     const map = buildInitialImportCardArtUrlMap(content)
     expect(map[importCardArtTargetKey("species", 0)]).toBe("https://example.com/catfolk.png")
     expect(map[importCardArtTargetKey("classes", 0)]).toBe("")
+  })
+
+  it("restores blank review URLs from bundled / row initial art", () => {
+    const withSpecies: ImportContent = {
+      species: [
+        {
+          name: "Aasimar (2024)",
+          description: null,
+          speed: 30,
+          size: "Medium",
+          traits: [],
+          card_image_url: "/images/compendium/species/aasimar.png",
+        },
+      ],
+    }
+    const targets = collectImportCardArtTargets(withSpecies)
+    expect(targets[0]?.initialUrl).toMatch(/\/images\/compendium\/species\/aasimar\.png$/)
+    const filled = fillBlankImportCardArtUrls({ [importCardArtTargetKey("species", 0)]: "" }, targets)
+    expect(filled?.[importCardArtTargetKey("species", 0)]).toBe(targets[0]?.initialUrl)
+    expect(fillBlankImportCardArtUrls(filled!, targets)).toBeNull()
   })
 
   it("seeds bundled card defaults when the import row has no URL", () => {

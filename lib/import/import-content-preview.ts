@@ -3,6 +3,11 @@ import type { ImportContent, PrerequisiteRule } from "@/lib/import/content-schem
 import { formatEquipmentCost } from "@/lib/compendium/equipment-display"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
 import { importCardArtTargetKey } from "@/lib/import/import-card-art"
+import type {
+  ImportCollision,
+  ImportCollisionKind,
+  ImportCollisionResolutionMap,
+} from "@/lib/import/import-collisions"
 import type { Equipment } from "@/lib/types"
 
 export type ImportContentPreviewDetail = {
@@ -67,6 +72,61 @@ export function importPreviewSkipKey(
 
 export function importPreviewItemSkipKey(item: Pick<ImportContentPreviewItem, "sectionKey" | "sourceIndex">): string {
   return importPreviewSkipKey(item.sectionKey, item.sourceIndex)
+}
+
+const COLLISION_KIND_PREVIEW_SECTION: Partial<
+  Record<ImportCollisionKind, ImportContentPreviewSectionKey>
+> = {
+  class: "classes",
+  feat: "feats",
+  species: "species",
+  spell: "spells",
+  background: "backgrounds",
+  language: "languages",
+}
+
+/** Preview skip keys for rows the user skipped on the name-conflict step. */
+export function previewSkipKeysForSkippedCollisions(
+  content: ImportContent,
+  collisions: readonly ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+): Set<string> {
+  const namesBySection = new Map<ImportContentPreviewSectionKey, Set<string>>()
+  for (const collision of collisions) {
+    if (resolutionMap[collision.id] !== "skip") continue
+    const section = COLLISION_KIND_PREVIEW_SECTION[collision.kind]
+    if (!section) continue
+    const names = namesBySection.get(section) ?? new Set<string>()
+    names.add(collision.incomingName.trim().toLowerCase())
+    namesBySection.set(section, names)
+  }
+  if (!namesBySection.size) return new Set()
+
+  const keys = new Set<string>()
+  for (const [section, names] of namesBySection) {
+    const rows = content[section]
+    if (!Array.isArray(rows)) continue
+    rows.forEach((row, index) => {
+      const name = String((row as { name?: string }).name ?? "").trim().toLowerCase()
+      if (names.has(name)) keys.add(importPreviewSkipKey(section, index))
+    })
+  }
+  return keys
+}
+
+/** Remove hidden rows from preview sections without reindexing sourceIndex. */
+export function omitPreviewItemsBySkipKeys(
+  sections: ImportContentPreviewSection[],
+  hiddenKeys: ReadonlySet<string> | readonly string[],
+): ImportContentPreviewSection[] {
+  const hidden = hiddenKeys instanceof Set ? hiddenKeys : new Set(hiddenKeys)
+  if (!hidden.size) return sections
+  return sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !hidden.has(importPreviewItemSkipKey(item))),
+    }))
+    .filter((section) => section.items.length > 0)
 }
 
 /** Drop rows the user skipped in the content preview (independent of collision skip). */

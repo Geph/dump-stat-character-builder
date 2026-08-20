@@ -24,13 +24,29 @@ function run(label, cmd, args, extraEnv = {}) {
     shell: true,
   })
   if (result.status !== 0) {
-    process.exit(result.status ?? 1)
+    const error = new Error(`${label} failed`)
+    error.exitCode = result.status ?? 1
+    throw error
   }
 }
 
-run("Icon manifest", "node", ["scripts/build-icon-manifest.mjs"])
-run("Prepare static routes", "node", ["scripts/prepare-static-build.mjs"])
-run("Next.js static export", "pnpm", ["exec", "next", "build"])
-run("Restore dynamic routes", "node", ["scripts/restore-static-build.mjs"])
+let routesStashed = false
+try {
+  run("Icon manifest", "node", ["scripts/build-icon-manifest.mjs"])
+  run("Prepare static routes", "node", ["scripts/prepare-static-build.mjs"])
+  routesStashed = true
+  run("Next.js static export", "pnpm", ["exec", "next", "build"])
+} catch (error) {
+  process.exitCode = error.exitCode ?? 1
+} finally {
+  if (routesStashed) {
+    try {
+      run("Restore dynamic routes", "node", ["scripts/restore-static-build.mjs"])
+    } catch (restoreError) {
+      console.error("Failed to restore dynamic routes after static build.")
+      process.exitCode = restoreError.exitCode ?? 1
+    }
+  }
+}
 
-console.log("\nStatic export written to out/")
+if (!process.exitCode) console.log("\nStatic export written to out/")

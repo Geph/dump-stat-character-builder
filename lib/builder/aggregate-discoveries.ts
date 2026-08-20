@@ -1,3 +1,7 @@
+import {
+  customAbilityMatchesClass,
+  type ClassAbilityMatchTarget,
+} from "@/lib/builder/class-ability-match"
 import type { CustomAbility, FeatureChoice } from "@/lib/types"
 
 function normalizeName(value: string): string {
@@ -7,20 +11,12 @@ function normalizeName(value: string): string {
 export function discoveryAbilitiesForClass(
   customAbilities: CustomAbility[],
   classNames: string[],
+  options?: { classIds?: string[] },
 ): CustomAbility[] {
-  const classKeys = new Set(classNames.map(normalizeName))
+  const targets: ClassAbilityMatchTarget = { classNames, classIds: options?.classIds }
   return customAbilities.filter((ability) => {
     if (ability.ability_role !== "discovery") return false
-    if (ability.attached_to_type === "class" && ability.attached_to_id) {
-      const attachKey = normalizeName(ability.attached_to_id)
-      return [...classKeys].some(
-        (classKey) => attachKey.includes(classKey) || classKey.includes(attachKey),
-      )
-    }
-    if (ability.source?.trim()) {
-      return [...classKeys].some((classKey) => normalizeName(ability.source).includes(classKey))
-    }
-    return classNames.length === 0
+    return customAbilityMatchesClass(ability, targets, { includeUnassigned: true })
   })
 }
 
@@ -42,8 +38,11 @@ export function aggregateDiscoveryOptions(params: {
   classNames: string[]
   classLevel: number
   selectedDiscoveryNames: string[]
+  classIds?: string[]
 }): FeatureChoice["options"] {
-  const discoveries = discoveryAbilitiesForClass(params.customAbilities, params.classNames)
+  const discoveries = discoveryAbilitiesForClass(params.customAbilities, params.classNames, {
+    classIds: params.classIds,
+  })
   return discoveries
     .filter((row) => isDiscoveryEligible(row, params.classLevel, params.selectedDiscoveryNames))
     .map((ability) => ({

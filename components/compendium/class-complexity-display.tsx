@@ -17,7 +17,7 @@ export function ClassComplexityDisplay({
   labelClassName = "text-primary",
   comfortableFromMd = false,
 }: {
-  cls: Pick<DndClass, "name" | "complexity">
+  cls: Pick<DndClass, "name" | "complexity"> & { source?: string | null }
   className?: string
   labelClassName?: string
   comfortableFromMd?: boolean
@@ -37,7 +37,9 @@ export function ClassComplexityDisplay({
   )
 }
 
-export function classComplexityDetailRow(cls: Pick<DndClass, "name" | "complexity">): {
+export function classComplexityDetailRow(
+  cls: Pick<DndClass, "name" | "complexity"> & { source?: string | null },
+): {
   label: string
   value: string
 } | null {

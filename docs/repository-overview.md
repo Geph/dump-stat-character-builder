@@ -41,7 +41,7 @@ Content is data. Mechanics are modifiers. The builder and sheet never hard-code 
 | `.github/` | CI and issue templates |
 | `.cursor/` | Cursor hooks and agent config |
 
-Root files that matter: `README.md` (product + license), `docs/import.md` (import formats), `LICENSE` (MIT + SRD attribution), `CONTRIBUTING.md`, `package.json`, `next.config.mjs`.
+Root files that matter: `README.md` (product + license), `docs/import.md` (import formats), `LICENSE` (MIT + SRD/font attribution), `CONTRIBUTING.md`, `package.json`, `next.config.mjs`.
 
 ---
 
@@ -271,7 +271,7 @@ Enrichment packs under `lib/import/enrichment-presets/packs/` are Dump Stat wiri
 | Asset | License | Where |
 | --- | --- | --- |
 | game-icons.net SVGs | [CC BY 3.0](http://creativecommons.org/licenses/by/3.0/) | `public/icons/`; attribution in footer, landing, icon picker |
-| Solbera D&D fonts | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | App typography; see README |
+| Solbera D&D fonts | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) | `app/fonts/solbera/` (NOT MIT); NOTICE.md + footer |
 
 ### 7. Card art and marketing images
 

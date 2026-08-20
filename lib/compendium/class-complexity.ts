@@ -24,15 +24,45 @@ export const SRD_CLASS_COMPLEXITY_BY_NAME: Record<string, ClassComplexity> = {
   Wizard: "hard",
 }
 
+/** Default Mage Hand Press class complexity tiers (Low/Medium/High → easy/medium/hard). */
+export const MHP_CLASS_COMPLEXITY_BY_NAME: Record<string, ClassComplexity> = {
+  Alchemist: "medium",
+  Captain: "medium",
+  Craftsman: "hard",
+  Dancer: "hard",
+  Gunslinger: "medium",
+  Investigator: "hard",
+  Martyr: "medium",
+  Necromancer: "hard",
+  Vagabond: "hard",
+  Warden: "medium",
+  Warmage: "easy",
+  Witch: "easy",
+}
+
+const MHP_UNIQUE_CLASS_NAMES = new Set(
+  Object.keys(MHP_CLASS_COMPLEXITY_BY_NAME).filter((name) => name !== "Warden"),
+)
+
+function classNameBase(name: string): string {
+  return name.replace(/\s*\(.*\)\s*$/, "").trim() || name
+}
+
+function isMageHandPressClass(name: string, source?: string | null): boolean {
+  if (source && /mage\s*hand\s*press/i.test(source)) return true
+  if (/\(\s*mage\s*hand\s*press\s*\)/i.test(name)) return true
+  return MHP_UNIQUE_CLASS_NAMES.has(classNameBase(name))
+}
+
 export function isClassComplexity(value: unknown): value is ClassComplexity {
   return value === "easy" || value === "medium" || value === "hard"
 }
 
 export function resolveClassComplexity(
-  cls: Pick<DndClass, "name" | "complexity">,
+  cls: Pick<DndClass, "name" | "complexity"> & { source?: string | null },
 ): ClassComplexity | null {
   if (isClassComplexity(cls.complexity)) return cls.complexity
-  return SRD_CLASS_COMPLEXITY_BY_NAME[cls.name] ?? null
+  return defaultClassComplexityForName(cls.name, cls.source)
 }
 
 export function formatClassComplexityLabel(complexity: ClassComplexity): string {
@@ -43,6 +73,13 @@ export function formatClassComplexityPhrase(complexity: ClassComplexity): string
   return `${formatClassComplexityLabel(complexity)} Complexity`
 }
 
-export function defaultClassComplexityForName(name: string): ClassComplexity | null {
-  return SRD_CLASS_COMPLEXITY_BY_NAME[name] ?? null
+export function defaultClassComplexityForName(
+  name: string,
+  source?: string | null,
+): ClassComplexity | null {
+  if (SRD_CLASS_COMPLEXITY_BY_NAME[name]) return SRD_CLASS_COMPLEXITY_BY_NAME[name]
+  const base = classNameBase(name)
+  const mhp = MHP_CLASS_COMPLEXITY_BY_NAME[base]
+  if (mhp && isMageHandPressClass(name, source)) return mhp
+  return null
 }

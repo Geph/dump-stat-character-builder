@@ -1,5 +1,7 @@
+import { isBombFormulaAbility } from "@/lib/builder/aggregate-bomb-formulas"
 import { isChoiceOptionEligible } from "@/lib/builder/choice-option-eligibility"
 import type { ChoicePrerequisiteContext } from "@/lib/builder/choice-prerequisite"
+import { customAbilityMatchesClass } from "@/lib/builder/class-ability-match"
 import type { CustomAbility } from "@/lib/types"
 
 function normalizeName(value: string): string {
@@ -9,43 +11,13 @@ function normalizeName(value: string): string {
 export function upgradeAbilitiesForClass(
   customAbilities: CustomAbility[],
   classNames: string[],
-  options?: { subclassName?: string | null },
+  options?: { subclassName?: string | null; classIds?: string[] },
 ): CustomAbility[] {
-  const classKeys = new Set(classNames.map(normalizeName))
-  const subclassKey = options?.subclassName?.trim()
-    ? normalizeName(options.subclassName)
-    : null
+  const targets = { classNames, classIds: options?.classIds }
   return customAbilities.filter((ability) => {
     if (ability.ability_role !== "upgrade" && ability.ability_role !== "weapon_mastery") return false
-    if (
-      ability.eligible_classes?.some((eligible) => {
-        const eligibleKey = normalizeName(eligible)
-        return [...classKeys].some(
-          (classKey) => eligibleKey.includes(classKey) || classKey.includes(eligibleKey),
-        )
-      })
-    ) {
-      return true
-    }
-    if (ability.attached_to_type === "class" && ability.attached_to_id) {
-      const attachKey = normalizeName(ability.attached_to_id)
-      return [...classKeys].some(
-        (classKey) => attachKey.includes(classKey) || classKey.includes(attachKey),
-      )
-    }
-    if (ability.attached_to_type === "subclass" && ability.attached_to_id) {
-      if (!subclassKey) return false
-      const attachKey = normalizeName(ability.attached_to_id)
-      return attachKey.includes(subclassKey) || subclassKey.includes(attachKey)
-    }
-    if (ability.source?.trim()) {
-      const sourceKey = normalizeName(ability.source)
-      if ([...classKeys].some((classKey) => sourceKey.includes(classKey))) return true
-      if (subclassKey && (sourceKey.includes(subclassKey) || subclassKey.includes(sourceKey))) {
-        return true
-      }
-    }
-    return classNames.length === 0
+    if (isBombFormulaAbility(ability)) return false
+    return customAbilityMatchesClass(ability, targets, { subclassName: options?.subclassName })
   })
 }
 
@@ -76,9 +48,11 @@ export function aggregateUpgradeOptions(params: {
   classLevel: number
   selectedUpgradeNames: string[]
   subclassName?: string | null
+  classIds?: string[]
 }): { name: string; description: string; prerequisite?: string | null; repeatable?: boolean | null }[] {
   const upgrades = upgradeAbilitiesForClass(params.customAbilities, params.classNames, {
     subclassName: params.subclassName,
+    classIds: params.classIds,
   })
   const selected = params.selectedUpgradeNames
   const options: {

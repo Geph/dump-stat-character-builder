@@ -638,6 +638,13 @@ const SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
       ),
     ],
   },
+  "Astral Elf::Astral Trance": {
+    linkedModifiers: [
+      ...tranceRest(4, "Astral Trance"),
+      skillChoice(1, "Astral Trance — skill until next long rest"),
+      toolChoice(1, "Astral Trance — weapon or tool until next long rest"),
+    ],
+  },
 
   // —— Gnome ——
   "Gnome::Gnomish Cunning": {
@@ -681,6 +688,18 @@ const SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
 
   // —— Autognome ——
   "Autognome::Sentry's Rest": { linkedModifiers: sentryRest("Sentry's Rest") },
+  "Autognome::Built for Success": {
+    linkedModifiers: [
+      usesPool(
+        { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+        "Built for Success",
+      ),
+      specialNote(
+        "After you know the d20 result but before effects resolve, add a d4 to an attack roll, ability check, or saving throw (PB uses / long rest)",
+        "Built for Success",
+      ),
+    ],
+  },
   "Autognome::Specialized Design": {
     linkedModifiers: [toolChoice(2, "Specialized Design — two tools")],
   },
@@ -689,6 +708,36 @@ const SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
       specialNote(
         "If targeted by Mending, may spend a Hit Die to regain HP = roll + CON (min 1); also benefits from listed healing spells despite being a Construct",
         "Healing Machine",
+      ),
+    ],
+  },
+
+  // —— Deep Gnome ——
+  "Deep Gnome::Gnomish Magic Resistance": {
+    linkedModifiers: [
+      checkAdvantageSave("deep_gnome_magic_res_int", {
+        ability: "Intelligence",
+        conditions: ["spell"],
+      }),
+      checkAdvantageSave("deep_gnome_magic_res_wis", {
+        ability: "Wisdom",
+        conditions: ["spell"],
+      }),
+      checkAdvantageSave("deep_gnome_magic_res_cha", {
+        ability: "Charisma",
+        conditions: ["spell"],
+      }),
+    ],
+  },
+
+  // —— Giff ——
+  "Giff::Hippo Build": {
+    linkedModifiers: [
+      checkAdvantageAbility("giff_hippo_str_check", "Strength", "Advantage on Strength checks"),
+      checkAdvantageSave("giff_hippo_str_save", { ability: "Strength" }),
+      specialNote(
+        "Count as one size larger for carrying capacity and the weight you can push, drag, or lift",
+        "Hippo Build",
       ),
     ],
   },

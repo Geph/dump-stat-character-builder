@@ -1503,7 +1503,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "save.advantage",
     confidence: "high",
-    test: /\badvantage\s+on\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+saving\s+throws?\b/i,
+    test: /\badvantage\s+on\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+(?:saving\s+throws?|saves?)\b/i,
     build: (match, ctx, text) => {
       const ability = parseSaveAbility(match[1])
       if (!ability) return null
@@ -1517,6 +1517,26 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
         },
         text,
       )
+    },
+  },
+  {
+    // "Advantage on Intelligence, Wisdom, and Charisma saving throws against spells" (Deep Gnome).
+    id: "save.advantage.mental.against_spells",
+    confidence: "high",
+    test:
+      /\badvantage\s+on\s+Intelligence(?:,|\s+and)?\s+Wisdom(?:,|\s+and)?\s+(?:and\s+)?Charisma\s+(?:saving\s+throws?|saves?)\s+against\s+spells\b/i,
+    build: (_match, ctx, text) => {
+      const abilities = ["Intelligence", "Wisdom", "Charisma"] as const
+      return fxInstance(newInstanceId(), effectCatalogRefId("check_roll_modifier"), {
+        effects: abilities.map((ability, index) => ({
+          id: modId(instanceKey(ctx, `mental_spell_save_adv_${index}`)),
+          kind: "check_roll_modifier" as const,
+          checkRollMode: "advantage" as const,
+          checkCategory: "save" as const,
+          checkAbility: ability,
+          checkConditionTypes: ["spell"],
+        })),
+      })
     },
   },
   {

@@ -231,7 +231,11 @@ Compendium icons are from [game-icons.net](https://game-icons.net/) (CC BY 3.0).
 
 ### Fonts
 
-Solbera’s D&D Fonts by Solbera / Ryrok, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) — see [Solbera D&D Fonts](https://jonathonf.github.io/solbera-dnd-fonts/). Copies used by the app live in `app/fonts/solbera/`.
+Display type uses [Solbera’s D&D Fonts](https://jonathonf.github.io/solbera-dnd-fonts/) by Solbera, with fixes and remakes by Ryrok, Ners, and LUCASTUCIOUS, licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) ([legal code](https://creativecommons.org/licenses/by-sa/4.0/legalcode)). Source: [jonathonf/solbera-dnd-fonts](https://github.com/jonathonf/solbera-dnd-fonts).
+
+Bundled families (Nodesto Caps Condensed, Bookinsanity, Scaly Sans, Mr Eaves Small Caps) live in [`app/fonts/solbera/`](app/fonts/solbera/). Filenames were kebab-cased for self-hosting; outlines were not edited. **Those `.otf` files are not MIT** — keep them under CC BY-SA 4.0 if you redistribute them. See [`app/fonts/solbera/NOTICE.md`](app/fonts/solbera/NOTICE.md).
+
+Section 5 of CC BY-SA 4.0 includes a Disclaimer of Warranties and Limitation of Liability that limits our liability to you.
 
 ### Trademarks & privacy
 

@@ -80,6 +80,10 @@ const HERO_SOURCES = {
   "rotating-02": ["rotating (2)", "rotating-02", "rotating-2"],
   "rotating-03": ["rotating (3)", "rotating-03", "rotating-3"],
   "rotating-04": ["rotating (4)", "rotating-04", "rotating-4"],
+  "rotating-05": ["rotating (5)", "rotating-05", "rotating-5"],
+  "rotating-06": ["rotating (6)", "rotating-06", "rotating-6"],
+  "rotating-07": ["rotating (7)", "rotating-07", "rotating-7"],
+  "rotating-08": ["rotating (8)", "rotating-08", "rotating-8"],
 }
 
 /** output basename → candidate source basenames */

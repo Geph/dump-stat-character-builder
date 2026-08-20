@@ -1040,7 +1040,10 @@ export const CARD_BLURB_IMPORT_HINT = `For every class and subclass:
 - Write card_blurb as a "How it feels to play" sentence: use active, player-facing language and summarize the core gameplay loop.
 - Favor what the player repeatedly does in play (control, protect, bargain, build, transform, etc.), not lore or a list of class features.
 - Do not copy progression instructions, prerequisites, level tables, or importer/editor guidance.
-- Keep the full source prose in description. card_blurb supplements description and never replaces or truncates it.`
+- Keep the full source prose in description. card_blurb supplements description and never replaces or truncates it.
+- On classes[] (not subclasses), always emit complexity: "easy" (Low), "medium" (Medium), or "hard" (High). This is builder-facing play difficulty, not CR.
+- Mage Hand Press class defaults (use these unless the user overrides): Alchemist medium, Captain medium, Craftsman hard, Dancer hard, Gunslinger medium, Investigator hard, Martyr medium, Necromancer hard, Vagabond hard, Warden medium, Warmage easy, Witch easy.
+- For other homebrew, judge from concurrent resources, option libraries, and spell-like systems the player juggles (simple martial loops → easy; several pools/choices → medium; crafting, minions, or stacked pickers → hard).`
 
 export const CHOICE_EXTRACTION_HINT = `When content requires a player to choose between fixed options (species lineage/ancestry/legacy, fighting style options listed by name, skill from a list, etc.):
 - Set isChoice: true on the trait or class feature (use null when not a choice)
@@ -1142,7 +1145,7 @@ export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Desi
 - Use the class name exactly as it appears in the source text's own headers and class table (e.g. "Psion," not an invented designer-prefixed variant) unless the user has explicitly told you a disambiguating prefix is required — do not default to prefixing the credited designer's name onto the class name. If a prefix convention is needed to avoid colliding with another compendium entry, that's a decision for the user to confirm, not something to infer from a byline or credits page.
 - **Known same-name collisions:** Mage Hand Press Warden ≠ KibblesTasty Warden (Endurance Dice / Primal Manifestations). Keep the source header name "Warden" in JSON; Dump Stat's collision UI will ask the user to choose a rename (suggestion: "Warden (Mage Hand Press)" or "Warden (Kibbles Tasty)") when the other already exists — do not invent a prefix unless the user asks.
 - That exact class name is the canonical string other passes must match (spells[].classes, source_name on abilities, subclass class_name) — see Name and source matching.
-- Put the full class in classes[] with hit_die, armor_proficiencies, weapon_proficiencies (top-level string arrays — NEVER {"armor":[...],"weapons":[...]}), saving_throws, and all class features by level
+- Put the full class in classes[] with hit_die, complexity ("easy" | "medium" | "hard"), armor_proficiencies, weapon_proficiencies (top-level string arrays — NEVER {"armor":[...],"weapons":[...]}), saving_throws, and all class features by level
 - Always emit skill_choices from the Skills: line: { count, options } for "Choose N from …"; when the line grants a fixed skill plus picks (e.g. "Psionics, and choose two from Deception, History, …"), set fixed: ["Psionics"] and put only the choosable skills in options
 - Put each subclass/archetype/path in subclasses[] in the SAME JSON as the class (never omit archetypes from a Classes pass) with class_name set to that same parent class name
 - Archetype unlock features (name like "Psionic Archetype"): short description only — do NOT emit isChoice with stub options naming each archetype; Dump Stat uses subclasses[] for the real pick

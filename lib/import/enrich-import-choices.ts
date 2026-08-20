@@ -8,7 +8,7 @@ import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import type { ImportContent, ImportContentWithAbilities } from "@/lib/import/content-schema"
 import { resolveClassSkillChoices } from "@/lib/import/parse-class-shell"
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
-import type { Feature } from "@/lib/types"
+import type { Feature, UsesAtLevel } from "@/lib/types"
 import { extractPrerequisiteFromDescription } from "@/lib/builder/choice-prerequisite"
 import { enrichPsionicTalentGrantFeatures } from "@/lib/builder/aggregate-psionic-talents"
 
@@ -131,13 +131,26 @@ function enrichKnacksFeature(feature: Feature): Feature {
   })
 }
 
+/**
+ * Formulas column of the Alchemist Features table — a cumulative "known" count, not a pool.
+ * The single level-2 feature owns every pick, so the tiers must be total-known values.
+ */
+export const ALCHEMIST_BOMB_FORMULAS_BY_LEVEL: UsesAtLevel[] = [
+  { level: 2, count: 3 },
+  { level: 4, count: 4 },
+  { level: 8, count: 5 },
+  { level: 12, count: 6 },
+  { level: 16, count: 7 },
+  { level: 19, count: 8 },
+]
+
 function buildBombFormulasPicker(feature: Feature): LinkedModifierInstance {
   const instanceId = createModifierInstanceId()
   return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
     legacyFeatureOptionPickerCharacteristic({
       id: modId("bomb_formulas_known"),
       category: "Bomb Formula",
-      choiceCount: 1,
+      choiceCount: 3,
       swappableOnRest: true,
       swapRestType: "long",
       resourceKey: "bomb_formulas_known",
@@ -162,33 +175,48 @@ function enrichBombFormulasFeature(feature: Feature): Feature {
     isChoice: true,
     choices: {
       category: "Bomb Formula",
-      count: 1,
+      count: 3,
+      choiceCountByLevel: ALCHEMIST_BOMB_FORMULAS_BY_LEVEL,
       options: [],
       resourceKey: "bomb_formulas_known",
       optionsSource: "class_bomb_formulas",
       swappableOnRest: true,
       swapRestType: "long",
+      swappableOnLevelUp: true,
     },
     linkedModifiers: [...(feature.linkedModifiers ?? []), buildBombFormulasPicker(feature)],
   })
 }
 
-function buildDiscoveriesPicker(feature: Feature): LinkedModifierInstance {
+/** Cumulative Discoveries known, used only when one feature owns every pick. */
+export const ALCHEMIST_DISCOVERIES_BY_LEVEL: UsesAtLevel[] = [
+  { level: 5, count: 1 },
+  { level: 9, count: 2 },
+  { level: 13, count: 3 },
+  { level: 17, count: 4 },
+]
+
+function buildDiscoveriesPicker(feature: Feature, cumulative: boolean): LinkedModifierInstance {
   const instanceId = createModifierInstanceId()
   return charInstance(instanceId, FEATURE_OPTION_PICKER_CATALOG_ID, [
     legacyFeatureOptionPickerCharacteristic({
       id: modId("discoveries_known"),
       category: "Discovery",
       choiceCount: 1,
-      resourceKey: "discoveries_known",
+      // Only the cumulative shape may point at the resource table; a per-level feature that did
+      // so would resolve the running total (4 at level 17) as its own pick count.
+      ...(cumulative ? { resourceKey: "discoveries_known" } : {}),
       optionsSource: "class_discoveries",
-      label: "Discoveries known (count scales on class table)",
+      label: cumulative
+        ? "Discoveries known (count scales on class table)"
+        : "Discovery known (one per Discovery feature)",
     }),
   ])
 }
 
 function enrichDiscoveriesFeature(feature: Feature): Feature {
-  if (!/^discoveries$/i.test(feature.name.trim())) return feature
+  const name = feature.name.trim()
+  if (!/^discover(?:y|ies)$/i.test(name)) return feature
   if ((feature.linkedModifiers ?? []).some((mod) =>
     mod.characteristics?.some((char) => {
       const legacy = char as { type?: string; resourceKey?: string | null }
@@ -197,17 +225,24 @@ function enrichDiscoveriesFeature(feature: Feature): Feature {
   )) {
     return feature
   }
+  // Sources model this either way: one plural "Discoveries" feature owning the cumulative count,
+  // or a singular "Discovery" feature repeated at levels 5/9/13/17 granting one pick each.
+  const cumulative = /ies$/i.test(name)
   return syncModifierRefs({
     ...feature,
     isChoice: true,
     choices: {
       category: "Discovery",
       count: 1,
+      ...(cumulative ? { choiceCountByLevel: ALCHEMIST_DISCOVERIES_BY_LEVEL } : {}),
       options: [],
-      resourceKey: "discoveries_known",
       optionsSource: "class_discoveries",
+      swappableOnLevelUp: true,
     },
-    linkedModifiers: [...(feature.linkedModifiers ?? []), buildDiscoveriesPicker(feature)],
+    linkedModifiers: [
+      ...(feature.linkedModifiers ?? []),
+      buildDiscoveriesPicker(feature, cumulative),
+    ],
   })
 }
 

@@ -24,6 +24,14 @@ export type LevelUpChoiceStep =
       classId: string
       feature: Feature
       required: number
+      /**
+       * `add` fills picks the character is owed (a new feature, or a count that grew on the class
+       * table). `swap` offers replacing one already-chosen pick, for features whose rules allow it
+       * on level-up (e.g. Alchemist Bomb Formulas and Discoveries).
+       */
+      mode: "add" | "swap"
+      /** Swap steps can be skipped without choosing anything. */
+      optional: boolean
     }
   | {
       kind: "feat_or_asi"
@@ -75,6 +83,10 @@ function featuresGainedAtLevel(
   return (features ?? []).filter(
     (feature) => feature.level > fromLevel && feature.level <= toLevel && featureShowsOnSheetTab(feature),
   )
+}
+
+function featuresUnlockedByLevel(features: Feature[], toLevel: number): Feature[] {
+  return features.filter((feature) => feature.level <= toLevel && featureShowsOnSheetTab(feature))
 }
 
 function progressionAt(cls: CharacterClassDetail["class"], level: number) {
@@ -137,19 +149,30 @@ export function buildLevelUpPlan(params: {
     })
   }
 
-  const choiceFeatures = [...classFeatures, ...subclassFeatures]
-  for (const feature of choiceFeatures) {
-    if (isAsiFeature(feature.name)) {
-      steps.push({
-        kind: "feat_or_asi",
-        id: `asi:${classId}:${feature.level}`,
-        title: `${feature.name} (level ${feature.level})`,
-        classId,
-        featureName: feature.name,
-        level: feature.level,
-      })
-      continue
-    }
+  for (const feature of [...classFeatures, ...subclassFeatures]) {
+    if (!isAsiFeature(feature.name)) continue
+    steps.push({
+      kind: "feat_or_asi",
+      id: `asi:${classId}:${feature.level}`,
+      title: `${feature.name} (level ${feature.level})`,
+      classId,
+      featureName: feature.name,
+      level: feature.level,
+    })
+  }
+
+  // Every unlocked choice feature is re-checked, not just the ones gained this level: counts such
+  // as the Alchemist's Bomb Formulas grow on the class table at levels the feature isn't listed.
+  const unlockedChoiceFeatures = featuresUnlockedByLevel(
+    [
+      ...((cls.features as Feature[] | undefined) ?? []),
+      ...((params.entry.subclass?.features as Feature[] | undefined) ?? []),
+    ],
+    toLevel,
+  )
+  const swapSteps: LevelUpChoiceStep[] = []
+  for (const feature of unlockedChoiceFeatures) {
+    if (isAsiFeature(feature.name)) continue
     if (!feature.isChoice || !feature.choices) continue
     const hasOptions =
       (feature.choices.options?.length ?? 0) > 0 || Boolean(feature.choices.optionsSource)
@@ -159,16 +182,33 @@ export function buildLevelUpPlan(params: {
     })
     const key = featureChoiceKey(classId, feature.name, feature.level)
     const already = params.featureChoicePicks[key]?.length ?? 0
-    if (already >= required) continue
-    steps.push({
-      kind: "feature_choice",
-      id: key,
-      title: feature.name,
-      classId,
-      feature,
-      required,
-    })
+    if (already < required) {
+      steps.push({
+        kind: "feature_choice",
+        id: key,
+        title: feature.name,
+        classId,
+        feature,
+        required,
+        mode: "add",
+        optional: false,
+      })
+      continue
+    }
+    if (feature.choices.swappableOnLevelUp && already > 0) {
+      swapSteps.push({
+        kind: "feature_choice",
+        id: key,
+        title: `Replace a ${feature.choices.category || feature.name} (optional)`,
+        classId,
+        feature,
+        required,
+        mode: "swap",
+        optional: true,
+      })
+    }
   }
+  steps.push(...swapSteps)
 
   if (FEAT_MILESTONES.includes(toLevel as (typeof FEAT_MILESTONES)[number])) {
     const alreadyHasAsiStep = steps.some((step) => step.kind === "feat_or_asi")
@@ -215,6 +255,17 @@ export function buildLevelUpPlan(params: {
     newFeatures,
     steps,
   }
+}
+
+/**
+ * How many picks a swap step replaced, or `null` when the selection isn't a legal single swap —
+ * level-up rules replace at most one pick and never reduce the total.
+ */
+export function countReplacedPicks(original: string[], next: string[]): number | null {
+  if (next.length !== original.length) return null
+  const kept = new Set(original)
+  const replaced = next.filter((name) => !kept.has(name)).length
+  return replaced <= 1 ? replaced : null
 }
 
 export function spellsEligibleForLevelUp(

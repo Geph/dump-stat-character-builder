@@ -14,6 +14,7 @@ import {
   MHP_WARDEN_CREATOR_URL,
   mhpClassCardImageUrl,
 } from "@/lib/seed-packs/mage-hand-press/class-presentation"
+import { MHP_CLASS_COMPLEXITY_BY_NAME } from "@/lib/compendium/class-complexity"
 
 const ROOT = join(process.cwd(), "lib/seed-packs")
 
@@ -30,6 +31,7 @@ function applyMhpPresentation(content: ImportContent): ImportContent {
           ...cls,
           icon: presentation.icon,
           card_blurb: presentation.card_blurb,
+          complexity: MHP_CLASS_COMPLEXITY_BY_NAME[baseName] ?? cls.complexity,
           creator_url: presentation.creator_url,
           description: presentation.description,
           card_image_url: mhpClassCardImageUrl(presentation.card_image_slug),
@@ -39,6 +41,7 @@ function applyMhpPresentation(content: ImportContent): ImportContent {
         return {
           ...cls,
           description: null,
+          complexity: MHP_CLASS_COMPLEXITY_BY_NAME[baseName] ?? cls.complexity,
           creator_url: MHP_WARDEN_CREATOR_URL,
           card_image_url: mhpClassCardImageUrl(MHP_WARDEN_CARD_IMAGE_SLUG),
         }
@@ -107,7 +110,7 @@ function stampFile(path: string, transform: (c: ImportContent) => ImportContent)
   const cls = next.classes?.[0]
   if (cls) {
     console.log(
-      `  ${path.split(/[/\\]/).pop()}: ${cls.name} icon=${(cls as { icon?: string }).icon ?? "—"} blurb=${cls.card_blurb ? "yes" : "no"} descLen=${(cls.description ?? "").length}`,
+      `  ${path.split(/[/\\]/).pop()}: ${cls.name} complexity=${(cls as { complexity?: string }).complexity ?? "—"} icon=${(cls as { icon?: string }).icon ?? "—"} blurb=${cls.card_blurb ? "yes" : "no"} descLen=${(cls.description ?? "").length}`,
     )
   } else {
     console.log(`  ${path.split(/[/\\]/).pop()}: (no class)`)

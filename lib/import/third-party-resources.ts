@@ -17,6 +17,14 @@ export type ThirdPartyResourcePattern = {
   proposeFromText?: boolean
   /** Full uses config emitted when proposed from prose (paired with proposeFromText). */
   textProposalUses?: UsesConfig
+  /**
+   * Class that owns this key and its mechanics. Set it when the resource name is a common word
+   * that shows up in unrelated classes' prose (e.g. "reagents" appears in Inventor Potionsmith
+   * flavor text but the Inventor has no such pool). Non-owner classes never get this resource
+   * proposed from prose, and an explicit resource of the same name is prefixed with the class
+   * slug so the two don't share a key.
+   */
+  ownerClassPattern?: RegExp
 }
 
 export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
@@ -509,6 +517,7 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     resourceKey: "reagents",
     namePattern: /\breagents?\b/i,
     displayName: "Reagents",
+    ownerClassPattern: /alchemist/i,
     definition:
       "Alchemist pool spent to throw Bombs, brew potions, and fuel class features. Recharges on a long rest; Reagent Synthesis restores on short rest (INT mod, once per long rest).",
     defaultUses: {
@@ -541,14 +550,18 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     resourceKey: "bomb_formulas_known",
     namePattern: /bomb\s*formulas?\s*known/i,
     displayName: "Bomb Formulas Known",
-    definition: "Bomb formulas the Alchemist knows — chosen from the formula list; swappable on a long rest.",
+    ownerClassPattern: /alchemist/i,
+    definition:
+      "Bomb formulas the Alchemist knows — a choice count, never a spendable pool. uses.type MUST be special with the class table's Formulas column as atLevelTable, and the Bomb Formulas feature carries the same tiers in choices.choiceCountByLevel. Swappable on a long rest and on level-up.",
     spendPatterns: [],
   },
   {
     resourceKey: "discoveries_known",
     namePattern: /discoveries?\s*known/i,
     displayName: "Discoveries Known",
-    definition: "Alchemist Discoveries chosen at 5th, 9th, 13th, and 17th level.",
+    ownerClassPattern: /alchemist/i,
+    definition:
+      "Alchemist Discoveries chosen at 5th, 9th, 13th, and 17th level — a choice count, never a spendable pool. Swappable on level-up.",
     spendPatterns: [],
   },
   {
@@ -703,4 +716,24 @@ export function slugClassPrefix(className: string): string {
 export function prefixedResourceKey(classPrefix: string, baseKey: string): string {
   if (!classPrefix || baseKey.startsWith(`${classPrefix}_`)) return baseKey
   return `${classPrefix}_${baseKey}`
+}
+
+/** True when the pattern is scoped to a specific class and `className` is not it. */
+export function isNonOwnerClassForResource(
+  className: string,
+  pattern: Pick<ThirdPartyResourcePattern, "ownerClassPattern">,
+): boolean {
+  if (!pattern.ownerClassPattern) return false
+  return !pattern.ownerClassPattern.test(className)
+}
+
+/**
+ * Keep class-scoped resource keys (e.g. the Alchemist's `reagents`) from being shared by an
+ * unrelated class that happens to use the same word. The owner keeps the bare key; anyone else
+ * gets a class-prefixed one so the two pools stay independent.
+ */
+export function remapClassScopedResourceKey(className: string, resourceKey: string): string {
+  const pattern = THIRD_PARTY_RESOURCE_PATTERNS.find((entry) => entry.resourceKey === resourceKey)
+  if (!pattern || !isNonOwnerClassForResource(className, pattern)) return resourceKey
+  return prefixedResourceKey(slugClassPrefix(className), resourceKey)
 }

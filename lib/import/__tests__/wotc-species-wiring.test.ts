@@ -84,6 +84,49 @@ describe("WOTC species wiring", () => {
     )
     expect(JSON.stringify(sentry?.linkedModifiers)).toMatch(/rest_replacement|magical_sleep/i)
     expect(JSON.stringify(specialized?.linkedModifiers)).toMatch(/tool_proficiencies/)
+
+    const builtForSuccess = (autognome?.traits as TraitRow[] | undefined)?.find(
+      (t) => t.name === "Built for Success",
+    )
+    expect(JSON.stringify(builtForSuccess?.linkedModifiers)).not.toMatch(/"Seeing"/)
+    expect(JSON.stringify(builtForSuccess?.linkedModifiers)).toMatch(/uses|Built for Success/i)
+  })
+
+  it.skipIf(skip)("wires Deep Gnome magic resistance and Giff Hippo Build correctly", () => {
+    const path = homebrewFixturePath(FIXTURE)!
+    const enriched = enrichImportContentModifiers(parseImportContentJson(readFileSync(path, "utf8"))!)
+
+    const deepGnome = enriched.species?.find((s) => s.name === "Deep Gnome")
+    const magicRes = (deepGnome?.traits as TraitRow[] | undefined)?.find(
+      (t) => t.name === "Gnomish Magic Resistance",
+    )
+    const magicResJson = JSON.stringify(magicRes?.linkedModifiers)
+    expect(magicResJson).toMatch(/Intelligence/)
+    expect(magicResJson).toMatch(/Wisdom/)
+    expect(magicResJson).toMatch(/Charisma/)
+    expect(magicResJson).toMatch(/spell/)
+    // Must not be unrestricted "any save vs spell"
+    const effects = (magicRes?.linkedModifiers ?? []).flatMap(
+      (mod) =>
+        ((mod as { activation?: { effects?: { checkAbility?: string }[] } }).activation?.effects ??
+          []) as { checkAbility?: string }[],
+    )
+    expect(effects.every((effect) => Boolean(effect.checkAbility))).toBe(true)
+
+    const giff = enriched.species?.find((s) => s.name === "Giff")
+    const hippo = (giff?.traits as TraitRow[] | undefined)?.find((t) => t.name === "Hippo Build")
+    const hippoJson = JSON.stringify(hippo?.linkedModifiers)
+    expect(hippoJson).toMatch(/Strength/)
+    expect(hippoJson).toMatch(/"checkCategory":"ability"/)
+    expect(hippoJson).toMatch(/"checkCategory":"save"/)
+    expect(hippoJson).toMatch(/one size larger|carrying/i)
+
+    const astral = enriched.species?.find((s) => s.name === "Astral Elf")
+    const astralTrance = (astral?.traits as TraitRow[] | undefined)?.find((t) => t.name === "Astral Trance")
+    const astralJson = JSON.stringify(astralTrance?.linkedModifiers)
+    expect(astralJson).toMatch(/rest_replacement|magical_sleep/i)
+    expect(astralJson).toMatch(/skills/)
+    expect(astralJson).toMatch(/tool_proficiencies/)
   })
 
   it.skipIf(skip)("preserves constrained skill pools and curated compound traits", () => {

@@ -21,24 +21,25 @@ Open [http://localhost:3000](http://localhost:3000). If you use npm instead of p
 
 ## Checks before opening a pull request
 
-Run the same checks CI runs on every PR:
+Install the repository's pre-push gate once per clone:
 
 ```bash
-pnpm lint
-pnpm check:mysql
+pnpm hooks:install
 ```
 
-Optional but recommended — catches TypeScript errors (no dedicated script in `package.json` yet):
+Every normal `git push` then runs the same checks as both CI jobs and blocks the
+push on the first failure:
 
 ```bash
-pnpm exec tsc --noEmit
+pnpm verify:ci
 ```
 
-CI also runs `pnpm build:static` on pull requests; run it locally if you changed build, routing, or static export behavior:
+That includes the MySQL dependency audit, ESLint, TypeScript, the full Vitest
+suite, all modifier/SRD audits, and the static export. A successful result is
+cached for that commit, so retrying the same push does not run it twice.
 
-```bash
-pnpm build:static
-```
+Emergency bypass: `git push --no-verify`. Use it only when intentionally
+accepting that GitHub CI may fail.
 
 ## Branch naming
 

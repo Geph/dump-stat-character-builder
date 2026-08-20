@@ -103,6 +103,65 @@ describe("applyUsesRest", () => {
     expect(blocked.rechargeCapsUsed).toBeUndefined()
   })
 
+  it("stacks a base short-rest regain with a capped bonus regain", () => {
+    // Alchemist Reagents: 1 back on every Short Rest, plus Reagent Synthesis (INT mod, 1/long).
+    const uses = {
+      type: "at_level" as const,
+      atLevelMode: "tier" as const,
+      atLevelTable: [{ level: 1, count: 10 }],
+      recharges: [
+        { rest: "short_rest" as const, amount: 1 },
+        {
+          rest: "short_rest" as const,
+          amountFormula: "ability_modifier" as const,
+          amountFormulaAbility: "INT" as const,
+          maxPerLongRest: 1,
+        },
+        { rest: "long_rest" as const },
+      ],
+    }
+    const abilityModifiers = { int: 3 }
+
+    const first = applyUsesRest(10, uses, "short_rest", 10, {
+      classLevel: 5,
+      rechargeCapsUsed: 0,
+      abilityModifiers,
+    })
+    expect(first.used).toBe(6)
+    expect(first.rechargeCapsUsed).toBe(1)
+
+    // Synthesis is spent, but the base 1-per-short-rest regain keeps working.
+    const second = applyUsesRest(first.used, uses, "short_rest", 10, {
+      classLevel: 5,
+      rechargeCapsUsed: 1,
+      abilityModifiers,
+    })
+    expect(second.used).toBe(5)
+    expect(second.rechargeCapsUsed).toBeUndefined()
+  })
+
+  it("does not spend a capped regain that had nothing to restore", () => {
+    const uses = {
+      type: "fixed" as const,
+      fixedAmount: 6,
+      recharges: [
+        {
+          rest: "short_rest" as const,
+          amountFormula: "ability_modifier" as const,
+          amountFormulaAbility: "INT" as const,
+          maxPerLongRest: 1,
+        },
+      ],
+    }
+    const full = applyUsesRest(0, uses, "short_rest", 6, {
+      classLevel: 5,
+      rechargeCapsUsed: 0,
+      abilityModifiers: { int: 3 },
+    })
+    expect(full.used).toBe(0)
+    expect(full.rechargeCapsUsed).toBeUndefined()
+  })
+
   it("applies class-level recharge overrides", () => {
     const uses = {
       type: "ability_modifier" as const,

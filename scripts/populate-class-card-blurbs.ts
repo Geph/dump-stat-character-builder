@@ -8,6 +8,7 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { basename, dirname, join, resolve } from "node:path"
 import { MHP_CLASS_PRESENTATION } from "@/lib/seed-packs/mage-hand-press/class-presentation"
+import { MHP_CLASS_COMPLEXITY_BY_NAME } from "@/lib/compendium/class-complexity"
 import { KIBBLES_CLASS_CARD_BLURBS } from "@/lib/seed-packs/kibbles-tasty/class-card-blurbs"
 import { SRD_CLASS_CARD_BLURBS } from "@/lib/srd/class-card-blurbs"
 
@@ -140,6 +141,17 @@ function generatedBlurb(row: JsonRecord, kind: "class" | "subclass"): string {
   return fitCardBlurb(`${name} offers a distinctive mix of combat, exploration, and roleplaying features.`)
 }
 
+function classNameBase(name: string): string {
+  return name.replace(/\s*\(.*\)\s*$/, "").trim() || name
+}
+
+function curatedClassComplexity(row: JsonRecord, filePath: string): string | null {
+  const path = filePath.toLowerCase()
+  if (!path.includes("mage hand press") && !path.includes("mage-hand-press")) return null
+  const name = classNameBase(String(row.name ?? "").trim())
+  return MHP_CLASS_COMPLEXITY_BY_NAME[name] ?? null
+}
+
 function curatedClassBlurb(row: JsonRecord, filePath: string): string | null {
   const name = String(row.name ?? "").trim()
   if (!name) return null
@@ -173,6 +185,11 @@ function populateContent(
     )
     if (row.card_blurb !== next) {
       row.card_blurb = next
+      changed = true
+    }
+    const complexity = curatedClassComplexity(row, filePath)
+    if (complexity && row.complexity !== complexity) {
+      row.complexity = complexity
       changed = true
     }
     classes++

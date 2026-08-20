@@ -1,4 +1,6 @@
+import { invalidateBuilderCompendiumCache } from "@/lib/data/builder-compendium-cache"
 import { upsertByName as upsertByNameLocal } from "@/lib/data/indexed-db-store"
+import { resolveAbilityAttachmentRow } from "@/lib/import/resolve-ability-attachment"
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
 import { enrichImportedSubclassRows } from "@/lib/compendium/enrich-import-subclasses"
 import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
@@ -102,6 +104,18 @@ function asClassResourceImports(content: ImportContent): ClassResourceImportRow[
 }
 
 export async function persistImportedContentLocal(
+  content: ImportContent | ImportContentWithFoundryMeta,
+  source: ImportSourceLabel,
+  options: PersistImportOptions = {},
+): Promise<PersistImportResult> {
+  try {
+    return await persistImportedContentLocalBody(content, source, options)
+  } finally {
+    invalidateBuilderCompendiumCache()
+  }
+}
+
+async function persistImportedContentLocalBody(
   content: ImportContent | ImportContentWithFoundryMeta,
   source: ImportSourceLabel,
   options: PersistImportOptions = {},
@@ -545,6 +559,28 @@ export async function persistImportedContentLocal(
     const rawAbilities = (sanitized as ImportContentWithAbilities).abilities!
     const { enrichAbilityImportRows } = await import("@/lib/import/enrich-ability-import")
     const { normalizeAbilityImportRows } = await import("@/lib/import/normalize-ability-import")
+    const classIdByName = new Map(
+      (await listRowsLocal("classes")).map((row) => [row.name as string, row.id as string]),
+    )
+    const subclassIdByName = new Map(
+      (await listRowsLocal("subclasses")).map((row) => [row.name as string, row.id as string]),
+    )
+    const speciesIdByName = new Map(
+      (await listRowsLocal("species")).map((row) => [row.name as string, row.id as string]),
+    )
+    const backgroundIdByName = new Map(
+      (await listRowsLocal("backgrounds")).map((row) => [row.name as string, row.id as string]),
+    )
+    const featIdByName = new Map(
+      (await listRowsLocal("feats")).map((row) => [row.name as string, row.id as string]),
+    )
+    const attachmentMaps = {
+      classIdByName,
+      subclassIdByName,
+      speciesIdByName,
+      backgroundIdByName,
+      featIdByName,
+    }
     const abilityRows = enrichAbilityImportRows(
       normalizeAbilityImportRows(
         rawAbilities.map((a) => stampSource({ ...a, show_in_builder: true }, source)),
@@ -567,7 +603,7 @@ export async function persistImportedContentLocal(
         spellCatalog,
         preferredSource,
       )
-      return {
+      const withSpells = {
         ...row,
         linked_modifiers: linkedModifiers ?? row.linked_modifiers ?? [],
         linkedModifiers: linkedModifiers ?? row.linkedModifiers ?? [],
@@ -576,6 +612,7 @@ export async function persistImportedContentLocal(
           ? { specialization_choices: specializationChoices }
           : {}),
       }
+      return resolveAbilityAttachmentRow(withSpells, attachmentMaps)
     })
     let abilitiesToWrite = abilityRows
     if (options.updateExistingNames?.ability?.length) {

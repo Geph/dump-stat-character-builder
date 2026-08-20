@@ -5,6 +5,7 @@ import { WeaponMasteryChoices } from "@/components/builder/weapon-mastery-choice
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import type { ClassAbilityFeatureEntry } from "@/lib/builder/class-ability-step"
 import { featureChoiceKey, getTakenSkills, type SkillPickSource } from "@/lib/builder/choices"
+import { featureChoiceHintFromDescription } from "@/lib/builder/feature-choice-hint"
 import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
 import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
 import type { FeatureChoiceCountBonusCharacteristic, FeatureChoiceOptionGrantCharacteristic } from "@/lib/compendium/characteristic-modifiers"
@@ -36,48 +37,58 @@ type Props = {
   onClearModifierPicks: (sourceKey: string) => void
 }
 
-function plainFeatureBlurb(feature: Feature): string | undefined {
-  const raw = feature.description?.trim()
-  if (!raw) return undefined
-  const plain = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
-  if (!plain) return undefined
-  // Keep the picker header short; full text stays on the feature / info overlays.
-  return plain.length > 220 ? `${plain.slice(0, 217).trimEnd()}…` : plain
-}
-
-function choiceHint(feature: Feature, choiceCount: number): string | undefined {
+function choiceHint(
+  feature: Feature,
+  choiceCount: number,
+): { hint?: string; hintDetails?: string } {
   if (isWeaponMasteryFeature(feature)) {
-    return `Choose ${choiceCount} weapon type${choiceCount === 1 ? "" : "s"}${
-      feature.choices?.swappableOnRest ? " (swap one on a Long Rest)" : ""
-    }.`
+    return {
+      hint: `Choose ${choiceCount} weapon type${choiceCount === 1 ? "" : "s"}${
+        feature.choices?.swappableOnRest ? " (swap one on a Long Rest)" : ""
+      }.`,
+    }
   }
   if (feature.choices?.optionsSource === "class_knacks") {
-    return `Choose ${choiceCount} ${
-      /trick|exploit|maneuver/i.test(feature.choices?.category ?? feature.name)
-        ? feature.choices?.category ?? "option"
-        : "Knack"
-    }${choiceCount === 1 ? "" : "s"}${
-      feature.choices?.swappableOnRest ? " (replace one when you level up)" : ""
-    }.`
+    return {
+      hint: `Choose ${choiceCount} ${
+        /trick|exploit|maneuver/i.test(feature.choices?.category ?? feature.name)
+          ? feature.choices?.category ?? "option"
+          : "Knack"
+      }${choiceCount === 1 ? "" : "s"}${
+        feature.choices?.swappableOnRest ? " (replace one when you level up)" : ""
+      }.`,
+    }
   }
   if (feature.choices?.optionsSource === "class_upgrades") {
-    return `Choose ${choiceCount} Upgrade${choiceCount === 1 ? "" : "s"}${
-      feature.choices?.swappableOnRest ? " (exchange on level-up per feature rules)" : ""
-    }.`
+    return {
+      hint: `Choose ${choiceCount} Upgrade${choiceCount === 1 ? "" : "s"}${
+        feature.choices?.swappableOnRest ? " (exchange on level-up per feature rules)" : ""
+      }.`,
+    }
   }
   if (feature.choices?.optionsSource === "known_discipline_talents") {
-    return `Choose ${choiceCount} psionic talent${choiceCount === 1 ? "" : "s"} from your known disciplines and General Psionic Talents (level gates apply).`
+    return {
+      hint: `Choose ${choiceCount} psionic talent${choiceCount === 1 ? "" : "s"} from your known disciplines and General Psionic Talents (level gates apply).`,
+    }
   }
   if (feature.choices?.optionsSource === "class_disciplines") {
-    return `Choose ${choiceCount} psionic discipline${choiceCount === 1 ? "" : "s"}. Disciplines granted by your subclass appear selected.`
+    return {
+      hint: `Choose ${choiceCount} psionic discipline${choiceCount === 1 ? "" : "s"}. Disciplines granted by your subclass appear selected.`,
+    }
   }
   if (feature.choices?.optionsSource === "class_talents") {
-    return `Choose ${choiceCount} general talent${choiceCount === 1 ? "" : "s"} available at your level.`
+    return {
+      hint: `Choose ${choiceCount} general talent${choiceCount === 1 ? "" : "s"} available at your level.`,
+    }
   }
-  // Shared mechanic text once at the top (e.g. Curious Mind) instead of on every card.
-  const blurb = plainFeatureBlurb(feature)
-  if (blurb) return blurb
-  return feature.choices?.category
+  const fromDescription = featureChoiceHintFromDescription(feature.description)
+  if (fromDescription) {
+    return {
+      hint: fromDescription.preview,
+      ...(fromDescription.showDetails ? { hintDetails: fromDescription.details } : {}),
+    }
+  }
+  return { hint: feature.choices?.category }
 }
 
 function namesMatchLoose(a: string, b: string): boolean {
@@ -119,6 +130,7 @@ export function ClassAbilityFeatureChoices({
           customAbilities,
           featureChoicePicks: { ...featureChoicePicks, ...(additionalChoicePicks ?? {}) },
           classNames: [className],
+          classIds: [classId],
           classLevel,
           equipmentCatalog: equipment,
           knownSpellNames,
@@ -140,7 +152,7 @@ export function ClassAbilityFeatureChoices({
         const isKnackPool = feature.choices?.optionsSource === "class_knacks"
         const isUpgradePool = feature.choices?.optionsSource === "class_upgrades"
         const isDisciplinePool = feature.choices?.optionsSource === "class_disciplines"
-        const hint = choiceHint(feature, choiceCount)
+        const { hint, hintDetails } = choiceHint(feature, choiceCount)
         const lockedOptions = isDisciplinePool
           ? (grantedCustomAbilityNames ?? []).filter((grant) =>
               customAbilities.some((ability) => {
@@ -228,6 +240,7 @@ export function ClassAbilityFeatureChoices({
               <MultiSelectChoices
                 title={withChosenOptionChrome(feature.name, featureChoicePicks[key] ?? [])}
                 hint={hint}
+                hintDetails={hintDetails}
                 options={optionsWithLocked}
                 maxCount={choiceCount}
                 selected={featureChoicePicks[key] ?? []}

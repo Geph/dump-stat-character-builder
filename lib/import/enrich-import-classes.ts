@@ -20,6 +20,7 @@ import { extractMulticlassSection } from "@/lib/import/parse-multiclass-section"
 import { stripClassProgressionTablesFromText } from "@/lib/import/strip-class-progression-tables"
 import {
   detectThirdPartyResourceSpend,
+  remapClassScopedResourceKey,
   THIRD_PARTY_RESOURCE_PATTERNS,
 } from "@/lib/import/third-party-resources"
 import type { Feature, UsesConfig } from "@/lib/types"
@@ -45,7 +46,10 @@ export type ClassResourceImportRow = {
 }
 
 function remapImportedResourceKey(className: string, resourceKey: string): string {
-  return remapKiResourceKey(className, remapPointPoolResourceKey(className, resourceKey))
+  return remapClassScopedResourceKey(
+    className,
+    remapKiResourceKey(className, remapPointPoolResourceKey(className, resourceKey)),
+  )
 }
 
 const PSI_COST_RE =

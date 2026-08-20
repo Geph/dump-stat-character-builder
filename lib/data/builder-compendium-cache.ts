@@ -180,9 +180,14 @@ export type BuilderCompendiumPayload = {
 let cached: BuilderCompendiumPayload | null = null
 let inflight: Promise<BuilderCompendiumPayload> | null = null
 
+export const BUILDER_COMPENDIUM_UPDATED_EVENT = "dumpstat:compendium-updated"
+
 export function invalidateBuilderCompendiumCache(): void {
   cached = null
   inflight = null
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(BUILDER_COMPENDIUM_UPDATED_EVENT))
+  }
 }
 
 export async function loadBuilderCompendium(

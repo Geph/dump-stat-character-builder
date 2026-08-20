@@ -1,5 +1,9 @@
 import type { CustomAbility } from "@/lib/types"
 import {
+  classLabelMatches,
+  customAbilityMatchesClass,
+} from "@/lib/builder/class-ability-match"
+import {
   isChoicePrerequisiteMet,
   parseMinimumLevelFromPrerequisite,
   prerequisiteMentionsAbility,
@@ -10,22 +14,12 @@ function normalizeName(value: string): string {
   return value.trim().toLowerCase()
 }
 
-function classNameMatches(abilityClass: string, classKey: string): boolean {
-  const left = normalizeName(abilityClass)
-  const right = classKey
-  if (!left || !right) return false
-  if (left === right) return true
-  // "Barbarian" matches "Alternate Barbarian" and vice versa.
-  if (left.includes(right) || right.includes(left)) return true
-  return false
-}
-
 export function knackAbilitiesForClass(
   customAbilities: CustomAbility[],
   classNames: string[],
-  options?: { subclassName?: string | null },
+  options?: { subclassName?: string | null; classIds?: string[] },
 ): CustomAbility[] {
-  const classKeys = new Set(classNames.map(normalizeName))
+  const targets = { classNames, classIds: options?.classIds }
   const subclassKey = options?.subclassName?.trim()
     ? normalizeName(options.subclassName)
     : null
@@ -33,35 +27,11 @@ export function knackAbilitiesForClass(
     const isKnackRole = ability.ability_role === "knack"
     const eligible = ability.eligible_classes ?? []
     const eligibleHit =
-      eligible.length > 0 &&
-      [...classKeys].some((classKey) =>
-        eligible.some((name) => classNameMatches(name, classKey)),
-      )
+      eligible.length > 0 && eligible.some((name) => classLabelMatches(name, targets))
     // Exploit / shared libraries often omit ability_role and use eligible_classes only.
     if (!isKnackRole && !eligibleHit) return false
-    if (isKnackRole && !eligibleHit) {
-      // Fall through to attachment / source matching for single-class knacks.
-    } else if (eligibleHit) {
-      return true
-    }
-
-    if (ability.attached_to_type === "class" && ability.attached_to_id) {
-      const attachKey = normalizeName(ability.attached_to_id)
-      return [...classKeys].some((classKey) => classNameMatches(attachKey, classKey))
-    }
-    if (ability.attached_to_type === "subclass" && ability.attached_to_id) {
-      if (!subclassKey) return false
-      const attachKey = normalizeName(ability.attached_to_id)
-      return attachKey.includes(subclassKey) || subclassKey.includes(attachKey)
-    }
-    if (ability.source?.trim()) {
-      const sourceKey = normalizeName(ability.source)
-      if ([...classKeys].some((classKey) => classNameMatches(sourceKey, classKey))) return true
-      if (subclassKey && (sourceKey.includes(subclassKey) || subclassKey.includes(sourceKey))) {
-        return true
-      }
-    }
-    return classNames.length === 0
+    if (eligibleHit) return true
+    return customAbilityMatchesClass(ability, targets, { subclassName: subclassKey })
   })
 }
 
@@ -96,9 +66,11 @@ export function aggregateKnackOptions(params: {
   selectedKnackNames: string[]
   knownSpellNames?: string[]
   subclassName?: string | null
+  classIds?: string[]
 }): { name: string; description: string; prerequisite?: string | null; repeatable?: boolean | null }[] {
   const knacks = knackAbilitiesForClass(params.customAbilities, params.classNames, {
     subclassName: params.subclassName,
+    classIds: params.classIds,
   })
   const selected = params.selectedKnackNames
   const context: KnackEligibilityContext = {

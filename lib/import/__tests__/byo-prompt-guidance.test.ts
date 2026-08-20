@@ -57,6 +57,15 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     }
   })
 
+  it("requires class complexity and lists Mage Hand Press defaults", () => {
+    const prompt = buildByoExtractionPrompt("classes")
+    expect(prompt).toContain('complexity: "easy" (Low)')
+    expect(prompt).toContain("Mage Hand Press class defaults")
+    expect(prompt).toContain("Warmage easy")
+    expect(prompt).toContain("Craftsman hard")
+    expect(prompt).toContain("Witch easy")
+  })
+
   it("preserves species provenance, regional choices, and spellcasting ability picks", () => {
     const prompt = buildByoExtractionPrompt("species")
     expect(prompt).toContain("source, creature_type, size/size_options")

@@ -946,6 +946,20 @@ type ImportChoiceOptions = NonNullable<
   NonNullable<ImportContent["classes"]>[number]["features"][number]["choices"]
 >
 
+type PersistedModifierFields = {
+  linkedModifiers?: unknown
+  modifierRefs?: unknown
+  importModifierMeta?: unknown
+}
+
+function pickPersistedModifierFields(row: PersistedModifierFields) {
+  return omitNull({
+    linkedModifiers: Array.isArray(row.linkedModifiers) ? row.linkedModifiers : undefined,
+    modifierRefs: Array.isArray(row.modifierRefs) ? row.modifierRefs : undefined,
+    importModifierMeta: Array.isArray(row.importModifierMeta) ? row.importModifierMeta : undefined,
+  })
+}
+
 function normalizeChoiceOptions(
   choices: z.infer<typeof ChoiceOptionsAiSchema> | null | undefined,
 ): ImportChoiceOptions | undefined {
@@ -959,6 +973,7 @@ function normalizeChoiceOptions(
         description: option.description,
         prerequisite: option.prerequisite,
         repeatable: option.repeatable,
+        ...pickPersistedModifierFields(option as PersistedModifierFields),
       }),
     ) as ImportChoiceOptions["options"],
     ...omitNull({
@@ -1049,6 +1064,8 @@ function normalizeFeatureLike(
     ? F
     : never
   : never {
+  // AI schema omits linkedModifiers (BYO contract), but Dump Stat / Drive JSON may
+  // already carry them — preserve on normalize so parse/import does not strip wiring.
   const next = omitNull({
     level: feature.level,
     name: feature.name,
@@ -1058,6 +1075,7 @@ function normalizeFeatureLike(
     choices: normalizeChoiceOptions(feature.choices),
     mechanics: normalizeMechanics(feature.mechanics),
     basedOnSrdFeature: feature.basedOnSrdFeature ?? undefined,
+    ...pickPersistedModifierFields(feature as PersistedModifierFields),
   })
   return next as ImportContent["classes"] extends (infer T)[] | undefined
     ? T extends { features: (infer F)[] }

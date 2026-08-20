@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import {
   collectImportContentPreview,
   groupImportContentPreviewBySource,
+  omitPreviewItemsBySkipKeys,
+  previewSkipKeysForSkippedCollisions,
   stripSkippedImportPreviewItems,
 } from "@/lib/import/import-content-preview"
 import type { ImportContent } from "@/lib/import/content-schema"
@@ -107,6 +109,44 @@ describe("collectImportContentPreview", () => {
     )
     expect(groups).toHaveLength(1)
     expect(groups[0]?.source).toBe("Custom Book")
+  })
+})
+
+describe("previewSkipKeysForSkippedCollisions", () => {
+  it("maps skipped name conflicts to preview skip keys without reindexing", () => {
+    const content = {
+      species: [
+        { name: "Dragonborn", size: "Medium", speed: 30, traits: [] },
+        { name: "Elf", size: "Medium", speed: 30, traits: [] },
+        { name: "Custom Folk", size: "Medium", speed: 30, traits: [] },
+      ],
+    } as unknown as ImportContent
+    const collisions = [
+      {
+        id: "species:dragonborn",
+        kind: "species" as const,
+        incomingName: "Dragonborn",
+        existingName: "Dragonborn",
+        suggestedName: "Dragonborn (Imported)",
+      },
+      {
+        id: "species:elf",
+        kind: "species" as const,
+        incomingName: "Elf",
+        existingName: "Elf",
+        suggestedName: "Elf (Imported)",
+      },
+    ]
+
+    const keys = previewSkipKeysForSkippedCollisions(content, collisions, {
+      "species:dragonborn": "skip",
+      "species:elf": "rename",
+    })
+    expect([...keys]).toEqual(["species:0"])
+
+    const sections = omitPreviewItemsBySkipKeys(collectImportContentPreview(content), keys)
+    expect(sections[0]?.items.map((item) => item.name)).toEqual(["Elf", "Custom Folk"])
+    expect(sections[0]?.items.map((item) => item.sourceIndex)).toEqual([1, 2])
   })
 })
 

@@ -30,6 +30,7 @@ export type ImportCardArtTarget = {
   section: ImportCardArtSection
   sectionLabel: string
   name: string
+  source: string
   detail?: string
   /** Compendium tab used for aspect / crop hints in the review UI. */
   compendiumTab: CompendiumContentType
@@ -113,6 +114,7 @@ function pushTargets<T extends { name: string; card_image_url?: string | null }>
     detail?: (row: T) => string | undefined
     include?: (row: T) => boolean
     keepExistingUrl?: boolean
+    source?: (row: T) => string | null | undefined
   },
 ): void {
   if (!rows?.length) return
@@ -128,6 +130,7 @@ function pushTargets<T extends { name: string; card_image_url?: string | null }>
       section,
       sectionLabel,
       name,
+      source: options?.source?.(row)?.trim() || "Imported content",
       detail: options?.detail?.(row),
       compendiumTab,
       initialUrl: rowInitialUrl(section, row, { keepExistingUrl: options?.keepExistingUrl }),
@@ -136,22 +139,46 @@ function pushTargets<T extends { name: string; card_image_url?: string | null }>
 }
 
 /** Collect compendium rows eligible for optional card art during import review. */
-export function collectImportCardArtTargets(content: ImportContent): ImportCardArtTarget[] {
+export function collectImportCardArtTargets(
+  content: ImportContent,
+  options?: {
+    defaultSource?: string
+    /** Soft-skip keys from content preview (`section:index`). */
+    skippedKeys?: ReadonlySet<string> | readonly string[]
+  },
+): ImportCardArtTarget[] {
   if (!shouldAssignBundledCardArt()) return []
+
+  const skipped = !options?.skippedKeys
+    ? null
+    : options.skippedKeys instanceof Set
+      ? options.skippedKeys
+      : new Set(options.skippedKeys)
 
   const targets: ImportCardArtTarget[] = []
   const keepExistingUrl = isCardArtOnlyImport(content)
+  const defaultSource = options?.defaultSource?.trim() || "Imported content"
+  const rowSource = (row: unknown) =>
+    (row as { source?: string | null }).source?.trim() || defaultSource
+  const classSources = new Map(
+    (content.classes ?? []).map((row) => [row.name.trim().toLowerCase(), rowSource(row)]),
+  )
 
-  pushTargets(targets, "classes", content.classes, { keepExistingUrl })
+  pushTargets(targets, "classes", content.classes, { keepExistingUrl, source: rowSource })
   pushTargets(targets, "subclasses", content.subclasses, {
     keepExistingUrl,
     detail: (row) => (row.class_name ? row.class_name : undefined),
+    source: (row) =>
+      rowSource(row) !== defaultSource
+        ? rowSource(row)
+        : classSources.get(row.class_name?.trim().toLowerCase() ?? "") ?? defaultSource,
   })
-  pushTargets(targets, "species", content.species, { keepExistingUrl })
-  pushTargets(targets, "backgrounds", content.backgrounds, { keepExistingUrl })
-  pushTargets(targets, "spells", content.spells, { keepExistingUrl })
+  pushTargets(targets, "species", content.species, { keepExistingUrl, source: rowSource })
+  pushTargets(targets, "backgrounds", content.backgrounds, { keepExistingUrl, source: rowSource })
+  pushTargets(targets, "spells", content.spells, { keepExistingUrl, source: rowSource })
   pushTargets(targets, "equipment", content.equipment, {
     keepExistingUrl,
+    source: rowSource,
     include: (row) => isMagicItem(row as Equipment),
     detail: (row) => {
       const item = row as Equipment
@@ -160,9 +187,10 @@ export function collectImportCardArtTargets(content: ImportContent): ImportCardA
   })
 
   const abilities = (content as ImportContentWithAbilities).abilities
-  pushTargets(targets, "abilities", abilities, { keepExistingUrl })
+  pushTargets(targets, "abilities", abilities, { keepExistingUrl, source: rowSource })
 
-  return targets
+  if (!skipped?.size) return targets
+  return targets.filter((target) => !skipped.has(target.key))
 }
 
 export function buildInitialImportCardArtUrlMap(content: ImportContent): ImportCardArtUrlMap {
@@ -171,6 +199,25 @@ export function buildInitialImportCardArtUrlMap(content: ImportContent): ImportC
     map[target.key] = target.initialUrl ?? ""
   }
   return map
+}
+
+/**
+ * Restore bundled / row URLs that the review map is missing or blanked.
+ * Used when `type=url` inputs strip relative `/images/compendium/…` paths.
+ */
+export function fillBlankImportCardArtUrls(
+  value: ImportCardArtUrlMap,
+  targets: readonly Pick<ImportCardArtTarget, "key" | "initialUrl">[],
+): ImportCardArtUrlMap | null {
+  let changed = false
+  const next = { ...value }
+  for (const target of targets) {
+    if (!target.initialUrl?.trim()) continue
+    if ((next[target.key] ?? "").trim()) continue
+    next[target.key] = target.initialUrl
+    changed = true
+  }
+  return changed ? next : null
 }
 
 export function importCardArtUsesPortraitArt(tab: CompendiumContentType): boolean {

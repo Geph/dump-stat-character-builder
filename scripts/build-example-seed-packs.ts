@@ -30,6 +30,7 @@ import {
   MHP_WARDEN_CREATOR_URL,
   mhpClassCardImageUrl,
 } from "@/lib/seed-packs/mage-hand-press/class-presentation"
+import { MHP_CLASS_COMPLEXITY_BY_NAME } from "@/lib/compendium/class-complexity"
 import {
   applyKibblesRowPresentation,
   KIBBLES_BACKGROUND_PRESENTATION,
@@ -201,6 +202,7 @@ function applyMhpClassPresentation(content: ImportContent): ImportContent {
           ...cls,
           icon: presentation.icon,
           card_blurb: presentation.card_blurb,
+          complexity: MHP_CLASS_COMPLEXITY_BY_NAME[baseName] ?? cls.complexity,
           creator_url: presentation.creator_url,
           description: presentation.description,
           card_image_url: mhpClassCardImageUrl(presentation.card_image_slug),
@@ -210,6 +212,7 @@ function applyMhpClassPresentation(content: ImportContent): ImportContent {
         return {
           ...cls,
           description: null,
+          complexity: MHP_CLASS_COMPLEXITY_BY_NAME[baseName] ?? cls.complexity,
           creator_url: MHP_WARDEN_CREATOR_URL,
           card_image_url: mhpClassCardImageUrl(MHP_WARDEN_CARD_IMAGE_SLUG),
         }

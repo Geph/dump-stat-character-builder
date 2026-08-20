@@ -19,6 +19,8 @@
     "seed-packs:build": "node scripts/run-vite-node.mjs scripts/build-example-seed-packs.ts",
     "version:bump": "node scripts/bump-version.mjs",
     "push": "node scripts/git-push.mjs Cursor",
+    "hooks:install": "node scripts/hooks/install.mjs",
+    "verify:ci": "node scripts/verify-ci.mjs",
     "check:mysql": "node scripts/check-no-supabase.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

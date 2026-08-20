@@ -24,6 +24,13 @@ const PORTRAIT_COMPENDIUM_PANEL_WIDTH =
 const PORTRAIT_SPELL_PANEL_WIDTH =
   "w-[min(90vw,calc((min(92vh,900px)-min(37vh,310px))*0.75))]"
 
+/**
+ * Widescreen background art (21:9): size the panel to the graphic width so the
+ * detail strip does not outgrow the hero. Shrinks with the viewport on small screens.
+ */
+const WIDESCREEN_BACKGROUND_PANEL_WIDTH =
+  "w-[min(92vw,calc((min(92vh,900px)-11rem)*21/9))] max-w-[min(92vw,calc((min(92vh,900px)-11rem)*21/9))]"
+
 const PORTRAIT_SPELL_DETAIL_STRIP_CLASS = "h-[min(37vh,310px)] max-h-[min(37vh,310px)]"
 
 /** Taller bottom scrim so casting badges stay readable on the shorter spell hero. */
@@ -64,8 +71,8 @@ type CompendiumDetailOverlayProps = {
   children: ReactNode
   /** Portrait class art uses top crop inside the landscape banner. */
   imageCrop?: CompendiumCardImageCrop
-  /** Default 80vw; narrow 64vw; slim 48vw; compact = text-only dialog; portrait variants tune detail strip height. */
-  panelWidth?: "default" | "narrow" | "slim" | "compact" | PortraitPanelWidth
+  /** Default 80vw; narrow 64vw; slim 48vw; widescreen = 21:9 background art; compact = text-only dialog; portrait variants tune detail strip height. */
+  panelWidth?: "default" | "narrow" | "slim" | "widescreen" | "compact" | PortraitPanelWidth
   /** `balanced` splits hero and detail strip evenly; `widescreen` locks the hero to 21:9. */
   heroLayout?: "default" | "balanced" | "widescreen"
 }
@@ -102,9 +109,11 @@ export function CompendiumDetailOverlay({
         ? "w-[min(48vw,420px)] max-w-[min(48vw,420px)]"
         : panelWidth === "narrow"
           ? "w-[64vw] max-w-[64vw]"
-          : "w-[80vw] max-w-[80vw]"
+          : panelWidth === "widescreen"
+            ? WIDESCREEN_BACKGROUND_PANEL_WIDTH
+            : "w-[80vw] max-w-[80vw]"
   const isBalancedHero = heroLayout === "balanced"
-  const isWidescreenHero = heroLayout === "widescreen"
+  const isWidescreenHero = heroLayout === "widescreen" || panelWidth === "widescreen"
   const [portraitDetailSheetOpen, setPortraitDetailSheetOpen] = useState(false)
 
   useEffect(() => {

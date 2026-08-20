@@ -2518,7 +2518,9 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 : activeTab === "species"
                   ? "portrait-species"
                   : "portrait"
-              : "default"
+              : activeTab === "backgrounds"
+                ? "widescreen"
+                : "default"
           }
           enableCardImage={
             areBrowseCardImagesEnabled() &&
@@ -2615,17 +2617,6 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                         ]
                       : activeTab === "spells"
                         ? spellDetailOverlayTags(selectedItem as Spell)
-                        : activeTab === "backgrounds"
-                          ? [
-                              ...((selectedItem as Background).feat_granted
-                                ? [
-                                    {
-                                      label: `FEAT: ${(selectedItem as Background).feat_granted}`,
-                                      emphasis: true as const,
-                                    },
-                                  ]
-                                : []),
-                            ]
                         : activeTab === "feats"
                           ? [
                               ...((selectedItem as Feat).category

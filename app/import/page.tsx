@@ -10,10 +10,17 @@ import { ImportContentPreviewPanel } from "@/components/import/import-content-pr
 import { ImportBackgroundFeatGapPanel } from "@/components/import/import-background-feat-gap-panel"
 import { ImportModifierReviewPanel } from "@/components/import/import-modifier-review-panel"
 import { ImportReportPanel, ImportTokenSavingsSummary } from "@/components/import/import-report-panel"
-import { ImportProposalPanel } from "@/components/import/import-proposal-panel"
+import {
+  ImportConfirmActions,
+  ImportProposalPanel,
+} from "@/components/import/import-proposal-panel"
 import { ImportCollisionPanel } from "@/components/import/import-collision-panel"
 import { ImportCardArtPanel } from "@/components/import/import-card-art-panel"
 import { ImportStagingPanel, type ImportReviewPhase } from "@/components/import/import-staging-panel"
+import type {
+  ImportSourceBulkAction,
+  ImportSourceBulkTarget,
+} from "@/components/import/import-source-bulk-actions"
 import {
   ImportAiSettings,
   importAiRequestBody,
@@ -45,6 +52,7 @@ import {
 import { mergeImportedSpellSchools } from "@/lib/compendium/schools-of-magic"
 import { seedLocalSrd } from "@/lib/data/local-seed"
 import { seedLocalExamplePack } from "@/lib/data/local-seed-packs"
+import { invalidateBuilderCompendiumCache } from "@/lib/data/builder-compendium-cache"
 import { EXAMPLE_SEED_PACKS, type ExampleSeedPackId } from "@/lib/seed-packs/pack-ids"
 import type { ExampleSeedFileError } from "@/lib/seed-packs/seed-example-pack"
 import {
@@ -72,15 +80,17 @@ import {
   importModifierMatchesStage,
   type ImportStage,
 } from "@/lib/import/import-staging"
-import type {
-  ImportProposalSelections,
-  ImportProposalSet,
+import {
+  defaultProposalSelections,
+  type ImportProposalSelections,
+  type ImportProposalSet,
 } from "@/lib/import/import-proposals"
 import {
   collisionRenamesResolved,
   defaultCollisionResolutionMap,
   defaultRenameMap,
   importCollisionId,
+  importModifierMatchesSkippedCollision,
   type ImportCollision,
   type ImportCollisionResolutionMap,
   type ImportRenameMap,
@@ -100,8 +110,15 @@ import {
 import { createClient } from "@/lib/db/client"
 import {
   buildInitialImportCardArtUrlMap,
+  collectImportCardArtTargets,
   type ImportCardArtUrlMap,
 } from "@/lib/import/import-card-art"
+import {
+  collectImportContentPreview,
+  groupImportContentPreviewBySource,
+  omitPreviewItemsBySkipKeys,
+  previewSkipKeysForSkippedCollisions,
+} from "@/lib/import/import-content-preview"
 import { isCardArtOnlyImport } from "@/lib/import/apply-card-art-import"
 import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import {
@@ -139,6 +156,28 @@ const STATIC_IMPORT_TABS: { id: ImportTab; label: string; icon: typeof Clipboard
 const IMPORT_TABS = canUseServerImport()
   ? SERVER_IMPORT_TABS
   : STATIC_IMPORT_TABS
+
+const BULK_COLLISION_KIND_BY_SECTION: Partial<Record<string, ImportCollision["kind"]>> = {
+  classes: "class",
+  feats: "feat",
+  species: "species",
+  spells: "spell",
+  backgrounds: "background",
+  abilities: "ability",
+  languages: "language",
+}
+
+const BULK_SKIPPABLE_SECTIONS = new Set([
+  "classes",
+  "species",
+  "backgrounds",
+  "subclasses",
+  "feats",
+  "creatures",
+  "spells",
+  "equipment",
+  "languages",
+])
 
 export default function ImportPage() {
   const staticMode = isStaticDeploy()
@@ -193,6 +232,10 @@ export default function ImportPage() {
   const [reviewPhase, setReviewPhase] = useState<ImportReviewPhase>("content")
   const [importSourceOpen, setImportSourceOpen] = useState(true)
   const [confirmingImport, setConfirmingImport] = useState(false)
+  const [proposalSelections, setProposalSelections] = useState<ImportProposalSelections>({
+    classResourceIds: [],
+    customAbilityIds: [],
+  })
   const [fileInputKey, setFileInputKey] = useState(0)
   const [showAiInfo, setShowAiInfo] = useState(false)
   const [showSeedInfo, setShowSeedInfo] = useState(false)
@@ -248,6 +291,31 @@ export default function ImportPage() {
     () => (pendingImport ? collectImportModifierReview(pendingImport.content) : []),
     [pendingImport],
   )
+  const collisionSkipKeys = useMemo(() => {
+    if (!pendingImport) return new Set<string>()
+    return previewSkipKeysForSkippedCollisions(
+      pendingImport.content,
+      pendingImport.collisions,
+      collisionResolutionMap,
+    )
+  }, [collisionResolutionMap, pendingImport])
+  const effectivePreviewSkipKeys = useMemo(() => {
+    if (!collisionSkipKeys.size) return previewSkipKeys
+    const next = new Set(previewSkipKeys)
+    for (const key of collisionSkipKeys) next.add(key)
+    return next
+  }, [collisionSkipKeys, previewSkipKeys])
+  const visibleModifierReviewRows = useMemo(() => {
+    if (!pendingImport) return modifierReviewRows
+    return modifierReviewRows.filter(
+      (row) =>
+        !importModifierMatchesSkippedCollision(
+          row.sourceLabel,
+          pendingImport.collisions,
+          collisionResolutionMap,
+        ),
+    )
+  }, [collisionResolutionMap, modifierReviewRows, pendingImport])
 
   const pendingBackgroundsGrantFeats = Boolean(
     pendingImport?.content.backgrounds?.some((background) => background.feat_granted?.trim()),
@@ -314,50 +382,96 @@ export default function ImportPage() {
     : null
 
   const stageModifierRows = useMemo(() => {
-    if (!activeReviewStage) return modifierReviewRows
-    return modifierReviewRows.filter((row) =>
+    if (!activeReviewStage) return visibleModifierReviewRows
+    return visibleModifierReviewRows.filter((row) =>
       importModifierMatchesStage(row.sourceLabel, activeReviewStage.id),
     )
-  }, [modifierReviewRows, activeReviewStage])
+  }, [visibleModifierReviewRows, activeReviewStage])
 
+  const allCardArtTargets = useMemo(
+    () =>
+      pendingImport && includeCardArt
+        ? collectImportCardArtTargets(pendingImport.content, {
+            defaultSource: pendingImport.materialSource,
+            skippedKeys: effectivePreviewSkipKeys,
+          })
+        : [],
+    [includeCardArt, pendingImport, effectivePreviewSkipKeys],
+  )
+  const stageCardArtSections = activeReviewStage
+    ? IMPORT_STAGE_CARD_ART_SECTIONS[activeReviewStage.id]
+    : undefined
   const stageHasModifiers = stageModifierRows.length > 0
+  const stageHasCardArt = Boolean(
+    includeCardArt &&
+      stageCardArtSections?.some((section) =>
+        allCardArtTargets.some((target) => target.section === section),
+      ),
+  )
   const isLastReviewStage = stagedReview
     ? reviewStageIndex >= pendingImport!.stages.length - 1
     : true
 
+  const collisionsForStage = (stage: ImportStage | null | undefined) => {
+    if (!pendingImport) return []
+    if (!stage) return pendingImport.collisions
+    const kinds = new Set(IMPORT_STAGE_COLLISION_KINDS[stage.id])
+    return pendingImport.collisions.filter((collision) => kinds.has(collision.kind))
+  }
+
+  const stageCollisions = collisionsForStage(activeReviewStage)
+  const stageHasConflicts = stageCollisions.length > 0
+
+  const reviewPhasesForStage = (stage: ImportStage): ImportReviewPhase[] => {
+    const phases: ImportReviewPhase[] = []
+    if (collisionsForStage(stage).length > 0) phases.push("conflicts")
+    phases.push("content")
+    const hasCardArt =
+      includeCardArt &&
+      IMPORT_STAGE_CARD_ART_SECTIONS[stage.id].some((section) =>
+        allCardArtTargets.some((target) => target.section === section),
+      )
+    if (hasCardArt) phases.push("card-art")
+    if (
+      visibleModifierReviewRows.some((row) => importModifierMatchesStage(row.sourceLabel, stage.id))
+    ) {
+      phases.push("modifiers")
+    }
+    return phases
+  }
+  const firstReviewPhaseForStage = (stage: ImportStage): ImportReviewPhase =>
+    reviewPhasesForStage(stage)[0] ?? "content"
+  const activeReviewPhases = activeReviewStage
+    ? reviewPhasesForStage(activeReviewStage)
+    : (["content"] as ImportReviewPhase[])
+  const activeReviewPhaseIndex = activeReviewPhases.indexOf(reviewPhase)
+
   const goPreviousReview = () => {
     if (!stagedReview || !pendingImport) return
-    if (reviewPhase === "modifiers") {
-      setReviewPhase("content")
+    if (activeReviewPhaseIndex > 0) {
+      setReviewPhase(activeReviewPhases[activeReviewPhaseIndex - 1])
       return
     }
     if (reviewStageIndex <= 0) return
     const prevIndex = reviewStageIndex - 1
     const prevStage = pendingImport.stages[prevIndex]
-    const prevHasModifiers = modifierReviewRows.some((row) =>
-      importModifierMatchesStage(row.sourceLabel, prevStage.id),
-    )
+    const previousPhases = reviewPhasesForStage(prevStage)
     setReviewStageIndex(prevIndex)
-    setReviewPhase(prevHasModifiers ? "modifiers" : "content")
+    setReviewPhase(previousPhases[previousPhases.length - 1])
   }
 
   const goNextReview = () => {
     if (!stagedReview || !pendingImport) return
-    if (reviewPhase === "content" && stageHasModifiers) {
-      setReviewPhase("modifiers")
+    if (activeReviewPhaseIndex >= 0 && activeReviewPhaseIndex < activeReviewPhases.length - 1) {
+      setReviewPhase(activeReviewPhases[activeReviewPhaseIndex + 1])
       return
     }
     if (isLastReviewStage) return
-    setReviewStageIndex((index) => index + 1)
-    setReviewPhase("content")
+    const nextIndex = reviewStageIndex + 1
+    const nextStage = pendingImport.stages[nextIndex]
+    setReviewStageIndex(nextIndex)
+    setReviewPhase(firstReviewPhaseForStage(nextStage))
   }
-
-  const stageCollisions = useMemo(() => {
-    if (!pendingImport) return []
-    if (!activeReviewStage) return pendingImport.collisions
-    const kinds = new Set(IMPORT_STAGE_COLLISION_KINDS[activeReviewStage.id])
-    return pendingImport.collisions.filter((collision) => kinds.has(collision.kind))
-  }, [pendingImport, activeReviewStage])
 
   const stageCollisionsResolved = collisionRenamesResolved(
     stageCollisions,
@@ -374,22 +488,143 @@ export default function ImportPage() {
   const reviewReadyToConfirm =
     allCollisionsResolved &&
     (!stagedReview ||
-      (isLastReviewStage && (reviewPhase === "modifiers" || !stageHasModifiers)))
+      (isLastReviewStage && activeReviewPhaseIndex === activeReviewPhases.length - 1))
 
   const canGoPreviousReview =
-    stagedReview && (reviewPhase === "modifiers" || reviewStageIndex > 0)
+    stagedReview && (activeReviewPhaseIndex > 0 || reviewStageIndex > 0)
   const canGoNextReview =
     stagedReview &&
     stageCollisionsResolved &&
-    ((reviewPhase === "content" && stageHasModifiers) ||
-      (!isLastReviewStage && (reviewPhase === "modifiers" || !stageHasModifiers)))
+    (activeReviewPhaseIndex < activeReviewPhases.length - 1 || !isLastReviewStage)
 
   const stagePreviewKeys = activeReviewStage
     ? IMPORT_STAGE_PREVIEW_KEYS[activeReviewStage.id]
     : undefined
-  const stageCardArtSections = activeReviewStage
-    ? IMPORT_STAGE_CARD_ART_SECTIONS[activeReviewStage.id]
-    : undefined
+
+  const contentHasMultipleSources = useMemo(() => {
+    if (!pendingImport) return false
+    const sections = omitPreviewItemsBySkipKeys(
+      collectImportContentPreview(
+        pendingImport.content,
+        stagePreviewKeys ? { sectionKeys: stagePreviewKeys } : undefined,
+      ),
+      collisionSkipKeys,
+    )
+    return groupImportContentPreviewBySource(sections, pendingImport.materialSource).length > 1
+  }, [collisionSkipKeys, pendingImport, stagePreviewKeys])
+
+  const cardArtHasMultipleSources = useMemo(() => {
+    if (!stageHasCardArt || !stageCardArtSections?.length) return false
+    const allowed = new Set(stageCardArtSections)
+    const sources = new Set(
+      allCardArtTargets.filter((target) => allowed.has(target.section)).map((target) => target.source),
+    )
+    return sources.size > 1
+  }, [allCardArtTargets, stageCardArtSections, stageHasCardArt])
+
+  const deferPhaseNextToSourceRow =
+    (reviewPhase === "content" && contentHasMultipleSources) ||
+    (reviewPhase === "card-art" && cardArtHasMultipleSources)
+
+  const phaseContinueLabel =
+    reviewPhase === "conflicts"
+      ? "Next: review content"
+      : reviewPhase === "content" && stageHasCardArt
+        ? "Next: review card art"
+        : reviewPhase !== "modifiers" && stageHasModifiers
+          ? "Next: review modifier wiring"
+          : "Next stage"
+
+  const phaseContinueReview =
+    canGoNextReview
+      ? {
+          label: phaseContinueLabel,
+          onClick: goNextReview,
+          disabled: !stageCollisionsResolved,
+        }
+      : undefined
+
+  const handlePreviewSkipKeysChange = (next: Set<string>) => {
+    setPreviewSkipKeys(next)
+    if (!next.size) return
+    setCardArtUrlMap((current) => {
+      let changed = false
+      const updated = { ...current }
+      for (const key of next) {
+        if (key in updated && updated[key]) {
+          updated[key] = ""
+          changed = true
+        }
+      }
+      return changed ? updated : current
+    })
+  }
+
+  const handleSourceBulkAction = (
+    _source: string,
+    targets: ImportSourceBulkTarget[],
+    action: ImportSourceBulkAction,
+  ) => {
+    if (!pendingImport) return
+
+    setPreviewSkipKeys((current) => {
+      const next = new Set(current)
+      for (const target of targets) {
+        if (!BULK_SKIPPABLE_SECTIONS.has(target.sectionKey)) continue
+        const key = `${target.sectionKey}:${target.sourceIndex}`
+        if (action === "skip") next.add(key)
+        else next.delete(key)
+      }
+      return next
+    })
+
+    if (action === "skip") {
+      setCardArtUrlMap((current) => {
+        let changed = false
+        const updated = { ...current }
+        for (const target of targets) {
+          const key = `${target.sectionKey}:${target.sourceIndex}`
+          if (key in updated && updated[key]) {
+            updated[key] = ""
+            changed = true
+          }
+        }
+        return changed ? updated : current
+      })
+    }
+
+    const collisionIds = new Set(
+      targets.flatMap((target) => {
+        const kind = BULK_COLLISION_KIND_BY_SECTION[target.sectionKey]
+        return kind ? [importCollisionId(kind, target.name)] : []
+      }),
+    )
+    if (!collisionIds.size) return
+    setCollisionResolutionMap((current) => {
+      const next = { ...current }
+      for (const collision of pendingImport.collisions) {
+        if (collisionIds.has(collision.id)) {
+          next[collision.id] = action
+        }
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (!pendingImport?.proposals) {
+      setProposalSelections({ classResourceIds: [], customAbilityIds: [] })
+      return
+    }
+    setProposalSelections(defaultProposalSelections(pendingImport.proposals))
+  }, [pendingImport?.proposals])
+
+  useEffect(() => {
+    if (!stagedReview || !activeReviewPhases.length) return
+    if (!activeReviewPhases.includes(reviewPhase)) {
+      setReviewPhase(activeReviewPhases[0])
+    }
+  }, [activeReviewPhases, reviewPhase, stagedReview])
 
   useEffect(() => {
     if (!pendingImport) {
@@ -404,7 +639,11 @@ export default function ImportPage() {
     if (!hadPendingImportRef.current) {
       hadPendingImportRef.current = true
       setReviewStageIndex(0)
-      setReviewPhase("content")
+      setReviewPhase(
+        pendingImport.stages[0]
+          ? firstReviewPhaseForStage(pendingImport.stages[0])
+          : "content",
+      )
       setPreviewSkipKeys(new Set())
       setCardArtUrlMap(
         includeCardArt ? buildInitialImportCardArtUrlMap(pendingImport.content) : {},
@@ -583,6 +822,7 @@ export default function ImportPage() {
       addedSchools.length > 0
         ? ` Added school${addedSchools.length === 1 ? "" : "s"} of magic: ${addedSchools.join(", ")}.`
         : ""
+    invalidateBuilderCompendiumCache()
     setMessage(
       (data.report?.headline ??
         `Successfully imported ${data.count ?? 0} items${breakdownText ? `: ${breakdownText}` : ""}${pagesText}`) +
@@ -1081,7 +1321,7 @@ export default function ImportPage() {
     <div id="import-root" className="min-h-screen bg-background flex flex-col">
       <MainNav />
 
-      <main id="import-main" className="relative max-w-4xl mx-auto px-4 py-8">
+      <main id="import-main" className="relative mx-auto w-full max-w-4xl px-4 py-8">
         {/* SRD quickseed — upper right (in-flow on mobile, floating on sm+) */}
         <div className="flex justify-end mb-4 sm:mb-0 sm:absolute sm:top-8 sm:right-4 z-20">
           <div className="relative">
@@ -1247,7 +1487,7 @@ export default function ImportPage() {
             ref={reviewRef}
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 scroll-mt-24 space-y-4"
+            className="mb-6 w-full scroll-mt-24 space-y-4"
           >
             {pendingImport.tokenSavings ? (
               <ImportTokenSavingsSummary savings={pendingImport.tokenSavings} />
@@ -1258,48 +1498,76 @@ export default function ImportPage() {
                 summary={pendingImport.stagingSummary}
                 activeIndex={reviewStageIndex}
                 phase={reviewPhase}
+                hasConflicts={stageHasConflicts}
+                hasCardArt={stageHasCardArt}
                 hasModifiers={stageHasModifiers}
                 onNext={goNextReview}
                 canNext={canGoNextReview}
+                showNextInFooter={!deferPhaseNextToSourceRow}
                 onBack={goPreviousReview}
                 canBack={Boolean(canGoPreviousReview)}
+                footerEnd={
+                  reviewReadyToConfirm && !backgroundFeatGateBlocking ? (
+                    <ImportConfirmActions
+                      compact
+                      confirming={confirmingImport}
+                      onCancel={clearPendingImport}
+                      onConfirm={() => void handleConfirmImport(proposalSelections)}
+                    />
+                  ) : undefined
+                }
+                conflictsChildren={
+                  <ImportCollisionPanel
+                    key={`collisions-${activeReviewStage?.id ?? "all"}`}
+                    collisions={stageCollisions}
+                    value={renameMap}
+                    onChange={setRenameMap}
+                    resolutionMap={collisionResolutionMap}
+                    onResolutionChange={setCollisionResolutionMap}
+                    variant={isCardArtReview ? "card-art" : "default"}
+                  />
+                }
                 contentChildren={
-                  <>
-                    <ImportCollisionPanel
-                      key={`collisions-${activeReviewStage?.id ?? "all"}`}
-                      collisions={stageCollisions}
-                      value={renameMap}
-                      onChange={setRenameMap}
-                      resolutionMap={collisionResolutionMap}
-                      onResolutionChange={setCollisionResolutionMap}
-                      variant={isCardArtReview ? "card-art" : "default"}
-                    />
-                    <ImportContentPreviewPanel
-                      key={`preview-${activeReviewStage?.id ?? "all"}`}
+                  <ImportContentPreviewPanel
+                    key={`preview-${activeReviewStage?.id ?? "all"}`}
+                    content={pendingImport.content}
+                    previewSummary={pendingImport.previewSummary}
+                    defaultSource={pendingImport.materialSource}
+                    sectionKeys={stagePreviewKeys}
+                    hideSummary
+                    embedded
+                    showModifierReviewHint={stageHasModifiers}
+                    onRenameItem={isCardArtReview ? undefined : handleRenameImportPreview}
+                    skippedKeys={previewSkipKeys}
+                    hiddenKeys={collisionSkipKeys}
+                    onSkippedKeysChange={isCardArtReview ? undefined : handlePreviewSkipKeysChange}
+                    onSourceBulkAction={isCardArtReview ? undefined : handleSourceBulkAction}
+                    continueReview={
+                      contentHasMultipleSources && reviewPhase === "content"
+                        ? phaseContinueReview
+                        : undefined
+                    }
+                  />
+                }
+                cardArtChildren={
+                  stageHasCardArt ? (
+                    <ImportCardArtPanel
+                      key={`card-art-${activeReviewStage?.id ?? "all"}`}
                       content={pendingImport.content}
-                      previewSummary={pendingImport.previewSummary}
+                      value={cardArtUrlMap}
+                      onChange={setCardArtUrlMap}
+                      sections={stageCardArtSections}
                       defaultSource={pendingImport.materialSource}
-                      sectionKeys={stagePreviewKeys}
-                      hideSummary
+                      skippedKeys={effectivePreviewSkipKeys}
                       embedded
-                      showModifierReviewHint={stageHasModifiers}
-                      cardArtUrls={includeCardArt ? cardArtUrlMap : undefined}
-                      onCardArtChange={includeCardArt ? setCardArtUrlMap : undefined}
-                      onRenameItem={isCardArtReview ? undefined : handleRenameImportPreview}
-                      skippedKeys={previewSkipKeys}
-                      onSkippedKeysChange={isCardArtReview ? undefined : setPreviewSkipKeys}
+                      onSourceBulkAction={handleSourceBulkAction}
+                      continueReview={
+                        cardArtHasMultipleSources && reviewPhase === "card-art"
+                          ? phaseContinueReview
+                          : undefined
+                      }
                     />
-                    {includeCardArt ? (
-                      <ImportCardArtPanel
-                        key={`card-art-${activeReviewStage?.id ?? "all"}`}
-                        content={pendingImport.content}
-                        value={cardArtUrlMap}
-                        onChange={setCardArtUrlMap}
-                        sections={stageCardArtSections}
-                        excludeSections={["classes", "subclasses"]}
-                      />
-                    ) : null}
-                  </>
+                  ) : null
                 }
                 modifiersChildren={
                   stageHasModifiers ? (
@@ -1327,16 +1595,17 @@ export default function ImportPage() {
                   content={pendingImport.content}
                   previewSummary={pendingImport.previewSummary}
                   defaultSource={pendingImport.materialSource}
-                  showModifierReviewHint={modifierReviewRows.length > 0}
+                  showModifierReviewHint={visibleModifierReviewRows.length > 0}
                   cardArtUrls={includeCardArt ? cardArtUrlMap : undefined}
                   onCardArtChange={includeCardArt ? setCardArtUrlMap : undefined}
                   onRenameItem={isCardArtReview ? undefined : handleRenameImportPreview}
                   skippedKeys={previewSkipKeys}
-                  onSkippedKeysChange={isCardArtReview ? undefined : setPreviewSkipKeys}
+                  hiddenKeys={collisionSkipKeys}
+                  onSkippedKeysChange={isCardArtReview ? undefined : handlePreviewSkipKeysChange}
                 />
-                {modifierReviewRows.length > 0 ? (
+                {visibleModifierReviewRows.length > 0 ? (
                   <ImportModifierReviewPanel
-                    rows={modifierReviewRows}
+                    rows={visibleModifierReviewRows}
                     onRemoveModifier={handleRemoveModifierPreview}
                     variant="review"
                   />
@@ -1347,6 +1616,7 @@ export default function ImportPage() {
                     value={cardArtUrlMap}
                     onChange={setCardArtUrlMap}
                     excludeSections={["classes", "subclasses"]}
+                    skippedKeys={effectivePreviewSkipKeys}
                   />
                 ) : null}
               </>
@@ -1364,6 +1634,9 @@ export default function ImportPage() {
                 confirming={confirmingImport}
                 onConfirm={handleConfirmImport}
                 onCancel={clearPendingImport}
+                hideActions={Boolean(stagedReview)}
+                selections={proposalSelections}
+                onSelectionsChange={setProposalSelections}
               />
             ) : null}
           </motion.div>

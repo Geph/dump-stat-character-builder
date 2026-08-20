@@ -150,25 +150,21 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     id: "alchemist.class.prime_bomb",
     pack: "alchemist",
     target: "class_feature",
-    match: { className: /alchemist/i, name: /^prime bomb$/i },
+    // "Empowered Bomb" is the older printing's name for the same Reagent-spending rider.
+    match: { className: /alchemist/i, name: /^(?:prime|empowered) bomb$/i },
     operations: [
+      // Priming is part of throwing the Bomb, so the sheet gets a combat action that rolls the
+      // Bomb attack with the Reagent spend control attached.
       {
         op: "attachNamedPreset",
-        preset: {
-          kind: "char_instance",
-          idKey: "prime_bomb_rider",
-          catalogRefId: "cat_char_power_rider",
-          characteristics: [
-            {
-              id: "char_prime_bomb_rider",
-              type: "power_rider",
-              parentPowerNames: ["Bomb", "Bombs"],
-              alertSummary:
-                "Once/turn: spend Reagents (up to Prime Bomb column) for +1d10 each; Explode radius +5 ft per Reagent.",
-            },
-          ],
-        },
-        replaceCharacteristicTypes: ["damage_roll_modifiers", "power_rider"],
+        preset: { kind: "alchemist_bomb" },
+        replaceCharacteristicTypes: ["special_attack", "damage_roll_modifiers"],
+      },
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
+      {
+        op: "appendDescription",
+        text: "Use this in place of one of your attacks with a Bomb, then choose how many Reagents to spend (up to the Prime Bomb column) for +1d10 damage each. A Bomb Formula can be applied to the same Bomb.",
       },
     ],
   },
@@ -891,15 +887,9 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
       name: /^bomb$/i,
     },
     skipIfCharacteristicTypes: ["special_attack"],
+    // Throwing a Bomb is free — Alchemist's Supplies make as many as the day needs. Reagents are
+    // spent to prime it, which the sheet exposes as the special_attack's resourceScaleKey rider.
     operations: [
-      {
-        op: "setUses",
-        uses: {
-          type: "class_resource",
-          classResourceKey: REAGENTS_KEY,
-          classResourceAmount: 1,
-        },
-      },
       {
         op: "attachNamedPreset",
         preset: { kind: "alchemist_bomb" },
@@ -927,18 +917,21 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     skipIfCharacteristicTypes: ["special_attack"],
     operations: [
       {
-        op: "setUses",
-        uses: {
-          type: "class_resource",
-          classResourceKey: REAGENTS_KEY,
-          classResourceAmount: 1,
-        },
-      },
-      {
         op: "attachNamedPreset",
         preset: { kind: "alchemist_bomb" },
       },
     ],
+  },
+  {
+    id: "alchemist.proposal.bomb_formula_upgrade_retag",
+    pack: "alchemist",
+    target: "proposal_ability",
+    match: {
+      sourceName: /alchemist/i,
+      name: /^(?!bombs?$).*\bbomb\b/i,
+      abilityRole: "upgrade",
+    },
+    operations: [{ op: "setAbilityRole", role: "bomb_formula" }],
   },
   {
     id: "alchemist.proposal.bomb_formula_name",

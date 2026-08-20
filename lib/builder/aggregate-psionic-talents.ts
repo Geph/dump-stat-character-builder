@@ -208,6 +208,8 @@ export type ResolveFeatureChoiceOptionsParams = {
   customAbilities: CustomAbility[]
   featureChoicePicks: Record<string, string[]>
   classNames: string[]
+  /** Persisted class UUIDs — custom abilities attach by id after import. */
+  classIds?: string[]
   classLevel?: number
   equipmentCatalog?: Equipment[]
   knownSpellNames?: string[]
@@ -348,6 +350,7 @@ export function resolveFeatureChoiceOptions(
     return aggregateKnackOptions({
       customAbilities: params.customAbilities,
       classNames: params.classNames,
+      classIds: params.classIds,
       classLevel,
       selectedKnackNames: selected,
       knownSpellNames: params.knownSpellNames,
@@ -360,6 +363,7 @@ export function resolveFeatureChoiceOptions(
     return aggregateUpgradeOptions({
       customAbilities: params.customAbilities,
       classNames: params.classNames,
+      classIds: params.classIds,
       classLevel,
       selectedUpgradeNames: selected,
       subclassName: params.subclassName,
@@ -369,6 +373,7 @@ export function resolveFeatureChoiceOptions(
     return aggregateBombFormulaOptions({
       customAbilities: params.customAbilities,
       classNames: params.classNames,
+      classIds: params.classIds,
       classLevel,
     })
   }
@@ -378,6 +383,7 @@ export function resolveFeatureChoiceOptions(
     return aggregateDiscoveryOptions({
       customAbilities: params.customAbilities,
       classNames: params.classNames,
+      classIds: params.classIds,
       classLevel,
       selectedDiscoveryNames: selected,
     })

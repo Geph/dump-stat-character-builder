@@ -13,6 +13,7 @@ import {
 } from "@/lib/character/character-classes"
 import {
   buildLevelUpPlan,
+  countReplacedPicks,
   spellsEligibleForLevelUp,
   type LevelUpPlan,
 } from "@/lib/character/level-up-plan"
@@ -152,17 +153,23 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       customAbilities: loaded.customAbilities,
       featureChoicePicks: choicePicks,
       classNames: [plan.className],
+      classIds: [plan.classId],
       classLevel: plan.toLevel,
       knownSpellNames,
       subclassName: selectedEntry.subclass?.name ?? null,
     })
   }, [choicePicks, current, knownSpellNames, loaded, plan, selectedEntry])
 
+  /** Picks as they stood before this level-up, so swap steps can measure what changed. */
+  const originalPicks = loaded?.character.feature_choice_picks ?? {}
+
   const canAdvance = (): boolean => {
     if (!current) return true
     if (current.kind === "subclass") return Boolean(subclassId)
     if (current.kind === "feature_choice") {
-      return (choicePicks[current.id] ?? []).length >= current.required
+      const picks = choicePicks[current.id] ?? []
+      if (current.mode !== "swap") return picks.length >= current.required
+      return countReplacedPicks(originalPicks[current.id] ?? [], picks) !== null
     }
     if (current.kind === "feat_or_asi") {
       if (asiMode === "feat") return Boolean(featId)
@@ -347,6 +354,11 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
               {current?.kind === "feature_choice" ? (
                 <MultiSelectChoices
                   title={withChosenOptionChrome(current.title, choicePicks[current.id] ?? [])}
+                  hint={
+                    current.mode === "swap"
+                      ? `Optional: deselect one ${current.feature.choices?.category || "pick"} and choose a single replacement, or move on to keep what you have.`
+                      : undefined
+                  }
                   options={featureChoiceOptions.map((option) => ({
                     name: option.name,
                     description: option.description,
@@ -424,6 +436,13 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
               {isReview ? (
                 <p className="text-sm text-muted-foreground">
                   Confirm to apply level {plan.toLevel} in {plan.className}. Hit points increase by the class average.
+                </p>
+              ) : null}
+
+              {current?.kind === "feature_choice" && current.mode === "swap" && !canAdvance() ? (
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                  Keep {(originalPicks[current.id] ?? []).length} selected and change at most one of
+                  them.
                 </p>
               ) : null}
 

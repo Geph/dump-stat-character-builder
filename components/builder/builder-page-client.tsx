@@ -7,7 +7,10 @@ import { MainNav } from "@/components/main-nav"
 import { SiteFooter } from "@/components/site-footer"
 import { GameIcon } from "@/components/game-icon-picker"
 import { createClient } from "@/lib/db/client"
-import { loadBuilderCompendium } from "@/lib/data/builder-compendium-cache"
+import {
+  BUILDER_COMPENDIUM_UPDATED_EVENT,
+  loadBuilderCompendium,
+} from "@/lib/data/builder-compendium-cache"
 import { asCompendiumRow, asCompendiumRows } from "@/lib/data/types"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
 import { pageFloatingHintClass, pageStepStripClass } from "@/lib/compendium/editor-field-styles"
@@ -92,6 +95,7 @@ import {
 } from "@/components/compendium/species-detail-trait-list"
 import { StartingEquipmentPackagePicker } from "@/components/builder/starting-equipment-package-picker"
 import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
+import { BuilderCatalogEmptyPrompt } from "@/components/builder/builder-catalog-empty-prompt"
 import {
   BuilderSpellCompactPick,
   SpellSelectionCard,
@@ -873,10 +877,7 @@ export default function BuilderPageClient() {
   ])
 
   useEffect(() => {
-    const fetchContent = async () => {
-      const db = createClient()
-      const payload = await loadBuilderCompendium(db)
-
+    const applyPayload = (payload: Awaited<ReturnType<typeof loadBuilderCompendium>>) => {
       setModifierCatalog(payload.modifierCatalog)
       setClasses(
         payload.classes.map((row) => ({
@@ -895,7 +896,17 @@ export default function BuilderPageClient() {
       setLoading(false)
     }
 
-    fetchContent()
+    const fetchContent = async (force = false) => {
+      const db = createClient()
+      applyPayload(await loadBuilderCompendium(db, force ? { force: true } : undefined))
+    }
+
+    void fetchContent()
+    const onCompendiumUpdated = () => {
+      void fetchContent(true)
+    }
+    window.addEventListener(BUILDER_COMPENDIUM_UPDATED_EVENT, onCompendiumUpdated)
+    return () => window.removeEventListener(BUILDER_COMPENDIUM_UPDATED_EVENT, onCompendiumUpdated)
   }, [])
 
   // Calculate point buy cost
@@ -3167,6 +3178,18 @@ export default function BuilderPageClient() {
                   } = paginateList(filteredClasses, classPickerPage, pickerPageSize)
                   const classesToShow = useSwipeVisualPicker ? filteredClasses : visibleClasses
 
+                  if (classes.length === 0) {
+                    return <BuilderCatalogEmptyPrompt itemLabel="classes" tab="classes" />
+                  }
+
+                  if (classesToShow.length === 0) {
+                    return (
+                      <p className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                        No classes match your search or source filter.
+                      </p>
+                    )
+                  }
+
                       return (
                     <>
                       <PickerGridPagination
@@ -3467,6 +3490,9 @@ export default function BuilderPageClient() {
                               <h4 className="font-bold text-sm text-foreground mb-2">
                                 {subclassUnlockLabel} (Level {subclassUnlockLevel}+)
                               </h4>
+                              {classSubclasses.length === 0 ? (
+                                <BuilderCatalogEmptyPrompt itemLabel="subclasses" tab="subclasses" />
+                              ) : (
                               <SwipeVisualPicker
                                 enabled={useSwipeVisualPicker}
                                 className={
@@ -3542,6 +3568,7 @@ export default function BuilderPageClient() {
                                   )
                                 })}
                               </SwipeVisualPicker>
+                              )}
                             </div>
                             )
                           })()}
@@ -3555,6 +3582,7 @@ export default function BuilderPageClient() {
                               customAbilities,
                               featureChoicePicks: { ...featureChoicePicks, ...featChoicePicks },
                               classNames: [cls.name],
+                              classIds: [entry.classId],
                               classLevel: entry.level,
                               equipmentCatalog: equipment,
                               knownSpellNames,
@@ -4077,6 +4105,18 @@ export default function BuilderPageClient() {
                     } = paginateList(filteredSpecies, speciesPickerPage, pickerPageSize)
                     const speciesToShow = useSwipeVisualPicker ? filteredSpecies : visibleSpecies
 
+                    if (species.length === 0) {
+                      return <BuilderCatalogEmptyPrompt itemLabel="species" tab="species" />
+                    }
+
+                    if (speciesToShow.length === 0) {
+                      return (
+                        <p className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                          No species match your search or source filter.
+                        </p>
+                      )
+                    }
+
                     return (
                       <>
                         <SwipeVisualPicker enabled={useSwipeVisualPicker} className={pickerGridClass}>
@@ -4485,6 +4525,18 @@ export default function BuilderPageClient() {
                       pageCount: backgroundPageCount,
                       safePage: safeBackgroundPage,
                     } = paginateList(filteredBackgrounds, backgroundPickerPage, pickerPageSize)
+
+                    if (backgrounds.length === 0) {
+                      return <BuilderCatalogEmptyPrompt itemLabel="backgrounds" tab="backgrounds" />
+                    }
+
+                    if (visibleBackgrounds.length === 0) {
+                      return (
+                        <p className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                          No backgrounds match your search or source filter.
+                        </p>
+                      )
+                    }
 
                     return (
                       <>
@@ -6588,15 +6640,9 @@ export default function BuilderPageClient() {
               onClose={close}
               item={bg}
               enableCardImage
-              heroLayout="balanced"
+              heroLayout="widescreen"
+              panelWidth="widescreen"
               subtitle={bg.source || "Custom"}
-              tags={
-                bg.feat_granted
-                  ? [{ label: `FEAT: ${bg.feat_granted}`, emphasis: true }]
-                  : isLegacyBackground(bg)
-                    ? [{ label: "ORIGIN FEAT: your choice", emphasis: true }]
-                    : []
-              }
               accentColor={accent}
               detailScroll
             >

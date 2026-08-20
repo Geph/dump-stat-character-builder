@@ -252,6 +252,31 @@ const CONTENT_KEY_BY_KIND: Record<ImportCollisionKind, keyof ImportContent> = {
   language: "languages",
 }
 
+const MODIFIER_SOURCE_PREFIX_BY_KIND: Partial<Record<ImportCollisionKind, string>> = {
+  class: "Class: ",
+  species: "Species: ",
+  background: "Background: ",
+  feat: "Feat: ",
+  ability: "Ability: ",
+}
+
+/** True when a modifier-review row belongs to a collision the user skipped. */
+export function importModifierMatchesSkippedCollision(
+  sourceLabel: string,
+  collisions: readonly ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+): boolean {
+  for (const collision of collisions) {
+    if (resolutionMap[collision.id] !== "skip") continue
+    const prefix = MODIFIER_SOURCE_PREFIX_BY_KIND[collision.kind]
+    if (!prefix) continue
+    const expected = `${prefix}${collision.incomingName}`
+    if (sourceLabel === expected) return true
+    if (collision.kind === "ability" && sourceLabel.startsWith(`${expected} (`)) return true
+  }
+  return false
+}
+
 /** Drop rows the user chose not to import for a name collision. */
 function stripSkippedCollisionRows(
   content: ImportContent,

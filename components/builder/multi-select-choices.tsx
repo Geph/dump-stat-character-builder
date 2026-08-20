@@ -21,6 +21,10 @@ import {
   isKnownToolName,
   isMusicalInstrumentToolName,
 } from "@/lib/compendium/tool-options"
+import {
+  FEATURE_CHOICE_HINT_MAX_CHARS,
+  stripFeatureHintHtml,
+} from "@/lib/builder/feature-choice-hint"
 import { cn } from "@/lib/utils"
 
 type ChoiceOption = {
@@ -58,6 +62,8 @@ type MultiSelectChoicesProps = {
   id?: string
   title: string
   hint?: string
+  /** Full feature/rule text shown from the header info button when the hint is shortened. */
+  hintDetails?: string
   options: ChoiceOption[]
   maxCount: number
   selected: string[]
@@ -138,6 +144,7 @@ export function MultiSelectChoices({
   id,
   title,
   hint,
+  hintDetails,
   options,
   maxCount,
   selected,
@@ -164,12 +171,15 @@ export function MultiSelectChoices({
   const showInfoButtons = showOptionInfo || showSkillInfoButtons || visual
   const showSkillIcons = visual && showSkillInfo
   const [infoOption, setInfoOption] = useState<ChoiceOption | null>(null)
+  const [hintInfoOpen, setHintInfoOpen] = useState(false)
   const [customDraft, setCustomDraft] = useState("")
   const [flatPage, setFlatPage] = useState(0)
   const [groupPages, setGroupPages] = useState<Record<string, number>>({})
   const [kindFilter, setKindFilter] = useState<KindFilter>("all")
   const [portalReady, setPortalReady] = useState(false)
   const pendingScrollY = useRef<number | null>(null)
+  const hintRef = useRef<HTMLParagraphElement>(null)
+  const [hintOverflows, setHintOverflows] = useState(false)
 
   useEffect(() => {
     setPortalReady(true)
@@ -180,6 +190,19 @@ export function MultiSelectChoices({
     window.scrollTo(0, pendingScrollY.current)
     pendingScrollY.current = null
   })
+
+  useLayoutEffect(() => {
+    const el = hintRef.current
+    if (!el) {
+      setHintOverflows(false)
+      return
+    }
+    const check = () => setHintOverflows(el.scrollHeight > el.clientHeight + 1)
+    check()
+    const observer = new ResizeObserver(check)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hint])
 
   const emitChange = (next: string[]) => {
     pendingScrollY.current = window.scrollY
@@ -258,6 +281,42 @@ export function MultiSelectChoices({
 
   const infoDescription =
     infoOption == null ? null : optionInfoText(infoOption, showSkillInfoButtons)
+  const hintInfoBody = (hintDetails?.trim() || hint?.trim()) ?? ""
+  const hintDetailsPlain = hintDetails ? stripFeatureHintHtml(hintDetails) : ""
+  const showHintInfo =
+    Boolean(hint?.trim()) &&
+    (Boolean(hintDetails?.trim()) ||
+      hintOverflows ||
+      (hint?.trim().length ?? 0) > FEATURE_CHOICE_HINT_MAX_CHARS ||
+      hintDetailsPlain.length > FEATURE_CHOICE_HINT_MAX_CHARS)
+  const closeInfoOverlay = () => {
+    setInfoOption(null)
+    setHintInfoOpen(false)
+  }
+  const overlay = hintInfoOpen
+    ? {
+        title,
+        body: hintInfoBody,
+        kicker: "Feature",
+        sourceLabel: null as string | null,
+        prerequisite: null as string | null,
+      }
+    : infoOption
+      ? {
+          title: infoOption.name,
+          body: infoDescription ?? "",
+          kicker:
+            showSkillInfoButtons &&
+            getSkillDescription(infoOption.name) &&
+            !infoOption.description?.trim()
+              ? "Skill"
+              : getToolDescription(infoOption.name) && !infoOption.description?.trim()
+                ? "Tool"
+                : "Details",
+          sourceLabel: infoOption.sourceLabel?.trim() || null,
+          prerequisite: infoOption.prerequisite?.trim() || null,
+        }
+      : null
 
   const gridClass = compact
     ? "grid grid-cols-1 sm:grid-cols-3 gap-1.5"
@@ -369,13 +428,32 @@ export function MultiSelectChoices({
   return (
     <>
       <div id={id} className="mt-4 p-4 bg-muted/40 rounded-xl border border-border">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <h3 className="font-bold text-sm text-foreground">{title}</h3>
-          <span className="text-xs text-muted-foreground">
-            {freeSelected.length}/{maxCount} selected
-          </span>
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h3 className="font-bold text-sm text-foreground min-w-0">{title}</h3>
+          <div className="flex items-center gap-1 shrink-0">
+            {showHintInfo ? (
+              <button
+                type="button"
+                aria-label={`About ${title}`}
+                onClick={() => {
+                  setInfoOption(null)
+                  setHintInfoOpen(true)
+                }}
+                className="rounded-md p-1 text-muted-foreground hover:text-primary hover:bg-card transition-colors"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+            <span className="text-xs text-muted-foreground">
+              {freeSelected.length}/{maxCount} selected
+            </span>
+          </div>
         </div>
-        {hint && <p className="text-xs text-muted-foreground mb-3">{hint}</p>}
+        {hint ? (
+          <p ref={hintRef} className="text-xs text-muted-foreground mb-3 line-clamp-2">
+            {hint}
+          </p>
+        ) : null}
         {showKindFilter ? (
           <div
             className="mb-3 flex flex-wrap gap-1.5"
@@ -469,13 +547,13 @@ export function MultiSelectChoices({
       {portalReady
         ? createPortal(
             <AnimatePresence>
-              {infoOption && (
+              {overlay && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4"
-                  onClick={() => setInfoOption(null)}
+                  onClick={closeInfoOverlay}
                 >
                   <motion.div
                     initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -486,39 +564,31 @@ export function MultiSelectChoices({
                   >
                     <button
                       type="button"
-                      onClick={() => setInfoOption(null)}
+                      onClick={closeInfoOverlay}
                       className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:text-foreground"
                       aria-label="Close"
                     >
                       <X className="h-4 w-4" />
                     </button>
                     <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1">
-                      {showSkillInfoButtons &&
-                      getSkillDescription(infoOption.name) &&
-                      !infoOption.description?.trim()
-                        ? "Skill"
-                        : getToolDescription(infoOption.name) && !infoOption.description?.trim()
-                          ? "Tool"
-                          : "Details"}
+                      {overlay.kicker}
                     </p>
                     <h4 className="font-serif text-xl font-black text-foreground pr-8">
-                      {infoOption.name}
+                      {overlay.title}
                     </h4>
-                    {infoOption.sourceLabel?.trim() ? (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {infoOption.sourceLabel.trim()}
-                      </p>
+                    {overlay.sourceLabel ? (
+                      <p className="mt-2 text-xs text-muted-foreground">{overlay.sourceLabel}</p>
                     ) : null}
-                    {infoOption.prerequisite?.trim() ? (
+                    {overlay.prerequisite ? (
                       <p
-                        className={`${infoOption.sourceLabel?.trim() ? "mt-1" : "mt-2"} text-xs text-muted-foreground`}
+                        className={`${overlay.sourceLabel ? "mt-1" : "mt-2"} text-xs text-muted-foreground`}
                       >
-                        Prerequisite: {infoOption.prerequisite}
+                        Prerequisite: {overlay.prerequisite}
                       </p>
                     ) : null}
                     <div className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                      {infoDescription?.trim() ? (
-                        <RichTextContent html={infoDescription} />
+                      {overlay.body.trim() ? (
+                        <RichTextContent html={overlay.body} />
                       ) : (
                         <p>No description available.</p>
                       )}

@@ -7,6 +7,7 @@ import {
   groupImportContentPreviewBySource,
   importContentPreviewLimit,
   importPreviewItemSkipKey,
+  omitPreviewItemsBySkipKeys,
   type ImportContentPreviewItem,
   type ImportContentPreviewNameKind,
   type ImportContentPreviewSection,
@@ -16,7 +17,12 @@ import {
   type ImportCardArtUrlMap,
 } from "@/lib/import/import-card-art"
 import { ImportCardArtControls } from "@/components/import/import-card-art-panel"
-import { BookOpen, Package, ScrollText, Users } from "lucide-react"
+import {
+  ImportSourceBulkActions,
+  type ImportSourceBulkAction,
+  type ImportSourceBulkTarget,
+} from "@/components/import/import-source-bulk-actions"
+import { BookOpen, ChevronLeft, ChevronRight, Package, ScrollText, Users } from "lucide-react"
 
 type ImportContentPreviewPanelProps = {
   content: ImportContent
@@ -38,9 +44,26 @@ type ImportContentPreviewPanelProps = {
   onRenameItem?: (kind: ImportContentPreviewNameKind, sourceIndex: number, nextName: string) => void
   /** Soft-skip keys (`section:index`) — independent of collision skip. */
   skippedKeys?: ReadonlySet<string>
+  /** Collision skips from the name-conflict step — hide these rows entirely. */
+  hiddenKeys?: ReadonlySet<string>
   onSkippedKeysChange?: (next: Set<string>) => void
   /** Source used for rows without their own source label. */
   defaultSource?: string
+  /** Apply one import decision to every entry in the active source group. */
+  onSourceBulkAction?: (
+    source: string,
+    targets: ImportSourceBulkTarget[],
+    action: ImportSourceBulkAction,
+  ) => void
+  /**
+   * Shown in the source Previous/Next row only on the last source page
+   * (replaces the disabled Next control).
+   */
+  continueReview?: {
+    label: string
+    onClick: () => void
+    disabled?: boolean
+  }
 }
 
 const SECTION_ICONS: Record<string, typeof BookOpen> = {
@@ -266,16 +289,47 @@ export function ImportContentPreviewPanel({
   onCardArtChange,
   onRenameItem,
   skippedKeys,
+  hiddenKeys,
   onSkippedKeysChange,
   defaultSource,
+  onSourceBulkAction,
+  continueReview,
 }: ImportContentPreviewPanelProps) {
-  const sections = useMemo(
+  const collectedSections = useMemo(
     () => collectImportContentPreview(content, sectionKeys ? { sectionKeys } : undefined),
     [content, sectionKeys],
+  )
+  const sections = useMemo(
+    () =>
+      hiddenKeys?.size ? omitPreviewItemsBySkipKeys(collectedSections, hiddenKeys) : collectedSections,
+    [collectedSections, hiddenKeys],
   )
   const sourceGroups = useMemo(
     () => groupImportContentPreviewBySource(sections, defaultSource),
     [defaultSource, sections],
+  )
+  const multipleSources = sourceGroups.length > 1
+  const [sourcePageIndex, setSourcePageIndex] = useState(0)
+
+  useEffect(() => {
+    setSourcePageIndex((current) =>
+      sourceGroups.length === 0 ? 0 : Math.min(current, sourceGroups.length - 1),
+    )
+  }, [sourceGroups.length])
+
+  const activeSourceGroup = multipleSources ? sourceGroups[sourcePageIndex] ?? null : null
+  const onLastSource = multipleSources && sourcePageIndex >= sourceGroups.length - 1
+  const showSourceContinue = Boolean(continueReview && onLastSource)
+  const activeSourceTargets = useMemo(
+    () =>
+      activeSourceGroup?.sections.flatMap((section) =>
+        section.items.map((item) => ({
+          sectionKey: item.sectionKey,
+          sourceIndex: item.sourceIndex,
+          name: item.name,
+        })),
+      ) ?? [],
+    [activeSourceGroup],
   )
 
   const handleToggleSkip = (item: ImportContentPreviewItem) => {
@@ -288,19 +342,22 @@ export function ImportContentPreviewPanel({
   }
 
   const visibleSummary = hideSummary ? undefined : previewSummary
-  if (!sections.length && !visibleSummary && !showModifierReviewHint) return null
+  const allHiddenByConflicts = collectedSections.length > 0 && sections.length === 0
+  if (!sections.length && !visibleSummary && !showModifierReviewHint && !allHiddenByConflicts) {
+    return null
+  }
 
   const singleSection = sections.length === 1
-  const multipleSources = sourceGroups.length > 1
   const renderSections = (
     visibleSections: ImportContentPreviewSection[],
     keyPrefix = "",
+    forceBare = false,
   ) =>
     visibleSections.map((section) => (
       <PreviewSection
         key={`${keyPrefix}${section.key}`}
         section={section}
-        bare={embedded && visibleSections.length === 1}
+        bare={forceBare || (embedded && visibleSections.length === 1)}
         cardArtUrls={cardArtUrls}
         onCardArtChange={onCardArtChange}
         onRenameItem={onRenameItem}
@@ -322,6 +379,10 @@ export function ImportContentPreviewPanel({
                 ? "Check the parsed entries for this stage before continuing."
                 : "Check parsed content below before confirming."}
             </p>
+          ) : allHiddenByConflicts ? (
+            <p className="mt-1 text-muted-foreground">
+              Skipped name conflicts are hidden from this step.
+            </p>
           ) : null}
           {showModifierReviewHint ? (
             <p className="mt-1 text-muted-foreground">
@@ -332,43 +393,141 @@ export function ImportContentPreviewPanel({
         </div>
       ) : sections.length > 0 ? (
         <p className="text-xs text-muted-foreground">
-          {showModifierReviewHint
-            ? "Edit names and optional card art below, then continue to modifier wiring."
-            : "Edit names and optional card art below before confirming."}
+          {onCardArtChange
+            ? showModifierReviewHint
+              ? "Edit names and optional card art below, then continue to modifier wiring."
+              : "Edit names and optional card art below before confirming."
+            : showModifierReviewHint
+              ? "Review content below, then continue through the remaining review steps."
+              : "Review content below before continuing."}
+        </p>
+      ) : allHiddenByConflicts ? (
+        <p className="text-xs text-muted-foreground">
+          Skipped name conflicts are hidden from this step.
         </p>
       ) : null}
 
       {sections.length > 0 ? (
         <div className={embedded ? "space-y-2" : "space-y-3"}>
-          {multipleSources
-            ? sourceGroups.map((group) => (
-                <section
-                  key={group.source}
-                  className="space-y-3 rounded-xl border border-primary/25 bg-primary/[0.03] p-3"
-                >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 className="font-semibold text-foreground">{group.source}</h3>
+          {multipleSources && activeSourceGroup ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    {sourcePageIndex + 1} of {sourceGroups.length}
+                  </span>
+                  <span className="mx-1.5">·</span>
+                  Reviewing sources one at a time
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={sourcePageIndex <= 0}
+                    onClick={() => setSourcePageIndex((index) => Math.max(0, index - 1))}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                    Previous
+                  </button>
+                  {showSourceContinue && continueReview ? (
+                    <button
+                      type="button"
+                      disabled={continueReview.disabled}
+                      onClick={continueReview.onClick}
+                      className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/25 transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      {continueReview.label}
+                      <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={sourcePageIndex >= sourceGroups.length - 1}
+                      onClick={() =>
+                        setSourcePageIndex((index) => Math.min(sourceGroups.length - 1, index + 1))
+                      }
+                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      Next
+                      <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="tablist"
+                aria-label="Import sources"
+              >
+                {sourceGroups.map((group, index) => {
+                  const active = index === sourcePageIndex
+                  return (
+                    <button
+                      key={group.source}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      title={`${group.source} (${group.itemCount})`}
+                      onClick={() => setSourcePageIndex(index)}
+                      className={`max-w-[14rem] truncate rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      }`}
+                    >
+                      {group.source}
+                      <span className={active ? "opacity-80" : "opacity-70"}>
+                        {" "}
+                        · {group.itemCount}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <section
+                key={activeSourceGroup.source}
+                className="space-y-3 rounded-xl border border-primary/25 bg-primary/[0.03] p-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-semibold text-foreground">{activeSourceGroup.source}</h3>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <span className="text-xs text-muted-foreground">
-                      {group.itemCount} item{group.itemCount === 1 ? "" : "s"}
+                      {activeSourceGroup.itemCount} item
+                      {activeSourceGroup.itemCount === 1 ? "" : "s"}
                     </span>
+                    <ImportSourceBulkActions
+                      source={activeSourceGroup.source}
+                      targets={activeSourceTargets}
+                      onAction={onSourceBulkAction}
+                      actions={["skip"]}
+                    />
                   </div>
-                  <div className="space-y-2">
-                    {renderSections(group.sections, `${group.source}:`)}
-                  </div>
-                </section>
-              ))
-            : sections.map((section) => (
-                <PreviewSection
-                  key={section.key}
-                  section={section}
-                  bare={embedded && singleSection}
-                  cardArtUrls={cardArtUrls}
-                  onCardArtChange={onCardArtChange}
-                  onRenameItem={onRenameItem}
-                  skippedKeys={skippedKeys}
-                  onToggleSkip={onSkippedKeysChange ? handleToggleSkip : undefined}
-                />
-              ))}
+                </div>
+                <div className="space-y-2">
+                  {renderSections(
+                    activeSourceGroup.sections,
+                    `${activeSourceGroup.source}:`,
+                    embedded && activeSourceGroup.sections.length === 1,
+                  )}
+                </div>
+              </section>
+            </div>
+          ) : (
+            sections.map((section) => (
+              <PreviewSection
+                key={section.key}
+                section={section}
+                bare={embedded && singleSection}
+                cardArtUrls={cardArtUrls}
+                onCardArtChange={onCardArtChange}
+                onRenameItem={onRenameItem}
+                skippedKeys={skippedKeys}
+                onToggleSkip={onSkippedKeysChange ? handleToggleSkip : undefined}
+              />
+            ))
+          )}
         </div>
       ) : null}
     </>

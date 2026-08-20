@@ -35,6 +35,10 @@ import {
 import { applyAllyEffectLocally } from "@/lib/character/apply-ally-effect"
 import { applyPartyHealEffect } from "@/lib/character/apply-party-heal"
 import { applyResourceToResourceRestore } from "@/lib/character/resource-conversion"
+import {
+  formatEmpowerEffect,
+  resolveSpecialAttackEmpower,
+} from "@/lib/character/special-attack-empower"
 import { defaultSheetPlayState } from "@/lib/character/sheet-play-state"
 import {
   resolveFeatureEffectHealAmount,
@@ -187,6 +191,7 @@ function ActionRollStep({
   proficiencyBonus,
   damageModifier,
   damageModifierNote = null,
+  bonusDice = null,
   psiSpent,
   hitDiceSpent,
   augmentSummary,
@@ -198,6 +203,8 @@ function ActionRollStep({
   proficiencyBonus: number
   damageModifier: number
   damageModifierNote?: string | null
+  /** Extra damage dice bought with a resource (e.g. Prime Bomb Reagents). */
+  bonusDice?: { count: number; sides: number; label: string } | null
   psiSpent: number
   hitDiceSpent: number
   augmentSummary: string | null
@@ -220,9 +227,12 @@ function ActionRollStep({
     action.hitDieSides != null && action.hitDieSides > 0
       ? action.hitDieSides
       : dieSides(specialAttack.damageDieType)
+  const extraDice = bonusDice && bonusDice.count > 0 ? bonusDice : null
   const damageExpression = `${specialAttack.damageDiceCount}d${sides}${
-    damageModifier ? ` ${damageModifier >= 0 ? "+" : ""}${damageModifier}` : ""
-  }${specialAttack.damageTypes[0] ? ` ${specialAttack.damageTypes[0]}` : ""}`
+    extraDice ? ` + ${extraDice.count}d${extraDice.sides}` : ""
+  }${damageModifier ? ` ${damageModifier >= 0 ? "+" : ""}${damageModifier}` : ""}${
+    specialAttack.damageTypes[0] ? ` ${specialAttack.damageTypes[0]}` : ""
+  }`
 
   const rollAttack = () => {
     const resolved = resolveRollMode({
@@ -260,6 +270,7 @@ function ActionRollStep({
             count: specialAttack.damageDiceCount,
             sides,
           },
+          ...(extraDice ? [{ count: extraDice.count, sides: extraDice.sides }] : []),
         ],
         modifier: damageModifier,
       },
@@ -297,6 +308,9 @@ function ActionRollStep({
         ) : null}
         {augmentSummary ? (
           <p className="text-xs text-muted-foreground">{augmentSummary}</p>
+        ) : null}
+        {extraDice ? (
+          <p className="text-xs font-semibold text-primary">{extraDice.label}</p>
         ) : null}
       </div>
 
@@ -389,6 +403,7 @@ function ActionDetailOverlay({
   onMarkDamageDealt,
   onBankBalanceOfPower,
   onRestoreUseByResource,
+  resolveResourcePool,
   allyCandidates = [],
   healContext = null,
   playerNoteValues = {},
@@ -426,6 +441,8 @@ function ActionDetailOverlay({
   onMarkDamageDealt?: () => void
   onBankBalanceOfPower?: (amount: number) => void
   onRestoreUseByResource?: () => string | null
+  /** Look up an arbitrary class resource pool so an attack can be empowered by spending it. */
+  resolveResourcePool?: (resourceKey: string, classId?: string | null) => ActionUsage | null
   allyCandidates?: PartyAllyCandidate[]
   healContext?: HealResolveContext | null
   playerNoteValues?: Record<string, string[]>
@@ -436,6 +453,7 @@ function ActionDetailOverlay({
   const [step, setStep] = useState<"detail" | "roll" | "target">("detail")
   const [useFeedback, setUseFeedback] = useState<string | null>(null)
   const [resourceSpendAmount, setResourceSpendAmount] = useState(1)
+  const [empowerSpend, setEmpowerSpend] = useState(0)
   const [pendingHealEffects, setPendingHealEffects] = useState<FeatureEffect[]>([])
   const [applyingHeal, setApplyingHeal] = useState(false)
   const menuOptions = (action.menuOptions ?? []).filter(
@@ -489,6 +507,26 @@ function ActionDetailOverlay({
       ? configuredResourceCost
       : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
   const chargeExhausted = usage != null && usage.max - usage.used < resourceSpend
+
+  const empower = resolveSpecialAttackEmpower(specialAttack, action.classLevel)
+  // The rider spends its own pool (Reagents, for a Bomb), which is usually not the pool the action
+  // itself draws on, so it is resolved separately from `usage`.
+  const empowerPool = empower
+    ? (resolveResourcePool?.(empower.resourceKey, action.classId) ?? null)
+    : null
+  const empowerMax = Math.min(
+    empower?.maxSpend ?? 0,
+    empowerPool
+      ? Math.max(
+          0,
+          empowerPool.max -
+            empowerPool.used -
+            (empowerPool.resourceId === usage?.resourceId ? resourceSpend : 0),
+        )
+      : 0,
+  )
+  const empowerApplied = Math.max(0, Math.min(empowerSpend, empowerMax))
+
   const canAffordPsi = psiCost <= availablePsiPoints && (psiLimit == null || psiCost <= psiLimit)
   const canAffordHitDice = hitDiceNeeded <= 0 || hitDiceNeeded <= hitDiceRemaining
   const canUse =
@@ -505,6 +543,7 @@ function ActionDetailOverlay({
     setStep("detail")
     setUseFeedback(null)
     setResourceSpendAmount(1)
+    setEmpowerSpend(0)
     setSelectedMenuOption(menuOptions[0]?.name ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the opened action changes
   }, [action.id])
@@ -521,14 +560,24 @@ function ActionDetailOverlay({
     }
 
     const spendViaAugments = psiCost > 0
+    const sharesEmpowerPool =
+      empowerPool != null && usage != null && empowerPool.resourceId === usage.resourceId
     if (usage && !spendViaAugments) {
-      usage.setUsed(usage.used + resourceSpend)
+      usage.setUsed(usage.used + resourceSpend + (sharesEmpowerPool ? empowerApplied : 0))
+    }
+    if (empowerPool && empowerApplied > 0 && !sharesEmpowerPool) {
+      empowerPool.setUsed(empowerPool.used + empowerApplied)
     }
     if (spendViaAugments) {
       onSpendPsi(psiCost)
     }
 
     const parts: string[] = []
+    if (empower && empowerApplied > 0) {
+      parts.push(
+        `Spent ${empowerApplied} ${empowerPool?.resourceName ?? empower.resourceKey.replace(/_/g, " ")} · ${formatEmpowerEffect(empower, empowerApplied)}`,
+      )
+    }
     if (selectedOption) {
       parts.push(selectedOption.name)
     }
@@ -790,6 +839,15 @@ function ActionDetailOverlay({
                 ? `Empowered Psionics (+${empoweredPsionicsDamageMod} INT)`
                 : null
             }
+            bonusDice={
+              empower && empowerApplied > 0 && empower.dicePerResource > 0
+                ? {
+                    count: empower.dicePerResource * empowerApplied,
+                    sides: empower.dieSides,
+                    label: `${empowerApplied} ${empowerPool?.resourceName ?? empower.resourceKey.replace(/_/g, " ")} · ${formatEmpowerEffect(empower, empowerApplied)}`,
+                  }
+                : null
+            }
             psiSpent={psiCost}
             hitDiceSpent={hitDiceNeeded}
             augmentSummary={augmentSummary}
@@ -1049,6 +1107,40 @@ function ActionDetailOverlay({
                   />
                 </label>
               ) : null}
+              {empower && empowerPool ? (
+                <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-primary">
+                      Empower with {empowerPool.resourceName ?? empower.resourceKey.replace(/_/g, " ")}
+                    </p>
+                    <p className="text-[10px] tabular-nums text-muted-foreground">
+                      {empowerPool.max - empowerPool.used} left · max {empower.maxSpend} per use
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from({ length: empower.maxSpend + 1 }, (_, spend) => (
+                      <button
+                        key={spend}
+                        type="button"
+                        disabled={spend > empowerMax}
+                        onClick={() => setEmpowerSpend(spend)}
+                        className={cn(
+                          "min-w-9 rounded-lg border px-2 py-1 text-xs font-semibold tabular-nums transition-colors",
+                          spend === empowerApplied
+                            ? "border-primary bg-primary/15 text-foreground"
+                            : "border-border hover:border-primary/40",
+                          spend > empowerMax && "opacity-40",
+                        )}
+                      >
+                        {spend}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formatEmpowerEffect(empower, empowerApplied)}
+                  </p>
+                </div>
+              ) : null}
               {useFeedback ? (
                 <p className="rounded-lg bg-primary/10 px-3 py-2 text-center text-xs font-semibold text-primary">
                   {useFeedback}
@@ -1090,6 +1182,9 @@ function ActionDetailOverlay({
               >
                 Use {action.name}
                 {usage && action.classResourceKey ? ` (${resourceSpend} ${usage.resourceName ?? "resource"})` : ""}
+                {empower && empowerApplied > 0
+                  ? ` (+${empowerApplied} ${empowerPool?.resourceName ?? "resource"})`
+                  : ""}
                 {hitDiceNeeded > 0 ? ` (${hitDiceNeeded} HD)` : ""}
                 {psiCost > 0 ? ` (${psiCost} psi)` : ""}
               </button>
@@ -1175,27 +1270,40 @@ export function SheetActionsPanel({
     return null
   }
 
+  /** Resolve any class resource pool as a spendable counter, by key. */
+  const resolveResourcePool = (
+    resourceKey: string,
+    classId?: string | null,
+  ): ActionUsage | null => {
+    if (!onResourceUsedChange) return null
+    // Keyed by class so a multiclass character's same-named pools stay distinct; the unprefixed
+    // search is only a fallback for actions that carry no class (e.g. standalone abilities).
+    const resource = classId
+      ? resourceById.get(`${classId}_${resourceKey}`)
+      : resourceEntries.find(
+          (entry) => entry.id === resourceKey || entry.id.endsWith(`_${resourceKey}`),
+        )
+    if (!resource) return null
+    const max = resolveUsesAtLevel(resource.uses, resource.classLevel, resolveContext)
+    if (max == null || max <= 0) return null
+    return {
+      max,
+      used: usedResourcesById[resource.id] ?? 0,
+      resourceName: resource.name,
+      resourceId: resource.id,
+      setUsed: (next) =>
+        onResourceUsedChange({
+          ...usedResourcesById,
+          [resource.id]: Math.min(max, Math.max(0, next)),
+        }),
+    }
+  }
+
   /** Resolve the spendable counter backing an action, if any. */
   const usageFor = (action: SheetActionEntry): ActionUsage | null => {
     if (action.classResourceKey && action.classId && onResourceUsedChange) {
-      const resourceId = `${action.classId}_${action.classResourceKey}`
-      const resource = resourceById.get(resourceId)
-      if (resource) {
-        const max = resolveUsesAtLevel(resource.uses, resource.classLevel, resolveContext)
-        if (max != null && max > 0) {
-          return {
-            max,
-            used: usedResourcesById[resourceId] ?? 0,
-            resourceName: resource.name,
-            resourceId,
-            setUsed: (next) =>
-              onResourceUsedChange({
-                ...usedResourcesById,
-                [resourceId]: Math.min(max, Math.max(0, next)),
-              }),
-          }
-        }
-      }
+      const pool = resolveResourcePool(action.classResourceKey, action.classId)
+      if (pool) return pool
     }
     const share = action.limitedUses?.useShareKey?.trim()
     const max =
@@ -1422,6 +1530,7 @@ export function SheetActionsPanel({
             onRestoreUseByResource={() =>
               restoreActionUseByResource(openAction, usageFor(openAction))
             }
+            resolveResourcePool={resolveResourcePool}
             allyCandidates={allyCandidates}
             healContext={healContext}
             playerNoteValues={playerNoteValues}

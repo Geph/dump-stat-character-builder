@@ -50,7 +50,8 @@ const POWER_RIDER_PARENTS: { re: RegExp; parents: string[] }[] = [
   { re: /\bAstral Construct\b/i, parents: ["Astral Construct"] },
   { re: /\bMind Leech\b/i, parents: ["Mind Leech"] },
   { re: /\bTelepathic Intrusion\b/i, parents: ["Telepathic Intrusion"] },
-  { re: /\bSeeing\b/i, parents: ["Seeing"] },
+  // Case-sensitive: lowercase "seeing the d20" (Autognome Built for Success) must not match.
+  { re: /(?<![A-Za-z])Seeing(?![A-Za-z])/, parents: ["Seeing"] },
   { re: /\bDenial\b/i, parents: ["Denial"] },
   { re: /\bElemental Blast\b/i, parents: ["Elemental Blast"] },
   // Kibbles prose sometimes typos "psychkinetics" (missing o).

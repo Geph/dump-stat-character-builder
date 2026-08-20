@@ -1,5 +1,5 @@
-# Solbera’s D&D Fonts
+# Solbera’s D&D Fonts (bundled)
 
-Bundled copies of [Solbera’s D&D Fonts](https://jonathonf.github.io/solbera-dnd-fonts/) by Solbera / Ryrok, licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+See **[NOTICE.md](./NOTICE.md)** for license, attribution, and what we changed.
 
-Self-hosted so the live app and GitHub Pages can load display type in Firefox. Remote `@font-face` URLs from another origin are blocked unless that host sends CORS headers.
+Self-hosted so Firefox and GitHub Pages can load display type. Remote `@font-face` from another origin is blocked unless that host sends CORS headers.

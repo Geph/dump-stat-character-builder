@@ -739,6 +739,43 @@ describe("detectFeatureModifiers", () => {
     }
   })
 
+  it("does not treat lowercase 'seeing the d20' as a Seeing power rider", () => {
+    const detections = detectFeatureModifiers(
+      "Add a d4 to an attack roll after seeing the d20 result but before effects resolve.",
+      { ...baseCtx, featureName: "Built for Success" },
+    )
+    expect(detections.some((entry) => entry.ruleId === "power.rider.from_prose")).toBe(false)
+  })
+
+  it("wires capitalized Seeing talent riders", () => {
+    const detections = detectFeatureModifiers(
+      "When you use Seeing, you can also sense invisible creatures.",
+      { ...baseCtx, featureName: "Clear Sight" },
+    )
+    const char = detections.find((entry) => entry.ruleId === "power.rider.from_prose")
+      ?.instance.characteristics?.[0]
+    expect(char?.type).toBe("power_rider")
+    if (char?.type === "power_rider") {
+      expect(char.parentPowerNames).toContain("Seeing")
+    }
+  })
+
+  it("wires Int/Wis/Cha save advantage against spells", () => {
+    const detections = detectFeatureModifiers(
+      "Advantage on Intelligence, Wisdom, and Charisma saving throws against spells.",
+      { ...baseCtx, featureName: "Gnomish Magic Resistance" },
+    )
+    const hit = detections.find((entry) => entry.ruleId === "save.advantage.mental.against_spells")
+    expect(hit).toBeTruthy()
+    const effects = hit?.instance.activation?.effects ?? []
+    expect(effects).toHaveLength(3)
+    expect(effects.map((e) => ("checkAbility" in e ? e.checkAbility : null))).toEqual([
+      "Intelligence",
+      "Wisdom",
+      "Charisma",
+    ])
+  })
+
   it("wires Unlimited Imagination choice count bonus", () => {
     const detections = detectFeatureModifiers(
       "You can select two options from Boundless Imagination instead of one.",

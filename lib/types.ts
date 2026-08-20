@@ -78,6 +78,12 @@ export interface FeatureChoice {
    */
   swapRestType?: "short" | "long" | null
   /**
+   * One pick may be replaced whenever the character gains a level in this class (e.g. the
+   * Alchemist's "whenever you gain an Alchemist level, you can replace one of your Discoveries").
+   * Surfaces an optional swap step in the level-up wizard.
+   */
+  swappableOnLevelUp?: boolean
+  /**
    * When set, builder aggregates options dynamically instead of using the static `options` array.
    * `known_discipline_talents` — union of talent lists from disciplines the character knows.
    */

@@ -104,7 +104,7 @@ function signatureFeatureFallbackBadge(cls: DndClass): ClassDetailHeroBadge | nu
 }
 
 export function getClassComplexityHeroBadge(
-  cls: Pick<DndClass, "name" | "complexity">,
+  cls: Pick<DndClass, "name" | "complexity"> & { source?: string | null },
 ): ClassDetailHeroBadge | null {
   const complexity = resolveClassComplexity(cls)
   if (!complexity) return null

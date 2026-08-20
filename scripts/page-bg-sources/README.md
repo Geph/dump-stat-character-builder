@@ -20,7 +20,7 @@ pnpm images:optimize
 
 | File | Output |
 |------|--------|
-| `rotating (1).png` … `rotating (4).png` | `public/images/hero/rotating-01.webp` … `rotating-04.webp` |
+| `rotating (1).png` … `rotating (8).png` | `public/images/hero/rotating-01.webp` … `rotating-08.webp` |
 
 Also accepts `rotating-01.jpg`, etc. Output at **2560×1280** WebP.
 

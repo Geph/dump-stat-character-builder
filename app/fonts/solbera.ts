@@ -1,9 +1,9 @@
 import localFont from "next/font/local"
 
 /**
- * Solbera’s D&D Fonts (CC BY-SA 4.0 — Solbera / Ryrok).
- * Self-hosted so Firefox can load them (cross-origin @font-face is blocked
- * unless the remote host sends CORS headers).
+ * Solbera’s D&D Fonts — CC BY-SA 4.0 (Solbera, with fixes by Ryrok, Ners, LUCASTUCIOUS).
+ * Font files in ./solbera/ are NOT MIT. See ./solbera/NOTICE.md.
+ * Self-hosted so Firefox can load them (cross-origin @font-face needs CORS).
  * https://jonathonf.github.io/solbera-dnd-fonts/
  */
 

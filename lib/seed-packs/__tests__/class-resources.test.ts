@@ -41,6 +41,32 @@ describe("non-SRD seed class resources", () => {
     expect([...resources.keys()]).toEqual(expect.arrayContaining(expectedKeys))
   })
 
+  it("keeps Reagents an Alchemist-only pool", () => {
+    const alchemist = resourceMap(
+      loadSeed("mage-hand-press/magehandpress-alchemist-class.json"),
+    ).get("reagents")
+    // Reagents (1 per short rest) stacks with Reagent Synthesis (INT mod, once per long rest).
+    expect(alchemist?.uses).toMatchObject({
+      type: "at_level",
+      recharges: [
+        { rest: "short_rest", amount: 1 },
+        {
+          rest: "short_rest",
+          amountFormula: "ability_modifier",
+          amountFormulaAbility: "INT",
+          maxPerLongRest: 1,
+        },
+        { rest: "long_rest" },
+      ],
+    })
+
+    // The Inventor's "Alchemical Reagents Pouch" is a gating item, not a spendable pool, so it
+    // must not carry the Alchemist's reagents key (or any reagents pool at all).
+    const inventorKeys = [...resourceMap(loadSeed("kibbles-tasty/kibbles-inventor-class.json")).keys()]
+    expect(inventorKeys).not.toContain("reagents")
+    expect(inventorKeys.filter((key) => key.includes("reagent"))).toEqual([])
+  })
+
   it("keeps subclass ownership on every newly reconciled resource", () => {
     const checks = [
       ["mage-hand-press/magehandpress-vagabond-class.json", "mage_brand_max_slot_level", "Mage Brand"],

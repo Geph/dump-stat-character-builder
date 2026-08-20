@@ -203,7 +203,10 @@ export function enrichSrdClassRow(row: Record<string, unknown>): Record<string, 
   const weaponProficiencyOverride = SRD_CLASS_WEAPON_PROFICIENCY_OVERRIDES[name]
   const complexity = isClassComplexity(row.complexity)
     ? row.complexity
-    : defaultClassComplexityForName(name)
+    : defaultClassComplexityForName(
+        name,
+        typeof row.source === "string" ? row.source : null,
+      )
 
   return applySrdFlavorDescription(
     applyBundledCardImage(

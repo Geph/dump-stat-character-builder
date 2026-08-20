@@ -1,6 +1,5 @@
 import type { RestType, UsesConfig } from "@/lib/types"
 import {
-  getRechargeAmount,
   getRechargeAmountOnInitiative,
   getEffectiveRechargeRules,
   getRestRechargeRules,
@@ -46,30 +45,34 @@ export function applyUsesRest(
       : getEffectiveRechargeRules(uses, options.classLevel).filter(
           (rule): rule is Extract<typeof rule, { rest: RestType }> => "rest" in rule,
         )
-  const rule = effectiveRules.find((entry) => entry.rest === rest)
-  if (!rule) return { used: currentUsed }
-  if (rule?.maxPerLongRest != null && rule.maxPerLongRest > 0) {
-    const usedCaps = options?.rechargeCapsUsed ?? 0
-    if (usedCaps >= rule.maxPerLongRest) return { used: currentUsed }
+  // A pool can stack more than one rule for the same rest: the Alchemist regains 1 Reagent on
+  // every Short Rest and, via Reagent Synthesis, up to their INT modifier once per Long Rest.
+  const rules = effectiveRules.filter((entry) => entry.rest === rest)
+  if (!rules.length) return { used: currentUsed }
+
+  let used = currentUsed
+  let capsUsed = options?.rechargeCapsUsed ?? 0
+  let capsConsumed = false
+
+  for (const rule of rules) {
+    const cap = rule.maxPerLongRest != null && rule.maxPerLongRest > 0 ? rule.maxPerLongRest : null
+    if (cap != null && capsUsed >= cap) continue
     const rechargeAmount = resolveRechargeRuleAmount(
       rule,
       options?.classLevel ?? null,
       options?.abilityModifiers ?? null,
     )
-    const nextUsed =
-      rechargeAmount == null ? 0 : Math.max(0, currentUsed - rechargeAmount)
-    return { used: nextUsed, rechargeCapsUsed: usedCaps + 1 }
+    const nextUsed = rechargeAmount == null ? 0 : Math.max(0, used - rechargeAmount)
+    if (cap != null) {
+      // Don't burn a limited recharge that had nothing to restore.
+      if (nextUsed === used) continue
+      capsUsed += 1
+      capsConsumed = true
+    }
+    used = nextUsed
   }
 
-  const rechargeAmount = rule
-    ? resolveRechargeRuleAmount(
-        rule,
-        options?.classLevel ?? null,
-        options?.abilityModifiers ?? null,
-      )
-    : getRechargeAmount(uses, rest)
-  if (rechargeAmount == null) return { used: 0 }
-  return { used: Math.max(0, currentUsed - rechargeAmount) }
+  return capsConsumed ? { used, rechargeCapsUsed: capsUsed } : { used }
 }
 
 export function applyInitiativeResourceRecharge(

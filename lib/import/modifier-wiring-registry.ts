@@ -460,9 +460,20 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ruleId: "save.advantage",
     trigger: "description",
     catalog: "cat_fx_check_roll_modifier",
-    examples: ["advantage on Constitution saving throws"],
+    examples: ["advantage on Constitution saving throws", "Advantage on Strength saves"],
     mechanicsKind: "check_roll_modifier",
     notes: 'checkCategory: "save"',
+  },
+  {
+    ruleId: "save.advantage.mental.against_spells",
+    trigger: "description",
+    catalog: "cat_fx_check_roll_modifier",
+    examples: [
+      "Advantage on Intelligence, Wisdom, and Charisma saving throws against spells",
+    ],
+    mechanicsKind: "check_roll_modifier",
+    notes:
+      'Three save advantages (Int/Wis/Cha) with checkConditionTypes: ["spell"] — Deep Gnome Gnomish Magic Resistance',
   },
   {
     ruleId: "save.advantage.magic",

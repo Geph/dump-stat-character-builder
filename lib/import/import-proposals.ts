@@ -5,7 +5,11 @@ import { isCompanionStatBlockFeature } from "@/lib/character/companion-recogniti
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
-import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
+import {
+  isNonOwnerClassForResource,
+  remapClassScopedResourceKey,
+  THIRD_PARTY_RESOURCE_PATTERNS,
+} from "@/lib/import/third-party-resources"
 import { remapPointPoolResourceKey } from "@/lib/import/enrich-point-pool-resources"
 import type { UsesConfig } from "@/lib/types"
 
@@ -527,7 +531,10 @@ function collectTableResources(
     for (const column of parsed.columns) {
       pushResource(into.classResources, seenResources, {
         className,
-        resourceKey: remapPointPoolResourceKey(className, column.resourceKey),
+        resourceKey: remapClassScopedResourceKey(
+          className,
+          remapPointPoolResourceKey(className, column.resourceKey),
+        ),
         name: column.resourceName,
         definition: defaultResourceDefinition(column.resourceName, className),
         description: `${column.resourceName} progression parsed from the ${className} level table.`,
@@ -550,6 +557,9 @@ function collectTextDerivedResources(
     for (const pattern of THIRD_PARTY_RESOURCE_PATTERNS) {
       if (!pattern.proposeFromText || !pattern.textProposalUses) continue
       if (!pattern.namePattern.test(text)) continue
+      // A class-scoped resource is never inferred from prose for another class — the Inventor's
+      // Potionsmith flavor text mentions reagents but it has no Alchemist-style pool.
+      if (isNonOwnerClassForResource(className, pattern)) continue
       pushResource(into.classResources, seenResources, {
         className,
         resourceKey: remapPointPoolResourceKey(className, pattern.resourceKey),
