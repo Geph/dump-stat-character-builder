@@ -19,4 +19,4 @@ Output: `public/images/compendium/classes/*.png` at **771×1024** (**3:4** portr
 
 Backgrounds use **21:9** (`1680×720`) — see `scripts/background-card-sources/README.md`.
 
-Source files here are gitignored. GitHub only receives optimized **SRD / Kibbles / Mage Hand Press** class portraits (`inventor`, `occultist`, `psion`, `warden-kibbles`, and the twelve SRD classes). Eberron Artificer and other setting-book class art stay local — see the README “Local card art” section.
+Source files here are gitignored. 
