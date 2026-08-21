@@ -1,3 +1,4 @@
+import { enrichReagentResourceUses } from "@/lib/compendium/alchemist-feature-wiring"
 import { INFLUENCE_POINTS_KEY, IN_COMBAT_TOGGLE } from "@/lib/character/influence-points"
 import {
   innateArcanumPresetForClass,
@@ -311,28 +312,7 @@ export function resolveRemapTarget(to: string, className: string): string {
   return to
 }
 
-/**
- * Reagents regain 1 on every Short Rest and refill on a Long Rest. Reagent Synthesis
- * (INT modifier, minimum 1, once per Long Rest) lives on the Reagent Synthesis feature
- * as a class_resource restore — not as a second stacked rule on this pool.
- */
-export function enrichReagentResourceUses(uses: UsesConfig): UsesConfig {
-  const recharges = [...(uses.recharges ?? [])]
-  const isRest = (rule: (typeof recharges)[number]) => rule.kind !== "real_time"
-  const withoutSynthesis = recharges.filter(
-    (rule) => !(isRest(rule) && rule.amountFormula === "ability_modifier"),
-  )
-  const hasBaseShortRest = withoutSynthesis.some(
-    (rule) => isRest(rule) && rule.rest === "short_rest" && rule.maxPerLongRest == null,
-  )
-  if (!hasBaseShortRest) {
-    withoutSynthesis.unshift({ rest: "short_rest", amount: 1 })
-  }
-  if (!withoutSynthesis.some((rule) => isRest(rule) && rule.rest === "long_rest")) {
-    withoutSynthesis.push({ rest: "long_rest" })
-  }
-  return { ...uses, recharges: withoutSynthesis }
-}
+export { enrichReagentResourceUses }
 
 function holyTrinketPoolSpend(label: string): LinkedModifierInstance {
   return usesInstance(
