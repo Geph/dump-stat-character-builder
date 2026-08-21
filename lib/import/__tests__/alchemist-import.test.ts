@@ -748,7 +748,9 @@ describe("enrichImportContentModifiers integration", () => {
         },
       ],
     } as unknown as ImportContent)
-    const mixologist = enriched.classes?.[0]?.features?.find((f) => f.name === "Potion Mixologist")
+    const mixologist = enriched.classes?.[0]?.features?.find((f) => f.name === "Potion Mixologist") as
+      | import("@/lib/types").Feature
+      | undefined
     expect(mixologist?.activation?.bonusAction).toBe(true)
     expect(mixologist?.sheetDisplay).toMatchObject({ combatActions: true })
     expect(mixologist?.sheetDisplay?.abilitiesActions).toBeFalsy()
