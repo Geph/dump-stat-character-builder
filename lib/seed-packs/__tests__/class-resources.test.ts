@@ -46,19 +46,11 @@ describe("non-SRD seed class resources", () => {
     const alchemist = resourceMap(
       loadSeed("mage-hand-press/magehandpress-alchemist-class.json"),
     ).get("reagents")
-    // Reagents (1 per short rest) stacks with Reagent Synthesis (INT mod, once per long rest).
+    // Reagents regain 1 on a Short Rest and refill on a Long Rest. Reagent Synthesis
+    // (INT mod, min 1, once per long rest) is a class-resource restore on that feature.
     expect(alchemist?.uses).toMatchObject({
       type: "at_level",
-      recharges: [
-        { rest: "short_rest", amount: 1 },
-        {
-          rest: "short_rest",
-          amountFormula: "ability_modifier",
-          amountFormulaAbility: "INT",
-          maxPerLongRest: 1,
-        },
-        { rest: "long_rest" },
-      ],
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
     })
 
     // The Inventor's "Alchemical Reagents Pouch" is a gating item, not a spendable pool, so it
@@ -66,6 +58,41 @@ describe("non-SRD seed class resources", () => {
     const inventorKeys = [...resourceMap(loadSeed("kibbles-tasty/kibbles-inventor-class.json")).keys()]
     expect(inventorKeys).not.toContain("reagents")
     expect(inventorKeys.filter((key) => key.includes("reagent"))).toEqual([])
+  })
+
+  it("tags Bomb Formulas and Discoveries as picker libraries, not upgrades", () => {
+    const seed = loadSeed("mage-hand-press/magehandpress-alchemist-class.json")
+    const roles = new Map<string, number>()
+    for (const ability of seed.abilities ?? []) {
+      const role = ability.ability_role ?? "(none)"
+      roles.set(role, (roles.get(role) ?? 0) + 1)
+    }
+    expect(roles.get("bomb_formula")).toBe(18)
+    expect(roles.get("discovery")).toBe(12)
+    expect(roles.get("upgrade")).toBeUndefined()
+
+    const formulas = seed.classes
+      ?.find((entry) => entry.name === "Alchemist")
+      ?.features?.find((feature) => feature.name === "Bomb Formulas")
+    expect(formulas?.choices).toMatchObject({
+      optionsSource: "class_bomb_formulas",
+      resourceKey: "bomb_formulas_known",
+    })
+    expect(formulas?.choices?.choiceCountByLevel?.at(-1)).toEqual({ level: 19, count: 8 })
+
+    const synthesis = seed.classes
+      ?.find((entry) => entry.name === "Alchemist")
+      ?.features?.find((feature) => feature.name === "Reagent Synthesis")
+    expect(synthesis?.description).toMatch(/Intelligence modifier \(minimum of 1\)/)
+    expect(synthesis?.description).not.toMatch(/On a Short Rest, regain Reagents equal to/)
+    const restore = (synthesis?.linkedModifiers ?? [])
+      .flatMap((mod) => mod.activation?.effects ?? [])
+      .find((effect) => effect.kind === "class_resource")
+    expect(restore).toMatchObject({
+      classResourceChange: "increase",
+      resourceRefreshOncePerLongRest: true,
+      classResourceAmountConfig: { mode: "ability_modifier", ability: "INT", minimum: 1 },
+    })
   })
 
   it("ships both Bomb modes with their runtime ability rules", () => {

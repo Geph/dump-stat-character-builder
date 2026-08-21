@@ -38,6 +38,7 @@ export const BUILDER_CLASS_COLUMNS = [
   "saving_throws",
   "armor_proficiencies",
   "weapon_proficiencies",
+  "tool_proficiencies",
   "skill_choices",
   "starting_equipment",
   "starting_equipment_groups",

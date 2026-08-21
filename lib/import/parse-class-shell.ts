@@ -12,6 +12,7 @@ export type ParsedClassShell = {
   saving_throws: string[] | null
   armor_proficiencies: string[] | null
   weapon_proficiencies: string[] | null
+  tool_proficiencies: string[] | null
   skill_choices: ParsedClassSkillChoices | null
   primary_ability: string[] | null
   description: string | null
@@ -77,6 +78,19 @@ function parseWeaponProficiencies(text: string): string[] | null {
   const match = text.match(/Weapons:\s*([^\n]+)/i)
   if (!match) return null
   const items = splitProficiencyList(normalizeText(match[1]))
+  return items.length ? items : null
+}
+
+function parseToolProficiencies(text: string): string[] | null {
+  const match = text.match(/Tools?:\s*([^\n]+)/i) ?? text.match(/Tool Proficienc(?:y|ies):\s*([^\n]+)/i)
+  if (!match) return null
+  const raw = normalizeText(match[1]).replace(/\s*\(see\s+[^)]+\)\s*$/i, "").trim()
+  if (!raw || /^none$/i.test(raw)) return null
+  // Keep choice phrases intact as a single entry (builder turns them into pickers).
+  if (/\b(?:choose|select)\b/i.test(raw) || /\bor\b/i.test(raw)) {
+    return [raw]
+  }
+  const items = splitProficiencyList(raw)
   return items.length ? items : null
 }
 
@@ -227,6 +241,7 @@ export function parseClassShellFromText(
     saving_throws: parseSavingThrows(text),
     armor_proficiencies: parseArmorProficiencies(text),
     weapon_proficiencies: parseWeaponProficiencies(text),
+    tool_proficiencies: parseToolProficiencies(text),
     skill_choices: parseSkillChoices(text),
     primary_ability: parsePrimaryAbility(text),
     description: parseClassDescription(text, className),

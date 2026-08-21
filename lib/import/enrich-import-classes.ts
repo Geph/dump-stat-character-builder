@@ -15,6 +15,7 @@ import {
 } from "@/lib/import/enrichment-presets"
 import { enrichPointPoolClassResources, remapPointPoolResourceKey } from "@/lib/import/enrich-point-pool-resources"
 import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
+import { wireClassToolProficiencyChoices } from "@/lib/compendium/class-tool-proficiencies"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
 import { extractMulticlassSection } from "@/lib/import/parse-multiclass-section"
 import { stripClassProgressionTablesFromText } from "@/lib/import/strip-class-progression-tables"
@@ -519,7 +520,7 @@ export function enrichImportedClassRow(
   const existingIcon = typeof row.icon === "string" ? row.icon.trim() : ""
   const icon = existingIcon || defaultClassIconForName(className)
 
-  return {
+  return wireClassToolProficiencyChoices({
     ...row,
     description,
     features: applyImportedWeaponMasteryColumn(nextFeatures, className, progressionText),
@@ -530,7 +531,7 @@ export function enrichImportedClassRow(
     ...(icon ? { icon } : {}),
     ...(skill_choices ? { skill_choices } : {}),
     ...multiclassFields,
-  }
+  })
 }
 
 export function enrichSubclassFeaturesWithPsiCosts(

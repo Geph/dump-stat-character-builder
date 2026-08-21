@@ -1,4 +1,5 @@
 import { isBombFormulaAbility } from "@/lib/builder/aggregate-bomb-formulas"
+import { isDiscoveryAbility } from "@/lib/builder/aggregate-discoveries"
 import { isChoiceOptionEligible } from "@/lib/builder/choice-option-eligibility"
 import type { ChoicePrerequisiteContext } from "@/lib/builder/choice-prerequisite"
 import { customAbilityMatchesClass } from "@/lib/builder/class-ability-match"
@@ -17,6 +18,7 @@ export function upgradeAbilitiesForClass(
   return customAbilities.filter((ability) => {
     if (ability.ability_role !== "upgrade" && ability.ability_role !== "weapon_mastery") return false
     if (isBombFormulaAbility(ability)) return false
+    if (isDiscoveryAbility(ability)) return false
     return customAbilityMatchesClass(ability, targets, { subclassName: options?.subclassName })
   })
 }

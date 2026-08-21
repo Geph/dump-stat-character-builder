@@ -484,6 +484,7 @@ function specialAttack(
   instanceKey: string,
   config: {
     attackName: string
+    icon?: string | null
     attackProfile: "melee" | "ranged" | "emanation" | "force_save"
     damageDieType: "d4" | "d6" | "d8" | "d10" | "d12"
     damageDiceCount?: number
@@ -504,6 +505,7 @@ function specialAttack(
       id: modId(instanceKey),
       type: "special_attack",
       attackName: config.attackName,
+      icon: config.icon ?? "dragon-breath",
       attackProfile: config.attackProfile,
       properties: config.properties ?? [],
       damageTypes: config.damageTypes ?? [],

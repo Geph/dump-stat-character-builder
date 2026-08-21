@@ -302,6 +302,8 @@ export const ImportMechanicSchema = z.object({
   parentPowerNames: z.array(z.string()).optional(),
   parentMenuOptionNames: z.array(z.string()).optional(),
   alertSummary: z.string().optional(),
+  appliesToAttackVariants: z.array(z.enum(["attack", "primed", "explode"])).optional(),
+  selectable: z.boolean().optional(),
   /** temporary_hit_points */
   amount: z.number().optional(),
   amountDice: z.string().optional(),
@@ -327,6 +329,7 @@ export const ImportMechanicSchema = z.object({
   weaponPropertyFilter: z.array(z.string()).optional(),
   /** special_attack */
   attackName: z.string().optional(),
+  icon: z.string().optional(),
   attackProfile: z.enum(["melee", "ranged", "emanation", "force_save"]).optional(),
   targetMode: z.enum(["single", "multi", "area"]).optional(),
   areaShape: z
@@ -601,6 +604,12 @@ export const ClassImportSchema = z.object({
   saving_throws: z.array(z.string()).nullable().optional(),
   armor_proficiencies: z.array(z.string()).nullable().optional(),
   weapon_proficiencies: z.array(z.string()).nullable().optional(),
+  /**
+   * Fixed tools (e.g. "Thieves' Tools") and/or choice phrasing
+   * ("Choose 3 Musical Instruments", "Choose one kind of Artisan's Tools").
+   * Choice phrases become builder tool pickers; fixed names grant proficiency.
+   */
+  tool_proficiencies: z.array(z.string()).nullable().optional(),
   skill_choices: z
     .object({
       count: z.number(),
@@ -883,8 +892,18 @@ const UsesConfigImportSchema = z.object({
       z.object({
         rest: z.enum(["short_rest", "long_rest"]),
         amount: z.number().nullable().optional(),
-        amountFormula: z.enum(["half_class_level_round_up", "ability_modifier"]).nullable().optional(),
+        amountFormula: z
+          .enum([
+            "half_class_level_round_up",
+            "half_class_level_round_down",
+            "ability_modifier",
+            "proficiency_bonus",
+          ])
+          .nullable()
+          .optional(),
         amountFormulaAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable().optional(),
+        amountFormulaBonus: z.number().nullable().optional(),
+        amountFormulaMinimum: z.number().nullable().optional(),
         maxPerLongRest: z.number().nullable().optional(),
       }),
     )
@@ -897,8 +916,18 @@ const UsesConfigImportSchema = z.object({
           z.object({
             rest: z.enum(["short_rest", "long_rest"]),
             amount: z.number().nullable().optional(),
-            amountFormula: z.enum(["half_class_level_round_up", "ability_modifier"]).nullable().optional(),
-        amountFormulaAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable().optional(),
+            amountFormula: z
+              .enum([
+                "half_class_level_round_up",
+                "half_class_level_round_down",
+                "ability_modifier",
+                "proficiency_bonus",
+              ])
+              .nullable()
+              .optional(),
+            amountFormulaAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable().optional(),
+            amountFormulaBonus: z.number().nullable().optional(),
+            amountFormulaMinimum: z.number().nullable().optional(),
             maxPerLongRest: z.number().nullable().optional(),
           }),
         ),
@@ -1100,6 +1129,7 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - uses.type should be "at_level" with atLevelMode "tier" and atLevelTable [{ level, count }, ...] from the class table
 - **Spendable pools** (Rage, Ki, Psi Points, Exploit Dice, Battle Dice, Dances, Arcane Surge, etc.): include recharges as [{ "rest": "short_rest" }, { "rest": "long_rest" }] (object form preferred; bare ["short_rest","long_rest"] strings are accepted but discouraged)
 - **Battle Dice / pools that refill when you roll Initiative:** also set uses.rechargeOnInitiative: true (full pool) or a number for partial restore
+- **Captain Battle Dice:** spendable pool from the Battle Dice column (NdM) with rechargeOnInitiative. Battle Tactics auto-grants Bolster, Born Leader, Morale Boost, Rally, and Staggering Strike via grant_custom_ability — NOT a class_knacks / Maneuvers Known picker (Vagabond has the pick-N table). Subclass [Maneuver] features are extra named options.
 - **Gunslinger Risk Dice:** short/long rest pool from the Risk Dice column; include dieSidesByLevel (d8/d10/d12). Dire Gambit → rechargeOnInitiative: 1 (not full refill; enrichment sets this from the feature — do not set initiative recharge from the table alone). Keep "expend one Risk Die" on maneuvers. Base Maneuver Options (Bite the Bullet, Blindfire, Dodge Roll, Grazing Shot, Maverick Spirit, Skin of Your Teeth) are auto-known via Risk + grant_custom_ability — NOT a class_knacks picker. Always extract Skin of Your Teeth (PDF places Maneuver Options between Deadeye and Gun Tank). Include Pistolero. Do not contaminate with Captain/Vagabond-only Battle Die maneuvers.
 - **Martyr Spell Uses:** spendable long-rest pool from the Spell Uses column. Hit Point Spellcasting self-damage stays in the Spellcasting feature description (not modeled as normal slots).
 - **Martyr Max Spell Levels:** special cap (resource_key "max_spell_level") from the Max Spell Levels column — not a spendable pool and not normal caster progression.
@@ -1147,7 +1177,8 @@ export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Desi
 - Use the class name exactly as it appears in the source text's own headers and class table (e.g. "Psion," not an invented designer-prefixed variant) unless the user has explicitly told you a disambiguating prefix is required — do not default to prefixing the credited designer's name onto the class name. If a prefix convention is needed to avoid colliding with another compendium entry, that's a decision for the user to confirm, not something to infer from a byline or credits page.
 - **Known same-name collisions:** Mage Hand Press Warden ≠ KibblesTasty Warden (Endurance Dice / Primal Manifestations). Keep the source header name "Warden" in JSON; Dump Stat's collision UI will ask the user to choose a rename (suggestion: "Warden (Mage Hand Press)" or "Warden (Kibbles Tasty)") when the other already exists — do not invent a prefix unless the user asks.
 - That exact class name is the canonical string other passes must match (spells[].classes, source_name on abilities, subclass class_name) — see Name and source matching.
-- Put the full class in classes[] with hit_die, complexity ("easy" | "medium" | "hard"), armor_proficiencies, weapon_proficiencies (top-level string arrays — NEVER {"armor":[...],"weapons":[...]}), saving_throws, and all class features by level
+- Put the full class in classes[] with hit_die, complexity ("easy" | "medium" | "hard"), armor_proficiencies, weapon_proficiencies, tool_proficiencies (top-level string arrays — NEVER {"armor":[...],"weapons":[...],"tools":[...]}), saving_throws, and all class features by level
+- tool_proficiencies: fixed tools (e.g. "Thieves' Tools", "Herbalism Kit", "Alchemist's Supplies") and/or choice phrasing ("Choose 3 Musical Instruments", "Choose one type of Artisan's Tools or Musical Instrument", "Choose one kind of Artisan's Tools") — Dump Stat turns choice phrases into tool pickers
 - Always emit skill_choices from the Skills: line: { count, options } for "Choose N from …"; when the line grants a fixed skill plus picks (e.g. "Psionics, and choose two from Deception, History, …"), set fixed: ["Psionics"] and put only the choosable skills in options
 - Put each subclass/archetype/path in subclasses[] in the SAME JSON as the class (never omit archetypes from a Classes pass) with class_name set to that same parent class name
 - Archetype unlock features (name like "Psionic Archetype"): short description only — do NOT emit isChoice with stub options naming each archetype; Dump Stat uses subclasses[] for the real pick

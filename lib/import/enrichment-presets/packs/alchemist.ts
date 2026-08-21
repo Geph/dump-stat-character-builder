@@ -1,12 +1,39 @@
 import type { ContentSeed, EnrichmentPreset } from "@/lib/import/enrichment-presets/types"
 import { REAGENTS_KEY } from "@/lib/import/enrichment-presets/builders"
+import {
+  retagAlchemistCustomAbility,
+  sanitizeAlchemistFeatures,
+} from "@/lib/compendium/alchemist-feature-wiring"
 import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
 import { characteristicCatalogRefId, effectCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import { requiresActiveToggleLimitation } from "@/lib/compendium/modifier-limitations"
-import type { FeatureChoice } from "@/lib/types"
+import type { ImportContent } from "@/lib/import/content-schema"
+import type { Feature, FeatureChoice } from "@/lib/types"
 
 const SPELL_DYNAMOS_KEY = "spell_dynamos"
+
+function bombFormulaRider(idKey: string, formulaName: string) {
+  return {
+    op: "attachNamedPreset" as const,
+    preset: {
+      kind: "char_instance" as const,
+      idKey,
+      catalogRefId: "cat_char_power_rider",
+      characteristics: [
+        {
+          id: `char_${idKey}`,
+          type: "power_rider",
+          parentPowerNames: ["Bomb", "Bombs"],
+          appliesToAttackVariants: ["attack"],
+          selectable: true,
+          alertSummary: `Add ${formulaName} to a regular (non-primed) Bomb attack.`,
+        },
+      ],
+    },
+    replaceCharacteristicTypes: ["special_attack", "power_rider"],
+  }
+}
 
 function grantNamedAbility(
   abilityName: string,
@@ -162,19 +189,27 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     // "Empowered Bomb" is the older printing's name for the same Reagent-spending rider.
     match: { className: /alchemist/i, name: /^(?:prime|empowered) bomb$/i },
     operations: [
-      // Priming is part of throwing the Bomb, so the sheet gets a combat action that rolls the
-      // Bomb attack with the Reagent spend control attached.
+      // Priming is a mode on Bombs (one primed attack per Attack action), not its own combat card.
       {
         op: "attachNamedPreset",
-        preset: { kind: "alchemist_bomb" },
-        replaceCharacteristicTypes: ["special_attack", "damage_roll_modifiers"],
+        preset: {
+          kind: "char_instance",
+          idKey: "prime_bomb_rider",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "char_prime_bomb_rider",
+              type: "power_rider",
+              parentPowerNames: ["Bomb", "Bombs"],
+              appliesToAttackVariants: ["primed"],
+              alertSummary:
+                "Once per Attack action: replace one Bomb attack with a Primed Bomb and spend Reagents (up to the Prime Bomb column) for +1d10 damage each.",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["special_attack", "damage_roll_modifiers", "power_rider"],
       },
-      { op: "setActivation", activation: { action: true } },
-      { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
-      {
-        op: "appendDescription",
-        text: "Use this in place of one of your attacks with a Bomb, then choose how many Reagents to spend (up to the Prime Bomb column) for +1d10 damage each. A Bomb Formula can be applied to the same Bomb.",
-      },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: false, featuresTab: true } },
     ],
   },
   {
@@ -239,7 +274,7 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     match: { className: /alchemist/i, name: /^potion mixologist$/i },
     operations: [
       { op: "setActivation", activation: { bonusAction: true } },
-      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
         op: "appendDescription",
         text: "Bonus Action: drink two potions at once with no unexpected mixing effects.",
@@ -247,7 +282,7 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     ],
   },
   {
-    id: "alchemist.class.reagent_synthesis_note",
+    id: "alchemist.class.reagent_synthesis",
     pack: "alchemist",
     target: "class_feature",
     match: {
@@ -256,8 +291,29 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     },
     operations: [
       {
-        op: "appendDescription",
-        text: "On a Short Rest, regain Reagents equal to your Intelligence modifier (once per Long Rest).",
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "alchemist_reagent_synthesis",
+          catalogRefId: "cat_fx_class_resource",
+          effects: [
+            {
+              id: "mod_alchemist_reagent_synthesis",
+              kind: "class_resource",
+              classResourceKey: "reagents",
+              classResourceChange: "increase",
+              classResourceAmountConfig: {
+                mode: "ability_modifier",
+                ability: "INT",
+                minimum: 1,
+              },
+              resourceRefreshOnRest: "short_rest",
+              resourceRefreshOncePerLongRest: true,
+              label: "Reagent Synthesis",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: [],
       },
     ],
   },
@@ -321,6 +377,7 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
               id: "char_nuclear_bomb",
               type: "special_attack",
               attackName: "Nuclear Bomb",
+              icon: "nuclear-bomb",
               attackProfile: "force_save",
               attackVariant: "explode",
               targetMode: "area",
@@ -484,79 +541,42 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     pack: "alchemist",
     target: "subclass_feature",
     match: { subclassClassName: /alchemist/i, name: /^pheromone bomb/i },
-    operations: [
-      {
-        op: "attachNamedPreset",
-        preset: { kind: "alchemist_bomb_formula_from_name" },
-        replaceCharacteristicTypes: ["special_attack", "condition_immunity", "damage_resistance"],
-      },
-    ],
+    operations: [bombFormulaRider("pheromone_bomb_rider", "Pheromone Bomb")],
   },
   {
     id: "alchemist.subclass.painkiller_bomb",
     pack: "alchemist",
     target: "subclass_feature",
     match: { subclassClassName: /alchemist/i, name: /^painkiller bomb/i },
-    operations: [
-      {
-        op: "attachNamedPreset",
-        preset: { kind: "alchemist_bomb_formula_from_name" },
-        replaceCharacteristicTypes: ["special_attack"],
-        skipIfCharacteristicTypes: ["special_attack"],
-      },
-    ],
+    operations: [bombFormulaRider("painkiller_bomb_rider", "Painkiller Bomb")],
   },
   {
     id: "alchemist.subclass.black_powder_bomb",
     pack: "alchemist",
     target: "subclass_feature",
     match: { subclassClassName: /alchemist/i, name: /^black powder bomb/i },
-    operations: [
-      {
-        op: "attachNamedPreset",
-        preset: { kind: "alchemist_bomb_formula_from_name" },
-        replaceCharacteristicTypes: ["special_attack", "damage_resistance"],
-      },
-    ],
+    operations: [bombFormulaRider("black_powder_bomb_rider", "Black Powder Bomb")],
   },
   {
     id: "alchemist.subclass.slime_bomb",
     pack: "alchemist",
     target: "subclass_feature",
     match: { subclassClassName: /alchemist/i, name: /^slime bomb/i },
-    operations: [
-      {
-        op: "attachNamedPreset",
-        preset: { kind: "alchemist_bomb_formula_from_name" },
-        replaceCharacteristicTypes: ["special_attack"],
-      },
-    ],
+    operations: [bombFormulaRider("slime_bomb_rider", "Slime Bomb")],
   },
   {
     id: "alchemist.subclass.sleep_bomb",
     pack: "alchemist",
     target: "subclass_feature",
     match: { subclassClassName: /alchemist/i, name: /^sleep bomb/i },
-    operations: [
-      {
-        op: "attachNamedPreset",
-        preset: { kind: "alchemist_bomb_formula_from_name" },
-        replaceCharacteristicTypes: ["special_attack", "condition_immunity"],
-      },
-    ],
+    operations: [bombFormulaRider("sleep_bomb_rider", "Sleep Bomb")],
   },
   {
     id: "alchemist.subclass.arcano_bomb",
     pack: "alchemist",
     target: "subclass_feature",
     match: { subclassClassName: /alchemist/i, name: /^arcano bomb/i },
-    operations: [
-      {
-        op: "attachNamedPreset",
-        preset: { kind: "alchemist_bomb_formula_from_name" },
-        replaceCharacteristicTypes: ["special_attack"],
-      },
-    ],
+    operations: [bombFormulaRider("arcano_bomb_rider", "Arcano Bomb")],
   },
   {
     id: "alchemist.subclass.alchemical_romance",
@@ -576,9 +596,10 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
             {
               id: "char_alchemical_romance",
               type: "power_rider",
-              parentPowerNames: ["Pheromone Bomb"],
+              parentPowerNames: ["Bomb", "Bombs"],
+              appliesToAttackVariants: ["attack"],
               alertSummary:
-                "Spend 1–4 Reagents for Dreamy Haze / Extended Charm / Ignore Immunity / Toxic Love.",
+                "When adding Pheromone Bomb: spend 1–4 Reagents for Dreamy Haze / Extended Charm / Ignore Immunity / Toxic Love.",
             },
           ],
         },
@@ -802,6 +823,7 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
               id: "char_toxic_recompense",
               type: "special_attack",
               attackName: "Toxic Recompense",
+              icon: "poison-cloud",
               attackProfile: "force_save",
               attackVariant: "explode",
               targetMode: "single",
@@ -873,7 +895,8 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
             {
               id: "char_overloaded_charge",
               type: "power_rider",
-              parentPowerNames: ["Bomb", "Bombs", "Prime Bomb"],
+              parentPowerNames: ["Bomb", "Bombs"],
+              appliesToAttackVariants: ["primed"],
               alertSummary:
                 "Overloaded Charge: spend PB Reagents to empower → gain +2 Reagents you may spend immediately (can exceed max).",
             },
@@ -1163,8 +1186,10 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
               id: "char_timed_demolition",
               type: "power_rider",
               parentPowerNames: ["Bomb", "Bombs"],
+              appliesToAttackVariants: ["primed"],
+              selectable: true,
               alertSummary:
-                "Timed Demolition: when priming, set delay (rounds up to 10 min); Explode at end of your turn after duration. Overlapping blasts: one Bomb of your choice.",
+                "When you prime a Bomb: set a delay (rounds up to 10 min); it Explodes at the end of your turn after that duration. Overlapping blasts: one Bomb of your choice.",
             },
           ],
         },
@@ -1272,6 +1297,17 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     ],
   },
   {
+    id: "alchemist.proposal.discovery_upgrade_retag",
+    pack: "alchemist",
+    target: "proposal_ability",
+    match: {
+      sourceName: /alchemist/i,
+      abilityRole: "upgrade",
+      name: /^(?!.*\bbomb\b).+/i,
+    },
+    operations: [{ op: "setAbilityRole", role: "discovery" }],
+  },
+  {
     id: "alchemist.proposal.discovery_batch_brewing",
     pack: "alchemist",
     target: "proposal_ability",
@@ -1370,3 +1406,43 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
 ]
 
 export const ALCHEMIST_SEEDS: ContentSeed[] = []
+
+function isAlchemistContent(content: ImportContent): boolean {
+  return (content.classes ?? []).some((cls) => /alchemist/i.test(cls.name ?? ""))
+}
+
+export function sanitizeAlchemistImportContent(content: ImportContent): ImportContent {
+  if (!isAlchemistContent(content)) return content
+
+  const classes = (content.classes ?? []).map((cls) => {
+    if (!/alchemist/i.test(cls.name ?? "")) return cls
+    return {
+      ...cls,
+      features: sanitizeAlchemistFeatures(
+        (cls.features ?? []) as Feature[],
+      ) as typeof cls.features,
+    }
+  })
+
+  const abilities = Array.isArray(content.abilities)
+    ? content.abilities.map((ability) => retagAlchemistCustomAbility(ability))
+    : content.abilities
+
+  const customAbilities = content.import_proposals?.custom_abilities?.map((ability) =>
+    retagAlchemistCustomAbility(ability),
+  )
+
+  return {
+    ...content,
+    classes,
+    ...(abilities ? { abilities } : {}),
+    ...(customAbilities
+      ? {
+          import_proposals: {
+            ...content.import_proposals,
+            custom_abilities: customAbilities,
+          },
+        }
+      : {}),
+  }
+}

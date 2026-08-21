@@ -199,6 +199,7 @@ export function specialAttackCharacteristicFromParsed(
     id: modId(idKey),
     type: "special_attack",
     attackName: parsed.label,
+    icon: null,
     attackProfile: parsed.attackProfile,
     targetMode: parsed.targetMode,
     properties: ["Psionic"],

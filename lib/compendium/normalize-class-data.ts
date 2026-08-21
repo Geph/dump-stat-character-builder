@@ -1,8 +1,11 @@
-import type { StartingEquipmentGroup } from "@/lib/types"
+import type { Feature, StartingEquipmentGroup } from "@/lib/types"
 import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
 import { SRD_CLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/class-card-images-defaults"
 import { applyBundledCardImage } from "@/lib/compendium/card-image"
 import { enrichSrdClassRow } from "@/lib/compendium/enrich-srd-classes"
+import { wireClassToolProficiencyChoices } from "@/lib/compendium/class-tool-proficiencies"
+import { sanitizeAlchemistFeatures } from "@/lib/compendium/alchemist-feature-wiring"
+import { sanitizeCaptainFeatures } from "@/lib/compendium/captain-feature-wiring"
 import bundledClasses from "@/lib/srd/seed-data/classes.json"
 import { isSrdSource } from "@/lib/srd/source"
 
@@ -99,9 +102,14 @@ export function normalizeStartingEquipmentGroups(raw: unknown): StartingEquipmen
 }
 
 const bundledClassesByName = new Map(
-  (bundledClasses as { name: string; starting_equipment_groups?: unknown; starting_gold?: number }[]).map(
-    (dndClass) => [dndClass.name, dndClass],
-  ),
+  (
+    bundledClasses as {
+      name: string
+      starting_equipment_groups?: unknown
+      starting_gold?: number
+      tool_proficiencies?: string[] | null
+    }[]
+  ).map((dndClass) => [dndClass.name, dndClass]),
 )
 
 function classHasStartingPackages(groups: StartingEquipmentGroup[]): boolean {
@@ -115,6 +123,8 @@ export function enrichClassesList<
     source?: string | null
     starting_equipment_groups?: unknown
     starting_gold?: number | null
+    tool_proficiencies?: string[] | null
+    features?: unknown
   },
 >(rows: T[]): T[] {
   return rows.map((row) => {
@@ -148,11 +158,36 @@ export function enrichClassesList<
       }
     }
 
+    // Backfill tool_proficiencies from bundled SRD seed when older DB rows omit the column.
+    if (
+      isSrdSource(row.source) &&
+      !(Array.isArray(enriched.tool_proficiencies) && enriched.tool_proficiencies.length) &&
+      bundledClassesByName.get(row.name)?.tool_proficiencies?.length
+    ) {
+      enriched = {
+        ...enriched,
+        tool_proficiencies: [...(bundledClassesByName.get(row.name)!.tool_proficiencies ?? [])],
+      }
+    }
+
     if (isSrdSource(row.source)) {
+      // enrichSrdClassRow injects Bard/Monk tool picks, then wires any remaining
+      // choice phrases from tool_proficiencies.
       return enrichSrdClassRow(enriched as unknown as Record<string, unknown>) as T
     }
 
     enriched = sanitizeClassFeatureDescriptions(enriched)
+    if (/alchemist/i.test(enriched.name)) {
+      const features = sanitizeAlchemistFeatures((enriched as { features?: Feature[] }).features)
+      if (features) enriched = { ...enriched, features }
+    }
+    if (/captain/i.test(enriched.name)) {
+      const features = sanitizeCaptainFeatures((enriched as { features?: Feature[] }).features)
+      if (features) enriched = { ...enriched, features }
+    }
+    enriched = wireClassToolProficiencyChoices(
+      enriched as T & { features?: Feature[] | null; tool_proficiencies?: string[] | null },
+    ) as T
 
     const withIcon = (() => {
       const existingIcon = (enriched as { icon?: unknown }).icon

@@ -189,6 +189,11 @@ export interface FeatureEffect {
   classResourceChange?: "reduce" | "increase" | "reset" | null
   /** Uses reduced or restored; ignored when classResourceChange is reset. */
   classResourceAmount?: number | null
+  /**
+   * Formula for uses spent/restored (fixed, proficiency, or an ability modifier ± N with a
+   * minimum). When set, takes precedence over `classResourceAmount`.
+   */
+  classResourceAmountConfig?: RestoreAmountConfig | null
   /** heal_self / similar: how HP restored is calculated */
   healMode?: "fixed" | "dice" | "character_level" | "proficiency" | "ability_modifier" | null
   healFixed?: number | null
@@ -552,6 +557,8 @@ export interface DndClass {
   saving_throws: string[] | null
   armor_proficiencies: string[] | null
   weapon_proficiencies: string[] | null
+  /** Fixed tools and/or choice phrases (e.g. "Choose 3 Musical Instruments"). */
+  tool_proficiencies?: string[] | null
   skill_choices: { count: number; options: string[]; fixed?: string[] } | null
   starting_equipment: unknown
   starting_equipment_groups: StartingEquipmentGroup[] | null
@@ -624,15 +631,34 @@ export interface UsesAtLevel {
 
 export type RestType = "short_rest" | "long_rest" | "initiative"
 
+export type RestoreAmountMode = "full" | "fixed" | "proficiency" | "ability_modifier"
+
+export type RestoreAmountConfig = {
+  mode: Exclude<RestoreAmountMode, "full">
+  /** Fixed uses, or a flat bonus added to proficiency / an ability modifier. */
+  amount?: number | null
+  ability?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA" | null
+  minimum?: number | null
+}
+
 export interface RestRechargeRule {
   kind?: "rest"
   rest: RestType
   /** Uses restored on this rest; omit for full pool. */
   amount?: number | null
   /** Formula-based restore when amount is not a fixed literal. */
-  amountFormula?: "half_class_level_round_up" | "half_class_level_round_down" | "ability_modifier" | null
+  amountFormula?:
+    | "half_class_level_round_up"
+    | "half_class_level_round_down"
+    | "ability_modifier"
+    | "proficiency_bonus"
+    | null
   /** Ability whose modifier is used when amountFormula is ability_modifier. */
   amountFormulaAbility?: "STR" | "DEX" | "CON" | "INT" | "WIS" | "CHA" | null
+  /** Flat bonus added to a formula restore (ability modifier or proficiency). */
+  amountFormulaBonus?: number | null
+  /** Floor applied after the formula (e.g. Intelligence modifier, minimum of 1). */
+  amountFormulaMinimum?: number | null
   /** Cap how many times this recharge fires per long rest (e.g. once per long rest on short rest). */
   maxPerLongRest?: number | null
 }

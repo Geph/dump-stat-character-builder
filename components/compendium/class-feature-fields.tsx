@@ -28,6 +28,8 @@ import { DurationEditor } from "@/components/compendium/duration-editor"
 
 import { UsesConfigEditor } from "@/components/uses-config-editor"
 
+import { FeatureChoiceEditor } from "@/components/compendium/feature-choice-editor"
+
 
 
 type ClassFeatureFieldsProps = {
@@ -235,215 +237,21 @@ export function ClassFeatureFields({
 
 
         {feature.isChoice && feature.choices && (
-
-          <div className="bg-background border-2 border-primary/20 rounded-xl p-3 space-y-3 ml-6">
-
-            <p className="text-xs text-muted-foreground">
-
-              Use this for features that let the player pick between options (e.g. Fighting Style,
-
-              Weapon Mastery, subclass picks). Each option can carry its own set of modifier effects.
-
-            </p>
-
-            <div className="grid grid-cols-2 gap-3">
-
-              <div>
-
-                <label className="block text-xs font-semibold text-foreground mb-1">Category label</label>
-
-                <input
-
-                  type="text"
-
-                  value={feature.choices.category}
-
-                  onChange={(e) => onUpdateChoiceField(index, "category", e.target.value)}
-
-                  placeholder="Fighting Style, Skill, etc."
-
-                  className="w-full px-3 py-1.5 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-
-                />
-
-              </div>
-
-              <div>
-
-                <label className="block text-xs font-semibold text-foreground mb-1">Number to choose</label>
-
-                <input
-
-                  type="number"
-
-                  min={1}
-
-                  value={feature.choices.count}
-
-                  onChange={(e) =>
-
-                    onUpdateChoiceField(index, "count", parseInt(e.target.value, 10) || 1)
-
-                  }
-
-                  className="w-full px-3 py-1.5 bg-card border border-border rounded-lg text-sm text-center focus:outline-none focus:border-primary"
-
-                />
-
-              </div>
-
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-
-              <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
-
-                <input
-                  type="checkbox"
-                  checked={!!feature.choices.swappableOnRest}
-                  onChange={(e) => onUpdateChoiceField(index, "swappableOnRest", e.target.checked)}
-                />
-
-                Swappable when finishing a rest
-
-              </label>
-
-              {feature.choices.swappableOnRest && (
-
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-
-                  Swap on a
-
-                  <select
-                    value={feature.choices.swapRestType ?? "long"}
-                    onChange={(e) => onUpdateChoiceField(index, "swapRestType", e.target.value)}
-                    className="px-2 py-1 bg-card border border-border rounded-lg text-xs text-foreground focus:outline-none focus:border-primary"
-                  >
-                    <option value="long">Long Rest</option>
-                    <option value="short">Short Rest</option>
-                  </select>
-
-                </label>
-
-              )}
-
-            </div>
-
-            <p className="text-[11px] text-muted-foreground">
-
-              When enabled, the character sheet shows a drop-down on this feature so the player can
-              change the active option after a rest. The chosen option&apos;s modifier effects (spells,
-              resistances, bonuses, etc.) update automatically.
-
-            </p>
-
-
-
-            <div className="space-y-3">
-
-              <div className="flex items-center justify-between">
-
-                <span className="text-xs font-semibold text-foreground">Fixed options</span>
-
-                <button
-
-                  type="button"
-
-                  onClick={() => onAddChoiceOption(index)}
-
-                  className="text-xs text-primary hover:underline"
-
-                >
-
-                  + Add option
-
-                </button>
-
-              </div>
-
-              {(feature.choices.options ?? []).map((opt, oi) => (
-
-                <div key={oi} className="space-y-2 rounded-lg border border-border p-3 bg-card/50">
-
-                  <div className="flex gap-2">
-
-                    <input
-
-                      type="text"
-
-                      value={opt.name}
-
-                      onChange={(e) => onUpdateChoiceOption(index, oi, "name", e.target.value)}
-
-                      placeholder="Option name"
-
-                      className="flex-1 px-3 py-1.5 bg-card border border-border rounded-lg text-sm"
-
-                    />
-
-                    <button
-
-                      type="button"
-
-                      onClick={() => onRemoveChoiceOption(index, oi)}
-
-                      className="text-xs text-destructive px-2"
-
-                    >
-
-                      Remove
-
-                    </button>
-
-                  </div>
-
-                  <RichTextEditor
-
-                    value={opt.description ?? ""}
-
-                    onChange={(description) => onUpdateChoiceOption(index, oi, "description", description)}
-
-                    placeholder="Description (optional)"
-
-                    minHeightClass="min-h-[4rem]"
-
-                  />
-
-                  <LinkedModifiersEditor
-
-                    value={normalizeLinkedModifiers(opt.linkedModifiers, modifierCatalog, opt.modifierRefs)}
-
-                    onChange={(next) =>
-
-                      onUpdateChoiceOption(index, oi, "linkedModifiers", next)
-
-                    }
-
-                    catalog={modifierCatalog}
-
-                    classResources={classResources}
-
-                    spellOptions={spellOptions}
-
-                    label="Option modifiers"
-
-                    emptyMessage="No modifiers for this choice option."
-
-                  />
-
-                </div>
-
-              ))}
-
-            </div>
-
-          </div>
-
-        )}
+        <FeatureChoiceEditor
+          choices={feature.choices}
+          classResources={classResources}
+          modifierCatalog={modifierCatalog}
+          spellOptions={spellOptions}
+          onChangeField={(field, value) => onUpdateChoiceField(index, field, value)}
+          onAddOption={() => onAddChoiceOption(index)}
+          onUpdateOption={(optionIndex, field, value) =>
+            onUpdateChoiceOption(index, optionIndex, field, value)
+          }
+          onRemoveOption={(optionIndex) => onRemoveChoiceOption(index, optionIndex)}
+        />
+      )}
 
       </div>
-
-
 
       <label className="flex items-center gap-2 cursor-pointer text-sm pt-2 border-t border-border">
 

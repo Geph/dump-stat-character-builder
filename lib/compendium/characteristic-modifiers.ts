@@ -18,6 +18,7 @@ import {
   MARTIAL_WEAPONS_LABEL,
   type WeaponProficiencyMode,
 } from "@/lib/compendium/weapon-proficiency-options"
+import { resolveSpecialAttackIcon } from "@/lib/compendium/special-attack-icons-defaults"
 
 export const ABILITY_SCORE_KEYS = [
   "strength",
@@ -688,6 +689,8 @@ export interface WeaponDamageDieOverrideCharacteristic extends CharacteristicMod
 
 export interface SpecialAttackCharacteristic extends CharacteristicModifierBase {
   type: "special_attack"
+  /** game-icons.net slug shown on the sheet combat card. */
+  icon?: string | null
   attackName?: string
   attackProfile?: "melee" | "ranged" | "emanation" | "force_save"
   /** single = one creature; multi = pick N targets; area = all in zone (Volley, Whirlwind, etc.) */
@@ -711,8 +714,8 @@ export interface SpecialAttackCharacteristic extends CharacteristicModifierBase 
   /** On a successful save, target takes half damage (area exploits). */
   saveHalfDamage?: boolean
   rangeFeet?: number | null
-  /** attack vs explode variant when one ability has multiple special_attack modes (Bomb). */
-  attackVariant?: "attack" | "explode" | null
+  /** attack / primed / explode when one ability has multiple special_attack modes (Bomb). */
+  attackVariant?: "attack" | "primed" | "explode" | null
   /** Linear Prime Bomb scaling: +Nd10 (or formula dice) per resource spent. */
   resourceScaleKey?: string | null
   bonusDicePerResource?: string | null
@@ -1270,6 +1273,10 @@ export interface PowerRiderCharacteristic extends CharacteristicModifierBase {
   parentMenuOptionNames?: string[]
   /** Short summary for the alert badge (defaults to feature label). */
   alertSummary?: string
+  /** When set, only show this rider for these special_attack variants. */
+  appliesToAttackVariants?: Array<"attack" | "primed" | "explode">
+  /** When true, the sheet offers this rider as an optional add-on. */
+  selectable?: boolean
 }
 
 /** Set listed ability scores equal to another ability's score (Physical Surge). */
@@ -1479,6 +1486,7 @@ export function createCharacteristicModifier(
         id,
         type,
         attackName: "Special Attack",
+        icon: null,
         attackProfile: "melee",
         properties: [],
         damageTypes: [],
@@ -1883,6 +1891,13 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       parentPowerNames: coerceStringArray(raw.parentPowerNames),
       parentMenuOptionNames: coerceStringArray(raw.parentMenuOptionNames),
       alertSummary: raw.alertSummary ?? "",
+      appliesToAttackVariants: Array.isArray(raw.appliesToAttackVariants)
+        ? raw.appliesToAttackVariants.filter(
+            (entry): entry is "attack" | "primed" | "explode" =>
+              entry === "attack" || entry === "primed" || entry === "explode",
+          )
+        : undefined,
+      selectable: raw.selectable ?? false,
     }
   }
 
@@ -1955,6 +1970,7 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     const raw = value as SpecialAttackCharacteristic
     return {
       ...raw,
+      icon: resolveSpecialAttackIcon(raw),
       targetMode: raw.targetMode ?? "single",
       maxTargets: raw.maxTargets ?? null,
       useWeaponDamage: raw.useWeaponDamage ?? false,

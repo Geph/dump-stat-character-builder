@@ -66,6 +66,7 @@ export function extractImportContentDeterministic(
         saving_throws: shell.saving_throws ?? undefined,
         armor_proficiencies: shell.armor_proficiencies ?? undefined,
         weapon_proficiencies: shell.weapon_proficiencies ?? undefined,
+        tool_proficiencies: shell.tool_proficiencies ?? undefined,
         skill_choices: shell.skill_choices ?? undefined,
         features: importFeatures,
         spell_list: spellList ?? undefined,

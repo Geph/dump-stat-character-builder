@@ -356,6 +356,20 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     },
   },
   {
+    resourceKey: "traps_known",
+    namePattern: /traps?\s*known/i,
+    displayName: "Traps Known",
+    ownerClassPattern: /craftsman/i,
+    definition:
+      "Trappers' Guild traps chosen from the trap list — a choice count for the Traps feature picker (optionsSource class_upgrades), never a spendable pool.",
+    spendPatterns: [],
+    defaultUses: {
+      type: "special",
+      specialDescription: "Number of Trappers' Guild traps known.",
+      atLevelMode: "tier",
+    },
+  },
+  {
     resourceKey: "charge_points",
     namePattern: /charge\s*points?/i,
     displayName: "Charge Points",

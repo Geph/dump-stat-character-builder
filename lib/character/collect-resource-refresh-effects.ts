@@ -1,6 +1,7 @@
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { readLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
+import { resolveRestoreAmount, type RestoreAmountConfig } from "@/lib/compendium/restore-amount-config"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import type { Feature, FeatureEffect, RestType, UsesConfig } from "@/lib/types"
 
@@ -15,6 +16,7 @@ export type ResourceRefreshEffect = {
   oncePerLongRest?: boolean
   /** Restore this many uses (Dire Gambit). */
   restoreAmount?: number | null
+  restoreAmountConfig?: RestoreAmountConfig | null
   /** Fill until at least this many remain (Superior Inspiration, Perfect Focus). */
   fillUntilRemaining?: number | null
   formula?: "full" | "half_level_up" | "half_level_down" | null
@@ -96,6 +98,7 @@ function refreshEffectFromFeatureEffect(
       effect.resourceRefreshCap == null && effect.classResourceAmount != null
         ? effect.classResourceAmount
         : null,
+    restoreAmountConfig: effect.classResourceAmountConfig ?? null,
     fillUntilRemaining: effect.resourceRefreshCap ?? null,
     formula,
   }
@@ -137,6 +140,7 @@ function nextUsedAfterRefresh(
   currentUsed: number,
   max: number,
   effect: ResourceRefreshEffect,
+  resolveContext: ResolveUsesContext,
 ): number {
   if (max <= 0) return currentUsed
   if (effect.fillUntilRemaining != null && effect.fillUntilRemaining > 0) {
@@ -148,6 +152,13 @@ function nextUsedAfterRefresh(
   }
   if (effect.formula === "half_level_down") {
     const restore = Math.max(0, Math.floor(effect.classLevel / 2))
+    return Math.max(0, currentUsed - restore)
+  }
+  if (effect.restoreAmountConfig) {
+    const restore = resolveRestoreAmount(effect.restoreAmountConfig, {
+      proficiencyBonus: resolveContext.proficiencyBonus,
+      abilityModifiers: resolveContext.abilityModifiers,
+    })
     return Math.max(0, currentUsed - restore)
   }
   if (effect.restoreAmount != null && effect.restoreAmount > 0) {
@@ -192,7 +203,7 @@ export function applyFeatureResourceRefresh(params: {
     const max = resolveUsesAtLevel(entry.uses, entry.classLevel, params.resolveContext)
     if (max == null || max <= 0) continue
     const current = next[entry.id] ?? 0
-    const updated = nextUsedAfterRefresh(current, max, effect)
+    const updated = nextUsedAfterRefresh(current, max, effect, params.resolveContext)
     if (updated === current) continue
     next[entry.id] = updated
     if (effect.oncePerLongRest) caps[effect.id] = (caps[effect.id] ?? 0) + 1

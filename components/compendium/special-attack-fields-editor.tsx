@@ -15,6 +15,7 @@ import {
   normalizeBonusByLevel,
   type BonusByLevelEntry,
 } from "@/lib/compendium/bonus-by-level"
+import { GameIconPicker } from "@/components/game-icon-picker"
 
 function TagInput({
   values,
@@ -178,7 +179,15 @@ export function SpecialAttackFieldsEditor({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-[auto_1fr_1fr] sm:items-end">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Icon</label>
+          <GameIconPicker
+            value={mod.icon ?? null}
+            onChange={(icon) => onChange({ ...mod, icon })}
+            inline
+          />
+        </div>
         <div>
           <label className="block text-xs text-muted-foreground mb-1">Attack name</label>
           <input

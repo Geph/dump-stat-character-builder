@@ -1,3 +1,4 @@
+import { fixedToolProficienciesFromList } from "@/lib/compendium/class-tool-proficiencies"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import { mergeProficiencyLists } from "@/lib/compendium/background-proficiencies"
 import {
@@ -155,7 +156,7 @@ export function aggregateClassToolProficiencies(params: {
     const cls = classes.find((candidate) => candidate.id === entry.classId)
     if (!cls) continue
     if (isPrimaryClassEntry(entry.classId, primaryClassId)) {
-      // Primary class tool proficiencies come from class data if we add them later.
+      lists.push(fixedToolProficienciesFromList(cls.tool_proficiencies))
       lists.push(classToolPicks[entry.classId] ?? [])
     } else {
       lists.push(fixedMulticlassTools(cls, false))

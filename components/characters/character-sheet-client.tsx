@@ -680,6 +680,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [attunedItemIds, setAttunedItemIds] = useState<string[]>([])
   const [equipmentBaseSelections, setEquipmentBaseSelections] = useState<Record<string, string>>({})
   const [usedActionUsesById, setUsedActionUsesById] = useState<Record<string, number>>({})
+  const [primedBombUsedThisTurn, setPrimedBombUsedThisTurn] = useState(false)
   const [actionEconomySpent, setActionEconomySpent] = useState<ActionEconomySpent>(emptyActionEconomySpent)
   const [usedHitDiceByClassId, setUsedHitDiceByClassId] = useState<Record<string, number>>({})
   const [shortRestHitDiceOpen, setShortRestHitDiceOpen] = useState(false)
@@ -2669,6 +2670,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   )
 
   const handleTurnStart = useCallback(() => {
+    setPrimedBombUsedThisTurn(false)
     setActionEconomySpent(emptyActionEconomySpent())
     // Full Awakening lasts until the start of your next turn.
     setActiveSheetToggleIds((prev) =>
@@ -2750,6 +2752,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       setUsedSpellSlotsByKey(result.usedSpellSlotsByKey)
       setUsedResourcesById(result.usedResourcesById)
       setUsedActionUsesById(result.usedActionUsesById)
+      setPrimedBombUsedThisTurn(false)
       if (result.rechargeCapsByResourceId) {
         setRechargeCapsByResourceId(result.rechargeCapsByResourceId)
       }
@@ -4042,7 +4045,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   <SheetRestButtons
                     onRest={handleRest}
                     onTurnStart={
-                      turnStartTriggers.length || hasRampageDie ? handleTurnStart : undefined
+                      turnStartTriggers.length ||
+                      hasRampageDie ||
+                      combatActions.some((action) =>
+                        action.specialAttacks?.some((profile) => profile.attackVariant === "primed"),
+                      )
+                        ? handleTurnStart
+                        : undefined
                     }
                   />
                   <div className="relative inline-flex shrink-0">
@@ -4831,6 +4840,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
                     onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
                     onSpendSpellSlot={handleSpendSpellSlot}
+                    primedBombUsedThisTurn={primedBombUsedThisTurn}
+                    onPrimedBombUsed={() => setPrimedBombUsedThisTurn(true)}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground italic">
@@ -5080,6 +5091,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
                         onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
                         onSpendSpellSlot={handleSpendSpellSlot}
+                        primedBombUsedThisTurn={primedBombUsedThisTurn}
+                        onPrimedBombUsed={() => setPrimedBombUsedThisTurn(true)}
                       />
                     </div>
                     {!equippedWeaponCards.length && !combatActions.length ? (

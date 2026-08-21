@@ -31,6 +31,12 @@ import {
   type AsiAllocation,
   type AsiAllocationsByFeatId,
 } from "@/lib/builder/asi-allocation"
+import { isFeatEligibleForCategories } from "@/lib/builder/feat-selection"
+import {
+  characterHasFightingStyleAccess,
+  levelUpFeatCategories,
+} from "@/lib/builder/fighting-style-access"
+import { mergeAlchemistDiscoveryPicks } from "@/lib/compendium/alchemist-feature-wiring"
 import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import { enrichSrdFeatRow } from "@/lib/compendium/enrich-srd-feats"
@@ -132,7 +138,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         customAbilities: asCompendiumRows(customAbilities) as unknown as CustomAbility[],
       })
       setClassId(classDetails[0]?.row.class_id ?? null)
-      setChoicePicks(char.feature_choice_picks ?? {})
+      setChoicePicks(mergeAlchemistDiscoveryPicks(char.feature_choice_picks ?? {}))
       setStepIndex(0)
       setSubclassId(null)
       setFeatId(null)
@@ -165,9 +171,26 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
 
   const eligibleFeats = useMemo(() => {
     if (!loaded) return []
-    const owned = new Set(loaded.character.feat_ids ?? [])
+    const ownedFeatIds = loaded.character.feat_ids ?? []
+    const hasFightingStyleAccess = characterHasFightingStyleAccess({
+      classDetails: loaded.classDetails,
+      ownedFeatIds,
+      feats: loaded.feats,
+    })
+    const categories = levelUpFeatCategories(hasFightingStyleAccess)
+    const milestoneLevel = plan?.toLevel ?? 1
     return loaded.feats
-      .filter((feat) => !owned.has(feat.id) && (feat.level_requirement ?? 1) <= (plan?.toLevel ?? 1))
+      .filter((feat) =>
+        isFeatEligibleForCategories(feat, categories, milestoneLevel, {
+          totalLevel: plan?.newTotalLevel ?? milestoneLevel,
+          classIds: loaded.classDetails.map((entry) => entry.row.class_id),
+          feats: loaded.feats,
+          ownedFeatIds,
+          speciesId: loaded.character.species_id,
+          backgroundId: loaded.character.background_id,
+          hasFightingStyleAccess,
+        }),
+      )
       .slice()
       .sort((a, b) => {
         const aAsi = isAsiFeat(a) ? 0 : 1
@@ -175,7 +198,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         if (aAsi !== bAsi) return aAsi - bAsi
         return a.name.localeCompare(b.name)
       })
-  }, [loaded, plan?.toLevel])
+  }, [loaded, plan?.newTotalLevel, plan?.toLevel])
 
   const selectedFeat = useMemo(
     () => (featId && loaded ? loaded.feats.find((feat) => feat.id === featId) ?? null : null),
@@ -261,7 +284,10 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           ? { ...row, level: plan.toLevel, subclass_id: subclassId ?? row.subclass_id }
           : row,
       )
-      const nextPicks = { ...(loaded.character.feature_choice_picks ?? {}), ...choicePicks }
+      const nextPicks = mergeAlchemistDiscoveryPicks({
+        ...(loaded.character.feature_choice_picks ?? {}),
+        ...choicePicks,
+      })
       const builderPicks = normalizeBuilderPicks(loaded.character.builder_picks)
       const existingSpells = builderPicks.spell_picks_by_class_id?.[plan.classId] ?? []
       const nextSpellPicks = {
@@ -299,6 +325,8 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           asi_allocations: nextAsi,
           hit_point_max: nextMax,
           hit_points: nextMax,
+          portrait_url: loaded.character.portrait_url,
+          banner_url: loaded.character.banner_url,
         })
         .eq("id", loaded.character.id)
       if (updateError) throw new Error(updateError.message)

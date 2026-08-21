@@ -8,10 +8,15 @@ import {
 } from "@/lib/character/special-attack-empower"
 import { remapClassScopedResourceKey } from "@/lib/import/third-party-resources"
 import { aggregateBombFormulaOptions } from "@/lib/builder/aggregate-bomb-formulas"
+import { aggregateDiscoveryOptions } from "@/lib/builder/aggregate-discoveries"
 import { aggregateUpgradeOptions } from "@/lib/builder/upgrade-choices"
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import { enrichImportChoiceFeatures } from "@/lib/import/enrich-import-choices"
 import { enrichAlchemistFeatures } from "@/lib/import/enrichment-presets"
+import {
+  mergeAlchemistDiscoveryPicks,
+  sanitizeAlchemistFeatures,
+} from "@/lib/compendium/alchemist-feature-wiring"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { collectImportProposals } from "@/lib/import/import-proposals"
 import { parseCraftableItemsTable } from "@/lib/import/parse-craftable-items-table"
@@ -263,6 +268,54 @@ describe("Alchemist choice pickers", () => {
     expect(formulas.find((row) => row.name === "Acid Bomb")?.ability_role).toBe("bomb_formula")
     expect(formulas.find((row) => row.name === "Bomb")?.ability_role).toBe("alchemist_bomb")
   })
+
+  it("retags upgrade-tagged discoveries and lists them on the Discoveries picker", () => {
+    const enriched = enrichAlchemistFeatures({
+      classes: [{ name: "Alchemist", description: "", hit_die: 8, primary_ability: ["Intelligence"], features: [] }],
+      import_proposals: {
+        custom_abilities: [
+          {
+            proposal_id: "alchemy_of_poison",
+            name: "Alchemy of Poison",
+            definition: "Poison discovery.",
+            description: "You gain Batch Brewing.",
+            source_type: "class",
+            source_name: "Alchemist",
+            level_requirement: 5,
+            ability_role: "upgrade",
+          },
+          {
+            proposal_id: "combat_studies",
+            name: "Combat Studies",
+            definition: "Martial discovery.",
+            description: "You gain proficiency with Martial weapons.",
+            source_type: "class",
+            source_name: "Alchemist",
+            level_requirement: 5,
+            ability_role: "upgrade",
+          },
+        ],
+      },
+    } as unknown as ImportContent)
+    const abilities = enriched.import_proposals?.custom_abilities ?? []
+    expect(abilities.every((row) => row.ability_role === "discovery")).toBe(true)
+
+    const options = aggregateDiscoveryOptions({
+      customAbilities: abilities as unknown as CustomAbility[],
+      classNames: ["Alchemist"],
+      classLevel: 5,
+      selectedDiscoveryNames: [],
+    })
+    expect(options.map((row) => row.name).sort()).toEqual(["Alchemy of Poison", "Combat Studies"])
+    expect(
+      aggregateUpgradeOptions({
+        customAbilities: abilities as unknown as CustomAbility[],
+        classNames: ["Alchemist"],
+        classLevel: 5,
+        selectedUpgradeNames: [],
+      }),
+    ).toEqual([])
+  })
 })
 
 describe("Alchemist craftable items and held cap", () => {
@@ -386,8 +439,24 @@ describe("Alchemist Prime Bomb empower rider", () => {
 })
 
 describe("Alchemist Reagent Synthesis recharge", () => {
-  it("adds INT-mod short rest recharge capped once per long rest", () => {
+  it("keeps Reagents at 1/short + full/long and wires Synthesis as a class-resource restore", () => {
     const enriched = enrichAlchemistFeatures({
+      classes: [
+        {
+          name: "Alchemist",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Intelligence"],
+          features: [
+            {
+              level: 2,
+              name: "Reagent Synthesis",
+              description:
+                "<p>When you finish a Short Rest, you can regain an additional number of expended Reagents up to your Intelligence modifier (minimum of 1).</p>",
+            },
+          ],
+        },
+      ],
       import_proposals: {
         class_resources: [
           {
@@ -407,16 +476,35 @@ describe("Alchemist Reagent Synthesis recharge", () => {
       },
     } as unknown as ImportContent)
     const resource = enriched.import_proposals?.class_resources?.[0]
-    expect(resource?.uses.recharges).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
+    expect(resource?.uses.recharges).toEqual([
+      { rest: "short_rest", amount: 1 },
+      { rest: "long_rest" },
+    ])
+    const synthesis = enriched.classes?.[0]?.features.find((f) => f.name === "Reagent Synthesis")
+    expect(synthesis?.description).toContain("minimum of 1")
+    expect(synthesis?.description).not.toMatch(/On a Short Rest, regain Reagents equal to your Intelligence modifier/)
+    const restore = (synthesis?.linkedModifiers ?? [])
+      .flatMap((mod) => mod.activation?.effects ?? [])
+      .find((effect) => effect.kind === "class_resource")
+    expect(restore).toMatchObject({
+      classResourceKey: "reagents",
+      classResourceChange: "increase",
+      resourceRefreshOnRest: "short_rest",
+      resourceRefreshOncePerLongRest: true,
+      classResourceAmountConfig: { mode: "ability_modifier", ability: "INT", minimum: 1 },
+    })
+    expect(
+      resolveRechargeRuleAmount(
+        {
           rest: "short_rest",
           amountFormula: "ability_modifier",
           amountFormulaAbility: "INT",
-          maxPerLongRest: 1,
-        }),
-      ]),
-    )
+          amountFormulaMinimum: 1,
+        },
+        5,
+        { INT: -1 },
+      ),
+    ).toBe(1)
     expect(
       resolveRechargeRuleAmount(
         {
@@ -425,7 +513,7 @@ describe("Alchemist Reagent Synthesis recharge", () => {
           amountFormulaAbility: "INT",
         },
         5,
-        { int: 3 },
+        { INT: 3 },
       ),
     ).toBe(3)
   })
@@ -473,17 +561,17 @@ describe("Alchemist Bomb Formulas and Discoveries pick counts", () => {
     })
   })
 
-  it("grants one Discovery per singular Discovery feature, swappable on level-up", () => {
+  it("uses the cumulative table for a singular Discovery feature", () => {
     const choices = enrichFeature("Discovery", 5)?.choices
     expect(choices).toMatchObject({
       count: 1,
       optionsSource: "class_discoveries",
+      resourceKey: "discoveries_known",
       swappableOnLevelUp: true,
     })
-    // A cumulative resource lookup would multiply picks across the level 5/9/13/17 features.
-    expect(choices?.resourceKey).toBeUndefined()
-    expect(choices?.choiceCountByLevel).toBeUndefined()
-    expect(resolveFeatureChoiceCount(choices!, 17, "Alchemist")).toBe(1)
+    expect(
+      [5, 8, 9, 13, 17, 20].map((level) => resolveFeatureChoiceCount(choices!, level, "Alchemist")),
+    ).toEqual([1, 1, 2, 3, 4, 4])
   })
 
   it("uses the cumulative table when one plural Discoveries feature owns every pick", () => {
@@ -491,6 +579,39 @@ describe("Alchemist Bomb Formulas and Discoveries pick counts", () => {
     expect(
       [5, 8, 9, 13, 17, 20].map((level) => resolveFeatureChoiceCount(choices!, level, "Alchemist")),
     ).toEqual([1, 1, 2, 3, 4, 4])
+  })
+
+  it("keeps one cumulative Discovery picker when four per-level features are imported", () => {
+    const features = sanitizeAlchemistFeatures([
+      { name: "Discovery", level: 5, description: "Gain a Discovery.", isChoice: true },
+      { name: "Discovery", level: 9, description: "Gain another Discovery.", isChoice: true },
+      { name: "Discovery", level: 13, description: "Gain another Discovery.", isChoice: true },
+      { name: "Discovery", level: 17, description: "Gain another Discovery.", isChoice: true },
+    ] as never)
+    const choiceRows = (features ?? []).filter((feature) => feature.isChoice)
+    expect(choiceRows).toHaveLength(1)
+    expect(choiceRows[0]?.level).toBe(5)
+    expect(choiceRows[0]?.choices?.resourceKey).toBe("discoveries_known")
+    expect(choiceRows[0]?.choices?.choiceCountByLevel).toEqual([
+      { level: 5, count: 1 },
+      { level: 9, count: 2 },
+      { level: 13, count: 3 },
+      { level: 17, count: 4 },
+    ])
+    expect((features ?? []).filter((feature) => !feature.isChoice)).toHaveLength(3)
+  })
+
+  it("merges split Discovery picks onto the earliest feature key", () => {
+    expect(
+      mergeAlchemistDiscoveryPicks({
+        "alchemist:L5:Discovery": ["Alchemy of Poison"],
+        "alchemist:L9:Discovery": ["Explosive Missile"],
+        "alchemist:L2:Bomb Formulas": ["Acid Bomb"],
+      }),
+    ).toEqual({
+      "alchemist:L5:Discovery": ["Alchemy of Poison", "Explosive Missile"],
+      "alchemist:L2:Bomb Formulas": ["Acid Bomb"],
+    })
   })
 })
 
@@ -590,6 +711,8 @@ describe("enrichImportContentModifiers integration", () => {
     expect(brewingChars.some((char) => char.type === "held_items_cap")).toBe(true)
     const brewingMenu = brewingChars.find((char) => char.type === "resource_ability_menu")
     expect(brewing?.activation?.action).toBe(true)
+    expect(brewing?.sheetDisplay?.abilitiesActions).toBe(true)
+    expect(brewing?.sheetDisplay?.combatActions).toBeFalsy()
     expect(brewingMenu).toMatchObject({ resourceKey: "reagents" })
     expect(
       (brewingMenu as { options?: { name?: string; resourceCost?: number }[] })?.options,
@@ -605,6 +728,30 @@ describe("enrichImportContentModifiers integration", () => {
       | undefined
     const bombChars = (bombs?.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
     expect(bombChars.filter((char) => char.type === "special_attack")).toHaveLength(2)
+  })
+
+  it("puts Potion Mixologist on the combat tab", () => {
+    const enriched = enrichAlchemistFeatures({
+      classes: [
+        {
+          name: "Alchemist",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Intelligence"],
+          features: [
+            {
+              level: 10,
+              name: "Potion Mixologist",
+              description: "Drink two potions at once.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+    const mixologist = enriched.classes?.[0]?.features?.find((f) => f.name === "Potion Mixologist")
+    expect(mixologist?.activation?.bonusAction).toBe(true)
+    expect(mixologist?.sheetDisplay).toMatchObject({ combatActions: true })
+    expect(mixologist?.sheetDisplay?.abilitiesActions).toBeFalsy()
   })
 
   it("clears false-positive immunity on Alchemical Romance and wires Poisoner grant", () => {
@@ -910,7 +1057,11 @@ describe("Alchemist Tier 1 / Tier 2 subclass stubs", () => {
 
     const timed = enrichSubclassFeature("Timed Demolition", "Mad Bomber")
     const timedChars = (timed.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
-    expect(timedChars.some((char) => char.type === "power_rider")).toBe(true)
+    expect(timedChars.find((char) => char.type === "power_rider")).toMatchObject({
+      parentPowerNames: ["Bomb", "Bombs"],
+      appliesToAttackVariants: ["primed"],
+      selectable: true,
+    })
 
     const oozes = enrichSubclassFeature("Elemental Oozes", "Ooze Rancher")
     expect(oozes.choices?.options?.map((opt) => opt.name)).toEqual([

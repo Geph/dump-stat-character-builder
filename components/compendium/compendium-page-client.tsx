@@ -72,10 +72,14 @@ import { stripHtml } from "@/lib/import/normalize-equipment"
 import { isTopLevelCompendiumAbility } from "@/lib/import/nest-psionic-ability-library"
 import {
   getCompendiumItemIcon,
-  isCompendiumContentType,
   isEquipmentBrowserTab,
   type CompendiumContentType,
 } from "@/lib/compendium/content-types"
+import {
+  compendiumBrowseHref,
+  compendiumBrowseUrlMatches,
+  readCompendiumBrowseState,
+} from "@/lib/compendium/browse-url"
 import {
   compendiumAccentColorStyles,
   getCompendiumItemAccentColor,
@@ -260,9 +264,11 @@ export default function CompendiumPageClient() {
   const router = useRouter()
   const { layout: cardLayout, setLayout: setCardLayout } = useBuilderLayout()
   const { isCompactOnly } = useAppPresentationMode()
-  const [activeTab, setActiveTab] = useState<ContentType>("classes")
+  const [activeTab, setActiveTab] = useState<ContentType>(
+    () => readCompendiumBrowseState(searchParams).tab,
+  )
   const [spellListDialogOpen, setSpellListDialogOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
+  const [searchQuery, setSearchQuery] = useState(() => readCompendiumBrowseState(searchParams).query)
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const [content, setContent] = useState<Record<ContentType, unknown[]>>({
     species: [],
@@ -336,30 +342,20 @@ export default function CompendiumPageClient() {
   })
 
   useEffect(() => {
-    const tab = searchParams.get("tab")
-    if (tab && isCompendiumContentType(tab)) {
-      setActiveTab(tab)
-    }
-    setSearchQuery(searchParams.get("q") ?? "")
+    const next = readCompendiumBrowseState(searchParams)
+    setActiveTab((current) => (current === next.tab ? current : next.tab))
+    setSearchQuery((current) => (current.trim() === next.query.trim() ? current : next.query))
   }, [searchParams])
 
   const changeActiveTab = (tab: ContentType) => {
     setActiveTab(tab)
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("tab", tab)
-    if (searchQuery.trim()) params.set("q", searchQuery.trim())
-    router.replace(`/compendium?${params.toString()}`, { scroll: false })
+    setSelectedItem(null)
   }
 
   useEffect(() => {
-    const query = deferredSearchQuery.trim()
-    if ((searchParams.get("q") ?? "") === query) return
-    const params = new URLSearchParams(searchParams.toString())
-    if (query) params.set("q", query)
-    else params.delete("q")
-    params.set("tab", activeTab)
-    router.replace(`/compendium?${params.toString()}`, { scroll: false })
-  }, [activeTab, deferredSearchQuery, router, searchParams])
+    if (compendiumBrowseUrlMatches(searchParams, activeTab, searchQuery)) return
+    router.replace(compendiumBrowseHref(activeTab, searchQuery), { scroll: false })
+  }, [activeTab, router, searchParams, searchQuery])
 
   useEffect(() => {
     setSourceFilter("all")

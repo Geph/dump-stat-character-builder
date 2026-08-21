@@ -6,6 +6,7 @@ import {
   applyUsesRest,
   shouldResetSpellSlotsOnRest,
 } from "@/lib/character/sheet-rest"
+import { applyFeatureResourceRefresh } from "@/lib/character/collect-resource-refresh-effects"
 import type { SpellSlotTable } from "@/lib/compendium/spell-slots"
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 
@@ -204,6 +205,58 @@ describe("applyUsesRest", () => {
   })
 })
 
+describe("Reagent Synthesis feature restore", () => {
+  it("restores INT modifier reagents once per long rest, minimum 1", () => {
+    const entries = [
+      {
+        id: "reagents",
+        uses: {
+          type: "at_level" as const,
+          atLevelTable: [{ level: 1, count: 10 }],
+          recharges: [{ rest: "short_rest" as const, amount: 1 }, { rest: "long_rest" as const }],
+        },
+        classLevel: 5,
+      },
+    ]
+    const effects = [
+      {
+        id: "synthesis",
+        featureName: "Reagent Synthesis",
+        resourceKey: "reagents",
+        classId: "alchemist",
+        classLevel: 5,
+        onRest: "short_rest" as const,
+        oncePerLongRest: true,
+        restoreAmountConfig: {
+          mode: "ability_modifier" as const,
+          ability: "INT" as const,
+          minimum: 1,
+        },
+      },
+    ]
+
+    const first = applyFeatureResourceRefresh({
+      usedResourcesById: { reagents: 10 },
+      resourceEntries: entries,
+      resolveContext: { proficiencyBonus: 3, abilityModifiers: { INT: 0 } },
+      effects,
+      trigger: "short_rest",
+    })
+    expect(first.usedResourcesById.reagents).toBe(9)
+    expect(first.rechargeCapsByResourceId.synthesis).toBe(1)
+
+    const blocked = applyFeatureResourceRefresh({
+      usedResourcesById: first.usedResourcesById,
+      resourceEntries: entries,
+      resolveContext: { proficiencyBonus: 3, abilityModifiers: { INT: 4 } },
+      effects,
+      trigger: "short_rest",
+      rechargeCapsByResourceId: first.rechargeCapsByResourceId,
+    })
+    expect(blocked.usedResourcesById.reagents).toBe(9)
+  })
+})
+
 describe("applySheetRest", () => {
   const wizardTable: SpellSlotTable = {
     type: "full",
@@ -267,6 +320,33 @@ describe("applySheetRest", () => {
       ]),
     )
     expect(result.summary.some((line) => line.includes("Channel Divinity"))).toBe(false)
+  })
+
+  it("lists Potion Brewing as an available short-rest activity", () => {
+    const result = applySheetRest({
+      rest: "short_rest",
+      maxHp: 20,
+      activeConditions: [],
+      usedSpellSlotsByKey: {},
+      spellSlotTables: [],
+      usedResourcesById: {},
+      resourceEntries: [],
+      usedActionUsesById: {},
+      sheetActions: [
+        {
+          id: "alchemist:1:Potion Brewing",
+          name: "Potion Brewing",
+          sourceLabel: "Alchemist",
+          kinds: ["action"],
+          category: "utility",
+          limitedUses: null,
+          classLevel: 3,
+          description: "You can spend 10 minutes to brew a potion.",
+        },
+      ],
+      resolveContext,
+    })
+    expect(result.summary).toContain("Available: Potion Brewing")
   })
 
   it("restores HP, spell slots, death saves, and long-rest resources on long rest", () => {

@@ -438,6 +438,190 @@ describe("collectSheetActions", () => {
       "explode",
     ])
     expect(bomb?.specialAttacks?.map((profile) => profile.damageDiceCount)).toEqual([2, 2])
+    expect(bomb?.spendsEconomy).toBe(false)
+  })
+
+  it("folds Prime Bomb into Bombs and keeps formula riders on regular attacks", () => {
+    const baseAttack = {
+      properties: [],
+      damageTypes: ["Fire"],
+      damageDiceCount: 1,
+      damageDieType: "d10" as const,
+      resourceScaleKey: "reagents",
+      bonusDicePerResource: "1d10",
+      maxResourcesSpentByLevel: [
+        { level: 2, mode: "fixed" as const, fixed: 1 },
+        { level: 5, mode: "fixed" as const, fixed: 2 },
+      ],
+      damageByLevel: [
+        { level: 1, mode: "dice" as const, dieCount: 1, dieType: "d10" as const },
+        { level: 5, mode: "dice" as const, dieCount: 2, dieType: "d10" as const },
+      ],
+    }
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 1,
+              name: "Bombs",
+              description: "Create and throw Bombs.",
+              activation: { action: true },
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_bomb",
+                  catalogRefId: "cat_char_special_attack",
+                  characteristics: [
+                    {
+                      ...baseAttack,
+                      id: "bomb_attack",
+                      type: "special_attack",
+                      attackVariant: "attack",
+                      attackProfile: "ranged",
+                    },
+                    {
+                      ...baseAttack,
+                      id: "bomb_explode",
+                      type: "special_attack",
+                      attackVariant: "explode",
+                      attackProfile: "force_save",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              level: 2,
+              name: "Prime Bomb",
+              description: "Spend Reagents to prime a Bomb.",
+              activation: { action: true },
+              sheetDisplay: { combatActions: true },
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_prime",
+                  catalogRefId: "cat_char_special_attack",
+                  characteristics: [
+                    {
+                      ...baseAttack,
+                      id: "prime_attack",
+                      type: "special_attack",
+                      attackVariant: "attack",
+                      attackProfile: "ranged",
+                    },
+                    {
+                      ...baseAttack,
+                      id: "prime_explode",
+                      type: "special_attack",
+                      attackVariant: "explode",
+                      attackProfile: "force_save",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          6,
+          {
+            subclassFeatures: [
+              {
+                level: 3,
+                name: "Painkiller Bomb",
+                description: "A formula applied to a Bomb.",
+                activation: { action: true },
+                linkedModifiers: [
+                  {
+                    instanceId: "modinst_painkiller",
+                    catalogRefId: "cat_char_power_rider",
+                    characteristics: [
+                      {
+                        id: "char_painkiller",
+                        type: "power_rider",
+                        parentPowerNames: ["Bomb", "Bombs"],
+                        appliesToAttackVariants: ["attack"],
+                        selectable: true,
+                        alertSummary: "Add Painkiller Bomb to a regular (non-primed) Bomb attack.",
+                      },
+                    ],
+                  },
+                ],
+              },
+              {
+                level: 6,
+                name: "Timed Demolition",
+                description: "When you prime a Bomb, you can set a delay.",
+                linkedModifiers: [
+                  {
+                    instanceId: "modinst_timed",
+                    catalogRefId: "cat_char_power_rider",
+                    characteristics: [
+                      {
+                        id: "char_timed",
+                        type: "power_rider",
+                        parentPowerNames: ["Bomb", "Bombs"],
+                        alertSummary: "When you prime a Bomb, set a delay before it Explodes.",
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ),
+      ],
+      species: null,
+      customAbilities: [],
+    })
+
+    expect(actions.map((action) => action.name)).toEqual(["Bombs"])
+    expect(actions[0]?.specialAttacks?.map((profile) => profile.attackVariant)).toEqual([
+      "attack",
+      "primed",
+      "explode",
+    ])
+    expect(actions[0]?.specialAttacks?.find((profile) => profile.attackVariant === "attack")?.resourceScaleKey).toBeNull()
+    expect(actions[0]?.specialAttacks?.find((profile) => profile.attackVariant === "primed")?.resourceScaleKey).toBe(
+      "reagents",
+    )
+    expect(actions[0]?.relatedTalentAlerts?.map((alert) => alert.name)).toEqual([
+      "Painkiller Bomb",
+      "Timed Demolition",
+    ])
+    expect(actions[0]?.relatedTalentAlerts?.[0]).toMatchObject({
+      selectable: true,
+      appliesToAttackVariants: ["attack"],
+    })
+    expect(actions[0]?.relatedTalentAlerts?.[1]).toMatchObject({
+      selectable: true,
+      appliesToAttackVariants: ["primed"],
+    })
+  })
+
+  it("files Potion Brewing on Abilities and Potion Mixologist on Combat", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 1,
+              name: "Potion Brewing",
+              description:
+                "You can spend 10 minutes and Reagents to brew a potion. Potion of Healing restores hit points.",
+              activation: { action: true, noEconomyCost: true },
+            },
+            {
+              level: 10,
+              name: "Potion Mixologist",
+              description: "As a Bonus Action, you drink two potions at once.",
+              activation: { bonusAction: true },
+            },
+          ],
+          10,
+        ),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Potion Brewing")?.category).toBe("utility")
+    expect(actions.find((action) => action.name === "Potion Mixologist")?.category).toBe("combat")
   })
 
   it("lists Action Surge on the combat tab only", () => {

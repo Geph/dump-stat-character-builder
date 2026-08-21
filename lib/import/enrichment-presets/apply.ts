@@ -20,6 +20,8 @@ import {
   getEnrichmentHook,
   getEnrichmentPresets,
 } from "@/lib/import/enrichment-presets/registry"
+import { sanitizeAlchemistImportContent } from "@/lib/import/enrichment-presets/packs/alchemist"
+import { sanitizeCaptainImportContent } from "@/lib/import/enrichment-presets/packs/captain"
 import { sanitizeGunslingerImportContent } from "@/lib/import/enrichment-presets/packs/gunslinger"
 import { sanitizeInvestigatorImportContent } from "@/lib/import/enrichment-presets/packs/investigator"
 import { sanitizeNecromancerImportContent } from "@/lib/import/enrichment-presets/packs/necromancer"
@@ -66,6 +68,7 @@ const CLASS_ROW_PACKS = new Set([
   "vagabond",
   "witch",
   "gunslinger",
+  "captain",
   "martyr",
   "necromancer",
   "mhp_warden",
@@ -84,6 +87,7 @@ const CONTENT_PACKS = new Set([
   "vagabond",
   "witch",
   "gunslinger",
+  "captain",
   "martyr",
   "necromancer",
   "mhp_warden",
@@ -651,6 +655,8 @@ export function applyImportEnrichmentPresets(
   }
 
   next = patchInitiativeRechargeFromFeatures(next)
+  next = sanitizeAlchemistImportContent(next)
+  next = sanitizeCaptainImportContent(next)
   next = sanitizeGunslingerImportContent(next)
   next = sanitizeCraftsmanMasteriesImportContent(next)
   next = sanitizeInvestigatorImportContent(next)

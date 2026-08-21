@@ -19,6 +19,7 @@ import {
   type SpellsKnownCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
+import { sanitizeBonusProficienciesFeature } from "@/lib/compendium/enrich-srd-class-features"
 import {
   effectiveLinkedModifiers,
   readLinkedModifiers,
@@ -415,7 +416,7 @@ function collectSlotsFromFeature(
   catalog: ModifierCatalogEntry[],
   context?: SlotBuildContext,
 ): ModifierPlayerChoiceSlot[] {
-  const feature = migrateFeatureOptionPickers(rawFeature)
+  const feature = sanitizeBonusProficienciesFeature(migrateFeatureOptionPickers(rawFeature))
   const sourceKey = featureChoiceKey(classId, feature.name, feature.level)
   const sourceLabel = `${className}: ${feature.name}`
   const slots: ModifierPlayerChoiceSlot[] = []
@@ -1010,9 +1011,15 @@ export function optionsForProficiencyGrantSlot(
     })
   }
 
-  const proficientSkillSet = new Set(proficientSkills)
-  const proficientToolSet = new Set(proficientTools)
-  const keepSelected = new Set(currentSelection)
+  const proficientSkillSet = new Set(
+    proficientSkills.map((name) => name.trim().toLowerCase()).filter(Boolean),
+  )
+  const proficientToolSet = new Set(
+    proficientTools.map((name) => name.trim().toLowerCase()).filter(Boolean),
+  )
+  const keepSelected = new Set(
+    currentSelection.map((name) => name.trim().toLowerCase()).filter(Boolean),
+  )
 
   const baseOptions =
     slot.options ??
@@ -1026,12 +1033,13 @@ export function optionsForProficiencyGrantSlot(
         : SKILL_NAMES.map((name) => ({ name })))
 
   return baseOptions.filter((option) => {
-    if (keepSelected.has(option.name)) return true
+    const key = option.name.trim().toLowerCase()
+    if (keepSelected.has(key)) return true
     if (SKILL_NAME_SET.has(option.name)) {
-      return !proficientSkillSet.has(option.name)
+      return !proficientSkillSet.has(key)
     }
-    if (TOOL_NAME_SET.has(option.name)) {
-      return !proficientToolSet.has(option.name)
+    if (slot.kind === "tool" || slot.kind === "skill_or_tool" || TOOL_NAME_SET.has(option.name)) {
+      return !proficientToolSet.has(key)
     }
     return true
   })

@@ -282,7 +282,7 @@ export function ModifierPlayerChoicePanel({
               existingExpertiseSkills,
               currentSelection,
             })
-          : isSkillKind || isLanguageKind
+          : isSkillKind || isToolKind || isLanguageKind
             ? optionsForProficiencyGrantSlot(slot, {
                 proficientSkills,
                 proficientTools,

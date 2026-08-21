@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { AlertTriangle, Dices, X } from "lucide-react"
+import { GameIcon } from "@/components/game-icon-picker"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
   PsionicAugmentPicker,
@@ -16,6 +17,7 @@ import {
   type ActionEconomyKind,
   type SheetActionEntry,
 } from "@/lib/character/sheet-actions"
+import { talentAlertAppliesToVariant } from "@/lib/character/alchemist-bomb-sheet"
 import { guardianTacticsToggleIdForOption, sheetToggleIdActivatedByAction } from "@/lib/compendium/sheet-toggle-registry"
 import { weaponMorphToggleIdForOption } from "@/lib/character/weapon-morph"
 import type { IllusionTokenKind } from "@/lib/character/illusion-tokens"
@@ -119,6 +121,9 @@ type SheetActionsPanelProps = {
   playerNoteValues?: Record<string, string[]>
   onPlayerNoteChange?: (key: string, value: string) => void
   onEquipmentChoiceChange?: (key: string, value: string) => void
+  /** One Primed Bomb per Attack action; Extra Attack still allows extra regular bombs. */
+  primedBombUsedThisTurn?: boolean
+  onPrimedBombUsed?: () => void
 }
 
 function actionPlayerNoteKey(action: SheetActionEntry, noteId: string): string {
@@ -492,6 +497,8 @@ function ActionDetailOverlay({
   onRestoreSpellSlotsByCombinedLevel,
   onRestoreResourceFromSpellSlot,
   onSpendSpellSlot,
+  primedBombUsedThisTurn = false,
+  onPrimedBombUsed,
 }: {
   action: SheetActionEntry
   usage: ActionUsage | null
@@ -539,6 +546,8 @@ function ActionDetailOverlay({
     ability: "INT" | "WIS" | "CHA" | "STR" | "DEX" | "CON"
   }) => string | null
   onSpendSpellSlot?: (minSpellLevel: number) => string | null
+  primedBombUsedThisTurn?: boolean
+  onPrimedBombUsed?: () => void
 }) {
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
   const [step, setStep] = useState<"detail" | "roll" | "target">("detail")
@@ -546,6 +555,7 @@ function ActionDetailOverlay({
   const [resourceSpendAmount, setResourceSpendAmount] = useState(1)
   const [empowerSpend, setEmpowerSpend] = useState(0)
   const [overloadedChargeActive, setOverloadedChargeActive] = useState(false)
+  const [selectedRiderNames, setSelectedRiderNames] = useState<string[]>([])
   const attackProfiles =
     action.specialAttacks?.length ? action.specialAttacks : action.specialAttack ? [action.specialAttack] : []
   const [selectedAttackProfileId, setSelectedAttackProfileId] = useState<string | null>(
@@ -574,6 +584,11 @@ function ActionDetailOverlay({
     attackProfiles.find((profile) => profile.id === selectedAttackProfileId) ??
     attackProfiles[0] ??
     null
+  const visibleTalentAlerts = (action.relatedTalentAlerts ?? []).filter((alert) =>
+    talentAlertAppliesToVariant(alert.appliesToAttackVariants, specialAttack?.attackVariant),
+  )
+  const selectableRiders = visibleTalentAlerts.filter((alert) => alert.selectable)
+  const infoTalentAlerts = visibleTalentAlerts.filter((alert) => !alert.selectable)
   const psiCost = psionicAugments
     ? totalPsionicAugmentCost(psionicAugments, augmentSelections)
     : 0
@@ -652,6 +667,8 @@ function ActionDetailOverlay({
 
   const canAffordPsi = psiCost <= availablePsiPoints && (psiLimit == null || psiCost <= psiLimit)
   const canAffordHitDice = hitDiceNeeded <= 0 || hitDiceNeeded <= hitDiceRemaining
+  const primedModeSelected = specialAttack?.attackVariant === "primed"
+  const primedBlocked = primedModeSelected && primedBombUsedThisTurn
   const canUse =
     !incapacitated &&
     !chargeExhausted &&
@@ -660,7 +677,8 @@ function ActionDetailOverlay({
     (psiCost === 0 || Boolean(psiResourceId)) &&
     (hitDiceNeeded === 0 || Boolean(onSpendHitDice)) &&
     (!overloadedChargeActive || overloadedChargeAffordable) &&
-    (menuOptions.length === 0 || Boolean(selectedMenuOption))
+    (menuOptions.length === 0 || Boolean(selectedMenuOption)) &&
+    !primedBlocked
 
   useEffect(() => {
     setAugmentSelections([])
@@ -669,6 +687,7 @@ function ActionDetailOverlay({
     setResourceSpendAmount(1)
     setEmpowerSpend(0)
     setOverloadedChargeActive(false)
+    setSelectedRiderNames([])
     setSelectedAttackProfileId(attackProfiles[0]?.id ?? null)
     setSelectedMenuOption(menuOptions[0]?.name ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the opened action changes
@@ -741,6 +760,13 @@ function ActionDetailOverlay({
           ? `Overloaded Charge: spent ${empowerResourceCost} ${empowerPool?.resourceName ?? empower.resourceKey.replace(/_/g, " ")} for ${formatEmpowerEffect(empower, empowerApplied)}`
           : `Spent ${empowerResourceCost} ${empowerPool?.resourceName ?? empower.resourceKey.replace(/_/g, " ")} · ${formatEmpowerEffect(empower, empowerApplied)}`,
       )
+    }
+    if (primedModeSelected) {
+      onPrimedBombUsed?.()
+    }
+    const appliedRiders = selectableRiders.filter((alert) => selectedRiderNames.includes(alert.name))
+    if (appliedRiders.length) {
+      parts.push(`Riders: ${appliedRiders.map((alert) => alert.name).join(", ")}`)
     }
     if (selectedOption) {
       parts.push(
@@ -997,7 +1023,12 @@ function ActionDetailOverlay({
       >
         <div className="sticky top-0 flex items-start justify-between gap-3 p-4 border-b border-border bg-card/95 backdrop-blur-sm">
           <div>
-            <h2 className="text-lg font-black text-foreground">{action.name}</h2>
+            <h2 className="flex items-center gap-2 text-lg font-black text-foreground">
+              {specialAttack?.icon ? (
+                <GameIcon name={specialAttack.icon} className="h-5 w-5 shrink-0 text-primary" />
+              ) : null}
+              {action.name}
+            </h2>
             <p className="text-xs text-muted-foreground">
               {action.sourceLabel}
               {" · "}
@@ -1099,36 +1130,52 @@ function ActionDetailOverlay({
                   <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                     Attack mode
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={cn("grid gap-2", attackProfiles.length >= 3 ? "grid-cols-3" : "grid-cols-2")}>
                     {attackProfiles.map((profile) => {
                       const selected = profile.id === specialAttack?.id
+                      const primedLocked =
+                        profile.attackVariant === "primed" && primedBombUsedThisTurn
                       const label =
                         profile.attackVariant === "explode"
                           ? "Explode"
-                          : profile.attackVariant === "attack"
-                            ? "Attack"
-                            : profile.label || profile.attackName || "Use"
+                          : profile.attackVariant === "primed"
+                            ? "Primed"
+                            : profile.attackVariant === "attack"
+                              ? "Attack"
+                              : profile.label || profile.attackName || "Use"
                       return (
                         <button
                           key={profile.id}
                           type="button"
                           onClick={() => {
                             setSelectedAttackProfileId(profile.id)
-                            setEmpowerSpend(0)
+                            setEmpowerSpend(profile.attackVariant === "primed" ? 1 : 0)
                             setOverloadedChargeActive(false)
+                            setSelectedRiderNames([])
                           }}
                           className={cn(
-                            "rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
+                            "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
                             selected
                               ? "border-primary bg-primary/10 text-foreground"
                               : "border-border hover:border-primary/40",
+                            primedLocked && "opacity-60",
                           )}
                         >
+                          {profile.icon ? (
+                            <GameIcon name={profile.icon} className="h-3.5 w-3.5 shrink-0" />
+                          ) : null}
                           {label}
                         </button>
                       )
                     })}
                   </div>
+                  {attackProfiles.some((profile) => profile.attackVariant === "primed") ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      Extra Attack lets you throw more regular bombs; only one can be Primed per
+                      Attack action.
+                      {primedBombUsedThisTurn ? " Primed already used this turn." : ""}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
               {usage ? (
@@ -1231,12 +1278,47 @@ function ActionDetailOverlay({
                   onChange={setAugmentSelections}
                 />
               ) : null}
-              {action.relatedTalentAlerts?.length ? (
+              {selectableRiders.length ? (
+                <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                    Add riders
+                  </p>
+                  {selectableRiders.map((alert) => {
+                    const checked = selectedRiderNames.includes(alert.name)
+                    return (
+                      <label
+                        key={`${alert.name}:${alert.summary}`}
+                        className="flex cursor-pointer items-start gap-2"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={checked}
+                          onChange={() => {
+                            setSelectedRiderNames((current) =>
+                              current.includes(alert.name)
+                                ? current.filter((name) => name !== alert.name)
+                                : [...current, alert.name],
+                            )
+                          }}
+                        />
+                        <span className="min-w-0 space-y-1">
+                          <span className="block text-xs font-semibold text-foreground">{alert.name}</span>
+                          <span className="block text-xs text-foreground/90 leading-relaxed">
+                            {alert.summary}
+                          </span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              ) : null}
+              {infoTalentAlerts.length ? (
                 <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
                     Related talents
                   </p>
-                  {action.relatedTalentAlerts.map((alert) => (
+                  {infoTalentAlerts.map((alert) => (
                     <div key={`${alert.name}:${alert.summary}`} className="flex gap-2">
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                       <div className="min-w-0 space-y-1">
@@ -1495,6 +1577,8 @@ export function SheetActionsPanel({
   onRestoreSpellSlotsByCombinedLevel,
   onRestoreResourceFromSpellSlot,
   onSpendSpellSlot,
+  primedBombUsedThisTurn = false,
+  onPrimedBombUsed,
 }: SheetActionsPanelProps) {
   const [openActionId, setOpenActionId] = useState<string | null>(null)
 
@@ -1697,7 +1781,15 @@ export function SheetActionsPanel({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-foreground truncate">{entry.name}</p>
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+              {entry.specialAttacks?.[0]?.icon || entry.specialAttack?.icon ? (
+                <GameIcon
+                  name={(entry.specialAttacks?.[0]?.icon || entry.specialAttack?.icon)!}
+                  className="h-3.5 w-3.5 shrink-0 text-primary"
+                />
+              ) : null}
+              <span className="truncate">{entry.name}</span>
+            </p>
             <p className="text-[10px] text-muted-foreground truncate">
               {entry.trigger ? `${entry.trigger} · ` : ""}
               {entry.sourceLabel}
@@ -1828,6 +1920,8 @@ export function SheetActionsPanel({
             onRestoreSpellSlotsByCombinedLevel={onRestoreSpellSlotsByCombinedLevel}
             onRestoreResourceFromSpellSlot={onRestoreResourceFromSpellSlot}
             onSpendSpellSlot={onSpendSpellSlot}
+            primedBombUsedThisTurn={primedBombUsedThisTurn}
+            onPrimedBombUsed={onPrimedBombUsed}
           />
         ) : null}
       </AnimatePresence>

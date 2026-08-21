@@ -1,5 +1,16 @@
 import { featureChoiceKey } from "@/lib/builder/choices"
+import { isBombFormulaAbility } from "@/lib/builder/aggregate-bomb-formulas"
 import { isDisciplinePackageAbility } from "@/lib/builder/aggregate-psionic-talents"
+import {
+  expandAlchemistBombProfiles,
+  isAlchemistBombName,
+  isPrimeBombName,
+  isShortRestActivityText,
+  looksLikePrimeBombRiderText,
+  looksLikeSelectableBombRider,
+  resolveBombRiderAttackVariants,
+  shouldSuppressStandaloneBombCard,
+} from "@/lib/character/alchemist-bomb-sheet"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import {
@@ -134,6 +145,10 @@ export type SheetActionTalentAlert = {
   parentPowerNames?: string[]
   /** When set, attach only if the parent action lists a matching menu option. */
   parentMenuOptionNames?: string[]
+  /** When set, only show this rider for these Bomb modes. */
+  appliesToAttackVariants?: Array<"attack" | "primed" | "explode">
+  /** When true, the dialog offers this rider as an optional add-on. */
+  selectable?: boolean
 }
 
 /** Trigger characteristics that represent a player-elected reaction when `useReaction` is set. */
@@ -495,6 +510,12 @@ function classifyActionCategory(
   opts?: { preferCombat?: boolean },
 ): SheetActionCategory {
   if (opts?.preferCombat) return "combat"
+  if (/^potion mixologist$/i.test(item.name.trim())) return "combat"
+
+  const haystack = `${item.name} ${stripHtml(item.description ?? "")}`
+  if (isUtilityOnlyHaystack(haystack) || isShortRestActivityText(item.name, item.description)) {
+    return "utility"
+  }
 
   const resourceKey = resolveActionResourceKey(item)
   if (resourceKey && COMBAT_CLASS_RESOURCE_KEYS.has(resourceKey)) return "combat"
@@ -508,7 +529,6 @@ function classifyActionCategory(
       if (COMBAT_CHARACTERISTIC_TYPES.has(characteristic.type)) return "combat"
     }
   }
-  const haystack = `${item.name} ${stripHtml(item.description ?? "")}`
   if (COMBAT_TEXT_RE.test(haystack)) return "combat"
 
   // A Reaction only exists inside the turn order, and a Bonus Action that burns a limited pool
@@ -516,15 +536,20 @@ function classifyActionCategory(
   // its rules text never says "attack" or "damage".
   const kinds = explicitActionKinds(item)
   if (kinds.includes("reaction")) return "combat"
-  if (kinds.includes("bonus") && spendsLimitedPool(item) && !UTILITY_ONLY_TEXT_RE.test(haystack)) {
+  if (kinds.includes("bonus") && spendsLimitedPool(item) && !isUtilityOnlyHaystack(haystack)) {
     return "combat"
   }
   return "utility"
 }
 
-/** Downtime / exploration wording that keeps a resource-spending Bonus Action off the Combat tab. */
+/** Downtime / exploration wording that keeps a spend off the Combat tab. */
 const UTILITY_ONLY_TEXT_RE =
-  /\b(?:craft(?:ing|ed|s)?|forge|forging|downtime|workshop|artisan|smith'?s tools|between adventures|over the course of|8 hours|during a (?:short|long) rest|while you travel|travel(?:ing)? pace)\b/i
+  /\b(?:craft(?:ing|ed|s)?|brew(?:ing|ed)?|forge|forging|downtime|workshop|artisan|smith'?s tools|between adventures|over the course of|8 hours|during a (?:short|long) rest|while you travel|travel(?:ing)? pace)\b/i
+const SPEND_MINUTES_ACTIVITY_RE = /\b(?:spend|take)\b(?:\s+\w+){0,6}\s+\d+\s+minutes?\b/i
+
+function isUtilityOnlyHaystack(haystack: string): boolean {
+  return UTILITY_ONLY_TEXT_RE.test(haystack) || SPEND_MINUTES_ACTIVITY_RE.test(haystack)
+}
 
 /** True when using the item draws down a finite pool (its own uses or a class resource). */
 function spendsLimitedPool(item: ActivatableItem): boolean {
@@ -556,6 +581,18 @@ function resolveActionResourceKey(item: ActivatableItem): string | null {
   return null
 }
 
+function isSelectableBombFormulaRiderFeature(feature: ActivatableItem): boolean {
+  if (isAlchemistBombName(feature.name) || isPrimeBombName(feature.name)) return false
+  return (feature.linkedModifiers ?? []).some((instance) =>
+    (instance.characteristics ?? []).some(
+      (char) =>
+        char.type === "power_rider" &&
+        Boolean(char.selectable) &&
+        (char.parentPowerNames ?? []).some((parent) => isAlchemistBombName(parent)),
+    ),
+  )
+}
+
 function resolveSpecialAttacks(
   item: ActivatableItem,
   classLevel?: number,
@@ -580,7 +617,7 @@ function resolveSpecialAttacks(
       }
     }
   }
-  return attacks
+  return expandAlchemistBombProfiles(attacks, classLevel ?? 1)
 }
 
 function resolveSpecialAttack(
@@ -888,7 +925,10 @@ function pushActivatableItemActions(
   if ((feature.level ?? 1) > levelCap) return
   const display = resolveFeatureSheetDisplay(feature as unknown as Feature)
   const movementExpansions = collectMovementOptionExpansions(feature)
-  const suppressParent = suppressParentForMovementExpansions(feature, movementExpansions)
+  const suppressParent =
+    suppressParentForMovementExpansions(feature, movementExpansions) ||
+    shouldSuppressStandaloneBombCard(feature.name, resolveSpecialAttacks(feature, levelCap)) ||
+    isSelectableBombFormulaRiderFeature(feature)
   const limitedUses = resolveLimitedUsesWithInference(feature, availableResourceKeys)
   const itemWithUses: ActivatableItem = { ...feature, limitedUses }
 
@@ -917,6 +957,7 @@ function pushActivatableItemActions(
         const healEffects = resolveHealEffects(feature)
         const playerNotes = resolvePlayerNotes(feature)
         const equipmentChoices = resolveEquipmentChoices(feature)
+        const specialAttacks = resolveSpecialAttacks(feature, levelCap)
         actions.push({
           id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
           name: feature.name,
@@ -929,13 +970,17 @@ function pushActivatableItemActions(
           description: feature.description ?? null,
           classId,
           classResourceKey: resolveActionResourceKey(itemWithUses),
-          specialAttack: resolveSpecialAttack(feature, levelCap),
-          specialAttacks: resolveSpecialAttacks(feature, levelCap),
+          specialAttack: specialAttacks[0] ?? null,
+          specialAttacks,
           menuOptions: menuOptions.length ? menuOptions : undefined,
           spendHitDice: resolveSpendHitDice(feature),
           hitDieSides: hitDieSides ?? null,
           healEffects: healEffects.length ? healEffects : undefined,
-          spendsEconomy: trigger ? false : (fallback.spendsEconomy ?? resolveSpendsEconomy(feature)),
+          spendsEconomy: trigger
+            ? false
+            : isAlchemistBombName(feature.name)
+              ? false
+              : (fallback.spendsEconomy ?? resolveSpendsEconomy(feature)),
           playerNotes: playerNotes.length ? playerNotes : undefined,
           equipmentChoices: equipmentChoices.length ? equipmentChoices : undefined,
           psionicAugments: resolvePsionicAugments({
@@ -1051,6 +1096,7 @@ function customAbilityHaystack(ability: CustomAbility): string {
 
 function isCustomAbilityAction(ability: CustomAbility): boolean {
   if (ability.ability_role === "talent_pool") return false
+  if (ability.ability_role === "bomb_formula" || isBombFormulaAbility(ability)) return false
   const haystack = customAbilityHaystack(ability)
   const hasSpend = hasManeuverSpendText(haystack)
   if (ability.ability_role === "discipline") {
@@ -1157,6 +1203,12 @@ function pushCustomAbilityActions(
       kinds.push("action")
     }
     if (!kinds.length) continue
+    if (
+      (ability.ability_role === "alchemist_bomb" || isAlchemistBombName(ability.name)) &&
+      actions.some((action) => isAlchemistBombName(action.name))
+    ) {
+      continue
+    }
 
     seenPowerNames.add(normalizePickName(ability.name))
     const healEffects = resolveHealEffects(item)
@@ -1186,7 +1238,7 @@ function pushCustomAbilityActions(
       duration: ability.duration ?? null,
       concentration: ability.concentration,
       healEffects: healEffects.length ? healEffects : undefined,
-      spendsEconomy: fallback.spendsEconomy,
+      spendsEconomy: isAlchemistBombName(ability.name) ? false : fallback.spendsEconomy,
     })
   }
 
@@ -1301,15 +1353,49 @@ function collectTalentAlertsFromFeatures(
         const key = `${feature.name}::${char.parentPowerNames.join("|")}`
         if (seen.has(key)) continue
         seen.add(key)
+        const summary = resolvePowerRiderSummary(feature.name, char, levelCap)
         alerts.push({
           name: feature.name,
-          summary: resolvePowerRiderSummary(feature.name, char, levelCap),
+          summary,
           description: feature.description ?? null,
           sourceLabel,
           parentPowerNames: char.parentPowerNames,
           parentMenuOptionNames: char.parentMenuOptionNames,
+          appliesToAttackVariants: resolveBombRiderAttackVariants({
+            name: feature.name,
+            description: feature.description,
+            summary,
+            appliesToAttackVariants: char.appliesToAttackVariants,
+          }),
+          selectable: looksLikeSelectableBombRider({
+            selectable: char.selectable,
+            name: feature.name,
+            description: feature.description,
+            summary,
+          }),
         })
       }
+    }
+    if (isPrimeBombName(feature.name)) return
+    if (seen.has(`${feature.name}::Bomb|Bombs`)) return
+    if (shouldSuppressStandaloneBombCard(feature.name, resolveSpecialAttacks(feature, levelCap))) {
+      const key = `${feature.name}::Bomb|Bombs`
+      seen.add(key)
+      alerts.push({
+        name: feature.name,
+        summary: looksLikePrimeBombRiderText(feature.name, feature.description)
+          ? "Add this rider when you prime a Bomb."
+          : "Add this formula to a regular (non-primed) Bomb attack.",
+        description: feature.description ?? null,
+        sourceLabel,
+        parentPowerNames: ["Bomb", "Bombs"],
+        appliesToAttackVariants: resolveBombRiderAttackVariants({
+          name: feature.name,
+          description: feature.description,
+          formulaRider: true,
+        }),
+        selectable: true,
+      })
     }
   }
 
@@ -1365,13 +1451,26 @@ function collectTalentAlertsFromCustomAbilities(
         const key = `${option.name}::${char.parentPowerNames.join("|")}`
         if (seen.has(key)) continue
         seen.add(key)
+        const summary = char.alertSummary?.trim() || char.label?.trim() || option.name
         alerts.push({
           name: option.name,
-          summary: char.alertSummary?.trim() || char.label?.trim() || option.name,
+          summary,
           description: option.description ?? null,
           sourceLabel,
           parentPowerNames: char.parentPowerNames,
           parentMenuOptionNames: char.parentMenuOptionNames,
+          appliesToAttackVariants: resolveBombRiderAttackVariants({
+            name: option.name,
+            description: option.description,
+            summary,
+            appliesToAttackVariants: char.appliesToAttackVariants,
+          }),
+          selectable: looksLikeSelectableBombRider({
+            selectable: char.selectable,
+            name: option.name,
+            description: option.description,
+            summary,
+          }),
         })
       }
     }
@@ -1427,9 +1526,57 @@ function collectTalentAlertsFromCustomAbilities(
             sourceLabel,
             parentPowerNames: char.parentPowerNames,
             parentMenuOptionNames: char.parentMenuOptionNames,
+            appliesToAttackVariants: resolveBombRiderAttackVariants({
+              name: ability.name,
+              description: ability.description,
+              summary,
+              appliesToAttackVariants: char.appliesToAttackVariants,
+            }),
+            selectable: looksLikeSelectableBombRider({
+              selectable: char.selectable,
+              name: ability.name,
+              description: ability.description,
+              summary,
+            }),
           })
         }
       }
+    }
+    if (!isBombFormulaAbility(ability) || isAlchemistBombName(ability.name) || isPrimeBombName(ability.name)) {
+      continue
+    }
+    const nested = ability.choices?.options ?? []
+    const formulaRows =
+      nested.length > 0
+        ? nested.filter((option) => {
+            const name = normalizePickName(option.name)
+            return (
+              picked.has(name) ||
+              [...picked].some((pick) => name.includes(pick) || pick.includes(name))
+            )
+          })
+        : talentPicked
+          ? [{ name: ability.name, description: ability.description ?? null }]
+          : []
+    for (const row of formulaRows) {
+      const key = `${row.name}::Bomb|Bombs`
+      if (seen.has(key)) continue
+      seen.add(key)
+      alerts.push({
+        name: row.name,
+        summary: looksLikePrimeBombRiderText(row.name, row.description)
+          ? "Add this rider when you prime a Bomb."
+          : "Add this formula to a regular (non-primed) Bomb attack.",
+        description: row.description ?? null,
+        sourceLabel,
+        parentPowerNames: ["Bomb", "Bombs"],
+        appliesToAttackVariants: resolveBombRiderAttackVariants({
+          name: row.name,
+          description: row.description,
+          formulaRider: true,
+        }),
+        selectable: true,
+      })
     }
   }
 
@@ -1465,12 +1612,22 @@ function attachTalentAlertsToActions(
     return {
       ...action,
       relatedTalentAlerts: matched.map(
-        ({ name, summary, description, sourceLabel, parentMenuOptionNames }) => ({
+        ({
           name,
           summary,
           description,
           sourceLabel,
           parentMenuOptionNames,
+          appliesToAttackVariants,
+          selectable,
+        }) => ({
+          name,
+          summary,
+          description,
+          sourceLabel,
+          parentMenuOptionNames,
+          appliesToAttackVariants,
+          selectable,
         }),
       ),
     }

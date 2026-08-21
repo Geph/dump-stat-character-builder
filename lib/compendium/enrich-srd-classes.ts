@@ -7,6 +7,7 @@ import {
 import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
 import { SRD_CLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/class-card-images-defaults"
 import { applyBundledCardImage } from "@/lib/compendium/card-image"
+import { wireClassToolProficiencyChoices } from "@/lib/compendium/class-tool-proficiencies"
 import { applySrdFlavorDescription } from "@/lib/compendium/srd-flavor-descriptions"
 import {
   GRANT_FEAT_CATALOG_ID,
@@ -208,19 +209,21 @@ export function enrichSrdClassRow(row: Record<string, unknown>): Record<string, 
         typeof row.source === "string" ? row.source : null,
       )
 
-  return applySrdFlavorDescription(
-    applyBundledCardImage(
-      {
-        ...row,
-        icon,
-        features,
-        ...(complexity ? { complexity } : {}),
-        ...(weaponProficiencyOverride ? { weapon_proficiencies: weaponProficiencyOverride } : {}),
-        spellcasting: normalizeSpellcasting(row.spellcasting),
-      },
-      SRD_CLASS_CARD_IMAGES_BY_NAME,
+  return wireClassToolProficiencyChoices(
+    applySrdFlavorDescription(
+      applyBundledCardImage(
+        {
+          ...row,
+          icon,
+          features,
+          ...(complexity ? { complexity } : {}),
+          ...(weaponProficiencyOverride ? { weapon_proficiencies: weaponProficiencyOverride } : {}),
+          spellcasting: normalizeSpellcasting(row.spellcasting),
+        },
+        SRD_CLASS_CARD_IMAGES_BY_NAME,
+      ),
+      "class",
     ),
-    "class",
   )
 }
 

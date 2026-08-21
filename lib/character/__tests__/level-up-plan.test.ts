@@ -111,6 +111,13 @@ function alchemistAt(level: number): CharacterClassDetail {
             count: 1,
             options: [],
             optionsSource: "class_discoveries",
+            resourceKey: "discoveries_known",
+            choiceCountByLevel: [
+              { level: 5, count: 1 },
+              { level: 9, count: 2 },
+              { level: 13, count: 3 },
+              { level: 17, count: 4 },
+            ],
             swappableOnLevelUp: true,
           },
         }),
@@ -159,6 +166,22 @@ describe("buildLevelUpPlan — Alchemist formulas and discoveries", () => {
       }),
     )
     expect(step).toMatchObject({ required: 3, mode: "swap", optional: true })
+  })
+
+  it("re-opens Discoveries at level 9 when the class table grants a second", () => {
+    const plan = buildLevelUpPlan({
+      entry: alchemistAt(8),
+      subclasses: [],
+      currentTotalLevel: 8,
+      featureChoicePicks: {
+        [FORMULAS_KEY]: ["Acid Bomb", "Frost Bomb", "Shrapnel Bomb"],
+        [DISCOVERY_KEY]: ["Alchemy of Poison"],
+      },
+    })
+    const discovery = plan?.steps.find(
+      (step) => step.kind === "feature_choice" && step.id === DISCOVERY_KEY,
+    )
+    expect(discovery).toMatchObject({ required: 2, mode: "add" })
   })
 
   it("offers a Discovery swap once one is chosen, without demanding a second", () => {

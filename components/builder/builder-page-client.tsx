@@ -260,6 +260,7 @@ import {
   isOriginSelectableCategory,
   normalizeFeatCategory,
 } from "@/lib/builder/feat-selection"
+import { characterHasFightingStyleAccess } from "@/lib/builder/fighting-style-access"
 import {
   allSelectedAsiAllocationsValid,
   COMBINED_MILESTONE_ASI_KEY,
@@ -305,6 +306,7 @@ import {
   resolvePrimaryClassId,
 } from "@/lib/builder/primary-class"
 import {
+  aggregateClassToolProficiencies,
   getClassSkillPickRequirement,
   getMulticlassToolPickRequirement,
   multiclassProficiencySummary,
@@ -1219,6 +1221,18 @@ export default function BuilderPageClient() {
       }),
     [featureChoicePicks, allFeatPickSlotKeys, grantedFeatIds],
   )
+  const hasFightingStyleAccess = useMemo(
+    () =>
+      characterHasFightingStyleAccess({
+        classLevels: activeClassLevels,
+        classes,
+        subclasses,
+        subclassByClassId,
+        ownedFeatIds,
+        feats,
+      }),
+    [activeClassLevels, classes, feats, ownedFeatIds, subclassByClassId, subclasses],
+  )
   const weaponMasteryDescriptions = useMemo(
     () =>
       buildWeaponMasteryDescriptionsLookup(
@@ -1774,7 +1788,12 @@ export default function BuilderPageClient() {
     proficientTools: [
       ...new Set([
         ...aggregatedCharacteristics.toolProficiencies,
-        ...Object.values(classToolPicks).flat(),
+        ...aggregateClassToolProficiencies({
+          classLevels: activeClassLevels,
+          classes,
+          primaryClassId,
+          classToolPicks,
+        }),
         ...normalizeBackgroundProficiencies(
           selectedBackground?.proficiencies as BackgroundProficiencies | null,
           selectedBackground?.tool_proficiencies,
@@ -2019,6 +2038,7 @@ export default function BuilderPageClient() {
       backgroundId: character.background_id,
       preferredSources: preferredFeatSources,
       ...featPrerequisiteStats,
+      hasFightingStyleAccess,
       // Ability scores are finalized on a later step — don't wipe Grappler-style picks early.
       skipAbilityScorePrerequisites: true,
     }
@@ -2063,6 +2083,7 @@ export default function BuilderPageClient() {
     preferredFeatSources,
     featPickSlots,
     activeClassLevels,
+    hasFightingStyleAccess,
   ])
   
   // Darkvision: engine merges species-trait text with CharacteristicModifier vision entries
@@ -3460,17 +3481,31 @@ export default function BuilderPageClient() {
                           {entry.level >= 1 && (() => {
                             const toolReq = getMulticlassToolPickRequirement(cls, isPrimary)
                             if (!toolReq) return null
+                            const selected = classToolPicks[entry.classId] ?? []
+                            const selectedKeys = new Set(
+                              selected.map((name) => name.trim().toLowerCase()).filter(Boolean),
+                            )
+                            const alreadyProficient = new Set(
+                              modifierExpertisePickerProps.proficientTools
+                                .filter((name) => !selectedKeys.has(name.trim().toLowerCase()))
+                                .map((name) => name.trim().toLowerCase())
+                                .filter(Boolean),
+                            )
+                            const options = toolReq.options.filter((name) => {
+                              const key = name.trim().toLowerCase()
+                              return selectedKeys.has(key) || !alreadyProficient.has(key)
+                            })
                             return (
                               <MultiSelectChoices
                                 title={toolReq.label}
                                 hint={`Choose ${toolReq.count} from the list below.`}
-                                options={toolReq.options.map((name) => ({ name }))}
+                                options={options.map((name) => ({ name }))}
                                 maxCount={toolReq.count}
-                                selected={classToolPicks[entry.classId] ?? []}
-                                onChange={(selected) =>
+                                selected={selected}
+                                onChange={(next) =>
                                   setClassToolPicks((prev) => ({
                                     ...prev,
-                                    [entry.classId]: selected,
+                                    [entry.classId]: next,
                                   }))
                                 }
                                 accentClass="border-secondary bg-secondary/10"
@@ -3831,6 +3866,7 @@ export default function BuilderPageClient() {
                         currentSlotFeatId: pickedId,
                         preferredSources: preferredFeatSources,
                         ...featPrerequisiteStats,
+                        hasFightingStyleAccess,
                         // Class step is before Abilities — keep score-gated feats (e.g. Grappler) visible.
                         skipAbilityScorePrerequisites: true,
                       }
@@ -4313,6 +4349,7 @@ export default function BuilderPageClient() {
                           currentSlotFeatId: pickedId,
                           preferredSources: preferredFeatSources,
                           ...featPrerequisiteStats,
+                          hasFightingStyleAccess,
                         }
                         const eligible = filterPreferredSourceReplacements(
                           feats.filter((feat) =>
@@ -4737,6 +4774,7 @@ export default function BuilderPageClient() {
                           currentSlotFeatId: pickedId,
                           preferredSources: preferredFeatSources,
                           ...featPrerequisiteStats,
+                          hasFightingStyleAccess,
                         }
                         const eligible = filterPreferredSourceReplacements(
                           feats.filter((feat) =>

@@ -32,6 +32,7 @@ import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import { compendiumListHref } from "@/lib/compendium/content-types"
 import { DND_SKILLS } from "@/lib/compendium/constants"
+import { SRD_TOOL_NAMES } from "@/lib/compendium/srd-tool-names"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { normalizeFeatureRow } from "@/lib/compendium/normalize-feature-activation"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
@@ -55,6 +56,14 @@ import {
 const ABILITIES = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
 const ARMOR_TYPES = ["Light armor", "Medium armor", "Heavy armor", "Shields"]
 const WEAPON_TYPES = ["Simple weapons", "Martial weapons", "Specific weapon"]
+const TOOL_OTHER_VALUE = "__other__"
+const TOOL_CHOICE_PRESETS = [
+  "Choose one kind of Artisan's Tools",
+  "Choose one kind of Musical Instrument",
+  "Choose one kind of Gaming Set",
+  "Choose 3 Musical Instruments",
+  "Choose one type of Artisan's Tools or Musical Instrument",
+] as const
 const LEVELS = Array.from({ length: 20 }, (_, i) => i + 1)
 const ABILITY_MODIFIERS = ["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const
 const DIE_TYPES = ["d4", "d6", "d8", "d10", "d12", "d20"] as const
@@ -83,6 +92,7 @@ interface ClassFormData {
   saving_throws: string[]
   armor_proficiencies: string[]
   weapon_proficiencies: string[]
+  tool_proficiencies: string[]
   skill_choices: { count: number; options: string[] }
   features: ClassFeature[]
   spellcasting: {
@@ -111,6 +121,7 @@ const defaultClass: ClassFormData = {
   saving_throws: [],
   armor_proficiencies: [],
   weapon_proficiencies: [],
+  tool_proficiencies: [],
   skill_choices: { count: 2, options: [] },
   features: [{ level: 1, name: "", description: "" }],
   spellcasting: null,
@@ -142,6 +153,8 @@ export default function ClassEditorPage({ id }: { id: string }) {
   const [includeRelatedAbilities, setIncludeRelatedAbilities] = useState(false)
   const [relatedLoading, setRelatedLoading] = useState(false)
   const [allSpells, setAllSpells] = useState<{ id: string; name: string }[]>([])
+  const [toolPick, setToolPick] = useState("")
+  const [otherToolInput, setOtherToolInput] = useState("")
   const router = useRouter()
   const { handleCopy, copying, copyError, canCopy } = useDuplicateCompendiumItem("classes", id)
   const { catalog: modifierCatalog } = useModifierCatalog()
@@ -195,6 +208,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
               saving_throws: enriched.saving_throws || [],
               armor_proficiencies: enriched.armor_proficiencies || [],
               weapon_proficiencies: enriched.weapon_proficiencies || [],
+              tool_proficiencies: enriched.tool_proficiencies || [],
               skill_choices: enriched.skill_choices || { count: 2, options: [] },
               features: (enriched.features || [{ level: 1, name: "", description: "" }]).map((feature: ClassFeature) =>
                 normalizeFeatureRow(feature),
@@ -373,6 +387,24 @@ export default function ClassEditorPage({ id }: { id: string }) {
       [field]: prev[field].includes(value)
         ? prev[field].filter(v => v !== value)
         : [...prev[field], value]
+    }))
+  }
+
+  const addToolProficiency = (tool: string) => {
+    const trimmed = tool.trim()
+    if (!trimmed) return
+    setForm((prev) => {
+      if (prev.tool_proficiencies.some((entry) => entry.toLowerCase() === trimmed.toLowerCase())) {
+        return prev
+      }
+      return { ...prev, tool_proficiencies: [...prev.tool_proficiencies, trimmed] }
+    })
+  }
+
+  const removeToolProficiency = (tool: string) => {
+    setForm((prev) => ({
+      ...prev,
+      tool_proficiencies: prev.tool_proficiencies.filter((entry) => entry !== tool),
     }))
   }
 
@@ -773,6 +805,102 @@ export default function ClassEditorPage({ id }: { id: string }) {
                 </label>
               ))}
             </div>
+          </div>
+
+          {/* Tool Proficiencies */}
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-2">
+              Tool Proficiencies
+            </label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Fixed tools grant proficiency. Choice phrases (e.g. Choose 3 Musical Instruments) become
+              builder pickers.
+            </p>
+            <select
+              value={toolPick}
+              onChange={(e) => {
+                const value = e.target.value
+                setToolPick(value)
+                if (value && value !== TOOL_OTHER_VALUE) {
+                  addToolProficiency(value)
+                  setToolPick("")
+                }
+              }}
+              className="w-full px-4 py-2 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary mb-2"
+            >
+              <option value="">Add tool or choice phrase...</option>
+              <optgroup label="Choice phrases">
+                {TOOL_CHOICE_PRESETS.filter(
+                  (preset) => !form.tool_proficiencies.includes(preset),
+                ).map((preset) => (
+                  <option key={preset} value={preset}>
+                    {preset}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="SRD tools">
+                {SRD_TOOL_NAMES.filter(
+                  (tool) => !form.tool_proficiencies.includes(tool),
+                ).map((tool) => (
+                  <option key={tool} value={tool}>
+                    {tool}
+                  </option>
+                ))}
+              </optgroup>
+              <option value={TOOL_OTHER_VALUE}>Other...</option>
+            </select>
+            {toolPick === TOOL_OTHER_VALUE && (
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={otherToolInput}
+                  onChange={(e) => setOtherToolInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      addToolProficiency(otherToolInput)
+                      setOtherToolInput("")
+                      setToolPick("")
+                    }
+                  }}
+                  placeholder="e.g. Thieves' Tools"
+                  className="flex-1 px-4 py-2 bg-background border-2 border-border rounded-xl text-foreground focus:outline-none focus:border-primary"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    addToolProficiency(otherToolInput)
+                    setOtherToolInput("")
+                    setToolPick("")
+                  }}
+                  className="px-4 py-2 bg-primary/10 text-primary rounded-xl font-semibold hover:bg-primary/20"
+                >
+                  Add
+                </button>
+              </div>
+            )}
+            {form.tool_proficiencies.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {form.tool_proficiencies.map((tool) => (
+                  <span
+                    key={tool}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-muted rounded-full text-sm"
+                  >
+                    {tool}
+                    <button
+                      type="button"
+                      onClick={() => removeToolProficiency(tool)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No tool proficiencies yet.</p>
+            )}
           </div>
           </div>
           </CompendiumEditorPanel>

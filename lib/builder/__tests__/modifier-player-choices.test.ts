@@ -116,6 +116,31 @@ describe("proficiency grant modifier player choices", () => {
     expect(options.map((option) => option.name)).toEqual(["Lute"])
   })
 
+  it("hides already-proficient tools from pure tool grant slots", () => {
+    const toolSlot = {
+      slotKey: "species:elf::mod_tools::tool",
+      sourceKey: "species:elf",
+      sourceLabel: "Elf",
+      modId: "mod_tools",
+      kind: "tool" as const,
+      label: "Choose 1 tool",
+      maxCount: 1,
+      options: [
+        { name: "Thieves' Tools" },
+        { name: "Herbalism Kit" },
+        { name: "Lute" },
+      ],
+      toolChoicePool: null,
+    }
+
+    const options = optionsForProficiencyGrantSlot(toolSlot, {
+      proficientSkills: [],
+      proficientTools: ["thieves' tools"],
+    })
+
+    expect(options.map((option) => option.name)).toEqual(["Herbalism Kit", "Lute"])
+  })
+
   it("keeps current selections visible even when they are already proficient", () => {
     const options = optionsForProficiencyGrantSlot(skilledSlot, {
       proficientSkills: ["Athletics", "Stealth"],

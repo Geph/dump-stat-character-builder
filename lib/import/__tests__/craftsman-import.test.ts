@@ -112,6 +112,35 @@ describe("Craftsman enrichment", () => {
 
     const trap = enriched.import_proposals?.custom_abilities?.[0] as { ability_role?: string }
     expect(trap.ability_role).toBe("upgrade")
+  })
+
+  it("retags unnamed Trappers' Guild rows as upgrades and seeds traps_known", () => {
+    const enriched = applyImportEnrichmentPresets({
+      subclasses: [
+        {
+          name: "Trappers' Guild",
+          class_name: "Craftsman",
+          description: null,
+          features: [{ level: 3, name: "Traps", description: "Craft traps." }],
+        },
+      ],
+      import_proposals: {
+        custom_abilities: [
+          {
+            proposal_id: "custom_snare",
+            name: "Snare Line",
+            definition: "Trap",
+            description: "<p>A taut line.</p>",
+            source_type: "subclass",
+            source_name: "Trappers' Guild",
+            level_requirement: 3,
+          },
+        ],
+      },
+    } as unknown as ImportContent)
+
+    expect(enriched.import_proposals?.custom_abilities?.[0]?.ability_role).toBe("upgrade")
+    expect(enriched.class_resources?.some((row) => row.resource_key === "traps_known")).toBe(true)
 
     const options = aggregateUpgradeOptions({
       customAbilities: [
@@ -229,6 +258,11 @@ describe("Craftsman enrichment", () => {
     expect(traps.choices?.optionsSource).toBe("class_upgrades")
     expect(traps.choices?.resourceKey).toBe("traps_known")
     expect(traps.activation?.bonusAction).toBe(true)
+    expect(
+      enriched.class_resources?.some(
+        (row) => row.resource_key === "traps_known" && row.subclass_name === "Trappers' Guild",
+      ),
+    ).toBe(true)
 
     const cell = enriched.subclasses?.[1]?.features?.[0] as Feature
     expect(cell.limitedUses).toMatchObject({

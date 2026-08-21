@@ -14,6 +14,7 @@ import {
 } from "@/lib/compendium/spell-slots"
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import type { SheetActionEntry } from "@/lib/character/sheet-actions"
+import { isShortRestActivityText } from "@/lib/character/alchemist-bomb-sheet"
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
 import {
   applyFeatureResourceRefresh,
@@ -34,6 +35,7 @@ export function applyUsesRest(
     classLevel?: number
     rechargeCapsUsed?: number
     abilityModifiers?: Partial<Record<string, number>> | null
+    proficiencyBonus?: number | null
   },
 ): { used: number; rechargeCapsUsed?: number } {
   if (!uses || max <= 0) return { used: currentUsed }
@@ -65,6 +67,7 @@ export function applyUsesRest(
       rule,
       options?.classLevel ?? null,
       options?.abilityModifiers ?? null,
+      { proficiencyBonus: options?.proficiencyBonus },
     )
     const nextUsed = rechargeAmount == null ? 0 : Math.max(0, used - rechargeAmount)
     if (cap != null) {
@@ -253,6 +256,7 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
       classLevel: entry.classLevel,
       rechargeCapsUsed: nextRechargeCaps[entry.id] ?? 0,
       abilityModifiers: resolveContext.abilityModifiers,
+      proficiencyBonus: resolveContext.proficiencyBonus,
     })
     nextResources[entry.id] = applied.used
     if (applied.rechargeCapsUsed != null) {
@@ -314,6 +318,17 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
     usedActionUsesById: nextActions,
     rechargeCapsByResourceId: nextRechargeCaps,
     summary,
+  }
+
+  if (rest === "short_rest" || rest === "long_rest") {
+    const seenActivities = new Set<string>()
+    for (const action of sheetActions) {
+      if (!isShortRestActivityText(action.name, action.description)) continue
+      const key = action.name.trim().toLowerCase()
+      if (seenActivities.has(key)) continue
+      seenActivities.add(key)
+      summary.push(`Available: ${action.name}`)
+    }
   }
 
   if (rest === "long_rest") {

@@ -13,6 +13,7 @@ import {
   inferSpellPicksByClassId,
 } from "@/lib/builder/infer-builder-picks"
 import { getBuilderLayout, layoutToCardViewMode } from "@/lib/site-settings/builder-layout"
+import { mergeAlchemistDiscoveryPicks } from "@/lib/compendium/alchemist-feature-wiring"
 
 export function characterToDraft(character: Character): CharacterDraft {
   return {
@@ -109,7 +110,9 @@ export function characterToBuilderState(
     subclassByClassId,
     classSkillPicks,
     classToolPicks,
-    featureChoicePicks: (character.feature_choice_picks as Record<string, string[]>) ?? {},
+    featureChoicePicks: mergeAlchemistDiscoveryPicks(
+      (character.feature_choice_picks as Record<string, string[]>) ?? {},
+    ),
     featChoicePicks: (character.feat_choice_picks as Record<string, string[]>) ?? {},
     modifierPlayerPicks: (character.modifier_player_picks as Record<string, string[]>) ?? {},
     primaryClassId: character.class_id,

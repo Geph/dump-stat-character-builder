@@ -8,7 +8,11 @@ import { GRANT_CREATURE_CATALOG_ID } from "@/lib/compendium/grant-creature-catal
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { applyExpertisePresetOverride } from "@/lib/import/apply-expertise-preset-override"
 import { applyBlindsensePresetOverride } from "@/lib/import/apply-blindsense-preset-override"
-import { shouldSkipWildcardPreset } from "@/lib/import/resolve-wildcard-preset-conflict"
+import {
+  isLoreStyleAnySkillBonusProficiencies,
+  isLoreStyleBonusProficienciesSkillMod,
+  shouldSkipWildcardPreset,
+} from "@/lib/import/resolve-wildcard-preset-conflict"
 import { isModifierRedundantAgainst } from "@/lib/import/detect-feature-modifiers"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import {
@@ -4289,6 +4293,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
           id: modId("radiance_of_the_dawn"),
           type: "special_attack",
           attackName: "Radiance of the Dawn",
+          icon: "sun-radiations",
           attackProfile: "emanation",
           targetMode: "area",
           areaShape: "sphere",
@@ -4667,6 +4672,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
           id: modId("lands_aid"),
           type: "special_attack",
           attackName: "Land's Aid",
+          icon: "sprout",
           attackProfile: "force_save",
           targetMode: "area",
           areaShape: "sphere",
@@ -7368,6 +7374,41 @@ function resolvePresetKey(
   return null
 }
 
+/**
+ * Strip College-of-Lore "choose any 3 skills" modifiers that were wrongly applied to
+ * homebrew Bonus Proficiencies features with constrained picks (e.g. Acrobatics or Athletics).
+ */
+export function sanitizeBonusProficienciesFeature(feature: Feature): Feature {
+  if (!/bonus\s+proficiencies/i.test(feature.name ?? "")) return feature
+  if (isLoreStyleAnySkillBonusProficiencies(feature.description ?? "")) return feature
+
+  const linked = feature.linkedModifiers
+  if (!linked?.length) return feature
+
+  const nextLinked = linked
+    .map((instance) => {
+      const characteristics = (instance.characteristics ?? []).filter(
+        (mod) => !isLoreStyleBonusProficienciesSkillMod(mod),
+      )
+      if (characteristics.length === (instance.characteristics ?? []).length) return instance
+      if (!characteristics.length) return null
+      return { ...instance, characteristics }
+    })
+    .filter((instance): instance is NonNullable<typeof instance> => instance != null)
+
+  if (nextLinked.length === linked.length && nextLinked.every((inst, i) => inst === linked[i])) {
+    return feature
+  }
+
+  return {
+    ...feature,
+    linkedModifiers: nextLinked.length ? nextLinked : undefined,
+    modifierRefs: nextLinked.length
+      ? [...new Set(nextLinked.map((inst) => inst.catalogRefId).filter(Boolean))]
+      : undefined,
+  }
+}
+
 /** Apply only global `*::Feature` presets (safe for homebrew imports). */
 /**
  * When `presetScope` is supplied, resolve the class/subclass-scoped preset key first
@@ -7382,24 +7423,25 @@ export function enrichWildcardFeaturePresets(
   feature: Feature,
   presetScope?: { className?: string | null; subclassName?: string | null },
 ): Feature {
-  const normalizedName = (feature.name ?? "").trim().replace(/[\u2018\u2019\u201B']/g, "'")
+  const sanitized = sanitizeBonusProficienciesFeature(feature)
+  const normalizedName = (sanitized.name ?? "").trim().replace(/[\u2018\u2019\u201B']/g, "'")
   const key = presetScope?.className
     ? resolvePresetKey(presetScope.className, presetScope.subclassName ?? null, normalizedName)
     : `*::${normalizedName}`
-  if (!key) return feature
+  if (!key) return sanitized
   const preset = SRD_CLASS_FEATURE_MODIFIER_PRESETS[key]
-  if (!preset) return feature
-  if (shouldSkipWildcardPreset(feature.name ?? "", feature.description ?? "", key)) {
-    return feature
+  if (!preset) return sanitized
+  if (shouldSkipWildcardPreset(sanitized.name ?? "", sanitized.description ?? "", key)) {
+    return sanitized
   }
-  let merged = mergePresetModifiers(feature, preset)
+  let merged = mergePresetModifiers(sanitized, preset)
   if (key === "*::Expertise") {
     merged = applyExpertisePresetOverride(merged)
   }
   if (key === "*::Blindsense") {
     merged = applyBlindsensePresetOverride(merged)
   }
-  return merged
+  return sanitizeBonusProficienciesFeature(merged)
 }
 
 /** Whether a known modifier preset applies to this feature (for import reports). */
@@ -7467,15 +7509,16 @@ export function enrichClassFeatureWithModifierPresets(
   subclassName: string | null = null,
   options?: { skipMechanicalDetection?: boolean },
 ): Feature {
-  const key = resolvePresetKey(className, subclassName, feature.name ?? "")
-  let next = feature
+  const sanitized = sanitizeBonusProficienciesFeature(feature)
+  const key = resolvePresetKey(className, subclassName, sanitized.name ?? "")
+  let next = sanitized
   if (key) {
     if (key === "*::__subclass_spells__") {
-      next = mergePresetModifiers(feature, {
-        linkedModifiers: [alwaysPreparedSpells(`${feature.name ?? "Subclass spells"}`)],
+      next = mergePresetModifiers(sanitized, {
+        linkedModifiers: [alwaysPreparedSpells(`${sanitized.name ?? "Subclass spells"}`)],
       })
-    } else {
-      next = mergePresetModifiers(feature, SRD_CLASS_FEATURE_MODIFIER_PRESETS[key])
+    } else if (!shouldSkipWildcardPreset(sanitized.name ?? "", sanitized.description ?? "", key)) {
+      next = mergePresetModifiers(sanitized, SRD_CLASS_FEATURE_MODIFIER_PRESETS[key])
     }
   }
 
@@ -7486,12 +7529,12 @@ export function enrichClassFeatureWithModifierPresets(
   next = enrichFeatureWithMechanicalDetection(migrateFeatureOptionPickers(next), {
     contentKind: subclassName ? "subclass_feature" : "class_feature",
     sourceName: subclassName ?? className,
-    featureName: feature.name,
-    level: feature.level,
+    featureName: sanitized.name,
+    level: sanitized.level,
     classPrefix: className,
   })
 
-  return enrichWeaponMasteryFeature(next, className)
+  return enrichWeaponMasteryFeature(sanitizeBonusProficienciesFeature(next), className)
 }
 
 export function enrichClassFeaturesWithModifierPresets(

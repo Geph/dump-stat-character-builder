@@ -21,7 +21,9 @@ import {
 import { normalizeFeatureEffects } from "@/lib/compendium/normalize-feature-activation"
 import { defaultRollBonusConfig, rollBonusFromLegacy } from "@/lib/compendium/roll-bonus-config"
 import { ModifierLimitationsEditor } from "@/components/compendium/modifier-limitations-editor"
+import { RestoreAmountEditor } from "@/components/compendium/restore-amount-editor"
 import { RollBonusEditor } from "@/components/compendium/roll-bonus-editor"
+import type { RestoreAmountConfig } from "@/lib/compendium/restore-amount-config"
 import {
   defaultBonusByLevelEntry,
   normalizeBonusByLevel,
@@ -873,6 +875,11 @@ function ClassResourceChangeEditor({
   onChange: (patch: Partial<FeatureEffect>) => void
 }) {
   const mode = effect.classResourceChange ?? "reduce"
+  const restoreValue: RestoreAmountConfig | "full" =
+    effect.classResourceAmountConfig ??
+    (effect.classResourceAmount != null
+      ? { mode: "fixed", amount: effect.classResourceAmount }
+      : { mode: "fixed", amount: 1 })
 
   return (
     <div className="space-y-3 rounded-lg border border-border bg-card/50 p-3">
@@ -894,45 +901,42 @@ function ClassResourceChangeEditor({
       </select>
 
       {mode !== "reset" && (
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1">
-            {mode === "reduce" ? "Uses spent" : "Uses restored"}
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={99}
-            value={effect.classResourceAmount ?? 1}
-            onChange={(e) =>
-              onChange({
-                classResourceAmount: e.target.value ? parseInt(e.target.value, 10) : 1,
-              })
-            }
-            className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
-          />
-        </div>
+        <RestoreAmountEditor
+          label={mode === "reduce" ? "Uses spent" : "Uses restored"}
+          allowFull={false}
+          value={restoreValue}
+          onChange={(next) => {
+            if (next === "full") return
+            onChange({
+              classResourceAmountConfig: next,
+              classResourceAmount: next.mode === "fixed" ? next.amount ?? 1 : null,
+            })
+          }}
+        />
       )}
 
-      {mode === "reset" && (
+      {(mode === "increase" || mode === "reset") && (
         <div className="space-y-2">
-          <div>
-            <label className="block text-xs text-muted-foreground mb-1">
-              Cap restored uses (leave blank for full pool)
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={99}
-              value={effect.resourceRefreshCap ?? ""}
-              onChange={(e) =>
-                onChange({
-                  resourceRefreshCap: e.target.value ? parseInt(e.target.value, 10) : null,
-                })
-              }
-              placeholder="e.g. 2"
-              className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
-            />
-          </div>
+          {mode === "reset" && (
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">
+                Cap restored uses (leave blank for full pool)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={effect.resourceRefreshCap ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    resourceRefreshCap: e.target.value ? parseInt(e.target.value, 10) : null,
+                  })
+                }
+                placeholder="e.g. 2"
+                className="w-full max-w-[8rem] px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">When refreshed</label>
             <select
@@ -960,6 +964,15 @@ function ClassResourceChangeEditor({
               <option value="long_rest">After Long Rest</option>
             </select>
           </div>
+          <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(effect.resourceRefreshOncePerLongRest)}
+              onChange={(e) => onChange({ resourceRefreshOncePerLongRest: e.target.checked })}
+              className="accent-primary"
+            />
+            Once per Long Rest
+          </label>
         </div>
       )}
     </div>

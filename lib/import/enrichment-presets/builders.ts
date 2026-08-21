@@ -31,6 +31,7 @@ function bombAttackCharacteristic(damageTypes: string[]): CharacteristicModifier
     type: "special_attack",
     label: "Bomb — Attack",
     attackName: "Bomb",
+    icon: "rolling-bomb",
     attackProfile: "ranged",
     attackVariant: "attack",
     targetMode: "single",
@@ -64,6 +65,7 @@ function bombExplodeCharacteristic(damageTypes: string[]): CharacteristicModifie
     type: "special_attack",
     label: "Bomb — Explode (+INT mod, min +1)",
     attackName: "Bomb",
+    icon: "explosion-rays",
     attackProfile: "force_save",
     attackVariant: "explode",
     targetMode: "area",
@@ -310,33 +312,26 @@ export function resolveRemapTarget(to: string, className: string): string {
 }
 
 /**
- * Reagents recharge on three stacked rules: 1 back on every Short Rest (the Reagents feature),
- * up to your INT modifier once per Long Rest (Reagent Synthesis), and a full refill on a Long Rest.
+ * Reagents regain 1 on every Short Rest and refill on a Long Rest. Reagent Synthesis
+ * (INT modifier, minimum 1, once per Long Rest) lives on the Reagent Synthesis feature
+ * as a class_resource restore — not as a second stacked rule on this pool.
  */
 export function enrichReagentResourceUses(uses: UsesConfig): UsesConfig {
   const recharges = [...(uses.recharges ?? [])]
   const isRest = (rule: (typeof recharges)[number]) => rule.kind !== "real_time"
-  const hasBaseShortRest = recharges.some(
+  const withoutSynthesis = recharges.filter(
+    (rule) => !(isRest(rule) && rule.amountFormula === "ability_modifier"),
+  )
+  const hasBaseShortRest = withoutSynthesis.some(
     (rule) => isRest(rule) && rule.rest === "short_rest" && rule.maxPerLongRest == null,
   )
   if (!hasBaseShortRest) {
-    recharges.unshift({ rest: "short_rest", amount: 1 })
+    withoutSynthesis.unshift({ rest: "short_rest", amount: 1 })
   }
-  const hasSynthesis = recharges.some(
-    (rule) => isRest(rule) && rule.amountFormula === "ability_modifier",
-  )
-  if (!hasSynthesis) {
-    recharges.push({
-      rest: "short_rest",
-      amountFormula: "ability_modifier",
-      amountFormulaAbility: "INT",
-      maxPerLongRest: 1,
-    })
+  if (!withoutSynthesis.some((rule) => isRest(rule) && rule.rest === "long_rest")) {
+    withoutSynthesis.push({ rest: "long_rest" })
   }
-  if (!recharges.some((rule) => isRest(rule) && rule.rest === "long_rest")) {
-    recharges.push({ rest: "long_rest" })
-  }
-  return { ...uses, recharges }
+  return { ...uses, recharges: withoutSynthesis }
 }
 
 function holyTrinketPoolSpend(label: string): LinkedModifierInstance {

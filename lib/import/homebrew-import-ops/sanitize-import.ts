@@ -3,6 +3,7 @@
  * Safe to run before writing Drive import-json or after merging spell fill-ins.
  */
 
+import { sanitizeCaptainImportContent } from "@/lib/import/enrichment-presets/packs/captain"
 import { sanitizeWitchImportContent } from "@/lib/import/enrichment-presets/packs/witch"
 import { sanitizeVagabondImportContent } from "@/lib/import/enrichment-presets/packs/vagabond"
 import { sanitizeWarmageImportContent } from "@/lib/import/enrichment-presets/packs/warmage"
@@ -193,6 +194,7 @@ export function sanitizeHomebrewImportJson(content: unknown): Record<string, unk
   // Class-pack sanitizers (Hex grant shape, Battle Tactics, Arcane Surge, etc.)
   let out = next as ImportContent
   if (/witch/i.test(name)) out = sanitizeWitchImportContent(out)
+  if (/captain/i.test(name)) out = sanitizeCaptainImportContent(out)
   if (/vagabond/i.test(name)) out = sanitizeVagabondImportContent(out)
   if (/warmage/i.test(name)) out = sanitizeWarmageImportContent(out)
   if (/occultist/i.test(name)) out = sanitizeOccultistImportContent(out)

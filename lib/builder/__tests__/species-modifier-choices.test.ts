@@ -261,4 +261,25 @@ describe("isFeatEligibleForCategories — Origin slots", () => {
       isFeatEligibleForCategories(fightingStyleFeat, ["Fighting Style"], 1, fightingCtx),
     ).toBe(true)
   })
+
+  it("keeps Fighting Style feats out of General level-up slots unless the character already has access", () => {
+    const fightingStyleFeat = {
+      id: "feat_defense",
+      name: "Defense",
+      category: "Fighting Style",
+      level_requirement: null,
+    } as unknown as Feat
+    const generalCtx: FeatSlotContext = {
+      ...ctx,
+      totalLevel: 4,
+      feats: [...ctx.feats, fightingStyleFeat],
+    }
+    expect(isFeatEligibleForCategories(fightingStyleFeat, ["General"], 4, generalCtx)).toBe(false)
+    expect(
+      isFeatEligibleForCategories(fightingStyleFeat, ["General"], 4, {
+        ...generalCtx,
+        hasFightingStyleAccess: true,
+      }),
+    ).toBe(true)
+  })
 })

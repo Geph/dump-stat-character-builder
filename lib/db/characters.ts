@@ -90,12 +90,21 @@ export async function updateCharacter(id: string, data: Record<string, unknown>)
   const payload: Record<string, unknown> = {
     ...data,
     speed: normalizeCharacterSpeed(data.speed),
-    portrait_url: normalizePortraitUrl(data.portrait_url),
-    banner_url: normalizeBannerUrl(data.banner_url),
     updated_at: now,
   }
   delete payload.id
   delete payload.created_at
+  // Partial patches (level-up, gold, equipment) must not wipe art when those keys are omitted.
+  if ("portrait_url" in data) {
+    payload.portrait_url = normalizePortraitUrl(data.portrait_url)
+  } else {
+    delete payload.portrait_url
+  }
+  if ("banner_url" in data) {
+    payload.banner_url = normalizeBannerUrl(data.banner_url)
+  } else {
+    delete payload.banner_url
+  }
 
   await db.update(schema.characters).set(payload as never).where(eq(schema.characters.id, id))
   if (classRows !== undefined) {

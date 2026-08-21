@@ -378,8 +378,13 @@ export function resolveFeatureChoiceOptions(
     })
   }
   if (choices.optionsSource === "class_discoveries") {
-    const discoveryKey = Object.keys(params.featureChoicePicks).find((key) => /discover/i.test(key))
-    const selected = discoveryKey ? (params.featureChoicePicks[discoveryKey] ?? []) : []
+    const selected = [
+      ...new Set(
+        Object.entries(params.featureChoicePicks)
+          .filter(([key]) => /discover/i.test(key))
+          .flatMap(([, names]) => names ?? []),
+      ),
+    ]
     return aggregateDiscoveryOptions({
       customAbilities: params.customAbilities,
       classNames: params.classNames,

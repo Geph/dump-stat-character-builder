@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS classes (
   saving_throws JSON,
   armor_proficiencies JSON,
   weapon_proficiencies JSON,
+  tool_proficiencies JSON,
   skill_choices JSON,
   starting_equipment JSON,
   starting_equipment_groups JSON,

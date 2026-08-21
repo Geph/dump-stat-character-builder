@@ -39,4 +39,18 @@ describe("resolve-wildcard-preset-conflict", () => {
       shouldSkipWildcardPreset("Tactical Master", description, "*::Tactical Master"),
     ).toBe(false)
   })
+
+  it("skips Bonus Proficiencies preset for constrained Acrobatics-or-Athletics text", () => {
+    const description = "You gain proficiency in your choice of the Acrobatics or Athletics skill."
+    expect(
+      shouldSkipWildcardPreset("Bonus Proficiencies", description, "*::Bonus Proficiencies"),
+    ).toBe(true)
+  })
+
+  it("keeps Bonus Proficiencies preset for College of Lore any-three-skills text", () => {
+    const description = "You gain proficiency with three skills of your choice."
+    expect(
+      shouldSkipWildcardPreset("Bonus Proficiencies", description, "*::Bonus Proficiencies"),
+    ).toBe(false)
+  })
 })

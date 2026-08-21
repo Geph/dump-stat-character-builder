@@ -295,6 +295,8 @@ const ImportMechanicAiSchema = z.object({
   parentPowerNames: z.array(z.string()).nullable(),
   parentMenuOptionNames: z.array(z.string()).nullable(),
   alertSummary: z.string().nullable(),
+  appliesToAttackVariants: z.array(z.enum(["attack", "primed", "explode"])).nullable(),
+  selectable: z.boolean().nullable(),
   amount: z.number().nullable(),
   amountDice: z.string().nullable(),
   amountScaling: z
@@ -313,6 +315,7 @@ const ImportMechanicAiSchema = z.object({
   reachBonusFeet: z.number().nullable(),
   weaponPropertyFilter: z.array(z.string()).nullable(),
   attackName: z.string().nullable(),
+  icon: z.string().nullable(),
   attackProfile: z.enum(["melee", "ranged", "emanation", "force_save"]).nullable(),
   targetMode: z.enum(["single", "multi", "area"]).nullable(),
   areaShape: z
@@ -419,11 +422,18 @@ const UsesConfigAiSchema = z.object({
           rest: z.enum(["short_rest", "long_rest"]),
           amount: z.number().nullable(),
           amountFormula: z
-            .enum(["half_class_level_round_up", "ability_modifier"])
+            .enum([
+              "half_class_level_round_up",
+              "half_class_level_round_down",
+              "ability_modifier",
+              "proficiency_bonus",
+            ])
             .nullable(),
           amountFormulaAbility: z
             .enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"])
             .nullable(),
+          amountFormulaBonus: z.number().nullable(),
+          amountFormulaMinimum: z.number().nullable(),
           maxPerLongRest: z.number().nullable(),
         }),
       ]),
@@ -438,11 +448,18 @@ const UsesConfigAiSchema = z.object({
             rest: z.enum(["short_rest", "long_rest"]),
             amount: z.number().nullable(),
             amountFormula: z
-              .enum(["half_class_level_round_up", "ability_modifier"])
+              .enum([
+                "half_class_level_round_up",
+                "half_class_level_round_down",
+                "ability_modifier",
+                "proficiency_bonus",
+              ])
               .nullable(),
             amountFormulaAbility: z
               .enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"])
               .nullable(),
+            amountFormulaBonus: z.number().nullable(),
+            amountFormulaMinimum: z.number().nullable(),
             maxPerLongRest: z.number().nullable(),
           }),
         ),
@@ -581,6 +598,7 @@ const ClassAiSchema = z.object({
   saving_throws: z.array(z.string()).nullable(),
   armor_proficiencies: z.array(z.string()).nullable(),
   weapon_proficiencies: z.array(z.string()).nullable(),
+  tool_proficiencies: z.array(z.string()).nullable(),
   skill_choices: SkillChoicesAiSchema.nullable(),
   spellcasting: SpellcastingAiSchema.nullable(),
   features: z.array(ClassFeatureAiSchema).nullable(),
@@ -1128,6 +1146,7 @@ function normalizeClassRow(row: z.infer<typeof ClassAiSchema>): NonNullable<Impo
       saving_throws: row.saving_throws,
       armor_proficiencies: row.armor_proficiencies,
       weapon_proficiencies: row.weapon_proficiencies,
+      tool_proficiencies: row.tool_proficiencies,
       skill_choices: normalizeSkillChoices(row.skill_choices),
       spell_list: row.spell_list,
       starting_equipment_groups: row.starting_equipment_groups,

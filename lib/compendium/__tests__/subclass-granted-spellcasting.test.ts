@@ -45,6 +45,7 @@ function fighterWithEldritchKnight(level: number): CharacterClassDetail {
     saving_throws: null,
     armor_proficiencies: null,
     weapon_proficiencies: null,
+    tool_proficiencies: null,
     skill_choices: null,
     starting_equipment: null,
     starting_equipment_groups: null,

@@ -1,5 +1,12 @@
 import type { RechargeRule, RestType, UsesConfig } from "@/lib/types"
 import {
+  rechargeFieldsFromRestoreAmount,
+  resolveRestoreAmount,
+  restoreAmountFromRechargeRule,
+  type ResolveRestoreAmountContext,
+  type RestoreAmountConfig,
+} from "@/lib/compendium/restore-amount-config"
+import {
   formatRealTimeRechargeRule,
   isRealTimeRechargeRule,
   isRestRechargeRule,
@@ -103,6 +110,7 @@ export function resolveRechargeRuleAmount(
   rule: RechargeRule,
   classLevel: number | null,
   abilityModifiers?: Partial<Record<string, number>> | null,
+  extras?: Pick<ResolveRestoreAmountContext, "proficiencyBonus">,
 ): number | null {
   if (isRealTimeRechargeRule(rule)) return null
   if (rule.amountFormula === "half_class_level_round_up" && classLevel != null) {
@@ -111,9 +119,22 @@ export function resolveRechargeRuleAmount(
   if (rule.amountFormula === "half_class_level_round_down" && classLevel != null) {
     return Math.max(0, Math.floor(classLevel / 2))
   }
-  if (rule.amountFormula === "ability_modifier" && rule.amountFormulaAbility && abilityModifiers) {
-    const key = rule.amountFormulaAbility.toLowerCase()
-    return Math.max(0, abilityModifiers[key] ?? 0)
+  const restore = restoreAmountFromRechargeRule(rule)
+  if (restore !== "full") {
+    if (restore.mode === "fixed") {
+      return restore.amount != null && restore.amount > 0 ? restore.amount : null
+    }
+    if (
+      restore.mode === "ability_modifier" &&
+      !abilityModifiers &&
+      extras?.proficiencyBonus == null
+    ) {
+      return null
+    }
+    return resolveRestoreAmount(restore, {
+      proficiencyBonus: extras?.proficiencyBonus,
+      abilityModifiers,
+    })
   }
   if (rule.amount == null || rule.amount <= 0) return null
   return rule.amount
@@ -164,15 +185,28 @@ export function updateRestRechargeAmount(
   rest: RestType,
   amount: number | null,
 ): UsesConfig {
+  return updateRestRechargeRestore(
+    uses,
+    rest,
+    amount == null || amount <= 0 ? "full" : { mode: "fixed", amount },
+  )
+}
+
+export function updateRestRechargeRestore(
+  uses: UsesConfig,
+  rest: RestType,
+  value: RestoreAmountConfig | "full",
+): UsesConfig {
+  const fields = rechargeFieldsFromRestoreAmount(value)
   const rules = getRechargeRules(uses)
     .filter(isRestRechargeRule)
     .map((rule) =>
-    rule.rest === rest
-      ? {
-          ...rule,
-          amount: amount == null || amount <= 0 ? undefined : amount,
-        }
-      : rule,
-  )
+      rule.rest === rest
+        ? {
+            ...rule,
+            ...fields,
+          }
+        : rule,
+    )
   return normalizeUsesConfig({ ...uses, recharges: rules.length ? rules : undefined })
 }

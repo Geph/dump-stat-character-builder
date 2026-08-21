@@ -9,35 +9,123 @@ import type { FeatureChoice } from "@/lib/types"
 const CRAFTSMAN_MASTERY_NAMES =
   /^(bludgeon|mounted|parry|scatter|shift|sighted|tension|twinshot|explode|flurry|follow-through|jolt|numb|crush|daze|finisher|puncture|rake|automatic)$/i
 
+export const CRAFTSMAN_TRAP_NAMES =
+  /^(ball bearings|ballista trap|caltrops|hunting trap|razor wire|trigger bomb)$/i
+
+function isTrappersGuildName(value: string | null | undefined): boolean {
+  return /trappers?'?\s+guild/i.test(value ?? "")
+}
+
+function isCraftsmanTrapAbility(ability: {
+  name?: string | null
+  source_name?: string | null
+  source_type?: string | null
+  definition?: string | null
+}): boolean {
+  if (isTrappersGuildName(ability.source_name)) return true
+  if (CRAFTSMAN_TRAP_NAMES.test(ability.name ?? "")) return true
+  return /\btrap\b/i.test(ability.definition ?? "") && isTrappersGuildName(ability.source_name)
+}
+
+function hasTrappersContent(content: ImportContent): boolean {
+  if ((content.subclasses ?? []).some((row) => isTrappersGuildName(row.name))) return true
+  const features = [
+    ...(content.classes ?? []).flatMap((cls) => cls.features ?? []),
+    ...(content.subclasses ?? []).flatMap((row) => row.features ?? []),
+  ]
+  if (features.some((feature) => /^traps$/i.test(feature.name ?? ""))) return true
+  const abilities = [
+    ...(content.abilities ?? []),
+    ...(content.import_proposals?.custom_abilities ?? []),
+  ]
+  return abilities.some((ability) => isCraftsmanTrapAbility(ability))
+}
+
+function trapsKnownResource(className = "Craftsman") {
+  return {
+    class_name: className,
+    subclass_name: "Trappers' Guild",
+    resource_key: "traps_known",
+    name: "Traps Known",
+    description:
+      "Number of Trappers' Guild traps known — a choice count for the Traps picker, not a spendable pool.",
+    uses: {
+      type: "special" as const,
+      specialDescription: "Trap options chosen from the Trappers' Guild list.",
+      atLevelMode: "tier" as const,
+    },
+  }
+}
+
 /**
  * Standalone mastery-library extracts are compendium-sourced and have no source_name,
  * so the ordinary Craftsman proposal preset cannot identify them. Give these rows a
  * dedicated role consumed by both class upgrade pickers and weapon-mastery tooltips.
+ * Also retag Trappers' Guild trap rows and ensure traps_known exists when that guild is imported.
  */
 export function sanitizeCraftsmanMasteriesImportContent(content: ImportContent): ImportContent {
-  const proposals = content.import_proposals?.custom_abilities
-  if (!proposals?.length) return content
+  const hasCraftsman =
+    (content.classes ?? []).some((cls) => /craftsman/i.test(cls.name ?? "")) ||
+    (content.subclasses ?? []).some((row) => /craftsman/i.test(row.class_name ?? "")) ||
+    hasTrappersContent(content)
+  if (!hasCraftsman && !content.import_proposals?.custom_abilities?.length) return content
 
-  const customAbilities = proposals.map((ability) => {
+  const proposals = content.import_proposals?.custom_abilities
+  const customAbilities = proposals?.map((ability) => {
     const eligible = ability.eligible_classes ?? []
     const isCraftsmanMastery =
       CRAFTSMAN_MASTERY_NAMES.test(ability.name ?? "") &&
       (eligible.some((className) => /^craftsman$/i.test(className)) ||
         /\bweapon mastery property\b/i.test(ability.definition ?? ""))
-    if (!isCraftsmanMastery) return ability
+    if (isCraftsmanMastery) {
+      return {
+        ...ability,
+        ability_role: "weapon_mastery" as const,
+        mechanics: [],
+      }
+    }
+    if (isCraftsmanTrapAbility(ability)) {
+      return {
+        ...ability,
+        ability_role: "upgrade" as const,
+        source_type: ability.source_type ?? "subclass",
+        source_name: ability.source_name ?? "Trappers' Guild",
+      }
+    }
+    return ability
+  })
+
+  const abilities = content.abilities?.map((ability) => {
+    if (!isCraftsmanTrapAbility(ability)) return ability
     return {
       ...ability,
-      ability_role: "weapon_mastery" as const,
-      mechanics: [],
+      ability_role: "upgrade" as const,
+      source_type: ability.source_type ?? "subclass",
+      source_name: ability.source_name ?? "Trappers' Guild",
     }
   })
 
+  let classResources = content.class_resources
+  if (hasTrappersContent(content)) {
+    const hasTrapsKnown = (classResources ?? []).some((row) => row.resource_key === "traps_known")
+    if (!hasTrapsKnown) {
+      const className =
+        content.classes?.find((cls) => /craftsman/i.test(cls.name ?? ""))?.name ?? "Craftsman"
+      classResources = [...(classResources ?? []), trapsKnownResource(className)]
+    }
+  }
+
+  const nextProposals =
+    customAbilities &&
+    (content.import_proposals
+      ? { import_proposals: { ...content.import_proposals, custom_abilities: customAbilities } }
+      : {})
+
   return {
     ...content,
-    import_proposals: {
-      ...content.import_proposals,
-      custom_abilities: customAbilities,
-    },
+    ...nextProposals,
+    ...(abilities ? { abilities } : {}),
+    ...(classResources !== content.class_resources ? { class_resources: classResources } : {}),
   }
 }
 
@@ -577,6 +665,7 @@ export const CRAFTSMAN_PRESETS: EnrichmentPreset[] = [
               id: "char_armored_slam",
               type: "special_attack",
               attackName: "Armored Slam",
+              icon: "mailed-fist",
               attackProfile: "force_save",
               targetMode: "single",
               rangeFeet: 5,
@@ -916,8 +1005,7 @@ export const CRAFTSMAN_PRESETS: EnrichmentPreset[] = [
     pack: "craftsman",
     target: "proposal_ability",
     match: {
-      sourceName: /trappers'? guild/i,
-      name: /^(ball bearings|ballista trap|caltrops|hunting trap|razor wire|trigger bomb)$/i,
+      sourceName: /trappers?'?\s+guild/i,
     },
     operations: [{ op: "setAbilityRole", role: "upgrade" }],
   },

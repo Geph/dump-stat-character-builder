@@ -41,6 +41,7 @@ export const classes = mysqlTable("classes", {
   saving_throws: json("saving_throws").$type<string[]>(),
   armor_proficiencies: json("armor_proficiencies").$type<string[]>(),
   weapon_proficiencies: json("weapon_proficiencies").$type<string[]>(),
+  tool_proficiencies: json("tool_proficiencies").$type<string[]>(),
   skill_choices: json("skill_choices").$type<{
     count: number
     options: string[]

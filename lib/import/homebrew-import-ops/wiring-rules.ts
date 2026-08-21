@@ -267,6 +267,60 @@ export function auditImportWiring(content: unknown): WiringFinding[] {
     }
   }
 
+  // --- Captain ---
+  if (/captain/i.test(name)) {
+    const battle = res.find((r) => r.resource_key === "battle_dice")
+    if (!battle) {
+      findings.push({
+        id: "captain.battle_dice",
+        severity: "error",
+        message: "Missing class_resources.battle_dice",
+        path: "class_resources",
+      })
+    }
+    const tactics = featureNamed(features, /^battle tactics$/i)
+    const choices = asRecord(tactics?.choices)
+    if (!tactics) {
+      findings.push({
+        id: "captain.battle_tactics",
+        severity: "error",
+        message: "Missing Battle Tactics feature",
+        path: "classes[0].features",
+      })
+    } else if (choices?.optionsSource === "class_knacks") {
+      findings.push({
+        id: "captain.battle_tactics_not_picker",
+        severity: "error",
+        message:
+          "Captain Battle Tactics auto-grants Bolster, Born Leader, Morale Boost, Rally, and Staggering Strike — do not use optionsSource class_knacks (that is Vagabond Maneuvers Known)",
+        path: "classes[0].features[Battle Tactics].choices",
+      })
+    }
+  }
+
+  // --- Craftsman ---
+  if (/craftsman/i.test(name)) {
+    const traps = subclassFeature(root, /trappers?'?\s+guild/i, /^traps$/i)
+    const trapChoices = asRecord(traps?.choices)
+    if (traps && trapChoices?.optionsSource !== "class_upgrades") {
+      findings.push({
+        id: "craftsman.traps_picker",
+        severity: "error",
+        message:
+          'Trappers\' Guild Traps must use choices.optionsSource "class_upgrades" and resourceKey traps_known',
+        path: "subclasses[Trappers' Guild].features[Traps].choices",
+      })
+    }
+    if (traps && !res.some((r) => r.resource_key === "traps_known")) {
+      findings.push({
+        id: "craftsman.traps_known",
+        severity: "warn",
+        message: "Missing class_resources.traps_known (special choice count, subclass-scoped)",
+        path: "class_resources",
+      })
+    }
+  }
+
   // --- Vagabond ---
   if (/vagabond/i.test(name)) {
     const battle = res.find((r) => r.resource_key === "battle_dice")

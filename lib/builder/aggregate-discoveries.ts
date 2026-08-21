@@ -1,3 +1,4 @@
+import { isBombFormulaAbility } from "@/lib/builder/aggregate-bomb-formulas"
 import {
   customAbilityMatchesClass,
   type ClassAbilityMatchTarget,
@@ -8,6 +9,41 @@ function normalizeName(value: string): string {
   return value.trim().toLowerCase()
 }
 
+/**
+ * MHP imports often tag Discoveries as `upgrade`. Keep them out of Inventor-style upgrade
+ * pickers by requiring an Alchemist source (or an explicit discovery role).
+ */
+export function isDiscoveryAbility(ability: {
+  name: string
+  ability_role?: string | null
+  source?: string | null
+  source_name?: string | null
+  parent_class_name?: string | null
+}): boolean {
+  const role = ability.ability_role?.trim() ?? ""
+  if (role === "discovery") return true
+  if (role === "bomb_formula" || role === "alchemist_bomb") return false
+  if (isBombFormulaAbility(ability)) return false
+  if (role !== "upgrade" && role !== "") return false
+  const source = `${ability.source_name ?? ""} ${ability.source ?? ""} ${ability.parent_class_name ?? ""}`
+  return /\balchemist\b/i.test(source)
+}
+
+export function inferredAlchemistAbilityRole(ability: {
+  name: string
+  ability_role?: string | null
+  source?: string | null
+  source_name?: string | null
+  parent_class_name?: string | null
+}): "bomb_formula" | "discovery" | "alchemist_bomb" | null {
+  const role = ability.ability_role?.trim() ?? ""
+  if (role === "alchemist_bomb") return "alchemist_bomb"
+  if (/^bombs?$/i.test(ability.name.trim())) return "alchemist_bomb"
+  if (isBombFormulaAbility(ability)) return "bomb_formula"
+  if (isDiscoveryAbility(ability)) return "discovery"
+  return null
+}
+
 export function discoveryAbilitiesForClass(
   customAbilities: CustomAbility[],
   classNames: string[],
@@ -15,7 +51,7 @@ export function discoveryAbilitiesForClass(
 ): CustomAbility[] {
   const targets: ClassAbilityMatchTarget = { classNames, classIds: options?.classIds }
   return customAbilities.filter((ability) => {
-    if (ability.ability_role !== "discovery") return false
+    if (!isDiscoveryAbility(ability)) return false
     return customAbilityMatchesClass(ability, targets, { includeUnassigned: true })
   })
 }

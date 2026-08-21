@@ -46,6 +46,11 @@ export type FeatSlotContext = {
    * Blocks selecting another Magic Initiate when all three are claimed.
    */
   takenMagicInitiateSpellLists?: string[]
+  /**
+   * When true, General / ASI slots also accept Fighting Style feats (the character
+   * already has a Fighting Style feature or owns a Fighting Style feat).
+   */
+  hasFightingStyleAccess?: boolean
 }
 
 export function buildOwnedFeatIds(params: {
@@ -138,10 +143,14 @@ export function isFeatEligibleForCategories(
 
   // Origin slots accept Origin + Dark Gift. General ASI slots also accept Origin feats
   // (2024: any feat you're eligible for). Dark Gift stays Origin/Dark Gift–slot only.
+  // Fighting Style is not a General feat unless the character already has style access.
   const categoryMatches =
     normalizedCategories.has(category) ||
     (isOriginSlot && isOriginSelectableCategory(category)) ||
-    (normalizedCategories.has("General") && category === "Origin")
+    (normalizedCategories.has("General") && category === "Origin") ||
+    (normalizedCategories.has("General") &&
+      category === "Fighting Style" &&
+      Boolean(context.hasFightingStyleAccess))
   if (!categoryMatches && !nameAllowed) return false
 
   const taken = new Set(

@@ -1,4 +1,5 @@
 import { SRD_CLASS_RESOURCES_BY_NAME } from "@/lib/compendium/class-resources-defaults"
+import { sanitizeAlchemistClassResources } from "@/lib/compendium/alchemist-feature-wiring"
 import { resourcesForClass } from "@/lib/compendium/class-resource-rows"
 import { inferLegacyClassResourceSubclass } from "@/lib/compendium/subclass-gated-class-resources"
 import type { ClassResource, ClassResourceRow, DndClass } from "@/lib/types"
@@ -43,7 +44,7 @@ export function resolveClassResourcesForClass(
     seen.add(key)
     deduped.push(resource)
   }
-  return deduped
+  return /alchemist/i.test(cls.name) ? sanitizeAlchemistClassResources(deduped) : deduped
 }
 
 export function attachClassResourcesToClass(

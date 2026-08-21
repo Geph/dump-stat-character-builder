@@ -628,6 +628,7 @@ function buildFromMechanic(
             id: modId(instanceKey(ctx, "special_attack")),
             type: "special_attack",
             attackName: mechanic.attackName?.trim() || ctx.featureName || "Special Attack",
+            icon: mechanic.icon?.trim() || null,
             attackProfile,
             targetMode: mechanic.targetMode ?? (mechanic.areaShape ? "area" : "single"),
             areaShape: mechanic.areaShape ?? null,
@@ -798,6 +799,11 @@ function buildFromMechanic(
             .map((name) => name.trim())
             .filter(Boolean),
           alertSummary: mechanic.alertSummary?.trim() || undefined,
+          appliesToAttackVariants: (mechanic.appliesToAttackVariants ?? []).filter(
+            (entry): entry is "attack" | "primed" | "explode" =>
+              entry === "attack" || entry === "primed" || entry === "explode",
+          ),
+          selectable: mechanic.selectable ?? false,
         },
       ]),
     }

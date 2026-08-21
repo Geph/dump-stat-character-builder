@@ -66,6 +66,20 @@ function choiceHint(
       }.`,
     }
   }
+  if (feature.choices?.optionsSource === "class_bomb_formulas") {
+    return {
+      hint: `Choose ${choiceCount} Bomb Formula${choiceCount === 1 ? "" : "s"}${
+        feature.choices?.swappableOnRest ? " (replace on a Long Rest)" : ""
+      }.`,
+    }
+  }
+  if (feature.choices?.optionsSource === "class_discoveries") {
+    return {
+      hint: `Choose ${choiceCount} Discovery${choiceCount === 1 ? "" : "ies"}${
+        feature.choices?.swappableOnLevelUp ? " (replace one when you gain an Alchemist level)" : ""
+      }.`,
+    }
+  }
   if (feature.choices?.optionsSource === "known_discipline_talents") {
     return {
       hint: `Choose ${choiceCount} psionic talent${choiceCount === 1 ? "" : "s"} from your known disciplines and General Psionic Talents (level gates apply).`,
