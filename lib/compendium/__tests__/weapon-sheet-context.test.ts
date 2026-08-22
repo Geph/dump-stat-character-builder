@@ -237,7 +237,7 @@ describe("buildWeaponSheetContext", () => {
           characteristics: [
             {
               id: "mod_elemental_reach",
-              type: "weapon_reach_modifier",
+              type: "weapon_reach_modifier" as const,
               label: "Elemental Attunement",
               reachBonusFeet: 10,
               weaponPropertyFilter: [],
@@ -254,7 +254,7 @@ describe("buildWeaponSheetContext", () => {
         } as never,
       ],
       selectedFeatIds: ["elemental_attunement"],
-    }
+    } as CharacterBuildInputs
 
     const unarmedContext = buildWeaponSheetContext(unarmed, inputs, ["Simple weapons"])
     expect(unarmedContext.appliedModifiers.some((entry) => entry.name === "Elemental Attunement")).toBe(
