@@ -156,6 +156,12 @@ import { SheetStandardActionButtons } from "@/components/character-sheet/sheet-s
 import { SheetSectionHeading } from "@/components/character-sheet/sheet-section-heading"
 import { SheetEquipmentPanel } from "@/components/character-sheet/sheet-equipment-panel"
 import { SheetAddEquipmentOverlay } from "@/components/character-sheet/sheet-add-equipment-overlay"
+import { SheetPdfExportDialog } from "@/components/character-sheet/sheet-pdf-export-dialog"
+import {
+  buildSheetPdfInput,
+  buildSheetTemplateTarget,
+} from "@/lib/character/pdf-sheet/build-sheet-input"
+import { DEFAULT_TEMPLATE_CLASS_NAMES } from "@/lib/character/pdf-sheet/template-matching"
 import { SheetRollHistoryProvider } from "@/components/character-sheet/sheet-roll-history-context"
 import { ManualRollTrigger } from "@/components/character-sheet/manual-roll-trigger"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
@@ -672,6 +678,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [acFormulaPick, setAcFormulaPick] = useState<string | null>(null)
   const [conditionDropdownOpen, setConditionDropdownOpen] = useState(false)
   const [sheetMenuOpen, setSheetMenuOpen] = useState(false)
+  const [pdfExportOpen, setPdfExportOpen] = useState(false)
   const [portraitZoomOpen, setPortraitZoomOpen] = useState(false)
   const [bannerRestOpen, setBannerRestOpen] = useState(false)
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null)
@@ -1539,6 +1546,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const equipmentById = useMemo(
     () => new Map(equipment.map((item) => [item.id, item])),
     [equipment],
+  )
+
+  const pdfTemplateTarget = useMemo(
+    () => buildSheetTemplateTarget(classDetails, derived),
+    [classDetails, derived],
+  )
+  const pdfTemplateClassNames = useMemo(
+    () => [...new Set([...DEFAULT_TEMPLATE_CLASS_NAMES, ...pdfTemplateTarget.classNames])],
+    [pdfTemplateTarget],
   )
 
   const referencedSheetToggleIds = useMemo(
@@ -3774,6 +3790,44 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       }))
   })()
 
+  const buildPdfExportInput = () => {
+    if (!derived) return null
+    return buildSheetPdfInput({
+      character,
+      derived,
+      classDetails,
+      weaponCards: equippedWeaponCards,
+      spells: displayedSpells,
+      classFeatures: sheetClassFeatures,
+      equipment: displayedEquipment,
+      equipmentQuantity: (equipmentId) =>
+        ownedEquipmentQuantity(
+          character.equipment_ids ?? [],
+          character.equipment_quantities,
+          equipmentId,
+        ),
+      feats: [...characterFeatsForDisplay, ...(originFeat ? [originFeat] : [])],
+      hp: { current: currentHp, temp: tempHp, max: maxHp },
+      hitDicePool,
+    })
+  }
+  const exportPlainSummaryPdf = () => {
+    if (!derived) return
+    void import("@/lib/character/pdf-export").then(({ downloadCharacterPdf }) =>
+      downloadCharacterPdf({
+        name: character.name,
+        level: character.level,
+        classSummary: classLabel,
+        derived,
+        breakdowns: statBreakdowns,
+        sheetUrl:
+          typeof window !== "undefined"
+            ? `${window.location.origin}/characters/${character.id}`
+            : undefined,
+      }),
+    )
+  }
+
   const incapacitated = isIncapacitatedByConditions(activeConditions)
   const incomingAttackNotes = buildIncomingAttackNotes({
     activeConditions,
@@ -3884,19 +3938,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       type="button"
                       onClick={() => {
                         if (!character || !derived) return
-                        void import("@/lib/character/pdf-export").then(({ downloadCharacterPdf }) =>
-                          downloadCharacterPdf({
-                            name: character.name,
-                            level: character.level,
-                            classSummary: classLabel,
-                            derived,
-                            breakdowns: statBreakdowns,
-                            sheetUrl:
-                              typeof window !== "undefined"
-                                ? `${window.location.origin}/characters/${character.id}`
-                                : undefined,
-                          }),
-                        )
+                        setPdfExportOpen(true)
                         setSheetMenuOpen(false)
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted no-print"
@@ -3955,6 +3997,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             </Link>
           </div>
         </div>
+
+        <SheetPdfExportDialog
+          open={pdfExportOpen}
+          onOpenChange={setPdfExportOpen}
+          buildInput={buildPdfExportInput}
+          target={pdfTemplateTarget}
+          knownClassNames={pdfTemplateClassNames}
+          onExportPlainPdf={exportPlainSummaryPdf}
+        />
 
         <motion.div
           initial={{ opacity: 0, y: 12 }}
