@@ -55,10 +55,16 @@ import {
   getWeaponAttackAbility,
   getWeaponDamageText,
   getWeaponPropertyTags,
+  isUnarmedStrikeWeapon,
   isWeaponProficient,
   parseArmorAc,
   type AbilityMods,
 } from "@/lib/compendium/combat-stats"
+import {
+  buildUnarmedStrikeEquipment,
+  characterHasFreeHand,
+  extraUnarmedStrikeAbilityOverrides,
+} from "@/lib/character/unarmed-strike"
 import {
   buildWeaponDamageExpression,
   parseWeaponDamageDice,
@@ -132,12 +138,13 @@ function buildWeaponAttackDerived(
     characterLevel?: number
   },
 ): WeaponAttackDerived | null {
+  const unarmed = isUnarmedStrikeWeapon(weapon)
   const overrides = params.aggregatedCharacteristics.weaponAbilityOverrides
   const base = calculateWeaponAttack(
     weapon,
     params.abilityMods,
     params.proficiencyBonus,
-    isWeaponProficient(weapon, params.weaponProficiencies),
+    unarmed || isWeaponProficient(weapon, params.weaponProficiencies),
     overrides,
   )
   if (!base) return null
@@ -146,12 +153,14 @@ function buildWeaponAttackDerived(
   const modifierBonus = sumAttackRollModifiers(params.aggregatedCharacteristics, {
     subcategory: weapon.subcategory ?? "",
     properties: weaponProps,
+    unarmed,
   })
   const damageBonus =
     sumDamageRollModifiers(params.aggregatedCharacteristics, {
       subcategory: weapon.subcategory ?? "",
       properties: weaponProps,
       damageType: weapon.damage_type ?? "",
+      unarmed,
     }) + params.featureDamageBonus
 
   const attackBonus = base.attackBonus + modifierBonus
@@ -939,6 +948,32 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
           })
         : null
 
+  const unarmedStrikeWeapon = characterHasFreeHand({
+    mainWeapon: equippedWeapon,
+    offHandWeapon: equippedOffHandWeapon,
+    shield: equippedShield,
+  })
+    ? buildUnarmedStrikeEquipment({
+        die: aggregatedCharacteristics.unarmedStrikeDie,
+        dieByLevel: aggregatedCharacteristics.unarmedStrikeDieByLevel,
+        damageType: aggregatedCharacteristics.unarmedStrikeDamageType,
+        ability: aggregatedCharacteristics.unarmedStrikeAbility,
+        characterLevel: totalLevel,
+      })
+    : null
+  const unarmedStrikeAttack = unarmedStrikeWeapon
+    ? buildWeaponAttackDerived(unarmedStrikeWeapon, {
+        ...weaponAttackContext,
+        aggregatedCharacteristics: {
+          ...aggregatedCharacteristics,
+          weaponAbilityOverrides: [
+            ...extraUnarmedStrikeAbilityOverrides(aggregatedCharacteristics),
+            ...aggregatedCharacteristics.weaponAbilityOverrides,
+          ],
+        },
+      })
+    : null
+
   return {
     abilityScores,
     abilityMods,
@@ -1014,6 +1049,8 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     powerRiders: aggregatedCharacteristics.powerRiders,
     equippedWeaponAttack,
     equippedOffHandWeaponAttack,
+    unarmedStrikeWeapon,
+    unarmedStrikeAttack,
     attunementSlots: aggregatedCharacteristics.attunementSlots ?? 3,
   }
 }

@@ -2382,6 +2382,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         ),
       })
     }
+    if (derived?.unarmedStrikeWeapon && derived.unarmedStrikeAttack) {
+      cards.push({
+        weapon: derived.unarmedStrikeWeapon,
+        attack: derived.unarmedStrikeAttack,
+        hand: "main" as const,
+        defaultIncludeAbilityModifier: true,
+        abilityModifier: derived.unarmedStrikeAttack.damageAbilityMod,
+      })
+    }
     return cards
   }, [
     character?.equipment_ids,
@@ -2390,6 +2399,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     equippedOffHandWeapon,
     derived?.equippedWeaponAttack,
     derived?.equippedOffHandWeaponAttack,
+    derived?.unarmedStrikeWeapon,
+    derived?.unarmedStrikeAttack,
     derived?.abilityMods,
     derived?.proficiencyBonus,
     derived,

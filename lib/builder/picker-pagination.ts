@@ -54,9 +54,14 @@ export function getSpellPickerPageSize(isSmScreen: boolean): number {
   return isSmScreen ? 12 : 8
 }
 
-/** Feat / feature spell grants on narrow phones — paginate long spell lists. */
-export function getFeatSpellGrantPickerPageSize(isSmScreen: boolean): number {
-  return isSmScreen ? PICKER_GRID_ROWS * 3 : PICKER_GRID_ROWS * 2
+/** Feat / feature spell grants — match `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`. */
+export function getFeatSpellGrantPickerPageSize(params: {
+  isSmScreen: boolean
+  isLargeScreen: boolean
+}): number {
+  if (params.isLargeScreen) return PICKER_GRID_ROWS * 3 // 3 cols × 3 rows = 9
+  if (params.isSmScreen) return 8 // 2 cols × 4 rows
+  return PICKER_GRID_ROWS * 2 // 1 col × 6 rows = 6
 }
 
 /** Width/snap for one swipe carousel slide (apply to each item wrapper). */

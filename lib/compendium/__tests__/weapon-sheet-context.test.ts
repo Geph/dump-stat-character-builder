@@ -215,4 +215,55 @@ describe("buildWeaponSheetContext", () => {
     const rider = context.appliedModifiers.find((entry) => entry.name === "Precision Attack")
     expect(rider?.description).toBe("1d10 (superiority_dice die)")
   })
+
+  it("applies unarmed-only reach to Unarmed Strike and not to a mace", () => {
+    const unarmed = {
+      id: "unarmed-strike",
+      name: "Unarmed Strike",
+      category: "Weapon",
+      subcategory: "Simple Melee Weapons",
+      damage: "1",
+      damage_type: "Bludgeoning",
+      properties: [],
+    } as unknown as Equipment
+
+    const inputs = {
+      ...baseInputs,
+      modifierCatalog: [
+        {
+          id: "cat_char_weapon_reach_modifier",
+          name: "Weapon Reach",
+          group: "Attack & damage",
+          characteristics: [
+            {
+              id: "mod_elemental_reach",
+              type: "weapon_reach_modifier",
+              label: "Elemental Attunement",
+              reachBonusFeet: 10,
+              weaponPropertyFilter: [],
+              appliesToUnarmedStrike: true,
+            },
+          ],
+        },
+      ],
+      feats: [
+        {
+          id: "elemental_attunement",
+          name: "Elemental Attunement",
+          modifierRefs: ["cat_char_weapon_reach_modifier"],
+        } as never,
+      ],
+      selectedFeatIds: ["elemental_attunement"],
+    }
+
+    const unarmedContext = buildWeaponSheetContext(unarmed, inputs, ["Simple weapons"])
+    expect(unarmedContext.appliedModifiers.some((entry) => entry.name === "Elemental Attunement")).toBe(
+      true,
+    )
+
+    const maceContext = buildWeaponSheetContext(mace, inputs, ["Simple weapons"])
+    expect(maceContext.appliedModifiers.some((entry) => entry.name === "Elemental Attunement")).toBe(
+      false,
+    )
+  })
 })

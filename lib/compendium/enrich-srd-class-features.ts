@@ -416,7 +416,11 @@ function monkMartialArtsDieScaling(): BonusByLevelEntry[] {
   ]
 }
 
-function unarmedDieByLevel(rows: BonusByLevelEntry[], label?: string): LinkedModifierInstance {
+function unarmedDieByLevel(
+  rows: BonusByLevelEntry[],
+  label?: string,
+  extras?: { ability?: AbilityScoreKey },
+): LinkedModifierInstance {
   const key = (label ?? "scale").replace(/[^a-z0-9]+/gi, "_").toLowerCase()
   return charInstance(`modinst_unarmed_by_level_${key}`, "cat_char_unarmed_strike_damage", [
     {
@@ -424,6 +428,7 @@ function unarmedDieByLevel(rows: BonusByLevelEntry[], label?: string): LinkedMod
       type: "unarmed_strike_damage",
       die: "1d6",
       dieByLevel: rows,
+      ability: extras?.ability ?? null,
       label,
     },
   ])
@@ -2740,7 +2745,7 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
   ],
   "*::Martial Arts": {
     linkedModifiers: [
-      unarmedDieByLevel(monkMartialArtsDieScaling(), "Martial Arts die"),
+      unarmedDieByLevel(monkMartialArtsDieScaling(), "Martial Arts die", { ability: "dexterity" }),
       fxInstance("modinst_martial_arts_bonus_unarmed", "cat_fx_bonus_action_attack", {
         bonusAction: true,
         effects: [{ id: modId("martial_arts_bonus_unarmed"), kind: "bonus_action_attack" }],

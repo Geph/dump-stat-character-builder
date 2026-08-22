@@ -14,6 +14,7 @@ import { collectEquipmentMagicCharacteristics } from "@/lib/compendium/equipment
 import {
   getWeaponMastery,
   getWeaponPropertyTags,
+  isUnarmedStrikeWeapon,
   isWeaponProficient,
 } from "@/lib/compendium/combat-stats"
 import { describeWeaponMastery, weaponMasteryCatalogEntriesFromAbilities } from "@/lib/compendium/weapon-mastery"
@@ -58,8 +59,11 @@ function weaponMatchesModifierTarget(
   subcategory: string,
   properties: string[],
   target: string,
+  options?: { unarmed?: boolean },
 ): boolean {
   if (!target || target === "all") return true
+  const needle = target.toLowerCase()
+  if (options?.unarmed && (needle === "unarmed" || needle.includes("unarmed"))) return true
   const sub = subcategory.toLowerCase()
   const props = properties.join(" ").toLowerCase()
 
@@ -100,6 +104,7 @@ function entryMatchesWeapon(
     weapon.subcategory ?? "",
     properties,
     resolveModifierTarget(entry),
+    { unarmed: isUnarmedStrikeWeapon(weapon) },
   )
 }
 
@@ -182,11 +187,14 @@ function collectAppliedModifiers(
     if (mod.type === "weapon_reach_modifier") {
       const reachMod = mod as WeaponReachModifierCharacteristic
       const filter = reachMod.weaponPropertyFilter
-      const matches = filter?.length
-        ? filter.some((property) => properties.some((p) => normalizeToken(p) === normalizeToken(property)))
-        : // No property filter and scoped to Unarmed Strike only (the common case, e.g. Elemental
-          // Attunement) — doesn't apply to carried weapons at all.
-          !reachMod.appliesToUnarmedStrike && (weapon.subcategory ?? "").toLowerCase().includes("melee")
+      const isUnarmed = isUnarmedStrikeWeapon(weapon)
+      const matches = isUnarmed
+        ? Boolean(reachMod.appliesToUnarmedStrike)
+        : filter?.length
+          ? filter.some((property) => properties.some((p) => normalizeToken(p) === normalizeToken(property)))
+          : // No property filter and scoped to Unarmed Strike only (the common case, e.g. Elemental
+            // Attunement) — doesn't apply to carried weapons at all.
+            !reachMod.appliesToUnarmedStrike && (weapon.subcategory ?? "").toLowerCase().includes("melee")
       if (matches) {
         applied.push({
           name: mod.label ?? "Reach modifier",
@@ -201,7 +209,9 @@ function collectAppliedModifiers(
       const appliesTo = riderMod.appliesTo?.toLowerCase() ?? "all"
       if (
         appliesTo !== "all" &&
-        !weaponMatchesModifierTarget(weapon.subcategory ?? "", properties, appliesTo)
+        !weaponMatchesModifierTarget(weapon.subcategory ?? "", properties, appliesTo, {
+          unarmed: isUnarmedStrikeWeapon(weapon),
+        })
       ) {
         continue
       }

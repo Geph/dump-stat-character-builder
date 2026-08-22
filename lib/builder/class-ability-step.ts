@@ -36,6 +36,8 @@ export type ClassAbilityFeatureEntry = {
   feature: Feature
   source: "class" | "subclass"
   subclassName?: string | null
+  /** Scopes Weapon Mastery picks to what the class can actually wield. */
+  weaponProficiencies?: string[] | null
 }
 
 const CLASS_ABILITY_PROFICIENCY_SLOT_KINDS = new Set<ModifierPlayerChoiceKind>([
@@ -95,6 +97,7 @@ export function collectClassAbilityFeatures(params: {
         classLevel: levelEntry.level,
         feature,
         source: "class",
+        weaponProficiencies: cls.weapon_proficiencies ?? null,
       })
     }
 
@@ -121,6 +124,7 @@ export function collectClassAbilityFeatures(params: {
         feature,
         source: "subclass",
         subclassName: subclass.name,
+        weaponProficiencies: cls.weapon_proficiencies ?? null,
       })
     }
   }

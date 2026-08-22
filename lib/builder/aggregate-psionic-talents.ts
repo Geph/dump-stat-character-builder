@@ -5,7 +5,11 @@ import { aggregateUpgradeOptions } from "@/lib/builder/upgrade-choices"
 import { filterChoiceOptionsByEligibility, isCustomAbilityEligible } from "@/lib/builder/choice-option-eligibility"
 import type { ChoicePrerequisiteContext } from "@/lib/builder/choice-prerequisite"
 import type { CustomAbility, Equipment, Feature, FeatureChoice } from "@/lib/types"
-import { weaponMasteryOptionsForClass } from "@/lib/compendium/weapon-mastery-choice"
+import {
+  filterWeaponMasteryOptionsByProficiency,
+  isWeaponMasteryFeature,
+  weaponMasteryOptionsForClass,
+} from "@/lib/compendium/weapon-mastery-choice"
 import { weaponMasteryCatalogEntriesFromAbilities } from "@/lib/compendium/weapon-mastery"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 
@@ -212,6 +216,8 @@ export type ResolveFeatureChoiceOptionsParams = {
   classIds?: string[]
   classLevel?: number
   equipmentCatalog?: Equipment[]
+  /** Class weapon proficiencies — scopes Weapon Mastery options (e.g. Rogue / Dancer). */
+  classWeaponProficiencies?: string[] | null
   knownSpellNames?: string[]
   subclassName?: string | null
   /** Abilities granted by class/subclass modifiers (e.g. archetype disciplines). */
@@ -294,8 +300,16 @@ export function resolveFeatureChoiceOptions(
       params.classNames[0],
       params.equipmentCatalog ?? [],
       masteryCatalogEntries,
+      params.classWeaponProficiencies,
     )
     if (merged.length) return merged
+  }
+  if (isWeaponMasteryFeature(feature) && choices.options?.length) {
+    return filterWeaponMasteryOptionsByProficiency(
+      choices.options,
+      params.classWeaponProficiencies,
+      params.equipmentCatalog ?? [],
+    )
   }
   if (choices.optionsSource === "known_discipline_talents") {
     const aggregated = filterOptions(

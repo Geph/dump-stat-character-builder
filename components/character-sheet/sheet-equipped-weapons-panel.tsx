@@ -122,17 +122,14 @@ function WeaponAttackCard({
             ) : null}
           </div>
 
-          {range || baseDamage ? (
+          {range || damageExpression ? (
             <p className="text-[10px] text-foreground">
-              {baseDamage ? (
-                <span className="font-medium">
-                  {baseDamage}
-                  {weapon.damage_type ? ` ${weapon.damage_type}` : ""}
-                </span>
+              {damageExpression ? (
+                <span className="font-medium">{damageExpression}</span>
               ) : null}
               {range ? (
                 <span className="inline-flex items-center gap-0.5">
-                  {baseDamage ? <span className="text-muted-foreground mx-1">·</span> : null}
+                  {damageExpression ? <span className="text-muted-foreground mx-1">·</span> : null}
                   {range}
                   <ConditionInfoTip
                     description={describeWeaponRange(range) ?? range}

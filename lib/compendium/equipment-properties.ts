@@ -15,16 +15,34 @@ export const WEAPON_PROPERTIES = [
 
 export type WeaponPropertyTag = (typeof WEAPON_PROPERTIES)[number]
 
+function stringTags(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/[,/]/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
 /** Normalize equipment.properties from DB (array or SRD object shape) to string[]. */
 export function propertiesToStringArray(props: unknown): string[] {
-  if (Array.isArray(props)) {
-    return props.filter((p): p is string => typeof p === "string")
+  if (Array.isArray(props) || typeof props === "string") {
+    return stringTags(props)
   }
   if (props && typeof props === "object") {
     const record = props as unknown as Record<string, unknown>
-    if (Array.isArray(record.properties)) {
-      return record.properties.filter((p): p is string => typeof p === "string")
+    const tags = stringTags(record.properties)
+    for (const [key, value] of Object.entries(record)) {
+      if (key === "properties" || key === "damage" || key === "mastery" || key === "range" || key === "forms") {
+        continue
+      }
+      if (value === true) tags.push(key)
     }
+    return tags
   }
   return []
 }

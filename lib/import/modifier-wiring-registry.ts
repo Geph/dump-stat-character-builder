@@ -1344,7 +1344,7 @@ export const FEATURE_NAME_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_char_feature_option_picker",
     examples: ["Weapon Mastery"],
     notes:
-      "Wire tier table via choices.choiceCountByLevel on the Weapon Mastery feature (not class_resources). Property names and rules come from the Weapon Mastery Properties system catalog (custom_abilities …0004), with SRD defaults as fallback.",
+      "Wire tier table via choices.choiceCountByLevel on the Weapon Mastery feature (not class_resources). Property names and rules come from the Weapon Mastery Properties system catalog (custom_abilities …0004), with SRD defaults as fallback. Selectable weapons are derived from the class's weapon_proficiencies, so keep qualifiers verbatim (\"Martial weapons that have the Finesse or Light property\") instead of emitting an options list.",
   },
   {
     ruleId: "psion.tantrum_by_name",

@@ -2,7 +2,7 @@ import equipmentSeed from "@/lib/srd/seed-data/equipment.json"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { describeWeaponMastery } from "@/lib/compendium/weapon-mastery"
 import { WEAPON_MASTERY_CATALOG_ID } from "@/lib/compendium/weapon-mastery-catalog"
-import { getWeaponMastery } from "@/lib/compendium/combat-stats"
+import { getWeaponMastery, isWeaponProficient } from "@/lib/compendium/combat-stats"
 import type { Equipment } from "@/lib/types"
 import type { Feature, FeatureChoice } from "@/lib/types"
 
@@ -155,6 +155,19 @@ function weaponMatchesPool(weapon: SeedWeapon | Equipment, pool: WeaponMasteryPo
   return true
 }
 
+/**
+ * Mastery picks are limited to weapons the class is proficient with (SRD 5.2.1 Weapon
+ * Mastery: "…weapons of your choice with which you have proficiency"). Honors property
+ * qualifiers such as Rogue / Dancer "Martial weapons that have the Finesse or Light property".
+ */
+function weaponAllowedByProficiencies(
+  weapon: SeedWeapon | Equipment,
+  proficiencies: string[] | null | undefined,
+): boolean {
+  if (!proficiencies?.length) return true
+  return isWeaponProficient(weapon as Equipment, proficiencies)
+}
+
 function optionDescription(
   weapon: SeedWeapon | Equipment,
   masteryCatalogEntries?: ModifierCatalogEntry[] | null,
@@ -169,9 +182,15 @@ function weaponMasteryOptionsFromList(
   weapons: Array<SeedWeapon | Equipment>,
   pool: WeaponMasteryPool,
   masteryCatalogEntries?: ModifierCatalogEntry[] | null,
+  proficiencies?: string[] | null,
 ): FeatureChoiceOption[] {
   return weapons
-    .filter((item) => (item.category === "Weapon" || !item.category) && weaponMatchesPool(item, pool))
+    .filter(
+      (item) =>
+        (item.category === "Weapon" || !item.category) &&
+        weaponMatchesPool(item, pool) &&
+        weaponAllowedByProficiencies(item, proficiencies),
+    )
     .map((weapon) => ({
       name: weapon.name,
       description: optionDescription(weapon, masteryCatalogEntries),
@@ -183,18 +202,59 @@ export function weaponMasteryOptionsForClass(
   className: string,
   equipmentCatalog: Equipment[] = [],
   masteryCatalogEntries?: ModifierCatalogEntry[] | null,
+  weaponProficiencies?: string[] | null,
 ): FeatureChoiceOption[] {
   const pool = WEAPON_MASTERY_POOL_BY_CLASS[className] ?? "all"
   const seedWeapons = equipmentSeed as SeedWeapon[]
-  const fromSeed = weaponMasteryOptionsFromList(seedWeapons, pool, masteryCatalogEntries)
+  const fromSeed = weaponMasteryOptionsFromList(
+    seedWeapons,
+    pool,
+    masteryCatalogEntries,
+    weaponProficiencies,
+  )
   if (!equipmentCatalog.length) return fromSeed
 
-  const fromCatalog = weaponMasteryOptionsFromList(equipmentCatalog, pool, masteryCatalogEntries)
+  const fromCatalog = weaponMasteryOptionsFromList(
+    equipmentCatalog,
+    pool,
+    masteryCatalogEntries,
+    weaponProficiencies,
+  )
   const byName = new Map<string, FeatureChoiceOption>()
   for (const option of [...fromSeed, ...fromCatalog]) {
     if (!byName.has(option.name)) byName.set(option.name, option)
   }
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function weaponByNameLookup(equipmentCatalog: Equipment[]): Map<string, SeedWeapon | Equipment> {
+  const byName = new Map<string, SeedWeapon | Equipment>()
+  for (const weapon of equipmentSeed as SeedWeapon[]) {
+    byName.set(weapon.name.trim().toLowerCase(), weapon)
+  }
+  for (const weapon of equipmentCatalog) {
+    if (weapon.category && weapon.category !== "Weapon") continue
+    byName.set(weapon.name.trim().toLowerCase(), weapon)
+  }
+  return byName
+}
+
+/**
+ * Drop stored mastery options the class is not proficient with. Unknown (homebrew) weapon
+ * names are kept — proficiency can only be judged for weapons present in the catalog.
+ */
+export function filterWeaponMasteryOptionsByProficiency(
+  options: FeatureChoiceOption[],
+  weaponProficiencies: string[] | null | undefined,
+  equipmentCatalog: Equipment[] = [],
+): FeatureChoiceOption[] {
+  if (!weaponProficiencies?.length || !options.length) return options
+  const byName = weaponByNameLookup(equipmentCatalog)
+  return options.filter((option) => {
+    const weapon = byName.get(option.name.trim().toLowerCase())
+    if (!weapon) return true
+    return weaponAllowedByProficiencies(weapon, weaponProficiencies)
+  })
 }
 
 export function parseWeaponMasteryCountFromDescription(description: string): number | null {
@@ -212,6 +272,7 @@ export function buildWeaponMasteryFeatureChoice(
   feature: Feature,
   className: string,
   masteryCatalogEntries?: ModifierCatalogEntry[] | null,
+  weaponProficiencies?: string[] | null,
 ): FeatureChoice {
   const fromDescription = parseWeaponMasteryCountFromDescription(feature.description ?? "")
   const fallbackCount =
@@ -222,7 +283,7 @@ export function buildWeaponMasteryFeatureChoice(
     count: fromDescription ?? fallbackCount,
     swappableOnRest: true,
     choiceCountByLevel: weaponMasteryChoiceCountByLevel(className),
-    options: weaponMasteryOptionsForClass(className, [], masteryCatalogEntries),
+    options: weaponMasteryOptionsForClass(className, [], masteryCatalogEntries, weaponProficiencies),
   }
 }
 
@@ -237,6 +298,35 @@ export function isWeaponMasteryFeature(feature: Feature): boolean {
   const name = feature.name?.trim() ?? ""
   if (/^weapon mastery$/i.test(name)) return true
   return feature.choices?.category === "Weapon Mastery"
+}
+
+/**
+ * Re-scope a class row's stored Weapon Mastery options to its weapon proficiencies.
+ * Runs at load time so existing rows (SRD seed and imported homebrew alike) stop
+ * offering weapons the class can't use — e.g. Dancer, whose Martial proficiency is
+ * limited to Finesse or Light weapons.
+ */
+export function applyWeaponMasteryProficiencies<
+  T extends { name?: unknown; weapon_proficiencies?: unknown; features?: unknown },
+>(row: T): T {
+  const proficiencies = Array.isArray(row.weapon_proficiencies)
+    ? (row.weapon_proficiencies as string[]).filter(
+        (entry): entry is string => typeof entry === "string" && Boolean(entry.trim()),
+      )
+    : []
+  if (!proficiencies.length || !Array.isArray(row.features)) return row
+
+  let changed = false
+  const features = (row.features as Feature[]).map((feature) => {
+    if (!isWeaponMasteryFeature(feature) || !feature.choices?.options?.length) return feature
+    const options = filterWeaponMasteryOptionsByProficiency(feature.choices.options, proficiencies)
+    if (options.length === feature.choices.options.length) return feature
+    changed = true
+    return { ...feature, choices: { ...feature.choices, options } }
+  })
+
+  if (!changed) return row
+  return { ...row, features } as T
 }
 
 export function enrichImportedWeaponMasteryFromColumn(
@@ -270,11 +360,17 @@ export function enrichWeaponMasteryFeature(
   feature: Feature,
   className: string,
   masteryCatalogEntries?: ModifierCatalogEntry[] | null,
+  weaponProficiencies?: string[] | null,
 ): Feature {
   if (!/^weapon mastery$/i.test(feature.name?.trim() ?? "")) return feature
 
   const incoming = feature.choices
-  const built = buildWeaponMasteryFeatureChoice(feature, className, masteryCatalogEntries)
+  const built = buildWeaponMasteryFeatureChoice(
+    feature,
+    className,
+    masteryCatalogEntries,
+    weaponProficiencies,
+  )
   const choices: FeatureChoice = {
     ...built,
     category: incoming?.category?.trim() ? incoming.category : built.category,
@@ -285,7 +381,9 @@ export function enrichWeaponMasteryFeature(
       incoming?.choiceCountByLevel,
     ),
     resourceKey: incoming?.resourceKey ?? built.resourceKey,
-    options: incoming?.options?.length ? incoming.options : built.options,
+    options: incoming?.options?.length
+      ? filterWeaponMasteryOptionsByProficiency(incoming.options, weaponProficiencies)
+      : built.options,
   }
 
   const linkedModifiers = (feature.linkedModifiers ?? []).filter((instance) => {

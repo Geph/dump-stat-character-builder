@@ -48,6 +48,7 @@ import { mergeAlchemistDiscoveryPicks } from "@/lib/compendium/alchemist-feature
 import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import { enrichSrdFeatRow } from "@/lib/compendium/enrich-srd-feats"
+import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { asCompendiumRows } from "@/lib/data/types"
 import type { Character, CustomAbility, DndClass, Feat, Spell, Subclass } from "@/lib/types"
 import { ABILITY_SCORE_KEYS, type AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
@@ -132,9 +133,12 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       }
       const char = character as Character
       const classRows = normalizeCharacterClassRows(char)
+      const enrichedClasses = enrichClassesList(
+        asCompendiumRows(classes) as unknown as DndClass[],
+      )
       const classDetails = attachClassDetails(
         classRows,
-        asCompendiumRows(classes) as unknown as DndClass[],
+        enrichedClasses,
         asCompendiumRows(subclasses) as unknown as Subclass[],
       )
       const enrichedFeats = (asCompendiumRows(feats) as unknown as Feat[]).map(
@@ -245,6 +249,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       classNames: [plan.className],
       classIds: [plan.classId],
       classLevel: plan.toLevel,
+      classWeaponProficiencies: selectedEntry.class?.weapon_proficiencies ?? null,
       knownSpellNames,
       subclassName: selectedEntry.subclass?.name ?? null,
     })

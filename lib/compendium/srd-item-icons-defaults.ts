@@ -16,6 +16,7 @@ export const SRD_SPECIES_ICONS_BY_NAME: Record<string, string> = {
 /** Default game-icons.net slugs for feats (from local MySQL / curated PHB + SRD set). */
 export const SRD_FEAT_ICONS_BY_NAME: Record<string, string> = {
   "Aberrant Anatomy": "anatomy",
+  "Ability Score Improvement": "upgrade",
   Actor: "theater-curtains",
   "Agent of Order": "rule-book",
   Alert: "extra-lucid",

@@ -51,7 +51,14 @@ export function parseEquipmentWeight(raw: unknown): number | null {
 }
 
 export function cleanProperties(props: unknown): Record<string, unknown> {
-  if (!props || typeof props !== "object" || Array.isArray(props)) {
+  if (Array.isArray(props)) {
+    return {
+      properties: props
+        .map((entry) => (typeof entry === "string" ? stripHtml(entry) : entry))
+        .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0),
+    }
+  }
+  if (!props || typeof props !== "object") {
     return {}
   }
 

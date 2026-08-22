@@ -5,9 +5,11 @@ import { createPortal } from "react-dom"
 import { Check, Info, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import equipmentSeed from "@/lib/srd/seed-data/equipment.json"
+import { hasWeaponProperty } from "@/lib/compendium/combat-stats"
 import { buildWeaponMasteryDescriptionsLookup } from "@/lib/compendium/weapon-mastery"
 import { weaponIconSlug } from "@/lib/compendium/weapon-icons"
 import { GameIcon } from "@/components/game-icon-picker"
+import type { Equipment } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 type ChoiceOption = { name: string; description?: string }
@@ -25,15 +27,19 @@ type WeaponMasteryChoicesProps = {
   masteryDescriptions?: Record<string, string>
 }
 
-type WeaponFilter = "all" | "simple" | "martial" | "melee" | "ranged"
+type WeaponFilter =
+  | "all"
+  | "simple"
+  | "martial"
+  | "melee"
+  | "ranged"
+  | "finesse"
+  | "heavy"
+  | "reach"
 
-type SeedWeapon = {
-  name: string
-  category?: string
-  subcategory?: string | null
-}
+const PROPERTY_FILTERS = new Set<WeaponFilter>(["finesse", "heavy", "reach"])
 
-const SEED_WEAPONS = equipmentSeed as SeedWeapon[]
+const SEED_WEAPONS = equipmentSeed as Equipment[]
 
 const WEAPON_FILTER_OPTIONS: { id: WeaponFilter; label: string }[] = [
   { id: "all", label: "All" },
@@ -41,6 +47,9 @@ const WEAPON_FILTER_OPTIONS: { id: WeaponFilter; label: string }[] = [
   { id: "martial", label: "Martial" },
   { id: "melee", label: "Melee" },
   { id: "ranged", label: "Ranged" },
+  { id: "finesse", label: "Finesse" },
+  { id: "heavy", label: "Heavy" },
+  { id: "reach", label: "Reach" },
 ]
 
 function masteryNameFromDescription(description?: string): string | null {
@@ -50,16 +59,18 @@ function masteryNameFromDescription(description?: string): string | null {
   return trimmed || null
 }
 
-function weaponSubcategory(name: string): string {
-  const hit = SEED_WEAPONS.find(
-    (weapon) => weapon.name.trim().toLowerCase() === name.trim().toLowerCase(),
-  )
-  return (hit?.subcategory ?? "").toLowerCase()
+function seedWeaponByName(name: string): Equipment | undefined {
+  const needle = name.trim().toLowerCase()
+  return SEED_WEAPONS.find((weapon) => weapon.name.trim().toLowerCase() === needle)
 }
 
-function matchesWeaponFilter(subcategory: string, filter: WeaponFilter): boolean {
+function matchesWeaponFilter(name: string, filter: WeaponFilter): boolean {
   if (filter === "all") return true
-  return subcategory.includes(filter)
+  const weapon = seedWeaponByName(name)
+  if (PROPERTY_FILTERS.has(filter)) {
+    return weapon ? hasWeaponProperty(weapon, filter) : false
+  }
+  return (weapon?.subcategory ?? "").toLowerCase().includes(filter)
 }
 
 function FilterChip({
@@ -133,7 +144,7 @@ export function WeaponMasteryChoices({
   const filteredOptions = useMemo(() => {
     return options.filter((option) => {
       if (selectedSet.has(option.name)) return true
-      return matchesWeaponFilter(weaponSubcategory(option.name), weaponFilter)
+      return matchesWeaponFilter(option.name, weaponFilter)
     })
   }, [options, weaponFilter, selected])
 

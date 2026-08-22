@@ -147,6 +147,7 @@ export function ClassAbilityFeatureChoices({
           classIds: [classId],
           classLevel,
           equipmentCatalog: equipment,
+          classWeaponProficiencies: entry.weaponProficiencies ?? null,
           knownSpellNames,
           subclassName: subclassName ?? null,
           grantedCustomAbilityNames,

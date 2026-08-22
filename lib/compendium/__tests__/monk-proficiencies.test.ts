@@ -50,6 +50,16 @@ describe("Monk SRD proficiency wiring", () => {
     expect(mod.choiceOptions).toContain("Smith's Tools")
     expect(mod.choiceOptions).toContain("Lute")
   })
+
+  it("wires Martial Arts unarmed damage to use Dexterity (Finesse)", () => {
+    const monk = monkRow()
+    const features = monk.features as unknown as Feature[]
+    const martialArts = features.find((f) => f.name === "Martial Arts")
+    const unarmed = (martialArts?.linkedModifiers ?? [])
+      .flatMap((instance) => instance.characteristics ?? [])
+      .find((mod) => mod.type === "unarmed_strike_damage") as { ability?: string } | undefined
+    expect(unarmed?.ability).toBe("dexterity")
+  })
 })
 
 describe("isWeaponProficient with Light-qualified martial proficiency", () => {

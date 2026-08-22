@@ -3,6 +3,8 @@ import { defaultClassIconForName } from "@/lib/compendium/class-icons-defaults"
 import { SRD_CLASS_CARD_IMAGES_BY_NAME } from "@/lib/compendium/class-card-images-defaults"
 import { applyBundledCardImage } from "@/lib/compendium/card-image"
 import { enrichSrdClassRow } from "@/lib/compendium/enrich-srd-classes"
+import { ensureMilestoneGrantFeatFeatures } from "@/lib/compendium/ensure-asi-milestone-features"
+import { applyWeaponMasteryProficiencies } from "@/lib/compendium/weapon-mastery-choice"
 import { wireClassToolProficiencyChoices } from "@/lib/compendium/class-tool-proficiencies"
 import { sanitizeAlchemistFeatures } from "@/lib/compendium/alchemist-feature-wiring"
 import { sanitizeCaptainFeatures } from "@/lib/compendium/captain-feature-wiring"
@@ -185,6 +187,16 @@ export function enrichClassesList<
       const features = sanitizeCaptainFeatures((enriched as { features?: Feature[] }).features)
       if (features) enriched = { ...enriched, features }
     }
+    {
+      const features = (enriched as { features?: Feature[] }).features
+      if (Array.isArray(features)) {
+        enriched = {
+          ...enriched,
+          features: ensureMilestoneGrantFeatFeatures(features),
+        }
+      }
+    }
+    enriched = applyWeaponMasteryProficiencies(enriched)
     enriched = wireClassToolProficiencyChoices(
       enriched as T & { features?: Feature[] | null; tool_proficiencies?: string[] | null },
     ) as T

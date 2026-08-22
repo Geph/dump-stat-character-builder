@@ -194,6 +194,9 @@ export type DerivedCharacter = {
   powerRiders: import("@/lib/compendium/characteristic-modifiers").PowerRiderCharacteristic[]
   equippedWeaponAttack: WeaponAttackDerived | null
   equippedOffHandWeaponAttack: WeaponAttackDerived | null
+  /** Synthetic Unarmed Strike when the character has a free hand. */
+  unarmedStrikeWeapon: import("@/lib/types").Equipment | null
+  unarmedStrikeAttack: WeaponAttackDerived | null
   attunementSlots: number
 }
 

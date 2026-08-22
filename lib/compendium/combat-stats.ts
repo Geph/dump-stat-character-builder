@@ -55,6 +55,14 @@ export function isThrownWeapon(equipment: Equipment): boolean {
   return hasWeaponProperty(equipment, "thrown")
 }
 
+export const UNARMED_STRIKE_EQUIPMENT_ID = "unarmed-strike"
+
+/** Built-in Unarmed Strike attack option (not a purchased weapon). */
+export function isUnarmedStrikeWeapon(weapon: { id?: string | null; name?: string | null }): boolean {
+  if (weapon.id === UNARMED_STRIKE_EQUIPMENT_ID) return true
+  return /^unarmed strike$/i.test(weapon.name?.trim() ?? "")
+}
+
 export function parseArmorAc(acText: string, dexMod: number): number {
   const text = acText.trim()
 
@@ -144,14 +152,14 @@ export function getWeaponAttackAbility(
     }
   }
 
-  const isRanged = weapon.subcategory?.toLowerCase().includes("ranged") ?? false
-  if (isRanged) {
-    return { ability: "dexterity", mod: abilityMods.dexterity, label: "Dexterity" }
-  }
   if (hasWeaponProperty(weapon, "finesse")) {
     return abilityMods.dexterity > abilityMods.strength
       ? { ability: "dexterity", mod: abilityMods.dexterity, label: "Dexterity (Finesse)" }
       : { ability: "strength", mod: abilityMods.strength, label: "Strength (Finesse)" }
+  }
+  const isRanged = weapon.subcategory?.toLowerCase().includes("ranged") ?? false
+  if (isRanged) {
+    return { ability: "dexterity", mod: abilityMods.dexterity, label: "Dexterity" }
   }
   return { ability: "strength", mod: abilityMods.strength, label: "Strength" }
 }
@@ -219,6 +227,18 @@ function martialProficiencyAllows(weapon: Equipment, proficiency: string): boole
   return properties.some((property) => hasWeaponProperty(weapon, property))
 }
 
+/**
+ * Category proficiency qualifiers: melee / ranged scope ("Martial Ranged weapons")
+ * plus property qualifiers ("Martial weapons that have the Finesse or Light property").
+ */
+function categoryProficiencyAllows(weapon: Equipment, proficiency: string): boolean {
+  const prof = proficiency.toLowerCase()
+  const sub = weapon.subcategory?.toLowerCase() ?? ""
+  if (/\bmelee\b/.test(prof) && sub && !sub.includes("melee")) return false
+  if (/\branged\b/.test(prof) && sub && !sub.includes("ranged")) return false
+  return martialProficiencyAllows(weapon, proficiency)
+}
+
 export function isWeaponProficient(
   weapon: Equipment,
   proficiencies: string[] | null | undefined,
@@ -232,10 +252,12 @@ export function isWeaponProficient(
     if (sub.includes("martial")) return true
   }
   if (sub.includes("simple")) {
-    if (normalized.some((p) => p.includes("simple"))) return true
+    if (normalized.some((p) => p.includes("simple") && categoryProficiencyAllows(weapon, p))) {
+      return true
+    }
   }
   if (sub.includes("martial")) {
-    if (normalized.some((p) => p.includes("martial") && martialProficiencyAllows(weapon, p))) {
+    if (normalized.some((p) => p.includes("martial") && categoryProficiencyAllows(weapon, p))) {
       return true
     }
   }

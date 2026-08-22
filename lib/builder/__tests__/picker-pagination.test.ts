@@ -36,9 +36,10 @@ describe("getCinematicPickerItemClass", () => {
 })
 
 describe("getFeatSpellGrantPickerPageSize", () => {
-  it("paginates feat spell grants on narrow phones", () => {
-    expect(getFeatSpellGrantPickerPageSize(false)).toBe(6)
-    expect(getFeatSpellGrantPickerPageSize(true)).toBe(9)
+  it("matches the 1 / 2 / 3 column grant grid", () => {
+    expect(getFeatSpellGrantPickerPageSize({ isSmScreen: false, isLargeScreen: false })).toBe(6)
+    expect(getFeatSpellGrantPickerPageSize({ isSmScreen: true, isLargeScreen: false })).toBe(8)
+    expect(getFeatSpellGrantPickerPageSize({ isSmScreen: true, isLargeScreen: true })).toBe(9)
   })
 })
 

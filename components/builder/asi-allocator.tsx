@@ -7,6 +7,7 @@ import {
   getAsiPointsUsed,
   type AsiAllocation,
 } from "@/lib/builder/asi-allocation"
+import { GameIcon } from "@/components/game-icon-picker"
 import { compendiumCardHeroImageClass } from "@/lib/compendium/card-image"
 import { cn } from "@/lib/utils"
 
@@ -25,6 +26,8 @@ type Props = {
   variant?: "default" | "visual"
   /** Optional banner image (e.g. selected background card art). */
   headerImageUrl?: string | null
+  /** Game-icons slug shown in the visual card's upper right (feat / trait icon). */
+  icon?: string | null
   /** Base ability scores before this allocator's bonuses. */
   baseScores?: Partial<Record<(typeof ABILITY_SCORE_KEYS)[number], number>>
   /** Bonuses from other allocators already applied. */
@@ -54,6 +57,7 @@ export function AsiAllocator({
   helpText: helpTextOverride,
   variant = "default",
   headerImageUrl,
+  icon,
   baseScores,
   otherBonuses,
   scoreCap,
@@ -185,7 +189,12 @@ export function AsiAllocator({
       ) : null}
 
       <div className={cn("relative p-4", !bannerUrl && "pt-4")}>
-        <p className="font-serif text-base font-black uppercase tracking-wide text-white">{title}</p>
+        {icon ? (
+          <div className="pointer-events-none absolute right-3 top-3 text-amber-400/85" aria-hidden>
+            <GameIcon name={icon} className="h-11 w-11" />
+          </div>
+        ) : null}
+        <p className={cn("font-serif text-base font-black uppercase tracking-wide text-white", icon && "pr-14")}>{title}</p>
         {sourceLabel ? (
           <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-400/80">
             {sourceLabel}

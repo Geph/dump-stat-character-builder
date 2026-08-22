@@ -279,6 +279,11 @@ import {
   isOriginSelectableCategory,
   normalizeFeatCategory,
 } from "@/lib/builder/feat-selection"
+import {
+  collectOriginFeatDuplicateBlockers,
+  findDuplicateOriginFeatNames,
+  resolveOriginFeatOwnership,
+} from "@/lib/builder/origin-feat-conflicts"
 import { characterHasFightingStyleAccess } from "@/lib/builder/fighting-style-access"
 import {
   allSelectedAsiAllocationsValid,
@@ -378,6 +383,20 @@ type StandardArrayAssignments = Partial<Record<AbilityName, number>>
 
 const STANDARD_ARRAY = BUILDER_STANDARD_ARRAY
 const STANDARD_ARRAY_UNASSIGNED_SCORE = 10
+
+function featIconForAsiSource(sourceLabel: string | null | undefined, feats: Feat[]): string | null {
+  const featName = sourceLabel?.startsWith("Feat · ")
+    ? sourceLabel.slice("Feat · ".length)
+    : sourceLabel?.includes("Ability Score Improvement")
+      ? "Ability Score Improvement"
+      : null
+  if (!featName) return null
+  const feat = feats.find((entry) => entry.name === featName)
+  return getCompendiumItemIcon(
+    "feats",
+    (feat ?? { name: featName }) as unknown as Record<string, unknown>,
+  )
+}
 
 function standardAssignmentsFromCharacter(
   scores: Pick<CharacterDraft, AbilityName>,
@@ -1336,6 +1355,22 @@ export default function BuilderPageClient() {
   const classSelectedFeatIds = classStepFeatSlots.map((slot) => featureChoicePicks[slot.key]?.[0] ?? "")
   const speciesSelectedFeatIds = speciesFeatPickSlots.map(
     (slot) => featureChoicePicks[slot.key]?.[0] ?? "",
+  )
+  const backgroundSelectedFeatIds = [
+    ...backgroundFeatPickSlots.map((slot) => featureChoicePicks[slot.key]?.[0] ?? ""),
+    ...(backgroundGrantedFeat?.id ? [backgroundGrantedFeat.id] : []),
+  ]
+  const duplicateOriginFeatNames = useMemo(
+    () =>
+      findDuplicateOriginFeatNames(
+        resolveOriginFeatOwnership(speciesSelectedFeatIds, feats, "species"),
+        resolveOriginFeatOwnership(backgroundSelectedFeatIds, feats, "background"),
+      ),
+    [speciesSelectedFeatIds, backgroundSelectedFeatIds, feats],
+  )
+  const duplicateOriginFeatBlockers = useMemo(
+    () => collectOriginFeatDuplicateBlockers(duplicateOriginFeatNames),
+    [duplicateOriginFeatNames],
   )
   const selectedFeatIds = [...classSelectedFeatIds, ...speciesSelectedFeatIds].filter(Boolean)
   const selectedFeatCount = classSelectedFeatIds.filter(Boolean).length
@@ -2732,6 +2767,7 @@ export default function BuilderPageClient() {
   const speciesOptionsSectionComplete = useMemo(() => {
     if (!speciesPickerComplete || !selectedSpecies) return false
     if (!hasSpeciesOptionsSection) return true
+    if (duplicateOriginFeatNames.length > 0) return false
     return (
       collectSpeciesOptionBlockers(
         selectedSpecies,
@@ -2754,6 +2790,7 @@ export default function BuilderPageClient() {
     featChoicePicks,
     speciesStepModifierSlots,
     modifierPlayerPicks,
+    duplicateOriginFeatNames,
   ])
 
   const backgroundPickerComplete = Boolean(character.background_id)
@@ -2769,6 +2806,7 @@ export default function BuilderPageClient() {
   const backgroundOptionsSectionComplete = useMemo(() => {
     if (!backgroundPickerComplete || !selectedBackground) return false
     if (!hasBackgroundOptionsSection) return true
+    if (duplicateOriginFeatNames.length > 0) return false
     return (
       collectBackgroundOptionBlockers(
         backgroundFeatPickSlots.map((slot) => slot.key),
@@ -2789,6 +2827,7 @@ export default function BuilderPageClient() {
     featChoicePicks,
     backgroundStepModifierSlots,
     modifierPlayerPicks,
+    duplicateOriginFeatNames,
   ])
 
   const classLevelSectionSummary = useMemo(() => {
@@ -3016,13 +3055,15 @@ export default function BuilderPageClient() {
       )
     }
 
-    for (const slot of speciesFeatPickSlots) {
-      const id = featureChoicePicks[slot.key]?.[0]
-      const feat = id ? feats.find((entry) => entry.id === id) : null
-      if (!feat) continue
+    const pushFeat = (
+      feat: (typeof feats)[number] | null | undefined,
+      key: string,
+      accentClass: string,
+    ) => {
+      if (!feat) return
       groups.push(
         <BuilderSelectedChoiceChips
-          key={slot.key}
+          key={key}
           title="Feat"
           names={[feat.name]}
           layout={chipLayout}
@@ -3031,9 +3072,17 @@ export default function BuilderPageClient() {
             ...customSkillIconByName,
             [feat.name]: getCompendiumItemIcon("feats", feat as unknown as Record<string, unknown>),
           }}
-          accentClass={speciesAccent}
+          accentClass={accentClass}
+          errorNames={duplicateOriginFeatNames}
         />,
       )
+    }
+
+    for (const slot of speciesFeatPickSlots) {
+      const id = featureChoicePicks[slot.key]?.[0]
+      const feat = id ? feats.find((entry) => entry.id === id) : null
+      if (!feat) continue
+      pushFeat(feat, slot.key, speciesAccent)
       const choiceKey = featChoicePickKey(slot.key)
       const optionPicks = featChoicePicks[choiceKey] ?? []
       if (optionPicks.length) {
@@ -3071,6 +3120,7 @@ export default function BuilderPageClient() {
     feats,
     skillPickerLayout,
     customSkillIconByName,
+    duplicateOriginFeatNames,
   ])
 
   const backgroundOptionsSectionPreview = useMemo(() => {
@@ -3093,6 +3143,7 @@ export default function BuilderPageClient() {
             [feat.name]: getCompendiumItemIcon("feats", feat as unknown as Record<string, unknown>),
           }}
           accentClass="border-accent bg-accent/10"
+          errorNames={duplicateOriginFeatNames}
         />,
       )
     }
@@ -3184,6 +3235,7 @@ export default function BuilderPageClient() {
     modifierPlayerPicks,
     skillPickerLayout,
     customSkillIconByName,
+    duplicateOriginFeatNames,
   ])
 
   const canProceed = () => {
@@ -3239,6 +3291,7 @@ export default function BuilderPageClient() {
             backgroundFeatPickSlots.map((slot) => slot.key),
             selectedBackground,
           ) &&
+          duplicateOriginFeatNames.length === 0 &&
           validateFeatModifierChoices(
             feats,
             originStepFeatSelectionEntries,
@@ -3356,6 +3409,7 @@ export default function BuilderPageClient() {
             selectedBackground,
           ),
         )
+        blockers.push(...duplicateOriginFeatBlockers)
         blockers.push(
           ...collectFeatModifierChoiceBlockers(
             feats,
@@ -3458,6 +3512,7 @@ export default function BuilderPageClient() {
     speciesTraitPicks,
     speciesFeatPickSlots,
     backgroundFeatPickSlots,
+    duplicateOriginFeatBlockers,
     originStepFeatSelectionEntries,
     originStepModifierSlots,
     showLegacyMilestoneAsi,
@@ -5021,6 +5076,11 @@ export default function BuilderPageClient() {
                         speciesOptionsSectionComplete ? speciesOptionsSectionPreview : null
                       }
                     >
+                      {duplicateOriginFeatNames.length > 0 ? (
+                        <p className="mb-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                          {duplicateOriginFeatBlockers[0]}
+                        </p>
+                      ) : null}
                       {(selectedSpecies.size_options?.length ?? 0) > 1 && (
                         <div className="mb-2">
                           <p className="text-sm font-semibold text-foreground mb-1">Size</p>
@@ -5187,11 +5247,30 @@ export default function BuilderPageClient() {
                                     }}
                                     className={`p-3 rounded-lg border-2 text-left transition-all ${
                                       isSelected
-                                        ? "border-secondary bg-secondary/10"
+                                        ? duplicateOriginFeatNames.some(
+                                            (name) =>
+                                              name.trim().toLowerCase() ===
+                                              feat.name.trim().toLowerCase(),
+                                          )
+                                          ? "border-destructive bg-destructive/15 ring-1 ring-destructive/40"
+                                          : "border-secondary bg-secondary/10"
                                         : "border-border bg-card hover:border-secondary/50"
                                     }`}
                                   >
-                                    <p className="font-semibold text-sm text-foreground">{feat.name}</p>
+                                    <p
+                                      className={`font-semibold text-sm ${
+                                        isSelected &&
+                                        duplicateOriginFeatNames.some(
+                                          (name) =>
+                                            name.trim().toLowerCase() ===
+                                            feat.name.trim().toLowerCase(),
+                                        )
+                                          ? "text-destructive"
+                                          : "text-foreground"
+                                      }`}
+                                    >
+                                      {feat.name}
+                                    </p>
                                     <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                                       {feat.level_requirement && feat.level_requirement > 1 && (
                                         <span>Lvl {feat.level_requirement}+</span>
@@ -5506,6 +5585,11 @@ export default function BuilderPageClient() {
                         backgroundOptionsSectionComplete ? backgroundOptionsSectionPreview : null
                       }
                     >
+                      {duplicateOriginFeatNames.length > 0 ? (
+                        <p className="mb-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                          {duplicateOriginFeatBlockers[0]}
+                        </p>
+                      ) : null}
                     <ModifierPlayerChoicePanel
                       sourceKey={backgroundFeatureModsSourceKey(selectedBackground.id)}
                       sourceLabel={selectedBackground.name}
@@ -5531,6 +5615,36 @@ export default function BuilderPageClient() {
                         )
                       }}
                     />
+
+                  {backgroundGrantedFeat && backgroundFeatPickSlots.length === 0 ? (
+                    <div className="mt-4 space-y-2 border-t border-border pt-4">
+                      <BuilderSelectedChoiceChips
+                        title="Feat"
+                        names={[backgroundGrantedFeat.name]}
+                        layout={skillPickerLayout}
+                        showSkillIcons
+                        skillIconByName={{
+                          ...customSkillIconByName,
+                          [backgroundGrantedFeat.name]: getCompendiumItemIcon(
+                            "feats",
+                            backgroundGrantedFeat as unknown as Record<string, unknown>,
+                          ),
+                        }}
+                        accentClass="border-accent bg-accent/10"
+                        errorNames={duplicateOriginFeatNames}
+                      />
+                      {duplicateOriginFeatNames.some(
+                        (name) =>
+                          name.trim().toLowerCase() ===
+                          backgroundGrantedFeat.name.trim().toLowerCase(),
+                      ) ? (
+                        <p className="text-xs text-muted-foreground">
+                          This background always grants {backgroundGrantedFeat.name}. Change your
+                          species feat (or pick a different background) to continue.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   {isLegacyBackground(selectedBackground) ? (
                     <div className="mt-4 space-y-2 border-t border-border pt-4">
@@ -5632,11 +5746,28 @@ export default function BuilderPageClient() {
                                     }}
                                     className={`rounded-lg border-2 text-left transition-all px-2.5 py-1.5 ${
                                       isSelected
-                            ? "border-accent bg-accent/10"
-                            : "border-border bg-card hover:border-accent/50"
-                        }`}
-                      >
-                                    <p className="font-semibold text-foreground text-xs">
+                                        ? duplicateOriginFeatNames.some(
+                                            (name) =>
+                                              name.trim().toLowerCase() ===
+                                              feat.name.trim().toLowerCase(),
+                                          )
+                                          ? "border-destructive bg-destructive/15 ring-1 ring-destructive/40"
+                                          : "border-accent bg-accent/10"
+                                        : "border-border bg-card hover:border-accent/50"
+                                    }`}
+                                  >
+                                    <p
+                                      className={`font-semibold text-xs ${
+                                        isSelected &&
+                                        duplicateOriginFeatNames.some(
+                                          (name) =>
+                                            name.trim().toLowerCase() ===
+                                            feat.name.trim().toLowerCase(),
+                                        )
+                                          ? "text-destructive"
+                                          : "text-foreground"
+                                      }`}
+                                    >
                                       {feat.name}
                                     </p>
                                     {feat.prerequisite ? (
@@ -5959,6 +6090,10 @@ export default function BuilderPageClient() {
                           : null
                       }
                       variant={asiAllocatorVariant}
+                      icon={featIconForAsiSource(
+                        "Feat · Ability Score Improvement",
+                        feats,
+                      )}
                       baseScores={{
                         strength: character.strength,
                         dexterity: character.dexterity,
@@ -5986,6 +6121,7 @@ export default function BuilderPageClient() {
                       totalPoints={grant.points}
                       allowedAbilities={grant.allowedAbilities}
                       variant={asiAllocatorVariant}
+                      icon={featIconForAsiSource(grant.sourceLabel, feats)}
                       baseScores={{
                         strength: character.strength,
                         dexterity: character.dexterity,

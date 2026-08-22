@@ -97,5 +97,6 @@ export function useIsSmPickerScreen(): boolean {
 
 export function useFeatSpellGrantPickerPageSize(): number {
   const isSm = useIsSmPickerScreen()
-  return getFeatSpellGrantPickerPageSize(isSm)
+  const isLarge = useIsLargePickerScreen()
+  return getFeatSpellGrantPickerPageSize({ isSmScreen: isSm, isLargeScreen: isLarge })
 }

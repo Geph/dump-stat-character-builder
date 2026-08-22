@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { ToolGroupedChoices } from "@/components/builder/tool-grouped-choices"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
-import { useFeatSpellGrantPickerPageSize, useIsSmPickerScreen } from "@/hooks/use-picker-page-size"
+import { useFeatSpellGrantPickerPageSize } from "@/hooks/use-picker-page-size"
 import { paginateList } from "@/lib/builder/picker-pagination"
 import { builderChoiceTargetId } from "@/lib/builder/proceed-blockers"
 import {
@@ -72,12 +72,11 @@ function SpellGrantPicker({
   const selectedIds = picks[slot.slotKey] ?? []
   const [filter, setFilter] = useState("")
   const [page, setPage] = useState(0)
-  const isSmScreen = useIsSmPickerScreen()
-  const mobilePageSize = useFeatSpellGrantPickerPageSize()
+  const pageSize = useFeatSpellGrantPickerPageSize()
 
   useEffect(() => {
     setPage(0)
-  }, [filter, listClass, slot.slotKey])
+  }, [filter, listClass, slot.slotKey, pageSize])
 
   if (slot.requiresSpellListPick && !listClass) {
     return (
@@ -95,7 +94,6 @@ function SpellGrantPicker({
       { name: "classes", value: (spell) => spell.classes, weight: 1.1 },
     ],
   })
-  const pageSize = isSmScreen ? Math.max(filtered.length, 1) : mobilePageSize
   const { items: visibleSpells, pageCount, safePage } = paginateList(filtered, page, pageSize)
 
   const toggle = (spellId: string) => {
@@ -149,7 +147,7 @@ function SpellGrantPicker({
         <p className="text-xs text-muted-foreground">No spells match this filter.</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-sm:max-h-none sm:max-h-48 sm:overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {visibleSpells.map((spell) => {
               const isSelected = selectedIds.includes(spell.id)
               const isDisabled = !isSelected && selectedIds.length >= slot.maxCount

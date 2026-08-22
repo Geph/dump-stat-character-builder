@@ -3077,10 +3077,8 @@ export function sumAttackRollModifiers(
   for (const entry of aggregated.attackRollModifiers) {
     if (!targetConditionMatches(entry, options)) continue
     const target = resolveRollModifierTarget(entry)
-    if (options?.unarmed) {
-      if (target === "all" || target === "unarmed" || target.includes("unarmed")) {
-        bonus += entry.bonus
-      }
+    if (options?.unarmed && (target === "unarmed" || target.includes("unarmed"))) {
+      bonus += entry.bonus
       continue
     }
     if (weaponMatchesAttackTarget(options?.subcategory ?? "", options?.properties ?? [], target)) {
@@ -3105,10 +3103,8 @@ export function sumDamageRollModifiers(
   for (const entry of aggregated.damageRollModifiers) {
     if (!targetConditionMatches(entry, options)) continue
     const target = resolveRollModifierTarget(entry)
-    if (options?.unarmed) {
-      if (target === "all" || target === "unarmed" || target.includes("unarmed")) {
-        bonus += entry.bonus
-      }
+    if (options?.unarmed && (target === "unarmed" || target.includes("unarmed"))) {
+      bonus += entry.bonus
       continue
     }
     if (target === "all") {
@@ -3169,16 +3165,23 @@ export function resolveUnarmedStrikeDieAtLevel(
   return fallbackDie ?? null
 }
 
+function isUnarmedStrikeName(weapon: { id?: string | null; name?: string | null }): boolean {
+  if (weapon.id === "unarmed-strike") return true
+  return /^unarmed strike$/i.test(weapon.name?.trim() ?? "")
+}
+
 function weaponMatchesDieOverrideScope(
-  weapon: { name?: string | null; subcategory?: string | null },
+  weapon: { id?: string | null; name?: string | null; subcategory?: string | null },
   override: WeaponDamageDieOverrideCharacteristic,
 ): boolean {
   const scope = override.scope ?? "weapons"
-  if (scope === "all" || scope === "weapons") return true
-  if (scope === "unarmed") return false
+  const unarmed = isUnarmedStrikeName(weapon)
+  if (scope === "all") return true
+  if (scope === "unarmed") return unarmed
+  if (scope === "weapons") return !unarmed
   const subcategory = (weapon.subcategory ?? "").toLowerCase()
-  if (scope === "melee") return subcategory.includes("melee") || !subcategory.includes("ranged")
-  if (scope === "ranged") return subcategory.includes("ranged")
+  if (scope === "melee") return unarmed || subcategory.includes("melee") || !subcategory.includes("ranged")
+  if (scope === "ranged") return !unarmed && subcategory.includes("ranged")
   if (scope === "specific") {
     const names = (override.weaponNames ?? []).map((name) => name.trim().toLowerCase()).filter(Boolean)
     if (!names.length) return false
