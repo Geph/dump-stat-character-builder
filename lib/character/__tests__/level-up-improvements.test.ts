@@ -56,6 +56,36 @@ describe("collectAsiPoolsFromFeat", () => {
       expect.objectContaining({ points: 2, label: "Ability Score Improvement" }),
     ])
   })
+
+  it("resolves catalog-only asi_pool refs so half-feats still allocate", () => {
+    const feat = {
+      id: "observant",
+      name: "Observant",
+      modifierRefs: ["cat_asi"],
+    } as Feat
+    const grants = collectAsiPoolsFromFeat(feat, "feat:class:L4:Ability Score Improvement", [
+      {
+        id: "cat_asi",
+        name: "Ability scores",
+        characteristics: [
+          {
+            id: "mod_obs",
+            type: "ability_scores",
+            mode: "asi_pool",
+            points: 1,
+            allowedAbilities: ["intelligence", "wisdom"],
+          },
+        ],
+      } as never,
+    ])
+    expect(grants).toEqual([
+      expect.objectContaining({
+        points: 1,
+        allowedAbilities: ["intelligence", "wisdom"],
+        allocationKey: expect.stringContaining("feat:class:L4:Ability Score Improvement::ref::"),
+      }),
+    ])
+  })
 })
 
 describe("buildLevelUpPlan standardized notes and hit die", () => {

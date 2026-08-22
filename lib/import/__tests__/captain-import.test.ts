@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { CAPTAIN_BASE_MANEUVERS } from "@/lib/compendium/captain-feature-wiring"
+import {
+  CAPTAIN_BASE_MANEUVERS,
+  CAPTAIN_COHORT_TYPES,
+  sanitizeCaptainFeatures,
+} from "@/lib/compendium/captain-feature-wiring"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import { sanitizeCaptainImportContent } from "@/lib/import/enrichment-presets/packs/captain"
 import type { ImportContent } from "@/lib/import/content-schema"
@@ -116,5 +120,21 @@ describe("Captain seed pack", () => {
     expect(grant?.abilityNames).toEqual(expect.arrayContaining([...CAPTAIN_BASE_MANEUVERS]))
     const knacks = seed.abilities.filter((ability) => ability.ability_role === "knack").map((a) => a.name)
     expect(knacks).toEqual(expect.arrayContaining([...CAPTAIN_BASE_MANEUVERS]))
+  })
+
+  it("asks the player to pick one Cohort type at level 2", () => {
+    const seed = JSON.parse(
+      readFileSync(join(__dirname, "../../seed-packs/mage-hand-press/magehandpress-captain-class.json"), "utf8"),
+    ) as {
+      classes: { features: Feature[] }[]
+    }
+    const cohort = sanitizeCaptainFeatures(seed.classes[0].features)?.find(
+      (feature) => feature.name === "Cohort",
+    )
+    expect(cohort?.isChoice).toBe(true)
+    expect(cohort?.choices?.count).toBe(1)
+    expect(cohort?.choices?.options?.map((option) => option.name)).toEqual(
+      expect.arrayContaining([...CAPTAIN_COHORT_TYPES]),
+    )
   })
 })

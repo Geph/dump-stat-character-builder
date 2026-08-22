@@ -32,7 +32,11 @@ import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
 import { resolvePsionicAugments } from "@/lib/compendium/resolve-psionic-augments"
 import { resolveSpecialAttackAtLevel } from "@/lib/character/special-attack-empower"
+import { resolveSpecialAttackIcon } from "@/lib/compendium/special-attack-icons-defaults"
 import {
+  inferAllyBuffEffect,
+  inferAllyHealEffect,
+  inferDirectCompanionEffect,
   inferGrantInspirationEffect,
   shouldCollectTargetableEffect,
 } from "@/lib/character/effect-target-policy"
@@ -66,6 +70,8 @@ export type SheetActionEntry = {
   /** Ability role for custom abilities (e.g. psionic_power). */
   abilityRole?: string | null
   psionicAugments?: PsionicAugmentsConfig | null
+  /** game-icons slug shown on the combat/utility card. */
+  icon?: string | null
   /** Structured attack/damage profile when this action is a special attack power. */
   specialAttack?: SpecialAttackCharacteristic | null
   /** All selectable profiles when one action supports multiple modes (Bomb Attack / Explode). */
@@ -223,15 +229,69 @@ const ACTION_TEXT_PATTERNS: { re: RegExp; kind: ActionEconomyKind }[] = [
   { re: /\bas a magic action\b/i, kind: "action" },
 ]
 
+const ACTION_OR_BONUS_RE =
+  /(?:magic\s+)?action\s+or\s+(?:a\s+)?bonus\s+action|bonus\s+action\s+or\s+(?:an?\s+)?(?:magic\s+)?action/i
+const ACTION_OR_REACTION_RE =
+  /(?:magic\s+)?action\s+or\s+(?:a\s+)?reaction|reaction\s+or\s+(?:an?\s+)?(?:magic\s+)?action/i
+const BONUS_OR_REACTION_RE =
+  /bonus\s+action\s+or\s+(?:a\s+)?reaction|reaction\s+or\s+(?:a\s+)?bonus\s+action/i
+
+/** "as an action or a bonus action" (and similar or-pairs) — spend one of the listed economies. */
+export function flexibleEconomyKindsFromText(
+  description?: string | null,
+): ActionEconomyKind[] {
+  if (!description) return []
+  const text = stripHtml(description)
+  const kinds = new Set<ActionEconomyKind>()
+  if (ACTION_OR_BONUS_RE.test(text)) {
+    kinds.add("action")
+    kinds.add("bonus")
+  }
+  if (ACTION_OR_REACTION_RE.test(text)) {
+    kinds.add("action")
+    kinds.add("reaction")
+  }
+  if (BONUS_OR_REACTION_RE.test(text)) {
+    kinds.add("bonus")
+    kinds.add("reaction")
+  }
+  return [...kinds]
+}
+
+function unionActionKinds(
+  ...lists: Array<readonly ActionEconomyKind[] | undefined>
+): ActionEconomyKind[] {
+  const kinds: ActionEconomyKind[] = []
+  for (const list of lists) {
+    for (const kind of list ?? []) {
+      if (!kinds.includes(kind)) kinds.push(kind)
+    }
+  }
+  return kinds
+}
+
 function kindsFromCastingTime(castingTime: string | null | undefined): ActionEconomyKind[] {
   if (!castingTime) return []
   const text = castingTime.toLowerCase()
-  const kinds = new Set<ActionEconomyKind>()
   if (/\bno\s+action\b/.test(text)) return []
+  const kinds = new Set<ActionEconomyKind>(flexibleEconomyKindsFromText(text))
   if (/\bbonus\s+action\b/.test(text)) kinds.add("bonus")
   if (/\breaction\b/.test(text)) kinds.add("reaction")
-  if (/\b(?:magic\s+)?action\b/.test(text) && !/\bbonus\s+action\b/.test(text)) kinds.add("action")
+  if (/\b(?:magic\s+)?action\b/.test(text) && (!/\bbonus\s+action\b/.test(text) || kinds.has("action"))) {
+    kinds.add("action")
+  }
   return [...kinds]
+}
+
+/** When a card lists more than one economy and actually spends one, the player picks which. */
+export function selectableEconomyKinds(
+  kinds: readonly ActionEconomyKind[],
+  spendsEconomy?: boolean,
+  trigger?: string | null,
+): ActionEconomyKind[] {
+  if (spendsEconomy === false || trigger) return []
+  const unique = [...new Set(kinds)]
+  return unique.length > 1 ? unique : []
 }
 
 function stripHtml(text: string): string {
@@ -613,7 +673,16 @@ function resolveSpecialAttacks(
               "Earthshatter — replace one Attack; 10-foot slam (Warden 14+)",
           }
         }
-        attacks.push(resolveSpecialAttackAtLevel(attack, classLevel ?? 1))
+        const leveled = resolveSpecialAttackAtLevel(attack, classLevel ?? 1)
+        attacks.push({
+          ...leveled,
+          icon: resolveSpecialAttackIcon({
+            icon: leveled.icon,
+            attackName: leveled.attackName ?? item.name,
+            label: leveled.label ?? item.name,
+            attackVariant: leveled.attackVariant,
+          }),
+        })
       }
     }
   }
@@ -625,6 +694,23 @@ function resolveSpecialAttack(
   classLevel?: number,
 ): SpecialAttackCharacteristic | null {
   return resolveSpecialAttacks(item, classLevel)[0] ?? null
+}
+
+export function resolveSheetActionIcon(input: {
+  name: string
+  icon?: string | null
+  specialAttack?: SpecialAttackCharacteristic | null
+  specialAttacks?: SpecialAttackCharacteristic[]
+}): string | null {
+  const explicit = input.icon?.trim()
+  if (explicit) return explicit
+  const attack = input.specialAttacks?.[0] ?? input.specialAttack ?? null
+  return resolveSpecialAttackIcon({
+    icon: attack?.icon,
+    attackName: attack?.attackName ?? input.name,
+    label: attack?.label ?? input.name,
+    attackVariant: attack?.attackVariant,
+  })
 }
 
 function describeRiderCost(rider: BonusDamageRiderEntry): string | null {
@@ -716,6 +802,12 @@ function resolveHealEffects(item: ActivatableItem): FeatureEffect[] {
     push(instance.activation?.effects)
   }
   if (!effects.length) {
+    const inferredHeal = inferAllyHealEffect(item.name, item.description)
+    if (inferredHeal) effects.push(inferredHeal)
+    const inferredDirect = inferDirectCompanionEffect(item.name, item.description)
+    if (inferredDirect) effects.push(inferredDirect)
+    const inferredBuff = inferAllyBuffEffect(item.name, item.description)
+    if (inferredBuff) effects.push(inferredBuff)
     const inferred = inferGrantInspirationEffect(item.name, item.description)
     if (inferred) effects.push(inferred)
   }
@@ -755,13 +847,16 @@ function explicitActionKinds(item: ActivatableItem): ActionEconomyKind[] {
   }
   // Reckless Attack and similar free declarations (pre-enrichment DB rows).
   if (/^reckless attack$/i.test(item.name.trim())) return ["action"]
+  if (/^potion mixologist$/i.test(item.name.trim())) return ["bonus"]
   return []
 }
 
 /** Derive action-economy kinds from structured activation, modifiers, or prose. */
 export function inferActivatableActionKinds(item: ActivatableItem): ActionEconomyKind[] {
   const explicit = explicitActionKinds(item)
-  if (explicit.length) return explicit
+  const merged = unionActionKinds(explicit, flexibleEconomyKindsFromText(item.description))
+  if (merged.length) return merged
+  if (inferDirectCompanionEffect(item.name, item.description)) return ["action"]
   // Triggered spends have no action-economy cost; "action" only keeps them inside the
   // existing action pipeline — the panel re-buckets them under Triggered.
   return resolveTriggeredActivationLabel(item) ? ["action"] : []
@@ -770,6 +865,7 @@ export function inferActivatableActionKinds(item: ActivatableItem): ActionEconom
 function resolveSpendsEconomy(item: ActivatableItem): boolean | undefined {
   if (item.activation?.noEconomyCost === true) return false
   if (/^reckless attack$/i.test(item.name.trim())) return false
+  if (inferDirectCompanionEffect(item.name, item.description)) return false
   return undefined
 }
 
@@ -978,9 +1074,7 @@ function pushActivatableItemActions(
           healEffects: healEffects.length ? healEffects : undefined,
           spendsEconomy: trigger
             ? false
-            : isAlchemistBombName(feature.name)
-              ? false
-              : (fallback.spendsEconomy ?? resolveSpendsEconomy(feature)),
+            : (fallback.spendsEconomy ?? resolveSpendsEconomy(feature)),
           playerNotes: playerNotes.length ? playerNotes : undefined,
           equipmentChoices: equipmentChoices.length ? equipmentChoices : undefined,
           psionicAugments: resolvePsionicAugments({
@@ -1194,7 +1288,10 @@ function pushCustomAbilityActions(
         ? linkedKinds
         : textKinds
     const fallback = fallbackKindsForResourceSpend(inferredKinds, limitedUses, haystack)
-    const kinds = [...fallback.kinds]
+    const kinds = unionActionKinds(
+      fallback.kinds,
+      flexibleEconomyKindsFromText(`${ability.casting_time ?? ""} ${ability.description ?? ""}`),
+    )
 
     if (!kinds.length && ability.ability_role === "psionic_power") {
       kinds.push("action")
@@ -1229,6 +1326,7 @@ function pushCustomAbilityActions(
       classResourceKey: resolveActionResourceKey(item),
       customAbilityId: ability.id,
       abilityRole: ability.ability_role ?? null,
+      icon: ability.icon,
       psionicAugments: resolvePsionicAugments(ability),
       specialAttack: resolveSpecialAttack(item, levelCap),
       specialAttacks: resolveSpecialAttacks(item, levelCap),
@@ -1238,7 +1336,7 @@ function pushCustomAbilityActions(
       duration: ability.duration ?? null,
       concentration: ability.concentration,
       healEffects: healEffects.length ? healEffects : undefined,
-      spendsEconomy: isAlchemistBombName(ability.name) ? false : fallback.spendsEconomy,
+      spendsEconomy: fallback.spendsEconomy,
     })
   }
 
@@ -1304,6 +1402,7 @@ function pushCustomAbilityActions(
         classId: ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId,
         classResourceKey: resolveActionResourceKey(itemWithUses),
         customAbilityId: ability.id,
+        icon: ability.icon,
         psionicAugments: resolvePsionicAugments({
           name: entryName,
           description: entry.description ?? entry.summary ?? null,
@@ -1725,6 +1824,7 @@ export function collectSheetActions(params: {
   const seen = new Set<string>()
   return withRiders
     .map((action) => {
+      action = { ...action, icon: resolveSheetActionIcon(action) }
       if (/^magical cunning$/i.test(action.name)) {
         return { ...action, restorePactSlotsOnUse }
       }

@@ -10,6 +10,7 @@ import {
   groupEquipmentByCategory,
 } from "@/lib/compendium/equipment-categories"
 import { getEquipmentCostGp, formatEquipmentCost } from "@/lib/builder/equipment-utils"
+import { EquipmentQuantityStepper } from "@/components/character-sheet/equipment-quantity-stepper"
 import { paginateList } from "@/lib/builder/picker-pagination"
 import { usePickerPageSize } from "@/hooks/use-picker-page-size"
 import type { Equipment } from "@/lib/types"
@@ -26,6 +27,7 @@ type EquipmentShoppingPanelProps = {
   goldSpent: number
   totalGoldBudget: number
   onTogglePurchase: (itemId: string, checked: boolean) => void
+  onAdjustQuantity: (itemId: string, delta: number) => void
   onShowDetails: (item: Equipment) => void
 }
 
@@ -39,6 +41,7 @@ export function EquipmentShoppingPanel({
   goldSpent,
   totalGoldBudget,
   onTogglePurchase,
+  onAdjustQuantity,
   onShowDetails,
 }: EquipmentShoppingPanelProps) {
   const pageSize = usePickerPageSize("dense")
@@ -185,34 +188,34 @@ export function EquipmentShoppingPanel({
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {pageItems.map((item) => {
-                    const isPurchased = goldPurchasedEquipmentIds.includes(item.id)
+                    const purchasedQty = goldPurchasedEquipmentIds.filter((id) => id === item.id).length
+                    const isPurchased = purchasedQty > 0
                     const cost = getEquipmentCostGp(item)
-                    const cannotAfford = !isPurchased && goldSpent + cost > totalGoldBudget
+                    const cannotAffordAnother = goldSpent + cost > totalGoldBudget
+                    const cannotAfford = !isPurchased && cannotAffordAnother
                     return (
-                      <label
+                      <div
                         key={item.id}
                         className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
                           cannotAfford
-                            ? "border-border bg-card opacity-50 cursor-not-allowed"
+                            ? "border-border bg-card opacity-50"
                             : isPurchased
-                              ? "border-primary bg-primary/10 cursor-pointer"
-                              : "border-border bg-card hover:border-primary/50 cursor-pointer"
+                              ? "border-primary bg-primary/10"
+                              : "border-border bg-card hover:border-primary/50"
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isPurchased}
+                        <button
+                          type="button"
                           disabled={cannotAfford}
-                          onChange={(e) => onTogglePurchase(item.id, e.target.checked)}
-                          className="sr-only"
-                        />
-                        <div
+                          onClick={() => onTogglePurchase(item.id, !isPurchased)}
                           className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                             isPurchased ? "bg-primary border-primary" : "border-muted-foreground"
-                          }`}
+                          } disabled:cursor-not-allowed`}
+                          aria-pressed={isPurchased}
+                          aria-label={isPurchased ? `Remove ${item.name}` : `Buy ${item.name}`}
                         >
                           {isPurchased && <Check className="w-2.5 h-2.5 text-white" />}
-                        </div>
+                        </button>
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-1">
                             <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
@@ -220,20 +223,24 @@ export function EquipmentShoppingPanel({
                           </div>
                           <p className="text-xs text-muted-foreground tabular-nums">
                             {formatEquipmentCost(item) ?? "—"}
+                            {purchasedQty > 1 ? ` · ${purchasedQty}×` : ""}
                           </p>
                         </div>
+                        {isPurchased ? (
+                          <EquipmentQuantityStepper
+                            value={purchasedQty}
+                            onChange={(next) => onAdjustQuantity(item.id, next - purchasedQty)}
+                            ariaLabel={`${item.name} quantity`}
+                          />
+                        ) : null}
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            onShowDetails(item)
-                          }}
+                          onClick={() => onShowDetails(item)}
                           className="p-0.5 text-muted-foreground hover:text-primary shrink-0"
                         >
                           <Info className="w-3 h-3" />
                         </button>
-                      </label>
+                      </div>
                     )
                   })}
                 </div>

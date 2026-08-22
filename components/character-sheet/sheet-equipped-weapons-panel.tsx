@@ -3,12 +3,14 @@
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 import { ConditionInfoTip } from "@/components/character-sheet/condition-info-tip"
 import { WeaponDamageRollButton } from "@/components/character-sheet/weapon-damage-roll-button"
+import { GameIcon } from "@/components/game-icon-picker"
 import type { CharacterBuildInputs } from "@/lib/character/types"
 import {
   getWeaponDamageText,
   getWeaponMastery,
   getWeaponPropertyTags,
   getWeaponRangeText,
+  isThrownWeapon,
 } from "@/lib/compendium/combat-stats"
 import { describeWeaponMastery } from "@/lib/compendium/weapon-mastery"
 import {
@@ -33,6 +35,8 @@ type EquippedWeaponCard = {
   /** When set, spend this much HP when the attack roll button is used. */
   ammoHpCost?: number
   onSpendAmmoHp?: () => void
+  /** Owned copies — thrown weapons track this like remaining ammo. */
+  quantity?: number
 }
 
 export type ExtraWeaponMasteryControl = {
@@ -62,6 +66,7 @@ function WeaponAttackCard({
   note,
   ammoHpCost,
   onSpendAmmoHp,
+  quantity,
   buildInputs,
   weaponProficiencies,
   extraMastery,
@@ -99,15 +104,21 @@ function WeaponAttackCard({
     <div className="rounded border border-primary/40 bg-primary/5 px-2.5 py-2 min-w-0">
       <div className="flex items-stretch justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex flex-wrap items-baseline gap-x-1.5">
+          <div className="flex flex-wrap items-center gap-x-1.5">
+            {weapon.icon?.trim() ? (
+              <GameIcon name={weapon.icon.trim()} className="h-5 w-5 shrink-0 text-primary" />
+            ) : null}
             <p className="text-xs font-semibold text-foreground">{weapon.name}</p>
+            {quantity != null && quantity > 0 && (quantity > 1 || isThrownWeapon(weapon)) ? (
+              <span className="text-[10px] font-bold tabular-nums text-muted-foreground">
+                ×{quantity}
+                {isThrownWeapon(weapon) ? " left" : ""}
+              </span>
+            ) : null}
             {hand === "off" ? (
               <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                 Off-hand
               </span>
-            ) : null}
-            {weapon.subcategory ? (
-              <p className="text-[10px] text-muted-foreground">{weapon.subcategory}</p>
             ) : null}
           </div>
 
@@ -232,7 +243,7 @@ function WeaponAttackCard({
           ) : null}
         </div>
 
-        <div className="flex w-[6.75rem] shrink-0 flex-col gap-1 self-start">
+        <div className="flex w-[8.4375rem] shrink-0 flex-col gap-1 self-start">
           <D20RollButton
             modifier={attack.attackBonus}
             title={`${weapon.name} attack`}

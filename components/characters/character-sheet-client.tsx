@@ -70,6 +70,12 @@ import type {
 } from "@/lib/types"
 import { resolveEquippedItems } from "@/lib/compendium/equipment-magic-modifiers"
 import {
+  addOwnedEquipmentQuantity,
+  canDualWieldSameWeapon,
+  ownedEquipmentQuantity,
+  setOwnedEquipmentQuantity,
+} from "@/lib/character/equipment-quantities"
+import {
   characterHasTwoWeaponFighting,
   defaultOffHandIncludesAbilityMod,
 } from "@/lib/compendium/two-weapon-fighting"
@@ -142,6 +148,8 @@ import {
 import { resolveUsesAtLevel } from "@/lib/compendium/resolve-uses-config"
 import { DeathSaveTracker } from "@/components/character-sheet/death-save-tracker"
 import { SheetActionsPanel } from "@/components/character-sheet/sheet-actions-panel"
+import { SheetNonCombatStandardActions } from "@/components/character-sheet/sheet-non-combat-standard-actions"
+import { useDisplayNonCombatActions } from "@/components/settings/use-display-non-combat-actions"
 import { SheetEquippedWeaponsPanel } from "@/components/character-sheet/sheet-equipped-weapons-panel"
 import { SheetActionEconomyTracker } from "@/components/character-sheet/sheet-action-economy-tracker"
 import { SheetStandardActionButtons } from "@/components/character-sheet/sheet-standard-action-buttons"
@@ -180,7 +188,7 @@ import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choi
 import { collectSelectedCustomAbilityNames } from "@/lib/builder/picked-custom-abilities"
 import { catalogFeatPickIdsFromPicks } from "@/lib/builder/catalog-feat-options"
 import { collectKnownDisciplineNames } from "@/lib/builder/aggregate-psionic-talents"
-import { filterCustomAbilitiesForCharacterSheet } from "@/lib/character/filter-sheet-custom-abilities"
+import { filterCustomAbilitiesForCharacterSheet, filterFeatureTabCustomAbilities } from "@/lib/character/filter-sheet-custom-abilities"
 import { applyCustomAbilityModifications } from "@/lib/character/modify-custom-ability"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
@@ -722,6 +730,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [defaultActionsContext, setDefaultActionsContext] = useState<"abilities" | "combat" | null>(
     null,
   )
+  const { enabled: displayNonCombatActions } = useDisplayNonCombatActions()
   const conditionButtonRef = useRef<HTMLButtonElement>(null)
   const conditionMenuRef = useRef<HTMLDivElement>(null)
   const sheetMenuButtonRef = useRef<HTMLButtonElement>(null)
@@ -1133,6 +1142,80 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [character, characterBuildInputs, equippedArmorId, equippedShieldId, equippedWeaponId, equippedOffHandWeaponId],
   )
 
+  const persistEquipmentQuantity = useCallback(
+    async (itemId: string, quantity: number) => {
+      if (!character) return
+      const next = setOwnedEquipmentQuantity(
+        character.equipment_ids ?? [],
+        character.equipment_quantities,
+        itemId,
+        quantity,
+      )
+      const loadoutClears: {
+        armorId?: string | null
+        shieldId?: string | null
+        weaponId?: string | null
+        offHandWeaponId?: string | null
+      } = {}
+      if (quantity <= 0) {
+        if (equippedArmorId === itemId) loadoutClears.armorId = null
+        if (equippedShieldId === itemId) loadoutClears.shieldId = null
+        if (equippedWeaponId === itemId) loadoutClears.weaponId = null
+        if (equippedOffHandWeaponId === itemId) loadoutClears.offHandWeaponId = null
+      } else if (
+        !canDualWieldSameWeapon(quantity) &&
+        equippedWeaponId === itemId &&
+        equippedOffHandWeaponId === itemId
+      ) {
+        loadoutClears.offHandWeaponId = null
+      }
+
+      const nextAttuned = quantity <= 0
+        ? attunedItemIds.filter((id) => id !== itemId)
+        : attunedItemIds
+      const nextSelections = { ...equipmentBaseSelections }
+      if (quantity <= 0) delete nextSelections[itemId]
+      if (quantity <= 0) {
+        setPinnedEquipmentIds((prev) => prev.filter((id) => id !== itemId))
+        setEquipment((prev) =>
+          next.equipmentIds.includes(itemId) ? prev : prev.filter((item) => item.id !== itemId),
+        )
+      }
+
+      const db = createClient()
+      const { data, error } = await db
+        .from("characters")
+        .update({
+          equipment_ids: next.equipmentIds,
+          equipment_quantities: next.quantities,
+          attuned_item_ids: nextAttuned,
+          equipment_base_selections: nextSelections,
+        })
+        .eq("id", character.id)
+        .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
+        .single()
+      const row = parseCharacterQueryRow(data)
+      if (!error && row) {
+        setCharacter(row)
+        setAttunedItemIds(nextAttuned)
+        setEquipmentBaseSelections(nextSelections)
+      }
+      if (Object.keys(loadoutClears).length) {
+        await persistEquipmentLoadout(loadoutClears)
+      }
+    },
+    [
+      attunedItemIds,
+      character,
+      equippedArmorId,
+      equippedOffHandWeaponId,
+      equippedShieldId,
+      equippedWeaponId,
+      equipmentBaseSelections,
+      persistEquipmentLoadout,
+    ],
+  )
+
   const persistGold = useCallback(
     async (gold: number) => {
       if (!character) return
@@ -1213,7 +1296,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       const costGp = options.deductCost ? getEquipmentCostGp(item) : 0
       if (options.deductCost && characterGold < costGp) return
 
-      const nextIds = [...new Set([...(character.equipment_ids ?? []), item.id])]
+      const currentIds = character.equipment_ids ?? []
+      const added = currentIds.includes(item.id)
+        ? addOwnedEquipmentQuantity(currentIds, character.equipment_quantities, item.id, 1)
+        : setOwnedEquipmentQuantity(currentIds, character.equipment_quantities, item.id, 1)
+      const nextIds = added.equipmentIds
+      const nextQuantities = added.quantities
       const nextGold = options.deductCost ? characterGold - costGp : characterGold
       const nextSelections = { ...equipmentBaseSelections }
       if (options.selectedBaseId) {
@@ -1225,6 +1313,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         .from("characters")
         .update({
           equipment_ids: nextIds,
+          equipment_quantities: nextQuantities,
           gold: nextGold,
           equipment_base_selections: nextSelections,
         })
@@ -2256,6 +2345,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         hand: "main" as const,
         defaultIncludeAbilityModifier: true,
         abilityModifier: derived.equippedWeaponAttack.damageAbilityMod,
+        quantity: ownedEquipmentQuantity(
+          character?.equipment_ids ?? [],
+          character?.equipment_quantities,
+          equippedWeapon.id,
+        ),
       })
     }
     if (equippedOffHandWeapon && derived?.equippedOffHandWeaponAttack) {
@@ -2269,10 +2363,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           hasTwoWeaponFighting,
         ),
         abilityModifier: abilityMod,
+        quantity: ownedEquipmentQuantity(
+          character?.equipment_ids ?? [],
+          character?.equipment_quantities,
+          equippedOffHandWeapon.id,
+        ),
       })
     }
     return cards
   }, [
+    character?.equipment_ids,
+    character?.equipment_quantities,
     equippedWeapon,
     equippedOffHandWeapon,
     derived?.equippedWeaponAttack,
@@ -2355,6 +2456,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       featureChoicePicks,
     ],
   )
+
+  const featureTabCustomAbilities = useMemo(() => {
+    const actionIds = new Set<string>()
+    const actionNames = new Set<string>()
+    for (const action of sheetActions) {
+      if (action.customAbilityId) actionIds.add(action.customAbilityId)
+      if (action.name.trim()) actionNames.add(action.name.trim().toLowerCase())
+    }
+    return filterFeatureTabCustomAbilities(sheetCustomAbilities, {
+      sheetActionCustomAbilityIds: actionIds,
+      sheetActionNames: actionNames,
+    })
+  }, [sheetActions, sheetCustomAbilities])
 
   const orderedFeatureSections = useMemo(() => {
     const sections = applyOrder(featureTabSections, featureLayout.sectionOrder, (section) => section.id)
@@ -3017,6 +3131,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       equipment,
       creatures,
       modifierCatalog,
+      featureChoicePicks: character.feature_choice_picks ?? {},
       formSelections: formSelectionsFromState(companionState),
     })
     return { rows: mergeCompanionState(companions, companionState), formGroups }
@@ -3027,13 +3142,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const visibleSheetTabs = useMemo(() => {
     const tabs: SheetTab[] = ["abilities", "combat", "equipment", "features"]
     if (companionFormGroups.length > 0 || companionRows.length > 0) tabs.push("companions")
-    if (sheetCustomAbilities.length > 0) tabs.push("custom")
     tabs.push("details")
     return tabs
-  }, [companionFormGroups.length, companionRows.length, sheetCustomAbilities.length])
+  }, [companionFormGroups.length, companionRows.length])
 
   useEffect(() => {
-    if (!visibleSheetTabs.includes(activeTab)) setActiveTab("abilities")
+    if (!visibleSheetTabs.includes(activeTab)) {
+      setActiveTab(activeTab === "custom" ? "features" : "abilities")
+    }
   }, [activeTab, visibleSheetTabs])
 
   const persistCompanionState = useCallback(
@@ -3225,7 +3341,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     })
     const maxByKey = new Map(companionRows.map((row) => [row.key, row.maxHp]))
     const tempByKey = new Map(companionRows.map((row) => [row.key, row.tempHp]))
-    return rows.map((row) => {
+    const merged = rows.map((row) => {
       if (row.kind !== "companion" || row.characterId !== character?.id) return row
       return {
         ...row,
@@ -3233,6 +3349,27 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         tempHp: tempByKey.get(row.companionKey) ?? row.tempHp,
       }
     })
+    const seen = new Set(
+      merged
+        .filter((row) => row.kind === "companion" && row.characterId === character?.id)
+        .map((row) => row.companionKey),
+    )
+    if (character) {
+      for (const companion of companionRows) {
+        if (seen.has(companion.key)) continue
+        merged.push({
+          kind: "companion",
+          characterId: character.id,
+          companionKey: companion.key,
+          label: companion.displayName,
+          currentHp: companion.currentHp,
+          maxHp: companion.maxHp,
+          tempHp: companion.tempHp,
+          activeConditions: companion.activeConditions,
+        })
+      }
+    }
+    return merged
   }, [partyForAllies, partyCharacters, character, companionRows])
 
   const healContext = useMemo(() => {
@@ -4208,7 +4345,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   { id: "sheet-skills", label: "Skills" },
                   { id: "sheet-scores", label: "Abilities" },
                   { id: "sheet-proficiencies", label: "Prof." },
-                  { id: "sheet-utility-actions", label: "Actions" },
+                  { id: "sheet-utility-actions", label: "Non-Combat" },
                 ]
               : activeTab === "combat"
                 ? [
@@ -4218,10 +4355,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     { id: "sheet-saves", label: "Saves" },
                   ]
                 : activeTab === "features"
-                  ? orderedFeatureSections.map((section) => ({
-                      id: `feature-section-${section.id}`,
-                      label: featureTabNavLabel(section.title),
-                    }))
+                  ? [
+                      ...orderedFeatureSections.map((section) => ({
+                        id: `feature-section-${section.id}`,
+                        label: featureTabNavLabel(section.title),
+                      })),
+                      { id: "feature-section-custom-abilities", label: "Custom" },
+                    ]
                   : []
           }
         />
@@ -4794,13 +4934,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               <div className={`${SHEET_ABILITIES_PANEL.actions} rounded-xl p-3 border border-border`}>
                 <div id="sheet-utility-actions" className="flex items-center justify-between gap-2 mb-2">
                   <SheetSectionHeading icon={Swords} className="mb-0">
-                    Actions
+                    Non-Combat Actions
                   </SheetSectionHeading>
                   <DefaultActionsButton onClick={() => setDefaultActionsContext("abilities")} />
                 </div>
+                {displayNonCombatActions ? (
+                  <div className={utilityActions.length ? "mb-3" : undefined}>
+                    <SheetNonCombatStandardActions />
+                  </div>
+                ) : null}
                 {utilityActions.length ? (
                   <SheetActionsPanel
                     actions={utilityActions}
+                    singleColumn={false}
                     usedByActionId={usedActionUsesById}
                     onUsedChange={setUsedActionUsesById}
                     playerNoteValues={featureChoicePicks}
@@ -4843,7 +4989,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     primedBombUsedThisTurn={primedBombUsedThisTurn}
                     onPrimedBombUsed={() => setPrimedBombUsedThisTurn(true)}
                   />
-                ) : (
+                ) : displayNonCombatActions ? null : (
                   <p className="text-xs text-muted-foreground italic">
                     No non-combat actions from your features or traits. Use Standard Action Rules for
                     options like Dash, Hide, and Search.
@@ -5086,7 +5232,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         }
                         allyCandidates={allyCandidates}
                         healContext={healContext}
-                        singleColumn={false}
+                        singleColumn
                         onRestorePactSlots={handleRestorePactSlots}
                         onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
                         onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
@@ -5434,6 +5580,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   gold={characterGold}
                   onGoldChange={(gold) => void persistGold(gold)}
                   onAddEquipment={() => void openAddEquipmentOverlay()}
+                  ownedIds={character.equipment_ids ?? []}
+                  equipmentQuantities={character.equipment_quantities ?? {}}
+                  onQuantityChange={(id, quantity) => void persistEquipmentQuantity(id, quantity)}
                   searchQuery={equipmentSearchQuery}
                   onSearchQueryChange={setEquipmentSearchQuery}
                   equippedArmorId={equippedArmorId}
@@ -5658,6 +5807,53 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
                 </section>
               ))}
+              <section
+                id="feature-section-custom-abilities"
+                className={`${SHEET_FEATURES_PANEL} rounded-xl p-3 border border-border break-inside-avoid`}
+              >
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <SheetSectionHeading icon={Sparkles} className="mb-0">
+                    Custom Abilities
+                  </SheetSectionHeading>
+                  <Link
+                    href={compendiumEditHref("abilities", "new")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Custom Ability
+                  </Link>
+                </div>
+                <p className="mb-2 text-[11px] text-muted-foreground leading-snug">
+                  Abilities that are not already listed on Combat, Abilities &amp; Skills, or Companions.
+                </p>
+                {featureTabCustomAbilities.length ? (
+                  <div className="space-y-2">
+                    {featureTabCustomAbilities.map((ability) => {
+                      const uses = resolveUsesConfig(ability.characteristics, ability.uses)
+                      return (
+                        <div key={ability.id} className="p-2 bg-muted rounded-lg text-xs">
+                          <p className="font-bold">{ability.name}</p>
+                          {ability.description ? (
+                            <ExpandableDescription
+                              text={ability.description}
+                              className="text-muted-foreground"
+                            />
+                          ) : null}
+                          {uses && uses.type !== "unlimited" && (
+                            <p className="text-[10px] text-magenta mt-1">
+                              Uses: {uses.type === "fixed" ? uses.fixedAmount : uses.type}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-3">
+                    None yet — use Add Custom Ability for homebrew traits that belong here.
+                  </p>
+                )}
+              </section>
           </div>
 
           <div className={activeTab === "companions" ? "space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1" : "hidden print-sheet-section space-y-3"}>
@@ -5794,50 +5990,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               )}
           </div>
 
-          <div className={activeTab === "custom" ? "" : "hidden print-sheet-section"}>
-            <div className="bg-card rounded-xl p-3 border border-border">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <SheetSectionHeading icon={Sparkles} className="mb-0">
-                  Custom Abilities
-                </SheetSectionHeading>
-                <Link
-                  href={compendiumEditHref("abilities", "new")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:bg-primary/90 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Custom Ability
-                </Link>
-              </div>
-              {sheetCustomAbilities.length ? (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {sheetCustomAbilities.map((ability) => {
-                    const uses = resolveUsesConfig(ability.characteristics, ability.uses)
-                    return (
-                      <div key={ability.id} className="p-2 bg-muted rounded-lg text-xs">
-                        <p className="font-bold">{ability.name}</p>
-                        {ability.description ? (
-                          <ExpandableDescription
-                            text={ability.description}
-                            className="text-muted-foreground"
-                          />
-                        ) : null}
-                        {uses && uses.type !== "unlimited" && (
-                          <p className="text-[10px] text-magenta mt-1">
-                            Uses: {uses.type === "fixed" ? uses.fixedAmount : uses.type}
-                          </p>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground text-center py-4">No custom abilities</p>
-              )}
-            </div>
-          </div>
         </motion.div>
       </main>
-
       <AnimatePresence>
         {skillsInfoOpen ? (
           <motion.div
@@ -5938,6 +6092,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           onClose={() => setAddEquipmentOpen(false)}
           catalog={equipmentCatalog}
           ownedIds={character?.equipment_ids ?? []}
+          ownedQuantities={character?.equipment_quantities ?? {}}
           currentGold={characterGold}
           onAddItem={(item, options) => void handleAddEquipmentFromCatalog(item, options)}
         />

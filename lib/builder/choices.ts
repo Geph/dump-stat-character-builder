@@ -203,19 +203,14 @@ export function validateClassStepChoices(
   ).length === 0
 }
 
-export function collectOriginStepBlockers(
-  speciesId: string | null,
-  backgroundId: string | null,
+/** Species trait / feat picks after a species is selected (builder accordion section). */
+export function collectSpeciesOptionBlockers(
   selectedSpecies: Species | undefined,
   speciesTraitPicks: Record<string, string[]>,
   speciesFeatPickKeys: string[] = [],
   featureChoicePicks: Record<string, string[]> = {},
-  backgroundFeatPickKeys: string[] = [],
-  selectedBackground?: Background,
 ): string[] {
   const blockers: string[] = []
-  if (!speciesId) blockers.push("Select a species.")
-  if (!backgroundId) blockers.push("Select a background.")
   if (!selectedSpecies) return blockers
 
   for (let index = 0; index < (selectedSpecies.traits?.length ?? 0); index++) {
@@ -236,6 +231,17 @@ export function collectOriginStepBlockers(
     }
   }
 
+  return blockers
+}
+
+/** Background feat / Origin feat picks after a background is selected. */
+export function collectBackgroundOptionBlockers(
+  backgroundFeatPickKeys: string[] = [],
+  featureChoicePicks: Record<string, string[]> = {},
+  selectedBackground?: Background,
+): string[] {
+  const blockers: string[] = []
+
   for (const key of backgroundFeatPickKeys) {
     if (!(featureChoicePicks[key]?.[0] ?? "")) {
       blockers.push("Select a background-granted feat.")
@@ -246,6 +252,40 @@ export function collectOriginStepBlockers(
   if (!legacyBackgroundOriginFeatPickComplete(selectedBackground, featureChoicePicks)) {
     blockers.push("Select an Origin feat from your background.")
   }
+
+  return blockers
+}
+
+export function collectOriginStepBlockers(
+  speciesId: string | null,
+  backgroundId: string | null,
+  selectedSpecies: Species | undefined,
+  speciesTraitPicks: Record<string, string[]>,
+  speciesFeatPickKeys: string[] = [],
+  featureChoicePicks: Record<string, string[]> = {},
+  backgroundFeatPickKeys: string[] = [],
+  selectedBackground?: Background,
+): string[] {
+  const blockers: string[] = []
+  if (!speciesId) blockers.push("Select a species.")
+  if (!backgroundId) blockers.push("Select a background.")
+  if (!selectedSpecies) return blockers
+
+  blockers.push(
+    ...collectSpeciesOptionBlockers(
+      selectedSpecies,
+      speciesTraitPicks,
+      speciesFeatPickKeys,
+      featureChoicePicks,
+    ),
+  )
+  blockers.push(
+    ...collectBackgroundOptionBlockers(
+      backgroundFeatPickKeys,
+      featureChoicePicks,
+      selectedBackground,
+    ),
+  )
 
   return blockers
 }

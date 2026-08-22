@@ -934,6 +934,52 @@ function optionHasModifierConfig(option: {
   return Boolean(option.linkedModifiers?.length || option.modifierRefs?.length)
 }
 
+function characteristicIsSpellcastingAbilityChoice(char: { type?: string; abilityOptions?: string[] }): boolean {
+  return char.type === "spellcasting_ability" && (char.abilityOptions?.length ?? 0) > 1
+}
+
+function linkedModifiersHaveSpellcastingAbilityChoice(
+  instances: LinkedModifierInstance[] | null | undefined,
+): boolean {
+  return (instances ?? []).some((instance) =>
+    (instance.characteristics ?? []).some((char) => characteristicIsSpellcastingAbilityChoice(char)),
+  )
+}
+
+/**
+ * Lineage/legacy headers often re-detect Int/Wis/Cha from prose even though each option
+ * already carries the casting-ability pick. Drop the redundant trait-level slot.
+ */
+export function stripRedundantTraitSpellcastingAbility(trait: Trait): Trait {
+  const optionsHaveChoice = (trait.choices?.options ?? []).some((option) =>
+    linkedModifiersHaveSpellcastingAbilityChoice(option.linkedModifiers),
+  )
+  if (!optionsHaveChoice || !trait.linkedModifiers?.length) return trait
+
+  const linkedModifiers = trait.linkedModifiers
+    .map((instance) => {
+      const characteristics = (instance.characteristics ?? []).filter(
+        (char) => !characteristicIsSpellcastingAbilityChoice(char),
+      )
+      if (characteristics.length === (instance.characteristics ?? []).length) return instance
+      if (characteristics.length === 0 && !(instance.activation?.effects?.length)) return null
+      return { ...instance, characteristics }
+    })
+    .filter((instance): instance is LinkedModifierInstance => instance != null)
+
+  if (linkedModifiers.length === trait.linkedModifiers.length) {
+    const unchanged = linkedModifiers.every(
+      (instance, index) => instance === trait.linkedModifiers![index],
+    )
+    if (unchanged) return trait
+  }
+
+  return syncModifierRefs({
+    ...trait,
+    linkedModifiers,
+  })
+}
+
 function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
   const key = `${speciesName}::${trait.name}`
   const preset = SRD_SPECIES_TRAIT_PRESETS[key]
@@ -973,12 +1019,14 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
     }
   }
 
-  return enrichFeatureWithMechanicalDetection(next as unknown as Feature, {
+  const detected = enrichFeatureWithMechanicalDetection(next as unknown as Feature, {
     contentKind: "species_trait",
     sourceName: speciesName,
     featureName: trait.name,
     level: trait.level,
-  })
+  }) as unknown as Trait
+
+  return stripRedundantTraitSpellcastingAbility(detected)
 }
 
 /** SRD 2024 species that let the player choose their size (Medium or Small). */

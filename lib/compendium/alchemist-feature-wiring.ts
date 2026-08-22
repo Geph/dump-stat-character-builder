@@ -199,11 +199,24 @@ function collapseAlchemistDiscoveryFeatures(features: Feature[]): Feature[] {
   })
 }
 
+function sanitizePotionMixologistFeature(feature: Feature): Feature {
+  return {
+    ...feature,
+    activation: { ...(feature.activation ?? {}), bonusAction: true },
+    sheetDisplay: {
+      featuresTab: true,
+      combatActions: true,
+      abilitiesActions: false,
+    },
+  }
+}
+
 export function sanitizeAlchemistFeature(feature: Feature): Feature {
   const name = feature.name.trim()
   if (/^reagent synthesis$/i.test(name)) return sanitizeReagentSynthesisFeature(feature)
   if (/^bomb formulas?$/i.test(name)) return sanitizeBombFormulasFeature(feature)
   if (isDiscoveryFeatureName(name)) return sanitizeDiscoveryFeature(feature)
+  if (/^potion mixologist$/i.test(name)) return sanitizePotionMixologistFeature(feature)
   return feature
 }
 

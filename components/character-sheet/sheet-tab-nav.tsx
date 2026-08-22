@@ -15,7 +15,6 @@ import {
   Backpack,
   Medal,
   PawPrint,
-  Wand2,
   FileText,
   ChevronLeft,
   ChevronRight,
@@ -28,6 +27,7 @@ export type SheetTab =
   | "equipment"
   | "features"
   | "companions"
+  /** @deprecated Merged into Features → Custom Abilities. Kept for saved tab state. */
   | "custom"
 
 const TAB_GAP_PX = 6
@@ -35,7 +35,7 @@ const ARROW_SLOT_PX = 36
 const ROW_GAP_PX = 4
 
 const SHEET_TABS: {
-  id: SheetTab
+  id: Exclude<SheetTab, "custom">
   label: string
   icon: ReactNode
 }[] = [
@@ -63,11 +63,6 @@ const SHEET_TABS: {
     id: "companions",
     label: "Companion / Beast Form",
     icon: <PawPrint className="w-3.5 h-3.5 shrink-0" aria-hidden />,
-  },
-  {
-    id: "custom",
-    label: "Custom",
-    icon: <Wand2 className="w-3.5 h-3.5 shrink-0" aria-hidden />,
   },
   {
     id: "details",

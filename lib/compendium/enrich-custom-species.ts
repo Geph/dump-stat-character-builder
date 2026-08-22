@@ -6,6 +6,7 @@ import { applyBundledCardImage } from "@/lib/compendium/card-image"
 import {
   lookupSrdSpeciesChoiceOptionPreset,
   speciesRowHasLanguageGrant,
+  stripRedundantTraitSpellcastingAbility,
 } from "@/lib/compendium/enrich-srd-species"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
@@ -1656,13 +1657,14 @@ function applyPresetToTrait(
     }
   }
 
-  if (preferExactPresets && exactPreset) return next
-  return enrichFeatureWithMechanicalDetection(next as unknown as Feature, {
+  if (preferExactPresets && exactPreset) return stripRedundantTraitSpellcastingAbility(next)
+  const detected = enrichFeatureWithMechanicalDetection(next as unknown as Feature, {
     contentKind: "species_trait",
     sourceName: speciesName,
     featureName: trait.name,
     level: trait.level,
-  })
+  }) as unknown as Trait
+  return stripRedundantTraitSpellcastingAbility(detected)
 }
 
 function withSpeciesCardImage(row: Record<string, unknown>): Record<string, unknown> {

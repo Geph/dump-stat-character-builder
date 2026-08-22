@@ -3,11 +3,7 @@
 import { motion } from "framer-motion"
 import { BookOpen, X } from "lucide-react"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
-import {
-  DEFAULT_ACTION_CATEGORY_LABELS,
-  defaultActionsByCategory,
-  type DefaultActionCategory,
-} from "@/lib/character/default-actions"
+import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 
 type DefaultActionsButtonProps = {
   onClick: () => void
@@ -44,21 +40,12 @@ export function DefaultActionsButton({ onClick, variant = "compact" }: DefaultAc
 
 type DefaultActionsOverlayProps = {
   onClose: () => void
-  /** Abilities tab: other actions first; combat tab: combat actions first. */
+  /** Which sheet tab opened the overlay (kept for callers). */
   context: "abilities" | "combat"
 }
 
-const CATEGORY_ORDER_BY_CONTEXT: Record<
-  DefaultActionsOverlayProps["context"],
-  DefaultActionCategory[]
-> = {
-  abilities: ["other", "combat"],
-  combat: ["combat", "other"],
-}
-
-export function DefaultActionsOverlay({ onClose, context }: DefaultActionsOverlayProps) {
-  const grouped = defaultActionsByCategory()
-  const categoryOrder = CATEGORY_ORDER_BY_CONTEXT[context]
+export function DefaultActionsOverlay({ onClose }: DefaultActionsOverlayProps) {
+  const actions = [...DEFAULT_SHEET_ACTIONS].sort((a, b) => a.name.localeCompare(b.name))
 
   return (
     <motion.div
@@ -92,33 +79,20 @@ export function DefaultActionsOverlay({ onClose, context }: DefaultActionsOverla
           </button>
         </div>
 
-        <div className="p-4 space-y-5">
-          {categoryOrder.map((category) => {
-            const actions = grouped[category]
-            if (!actions.length) return null
-            return (
-              <section key={category}>
-                <h3 className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2">
-                  {DEFAULT_ACTION_CATEGORY_LABELS[category]}
-                </h3>
-                <div className="space-y-2">
-                  {actions.map((action) => (
-                    <div
-                      key={action.id}
-                      className="rounded-lg border border-border/70 bg-muted/25 px-3 py-2.5"
-                    >
-                      <p className="text-sm font-semibold text-foreground">{action.name}</p>
-                      <RichTextContent
-                        html={action.description}
-                        className="text-xs text-muted-foreground mt-1 leading-relaxed [&_p]:mb-0"
-                        fallback=""
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )
-          })}
+        <div className="p-4 space-y-2">
+          {actions.map((action) => (
+            <div
+              key={action.id}
+              className="rounded-lg border border-border/70 bg-muted/25 px-3 py-2.5"
+            >
+              <p className="text-sm font-semibold text-foreground">{action.name}</p>
+              <RichTextContent
+                html={action.description}
+                className="text-xs text-muted-foreground mt-1 leading-relaxed [&_p]:mb-0"
+                fallback=""
+              />
+            </div>
+          ))}
         </div>
       </motion.div>
     </motion.div>

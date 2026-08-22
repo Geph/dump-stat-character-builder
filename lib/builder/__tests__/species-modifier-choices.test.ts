@@ -122,9 +122,9 @@ describe("Elf — Elven Lineage", () => {
       { [String(lineageIndex)]: ["High Elf"] },
       catalog,
     )
-    const abilitySlot = slots.find((slot) => slot.kind === "spellcasting_ability")
-    expect(abilitySlot).toBeDefined()
-    expect(abilitySlot?.options?.map((option) => option.name).sort()).toEqual([
+    const abilitySlots = slots.filter((slot) => slot.kind === "spellcasting_ability")
+    expect(abilitySlots).toHaveLength(1)
+    expect(abilitySlots[0]?.options?.map((option) => option.name).sort()).toEqual([
       "Charisma",
       "Intelligence",
       "Wisdom",
@@ -177,9 +177,9 @@ describe("Gnome — Gnomish Lineage", () => {
       { [String(lineageIndex)]: ["Forest Gnome"] },
       catalog,
     )
-    const abilitySlot = slots.find((slot) => slot.kind === "spellcasting_ability")
-    expect(abilitySlot).toBeDefined()
-    expect(abilitySlot?.options?.map((option) => option.name).sort()).toEqual([
+    const abilitySlots = slots.filter((slot) => slot.kind === "spellcasting_ability")
+    expect(abilitySlots).toHaveLength(1)
+    expect(abilitySlots[0]?.options?.map((option) => option.name).sort()).toEqual([
       "Charisma",
       "Intelligence",
       "Wisdom",

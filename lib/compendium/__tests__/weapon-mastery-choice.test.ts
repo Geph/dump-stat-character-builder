@@ -75,6 +75,86 @@ describe("weapon mastery choices", () => {
     expect(resolveFeatureChoiceCount(choices, 16, "Fighter")).toBe(6)
   })
 
+  it("keeps Captain, Investigator, and Martyr at two masteries (never Fighter's ladder)", () => {
+    for (const className of ["Captain", "Investigator", "Martyr", "Dancer"]) {
+      const choices = enrichWeaponMasteryFeature(
+        {
+          level: 1,
+          name: "Weapon Mastery",
+          description:
+            "Your training with weapons allows you to use the mastery properties of two kinds of weapons of your choice with which you have proficiency.",
+          choices: {
+            category: "Weapon Mastery",
+            count: 2,
+            // Mistaken Fighter fallback previously stamped into seed packs
+            choiceCountByLevel: [
+              { level: 1, count: 3 },
+              { level: 4, count: 4 },
+              { level: 10, count: 5 },
+              { level: 16, count: 6 },
+            ],
+            options: [],
+          },
+        },
+        className,
+      ).choices!
+
+      expect(resolveFeatureChoiceCount(choices, 1, className), className).toBe(2)
+      expect(resolveFeatureChoiceCount(choices, 9, className), className).toBe(2)
+      expect(resolveFeatureChoiceCount(choices, 20, className), className).toBe(2)
+    }
+  })
+
+  it("corrects stale Fighter ladders on Captain even without re-enrichment", () => {
+    const stale = {
+      category: "Weapon Mastery",
+      count: 2,
+      choiceCountByLevel: [
+        { level: 1, count: 3 },
+        { level: 4, count: 4 },
+        { level: 10, count: 5 },
+        { level: 16, count: 6 },
+      ],
+      options: [],
+    }
+    expect(
+      resolveFeatureChoiceCount(stale, 9, "Captain", undefined, { featureName: "Weapon Mastery" }),
+    ).toBe(2)
+  })
+
+  it("scales Craftsman / Gunslinger / Vagabond / Warden like Barbarian (2→3→4)", () => {
+    for (const className of [
+      "Craftsman",
+      "Gunslinger",
+      "Vagabond",
+      "Warden",
+      "Warden (Mage Hand Press)",
+    ]) {
+      const choices = enrichWeaponMasteryFeature(
+        { level: 1, name: "Weapon Mastery", description: "two kinds of weapons" },
+        className,
+      ).choices!
+
+      expect(resolveFeatureChoiceCount(choices, 1, className), className).toBe(2)
+      expect(resolveFeatureChoiceCount(choices, 4, className), className).toBe(3)
+      expect(resolveFeatureChoiceCount(choices, 10, className), className).toBe(4)
+    }
+  })
+
+  it("does not default unknown classes to Fighter's mastery ladder", () => {
+    const choices = enrichWeaponMasteryFeature(
+      {
+        level: 1,
+        name: "Weapon Mastery",
+        description: "use the mastery properties of two kinds of weapons of your choice",
+      },
+      "Homebrew Skirmisher",
+    ).choices!
+
+    expect(resolveFeatureChoiceCount(choices, 1, "Homebrew Skirmisher")).toBe(2)
+    expect(resolveFeatureChoiceCount(choices, 16, "Homebrew Skirmisher")).toBe(2)
+  })
+
   it("detects weapon mastery for builder UI without legacy resourceKey", () => {
     const enriched = enrichClassFeatureWithModifierPresets(
       "Barbarian",

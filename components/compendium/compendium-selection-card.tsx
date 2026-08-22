@@ -40,6 +40,8 @@ type CompendiumSelectionCardProps = {
   onLearnMore?: (e: React.MouseEvent) => void
   learnMoreLabel?: string
   selectLabel?: string
+  /** When false, hide the overlay blurb and lift the source label into that space. */
+  showBlurb?: boolean
   className?: string
   size?: "sm" | "md" | "lg"
   /** Wide landscape (default) or portrait 3:4 for visual builder grids from `sm` up. */
@@ -55,6 +57,7 @@ function CardContent({
   tags,
   blurb,
   blurbLineClamp,
+  showBlurb,
   selected,
   disabled,
   onSelect,
@@ -68,6 +71,7 @@ function CardContent({
   tags: CompendiumCardTag[]
   blurb: string
   blurbLineClamp: string
+  showBlurb: boolean
   selected: boolean
   disabled: boolean
   onSelect?: () => void
@@ -102,7 +106,7 @@ function CardContent({
         </div>
       )}
 
-      {blurb && (
+      {showBlurb && blurb ? (
         <p
           className={cn(
             "mt-2 text-xs text-white/75 leading-relaxed max-sm:hidden",
@@ -111,10 +115,24 @@ function CardContent({
         >
           {blurb}
         </p>
-      )}
+      ) : sourceLabel ? (
+        <p
+          className={cn(
+            "mt-2 truncate text-[10px] font-bold uppercase tracking-wider max-sm:hidden",
+            accent.cardFooterText,
+          )}
+        >
+          {sourceLabel}
+        </p>
+      ) : null}
 
-      <div className="mt-3 flex items-center justify-between gap-3 max-sm:justify-end">
-        {sourceLabel ? (
+      <div
+        className={cn(
+          "mt-3 flex items-center gap-3",
+          showBlurb ? "justify-between max-sm:justify-end" : "justify-end",
+        )}
+      >
+        {showBlurb && sourceLabel ? (
           <p
             className={cn(
               "min-w-0 truncate text-[10px] font-bold uppercase tracking-wider max-sm:hidden",
@@ -123,9 +141,9 @@ function CardContent({
           >
             {sourceLabel}
           </p>
-        ) : (
+        ) : showBlurb ? (
           <span className="min-w-0 flex-1 max-sm:hidden" />
-        )}
+        ) : null}
         <div className="flex shrink-0 items-center gap-2">
           {onLearnMore && (
             <button
@@ -186,6 +204,7 @@ export function CompendiumSelectionCard({
   cardShape = "wide",
   imageAspect: _imageAspect = "21/9",
   imageCrop = "center",
+  showBlurb = true,
 }: CompendiumSelectionCardProps) {
   const imageUrl = getCompendiumCardImageUrl(item)
   const accent = compendiumAccentColorStyles(accentColor)
@@ -238,6 +257,7 @@ export function CompendiumSelectionCard({
     tags,
     blurb,
     blurbLineClamp,
+    showBlurb,
     selected,
     disabled,
     onSelect,

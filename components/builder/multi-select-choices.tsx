@@ -328,15 +328,14 @@ export function MultiSelectChoices({
     const isTakenElsewhere = !isSelected && isUnavailableName(option.name)
     const isDisabled =
       locked || isTakenElsewhere || (!isSelected && freeSelected.length >= maxCount)
-    const description = optionInfoText(option, showSkillInfoButtons)
-    const canShowInfo = showInfoButtons && Boolean(description)
+    const canShowInfo = showInfoButtons
     const iconSlug = showSkillIcons ? skillIconSlug(option.name, skillIconByName) : null
     const prereq = option.prerequisite?.trim() || null
 
     return (
       <div
         key={option.name}
-        className={compact && !canShowInfo ? undefined : "flex items-stretch gap-1"}
+        className={canShowInfo || !compact ? "flex items-stretch gap-1" : undefined}
       >
         <button
           type="button"

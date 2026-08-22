@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   customAbilityAppliesOnCharacterSheet,
   filterCustomAbilitiesForCharacterSheet,
+  filterFeatureTabCustomAbilities,
   type CharacterSheetAbilityContext,
 } from "@/lib/character/filter-sheet-custom-abilities"
 import {
@@ -138,5 +139,25 @@ describe("filterCustomAbilitiesForCharacterSheet", () => {
       }),
     ).toBe(true)
     expect(customAbilityAppliesOnCharacterSheet(row, warlockCtx)).toBe(false)
+  })
+})
+
+describe("filterFeatureTabCustomAbilities", () => {
+  it("keeps only abilities that are not already sheet actions or companions", () => {
+    const leftover = filterFeatureTabCustomAbilities(
+      [
+        ability({ id: "homebrew", name: "Homebrew Trait", description: "A passive note." }),
+        ability({ id: "rally", name: "Rally", description: "Bonus action heal." }),
+        {
+          ...ability({ id: "pet", name: "Pet", description: "A companion." }),
+          companion_creature_names: ["Wolf"],
+        } as CustomAbility,
+      ],
+      {
+        sheetActionCustomAbilityIds: ["rally"],
+        sheetActionNames: [],
+      },
+    )
+    expect(leftover.map((entry) => entry.id)).toEqual(["homebrew"])
   })
 })

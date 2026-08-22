@@ -29,6 +29,7 @@ import { useResumeLastCharacter } from "@/components/settings/use-resume-last-ch
 import { useManualSkillAbility } from "@/components/settings/use-manual-skill-ability"
 import { useWelcomeSplashSuppress } from "@/components/settings/use-welcome-splash-suppress"
 import { useSearchAutocomplete } from "@/components/settings/use-search-autocomplete"
+import { useDisplayNonCombatActions } from "@/components/settings/use-display-non-combat-actions"
 import { cn } from "@/lib/utils"
 
 const GITHUB_ISSUES_URL = "https://github.com/Geph/dump-stat-character-builder/issues"
@@ -62,6 +63,8 @@ export function GlobalSettingsMenu() {
   const { enabled: manualSkillAbility, setEnabled: setManualSkillAbility } = useManualSkillAbility()
   const { enabled: searchAutocomplete, setEnabled: setSearchAutocomplete } =
     useSearchAutocomplete()
+  const { enabled: displayNonCombatActions, setEnabled: setDisplayNonCombatActions } =
+    useDisplayNonCombatActions()
   const { suppressed: hideWelcomeSplash, setSuppressed: setHideWelcomeSplash } =
     useWelcomeSplashSuppress()
   const [open, setOpen] = useState(false)
@@ -292,6 +295,25 @@ export function GlobalSettingsMenu() {
                     <span className="mt-1 block text-xs text-muted-foreground">
                       Hides the first-visit Visual / Compact / No AI choice overlay. Uncheck to see it
                       again on the next home page visit.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-foreground">Character sheet</p>
+                <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                  <input
+                    type="checkbox"
+                    checked={displayNonCombatActions}
+                    onChange={(event) => setDisplayNonCombatActions(event.target.checked)}
+                    className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary"
+                  />
+                  <span className="text-sm leading-snug">
+                    <span className="font-semibold text-foreground">Display non-combat actions</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      Shows Help, Influence, Search, and other out-of-combat standard actions on the
+                      Abilities tab. Click a card for the rules text.
                     </span>
                   </span>
                 </label>

@@ -104,6 +104,10 @@ function alchemistAt(level: number): CharacterClassDetail {
             swappableOnLevelUp: true,
           },
         }),
+        feature("Potion Mixologist", 15, {
+          activation: { bonusAction: true },
+          sheetDisplay: { abilitiesActions: true },
+        }),
         feature("Discovery", 5, {
           isChoice: true,
           choices: {
@@ -211,6 +215,16 @@ describe("buildLevelUpPlan — Alchemist formulas and discoveries", () => {
       .filter((step) => step.kind === "feature_choice")
       .map((step) => (step as { mode: string }).mode)
     expect(modes).toEqual([...modes].sort((a, b) => (a === "add" ? -1 : b === "add" ? 1 : 0)))
+  })
+
+  it("lists Potion Mixologist when leveling from 14 to 15 even if Features tab was omitted", () => {
+    const plan = buildLevelUpPlan({
+      entry: alchemistAt(14),
+      subclasses: [],
+      currentTotalLevel: 14,
+      featureChoicePicks: {},
+    })
+    expect(plan?.newFeatures.some((feature) => feature.name === "Potion Mixologist")).toBe(true)
   })
 })
 

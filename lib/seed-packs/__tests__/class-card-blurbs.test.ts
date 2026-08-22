@@ -6,7 +6,7 @@ import { KIBBLES_CLASS_CARD_BLURBS } from "@/lib/seed-packs/kibbles-tasty/class-
 import srdClasses from "@/lib/srd/seed-data/classes.json"
 import srdSubclasses from "@/lib/srd/seed-data/subclasses.json"
 
-type BlurbRow = { name: string; card_blurb?: string | null }
+type BlurbRow = { name: string; card_blurb?: string | null; description?: string | null }
 
 function rowsInPackFolder(folder: string): BlurbRow[] {
   const root = join(process.cwd(), "lib", "seed-packs", folder)
@@ -41,6 +41,20 @@ describe("class and subclass card blurbs", () => {
       ...rowsInPackFolder("kibbles-tasty"),
       ...rowsInPackFolder("mage-hand-press"),
     ])
+  })
+
+  it("keeps seed class and subclass descriptions free of Becoming checklists", () => {
+    const rows = [
+      ...(srdClasses as BlurbRow[]),
+      ...(srdSubclasses as BlurbRow[]),
+      ...rowsInPackFolder("kibbles-tasty"),
+      ...rowsInPackFolder("mage-hand-press"),
+    ]
+    for (const row of rows) {
+      const description = (row as { description?: string | null }).description ?? ""
+      expect(description, `${row.name} description`).not.toMatch(/Becoming an?\s/i)
+      expect(description, `${row.name} description`).not.toMatch(/As a Level 1 Character/i)
+    }
   })
 
   it("uses play-style defaults for Kibbles classes before they are re-imported", () => {

@@ -14,6 +14,19 @@ export const CAPTAIN_BASE_MANEUVERS = [
 
 export const CAPTAIN_BATTLE_TACTICS_GRANT_ID = "modinst_captain_battle_tactics_maneuvers"
 
+/** Stat blocks the Captain picks when initiating a Cohort at 2nd level. */
+export const CAPTAIN_COHORT_TYPES = [
+  "Berserker",
+  "Champion",
+  "Cultist",
+  "Hunter",
+  "Mage",
+  "Priest",
+  "Minstrel",
+  "Scoundrel",
+  "Templar",
+] as const
+
 export function isCaptainBaseManeuverName(name: string | null | undefined): boolean {
   const key = name?.trim().toLowerCase() ?? ""
   return CAPTAIN_BASE_MANEUVERS.some((entry) => entry.toLowerCase() === key)
@@ -68,23 +81,48 @@ function mergeGrantNames(
   return { modifiers: next, changed: true }
 }
 
+function sanitizeCaptainCohortFeature(feature: Feature): Feature {
+  if (!/^cohort$/i.test(feature.name.trim())) return feature
+  const existingOptions = feature.choices?.options ?? []
+  const options =
+    existingOptions.length > 0
+      ? existingOptions
+      : CAPTAIN_COHORT_TYPES.map((name) => ({ name }))
+  const alreadyChoice =
+    feature.isChoice === true &&
+    (feature.choices?.count ?? 0) === 1 &&
+    options.length >= CAPTAIN_COHORT_TYPES.length
+  if (alreadyChoice) return feature
+  return {
+    ...feature,
+    isChoice: true,
+    choices: {
+      category: feature.choices?.category ?? "Cohort",
+      count: 1,
+      options,
+      swappableOnRest: feature.choices?.swappableOnRest ?? false,
+    },
+  }
+}
+
 export function sanitizeCaptainFeature(
   feature: Feature,
   extraManeuverNames: readonly string[] = [],
 ): Feature {
-  if (!/^battle tactics$/i.test(feature.name.trim())) return feature
+  const cohort = sanitizeCaptainCohortFeature(feature)
+  if (!/^battle tactics$/i.test(feature.name.trim())) return cohort
   const names = [...CAPTAIN_BASE_MANEUVERS, ...extraManeuverNames]
-  const { modifiers, changed } = mergeGrantNames(feature.linkedModifiers, names)
+  const { modifiers, changed } = mergeGrantNames(cohort.linkedModifiers, names)
   const sheetDisplay = {
     combatActions: true,
     featuresTab: true,
-    ...feature.sheetDisplay,
+    ...cohort.sheetDisplay,
   }
   const displayChanged =
-    feature.sheetDisplay?.combatActions !== true || feature.sheetDisplay?.featuresTab !== true
-  if (!changed && !displayChanged) return feature
+    cohort.sheetDisplay?.combatActions !== true || cohort.sheetDisplay?.featuresTab !== true
+  if (!changed && !displayChanged && cohort === feature) return feature
   return syncModifierRefs({
-    ...feature,
+    ...cohort,
     linkedModifiers: modifiers,
     sheetDisplay,
   })

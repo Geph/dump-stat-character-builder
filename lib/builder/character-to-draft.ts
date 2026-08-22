@@ -14,6 +14,7 @@ import {
 } from "@/lib/builder/infer-builder-picks"
 import { getBuilderLayout, layoutToCardViewMode } from "@/lib/site-settings/builder-layout"
 import { mergeAlchemistDiscoveryPicks } from "@/lib/compendium/alchemist-feature-wiring"
+import { pruneMissingClassSelections } from "@/lib/builder/prune-missing-class-picks"
 
 export function characterToDraft(character: Character): CharacterDraft {
   return {
@@ -46,6 +47,7 @@ export function characterToDraft(character: Character): CharacterDraft {
     armor_proficiencies: character.armor_proficiencies ?? [],
     languages: character.languages ?? ["Common"],
     equipment_ids: character.equipment_ids ?? [],
+    equipment_quantities: character.equipment_quantities ?? {},
     gold: character.gold ?? 0,
     spell_ids: character.spell_ids ?? [],
     feat_ids: character.feat_ids ?? [],
@@ -89,11 +91,41 @@ export function characterToBuilderState(
     inferSpellPicksByClassId(character, allClasses, options.spells ?? [])
 
   const speciesTraitPicks = builderPicks.species_trait_picks ?? {}
+  const featureChoicePicks = mergeAlchemistDiscoveryPicks(
+    (character.feature_choice_picks as Record<string, string[]>) ?? {},
+  )
+  const classAddOrder =
+    character.class_add_order ??
+    (classRows.length ? rowsToClassAddOrder(classRows) : classLevels.map((entry) => entry.classId))
+  const pruned =
+    allClasses.length > 0
+      ? pruneMissingClassSelections({
+          knownClassIds: allClasses.map((cls) => cls.id),
+          classLevels,
+          classAddOrder,
+          primaryClassId: character.class_id,
+          subclassByClassId,
+          classSkillPicks,
+          classToolPicks,
+          featureChoicePicks,
+          spellPicksByClassId,
+          extraSkillProficiencies: character.skill_proficiencies ?? [],
+        })
+      : null
+
+  const draft = characterToDraft(character)
+  if (pruned?.changed) {
+    draft.class_id = pruned.primaryClassId
+    draft.subclass_id = pruned.primaryClassId
+      ? (pruned.subclassByClassId[pruned.primaryClassId] ?? null)
+      : null
+    draft.skill_proficiencies = pruned.extraSkillProficiencies
+  }
 
   return {
     currentStep: 1,
     maxStepReached: BUILDER_STEP_IDS.DETAILS,
-    character: characterToDraft(character),
+    character: draft,
     abilityMethod: "pointbuy",
     pointsRemaining: 27,
     classSearch: "",
@@ -106,25 +138,21 @@ export function characterToBuilderState(
     equippedArmorId: character.equipped_armor_id ?? null,
     equippedShieldId: character.equipped_shield_id ?? null,
     equippedWeaponId: character.equipped_weapon_id ?? null,
-    classLevels,
-    subclassByClassId,
-    classSkillPicks,
-    classToolPicks,
-    featureChoicePicks: mergeAlchemistDiscoveryPicks(
-      (character.feature_choice_picks as Record<string, string[]>) ?? {},
-    ),
+    classLevels: pruned?.classLevels ?? classLevels,
+    subclassByClassId: pruned?.subclassByClassId ?? subclassByClassId,
+    classSkillPicks: pruned?.classSkillPicks ?? classSkillPicks,
+    classToolPicks: pruned?.classToolPicks ?? classToolPicks,
+    featureChoicePicks: pruned?.featureChoicePicks ?? featureChoicePicks,
     featChoicePicks: (character.feat_choice_picks as Record<string, string[]>) ?? {},
     modifierPlayerPicks: (character.modifier_player_picks as Record<string, string[]>) ?? {},
-    primaryClassId: character.class_id,
-    classAddOrder:
-      character.class_add_order ??
-      (classRows.length ? rowsToClassAddOrder(classRows) : classLevels.map((entry) => entry.classId)),
+    primaryClassId: pruned?.primaryClassId ?? character.class_id,
+    classAddOrder: pruned?.classAddOrder ?? classAddOrder,
     speciesTraitPicks,
     startingEquipmentOptionIndex: builderPicks.starting_equipment_option_index ?? null,
     backgroundStartingEquipmentOptionIndex:
       builderPicks.background_starting_equipment_option_index ?? null,
     goldPurchasedEquipmentIds: builderPicks.gold_purchased_equipment_ids ?? [],
-    spellPicksByClassId,
+    spellPicksByClassId: pruned?.spellPicksByClassId ?? spellPicksByClassId,
     asiAllocationsByFeatId: (character.asi_allocations as Record<string, Partial<Record<string, number>>>) ?? {},
     standardArrayAssignments: {},
     currentHp: character.hit_points ?? character.hit_point_max ?? null,

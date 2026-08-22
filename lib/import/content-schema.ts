@@ -1066,12 +1066,14 @@ import { COMMON_MODIFIERS_IMPORT_HINT } from "@/lib/import/common-modifiers-impo
 export const MECHANICS_IMPORT_HINT = COMMON_MODIFIERS_IMPORT_HINT
 
 export const CARD_BLURB_IMPORT_HINT = `For every class and subclass:
-- Always emit card_blurb as a separate, player-facing summary derived from the full description.
-- Keep card_blurb at 120 characters or fewer so it fits in two lines on builder cards and detail heroes.
+- Always emit card_blurb as a separate, player-facing summary derived from the flavor description.
+- Keep card_blurb at 120 characters or fewer so it fits in two lines on builder detail heroes.
 - Write card_blurb as a "How it feels to play" sentence: use active, player-facing language and summarize the core gameplay loop.
 - Favor what the player repeatedly does in play (control, protect, bargain, build, transform, etc.), not lore or a list of class features.
-- Do not copy progression instructions, prerequisites, level tables, or importer/editor guidance.
-- Keep the full source prose in description. card_blurb supplements description and never replaces or truncates it.
+- Put 1–3 original sentences of player-facing flavor in description. Classes use this for "How it feels to play"; subclasses use it for "What this path offers". Write a unique summary — do not copy book prose verbatim.
+- Do NOT put "Becoming a [Class]" / "As a Level 1 Character" / "As a Multiclass Character" checklists, Core Traits tables, or the level progression table in description. Those are not flavor.
+- Do not copy progression instructions, prerequisites, level tables, or importer/editor guidance into card_blurb.
+- card_blurb supplements description and never replaces or truncates it.
 - On classes[] (not subclasses), always emit complexity: "easy" (Low), "medium" (Medium), or "hard" (High). This is builder-facing play difficulty, not CR.
 - Mage Hand Press class defaults (use these unless the user overrides): Alchemist medium, Captain medium, Craftsman hard, Dancer hard, Gunslinger medium, Investigator hard, Martyr medium, Necromancer hard, Vagabond hard, Warden medium, Warmage easy, Witch easy.
 - For other homebrew, judge from concurrent resources, option libraries, and spell-like systems the player juggles (simple martial loops → easy; several pools/choices → medium; crafting, minions, or stacked pickers → hard).`
@@ -1184,7 +1186,7 @@ export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Desi
 - Archetype unlock features (name like "Psionic Archetype"): short description only — do NOT emit isChoice with stub options naming each archetype; Dump Stat uses subclasses[] for the real pick
 - Psion Secondary Discipline / Third Discipline: isChoice true with choices { category: "Psionic Discipline", count: 1, options: [] }. Prefer the name "Secondary Discipline" (not "Second Discipline")
 - Psion Psionic Talents: isChoice true with choices { category: "Psionic Talent", count: 2, options: [] } — do NOT set optionsSource "class_talents" (that is for General/Class Talents lists). Enrichment sets known_discipline_talents from the feature name
-- Do NOT embed the class level progression table in classes[].description — only flavor and rules prose; table data becomes features[] and class_resources[]
+- Do NOT embed the class level progression table or "Becoming a [Class]" / multiclass checklists in classes[].description — only a short original flavor summary ("How it feels to play"); table data becomes features[] and class_resources[]
 - Extract starting_equipment_groups when an Equipment block lists choice groups (a)/(b)/(c) and fixed items; mirror ONE group { description, options: [{ label, items: [{ name, quantity }] }] } — never a flat [{ label, items }] array; use labels A/B/C
 - Disciplines, talents, or invocation-like options with point costs should be class/subclass features; note psi/point costs in description
 - Custom spells and feats in spells[] and feats[]; set spell classes to include the custom class name; each spells[] stub needs level, school (use "Unknown" when absent), and concentration (boolean, default false)`

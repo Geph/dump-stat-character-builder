@@ -29,8 +29,11 @@ export function getDenseSpellPickerSchoolClass(): string {
 /** Default visible rows for paginated picker grids. */
 export const PICKER_GRID_ROWS = 3
 
-/** Class/species cinematic grids — 2 cols × 3 rows from `sm` up (phone swipe ignores page size). */
-export const CINEMATIC_COMPENDIUM_PAGE_SIZE = PICKER_GRID_ROWS * 2
+/** Class/subclass/species cinematic grids — 3 cols × 3 rows from `sm` up (phone swipe ignores page size). */
+export const CINEMATIC_COMPENDIUM_PAGE_SIZE = PICKER_GRID_ROWS * 3
+
+/** Backgrounds and other 2-col cinematic grids. */
+export const CINEMATIC_TWO_COL_PAGE_SIZE = PICKER_GRID_ROWS * 2
 
 /** Items per page before showing pagination controls. */
 export function getPickerPageSize(mode: PickerViewMode, isLargeScreen: boolean): number {
@@ -38,7 +41,7 @@ export function getPickerPageSize(mode: PickerViewMode, isLargeScreen: boolean):
     // Phone/medium: 2 cols × 4 rows = 8. Large: up to 4 cols × 3 rows = 12.
     return isLargeScreen ? PICKER_GRID_ROWS * 4 : 8
   }
-  // Cinematic compendium cards: 2 cols × 3 rows whenever paginated (`sm`+).
+  // Cinematic class/subclass/species cards: 3 cols × 3 rows whenever paginated (`sm`+).
   return CINEMATIC_COMPENDIUM_PAGE_SIZE
 }
 
@@ -72,13 +75,13 @@ export function getCinematicSpellPickerContainerClass(): string {
   ].join(" ")
 }
 
-/** Visual builder cards: swipe on phones, two columns from `sm` up. */
-export function getCinematicPickerContainerClass(): string {
+/** Visual builder cards: swipe on phones; `sm+` uses `columns` (class/species = 3, backgrounds = 2). */
+export function getCinematicPickerContainerClass(columns: 2 | 3 = 3): string {
   return [
     "px-1 py-2",
     "max-sm:flex max-sm:w-full max-sm:min-w-0 max-sm:flex-nowrap max-sm:gap-4 max-sm:overflow-x-auto max-sm:overscroll-x-contain max-sm:snap-x max-sm:snap-mandatory max-sm:scroll-smooth max-sm:pb-2 max-sm:[touch-action:pan-x]",
     "max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden",
-    "sm:grid sm:grid-cols-2 sm:gap-4",
+    columns === 3 ? "sm:grid sm:grid-cols-3 sm:gap-4" : "sm:grid sm:grid-cols-2 sm:gap-4",
   ].join(" ")
 }
 

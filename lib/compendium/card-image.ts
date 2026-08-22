@@ -26,9 +26,9 @@ export const COMPENDIUM_CLASS_LIST_CARD_MIN_HEIGHT_CLASS = "min-h-[350px]"
 /** Landscape browse cards — bottom scrim for text legibility. */
 export const COMPENDIUM_LIST_CARD_GRADIENT_CLASS =
   "bg-[linear-gradient(to_top,rgba(0,0,0,0.85)_0%,rgba(0,0,0,0.85)_40%,rgba(0,0,0,0.45)_46%,transparent_50%)]"
-/** Portrait / graphic browse cards — top 65% clear; 15% ramp; bottom 20% at 80% black (20% transparent). */
+/** Portrait / graphic browse cards — top ~48% clear; ramp through the title band; bottom 30% at 80% black. */
 export const COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS =
-  "bg-[linear-gradient(to_top,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.8)_20%,transparent_35%)]"
+  "bg-[linear-gradient(to_top,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.8)_30%,rgba(0,0,0,0.5)_42%,transparent_52%)]"
 /** Spell and background graphic browse cards — top 60% clear; 20% ramp; bottom 20% at 80% black. */
 export const COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS =
   "bg-[linear-gradient(to_top,rgba(0,0,0,0.8)_0%,rgba(0,0,0,0.8)_20%,transparent_40%)]"

@@ -389,7 +389,7 @@ export default function SubclassEditorPage({ id }: { id: string }) {
           <CompendiumDescriptionCardImageRow
             description={form.description}
             onDescriptionChange={(description) => setForm({ ...form, description })}
-            descriptionPlaceholder="Describe the subclass theme and flavor..."
+            descriptionPlaceholder="What this path offers — a short original summary of the subclass in play…"
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
             cardImageCrop="top"

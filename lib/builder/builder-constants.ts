@@ -69,6 +69,7 @@ export const BUILDER_EMPTY_CHARACTER: CharacterDraft = {
   languages: ["Common"],
   spell_ids: [],
   equipment_ids: [],
+  equipment_quantities: {},
   gold: 0,
   feat_ids: [],
   personality_traits: "",

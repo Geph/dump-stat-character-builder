@@ -228,6 +228,81 @@ describe("Find Familiar form selection", () => {
   })
 })
 
+describe("Captain Cohort choice", () => {
+  const cohortGrant = {
+    instanceId: "modinst_cohort",
+    catalogRefId: "cat_char_grant_creature",
+    characteristics: [
+      {
+        id: "mod_cohort",
+        type: "grant_creature",
+        creatureNames: ["Berserker", "Champion", "Hunter"],
+        choiceOptions: ["Berserker", "Champion", "Hunter"],
+        count: 1,
+      },
+    ],
+  }
+
+  function captain(level: number) {
+    return classDetail({
+      classId: "captain-1",
+      className: "Captain",
+      level,
+      features: [
+        {
+          name: "Cohort",
+          level: 2,
+          description: "You gain a loyal Cohort.",
+        },
+      ],
+    })
+  }
+
+  it("shows only the chosen Cohort and keeps the other types on the picker", () => {
+    const row = captain(2)
+    const feature = (row.class as unknown as { features: Record<string, unknown>[] }).features[0]
+    feature.linkedModifiers = [cohortGrant]
+
+    const { companions, formGroups } = resolveCharacterCompanionsDetailed({
+      classDetails: [row],
+      ctx: { ...CTX, classLevels: [{ className: "Captain", level: 2 }] },
+      creatures: [
+        { name: "Berserker", stat_block: { name: "Berserker", ac: { parts: [] }, hp: { parts: [] }, traits: [], actions: [] } },
+        { name: "Champion", stat_block: { name: "Champion", ac: { parts: [] }, hp: { parts: [] }, traits: [], actions: [] } },
+        { name: "Hunter", stat_block: { name: "Hunter", ac: { parts: [] }, hp: { parts: [] }, traits: [], actions: [] } },
+      ] as unknown as Creature[],
+      featureChoicePicks: { "captain-1:L2:Cohort": ["Hunter"] },
+    })
+
+    expect(companions.map((c) => c.template.name)).toEqual(["Hunter"])
+    const group = formGroups.find((entry) => entry.kind === "choice" && entry.featureName === "Cohort")
+    expect(group?.options.map((option) => option.name).sort()).toEqual([
+      "Berserker",
+      "Champion",
+      "Hunter",
+    ])
+    expect(group?.selected).toEqual(["Hunter"])
+  })
+
+  it("does not list every Cohort type before a pick is made", () => {
+    const row = captain(2)
+    const feature = (row.class as unknown as { features: Record<string, unknown>[] }).features[0]
+    feature.linkedModifiers = [cohortGrant]
+
+    const { companions, formGroups } = resolveCharacterCompanionsDetailed({
+      classDetails: [row],
+      ctx: { ...CTX, classLevels: [{ className: "Captain", level: 2 }] },
+      creatures: [
+        { name: "Berserker", stat_block: { name: "Berserker", ac: { parts: [] }, hp: { parts: [] }, traits: [], actions: [] } },
+        { name: "Champion", stat_block: { name: "Champion", ac: { parts: [] }, hp: { parts: [] }, traits: [], actions: [] } },
+      ] as unknown as Creature[],
+    })
+
+    expect(companions).toHaveLength(0)
+    expect(formGroups.some((group) => group.featureName === "Cohort")).toBe(true)
+  })
+})
+
 describe("Faithful Steed on the companion tab", () => {
   it("resolves the Otherworldly Steed via the grant_creature modifier", () => {
     const paladin = classDetail({

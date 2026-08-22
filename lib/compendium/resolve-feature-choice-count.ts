@@ -4,6 +4,7 @@ import type { ClassResource } from "@/lib/types"
 import { resolveTierCountAtLevel } from "@/lib/compendium/resolve-uses-config"
 import { resolveUsesAtLevel } from "@/lib/compendium/resolve-uses-config"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
+import { effectiveWeaponMasteryChoiceCountByLevel } from "@/lib/compendium/weapon-mastery-choice"
 
 function resourcesForClassName(
   className: string,
@@ -50,6 +51,16 @@ function resolveChoiceCountBonusAmount(
   return typeof flat === "number" && Number.isFinite(flat) ? Math.max(0, flat) : 0
 }
 
+function isWeaponMasteryChoice(
+  choices: FeatureChoice,
+  featureName: string | undefined,
+): boolean {
+  return (
+    /^weapon mastery$/i.test(choices.category?.trim() ?? "") ||
+    /^weapon mastery$/i.test(featureName?.trim() ?? "")
+  )
+}
+
 export type ResolveFeatureChoiceCountOptions = {
   featureName?: string
   proficiencyBonus?: number
@@ -67,7 +78,11 @@ export function resolveFeatureChoiceCount(
   const fallback = choices.count > 0 ? choices.count : 1
 
   let resolved = fallback
-  if (choices.choiceCountByLevel?.length) {
+  if (isWeaponMasteryChoice(choices, options?.featureName)) {
+    const table = effectiveWeaponMasteryChoiceCountByLevel(className, choices.choiceCountByLevel)
+    const tier = resolveTierCountAtLevel(table, classLevel)
+    resolved = tier > 0 ? tier : fallback
+  } else if (choices.choiceCountByLevel?.length) {
     const tier = resolveTierCountAtLevel(choices.choiceCountByLevel, classLevel)
     resolved = tier > 0 ? tier : fallback
   } else {

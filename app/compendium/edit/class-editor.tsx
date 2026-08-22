@@ -672,7 +672,7 @@ export default function ClassEditorPage({ id }: { id: string }) {
           <CompendiumDescriptionCardImageRow
             description={form.description}
             onDescriptionChange={(description) => setForm({ ...form, description })}
-            descriptionPlaceholder="A warrior who fights with great strength..."
+            descriptionPlaceholder="How it feels to play this class — a short original summary, not a Becoming checklist…"
             cardImageUrl={form.card_image_url}
             onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
             cardImageCrop="top"

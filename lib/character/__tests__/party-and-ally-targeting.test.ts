@@ -8,6 +8,9 @@ import { applyAllyEffectLocally } from "@/lib/character/apply-ally-effect"
 import { collectPartyAllyCandidates } from "@/lib/character/party-ally-candidates"
 import {
   collectTargetableEffects,
+  inferAllyBuffEffect,
+  inferAllyHealEffect,
+  inferDirectCompanionEffect,
   inferGrantInspirationEffect,
   resolveEffectTargetPolicy,
 } from "@/lib/character/effect-target-policy"
@@ -114,6 +117,36 @@ describe("ally heal targeting", () => {
     expect(
       inferGrantInspirationEffect("Bardic Inspiration", "Give a creature a Bardic Inspiration die"),
     ).toBeNull()
+  })
+
+  it("infers Rally heals and Blitz/Bolster cohort targeting", () => {
+    const rally = inferAllyHealEffect(
+      "Rally",
+      "Expend one Battle Die to choose one ally. That creature regains Hit Points equal to the number rolled + your Charisma modifier.",
+    )
+    expect(rally).toMatchObject({
+      kind: "heal_self",
+      healTarget: "choose_ally",
+      healAbility: "CHA",
+    })
+
+    const blitz = inferDirectCompanionEffect(
+      "Blitz",
+      "Once on each of your turns, you can direct your Cohort or an ally within 60 feet of yourself.",
+    )
+    expect(blitz).toMatchObject({
+      kind: "modify_creature",
+      healTarget: "choose_ally",
+    })
+
+    const bolster = inferAllyBuffEffect(
+      "Bolster",
+      "As a Bonus Action, you can expend one Battle Die to motivate an ally within 60 feet of yourself. The next time your ally makes an attack, it adds the Battle Die to the attack and damage roll.",
+    )
+    expect(bolster).toMatchObject({
+      kind: "modify_creature",
+      rollTarget: "ally",
+    })
   })
 })
 

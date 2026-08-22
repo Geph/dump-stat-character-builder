@@ -95,6 +95,20 @@ describe("non-SRD seed class resources", () => {
     })
   })
 
+  it("files Potion Mixologist as a level 15 Combat bonus action", () => {
+    const seed = loadSeed("mage-hand-press/magehandpress-alchemist-class.json")
+    const mixologist = seed.classes
+      ?.find((entry) => entry.name === "Alchemist")
+      ?.features?.find((feature) => feature.name === "Potion Mixologist") as Feature | undefined
+    expect(mixologist?.level).toBe(15)
+    expect(mixologist?.activation?.bonusAction).toBe(true)
+    expect(mixologist?.sheetDisplay).toMatchObject({
+      combatActions: true,
+      abilitiesActions: false,
+      featuresTab: true,
+    })
+  })
+
   it("ships both Bomb modes with their runtime ability rules", () => {
     const seed = loadSeed("mage-hand-press/magehandpress-alchemist-class.json")
     const alchemist = seed.classes?.find((entry) => entry.name === "Alchemist")

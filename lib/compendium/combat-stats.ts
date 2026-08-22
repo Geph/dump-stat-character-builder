@@ -51,6 +51,10 @@ export function hasWeaponProperty(equipment: Equipment, property: string): boole
   return propertiesToStringArray(equipment.properties).some((tag) => tag.toLowerCase().includes(needle))
 }
 
+export function isThrownWeapon(equipment: Equipment): boolean {
+  return hasWeaponProperty(equipment, "thrown")
+}
+
 export function parseArmorAc(acText: string, dexMod: number): number {
   const text = acText.trim()
 

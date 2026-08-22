@@ -69,6 +69,23 @@ describe("feature sheet display", () => {
     })
   })
 
+  it("keeps Potion Mixologist on Combat and Features when seed data filed it as Abilities-only", () => {
+    const feature = {
+      level: 15,
+      name: "Potion Mixologist",
+      description: "As a Bonus Action, you drink two potions at once.",
+      activation: { bonusAction: true },
+      sheetDisplay: {
+        abilitiesActions: true,
+      },
+    }
+    expect(resolveFeatureSheetDisplay(feature)).toEqual({
+      featuresTab: true,
+      abilitiesActions: false,
+      combatActions: true,
+    })
+  })
+
   it("surfaces Reckless Attack on combat actions even when sheetDisplay omitted combat", () => {
     const feature = {
       level: 2,

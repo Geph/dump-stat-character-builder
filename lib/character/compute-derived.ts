@@ -10,8 +10,10 @@ import {
   inferSpellPicksByClassId,
 } from "@/lib/builder/infer-builder-picks"
 import { aggregateAsiBonuses } from "@/lib/builder/asi-allocation"
+import { normalizeAsiAllocationsMap } from "@/lib/character/level-up-feat"
 import { aggregateBackgroundAbilityBonuses } from "@/lib/builder/background-asi"
 import { mergeSkillProficiencies } from "@/lib/builder/choices"
+import { pruneMissingClassSelections } from "@/lib/builder/prune-missing-class-picks"
 import {
   aggregateClassArmorProficiencies,
   aggregateClassToolProficiencies,
@@ -1120,6 +1122,23 @@ export function buildInputsFromSavedCharacter(params: {
   const subclassByClassId = rowsToSubclassMap(classRows)
   const primaryClassId = resolvePrimaryClassIdFromRows(classRows, character.class_id)
   const builderPicks = normalizeBuilderPicks(character.builder_picks)
+  const classSkillPicks =
+    builderPicks.class_skill_picks ??
+    inferClassSkillPicks(character as import("@/lib/types").Character, classes, params.background)
+  const pruned =
+    classes.length > 0
+      ? pruneMissingClassSelections({
+          knownClassIds: classes.map((cls) => cls.id),
+          classLevels,
+          classAddOrder: character.class_add_order ?? rowsToClassAddOrder(classRows),
+          primaryClassId,
+          subclassByClassId,
+          classSkillPicks,
+          classToolPicks: builderPicks.class_tool_picks ?? {},
+          featureChoicePicks: character.feature_choice_picks ?? {},
+          extraSkillProficiencies: character.skill_proficiencies ?? [],
+        })
+      : null
 
   return {
     baseAbilityScores: {
@@ -1130,32 +1149,30 @@ export function buildInputsFromSavedCharacter(params: {
       wisdom: character.wisdom,
       charisma: character.charisma,
     },
-    asiAllocations: (character.asi_allocations as CharacterBuildInputs["asiAllocations"]) ?? {},
+    asiAllocations: normalizeAsiAllocationsMap(character.asi_allocations),
     background: params.background ?? null,
     species: params.species ?? null,
-    classLevels,
+    classLevels: pruned?.classLevels ?? classLevels,
     classes,
     subclasses: params.subclasses ?? [],
-    subclassByClassId,
-    primaryClassId,
-    classAddOrder: character.class_add_order ?? rowsToClassAddOrder(classRows),
-    classSkillPicks:
-      builderPicks.class_skill_picks ??
-      inferClassSkillPicks(character as import("@/lib/types").Character, classes, params.background),
-    classToolPicks: builderPicks.class_tool_picks ?? {},
-    featureChoicePicks: character.feature_choice_picks ?? {},
+    subclassByClassId: pruned?.subclassByClassId ?? subclassByClassId,
+    primaryClassId: pruned?.primaryClassId ?? primaryClassId,
+    classAddOrder: pruned?.classAddOrder ?? character.class_add_order ?? rowsToClassAddOrder(classRows),
+    classSkillPicks: pruned?.classSkillPicks ?? classSkillPicks,
+    classToolPicks: pruned?.classToolPicks ?? builderPicks.class_tool_picks ?? {},
+    featureChoicePicks: pruned?.featureChoicePicks ?? character.feature_choice_picks ?? {},
     speciesTraitPicks: builderPicks.species_trait_picks ?? {},
     featChoicePicks: character.feat_choice_picks ?? {},
     modifierPlayerPicks: character.modifier_player_picks ?? {},
     selectedFeatIds: [
       ...new Set([
         ...(character.feat_ids ?? []),
-        ...catalogFeatPickIdsFromPicks(character.feature_choice_picks),
+        ...catalogFeatPickIdsFromPicks(pruned?.featureChoicePicks ?? character.feature_choice_picks),
       ]),
     ],
     grantedFeatIds: [],
     featSelectionEntries: [],
-    extraSkillProficiencies: character.skill_proficiencies ?? [],
+    extraSkillProficiencies: pruned?.extraSkillProficiencies ?? character.skill_proficiencies ?? [],
     extraToolProficiencies: character.tool_proficiencies ?? [],
     extraWeaponProficiencies: character.weapon_proficiencies ?? [],
     extraArmorProficiencies: character.armor_proficiencies ?? [],

@@ -29,9 +29,18 @@ export function inferFeatureSheetDisplay(item: ActivatableItem): ResolvedFeature
   }
 }
 
+function isPotionMixologist(name: string | undefined): boolean {
+  return /^potion mixologist$/i.test((name ?? "").trim())
+}
+
 export function resolveFeatureSheetDisplay(
   feature: Pick<Feature, "sheetDisplay" | "name"> & ActivatableItem,
 ): ResolvedFeatureSheetDisplay {
+  // Seed / older imports stamped Mixologist as Abilities-only and omitted featuresTab,
+  // which hid the level-up card and filed the bonus action on Non-Combat.
+  if (isPotionMixologist(feature.name)) {
+    return { featuresTab: true, abilitiesActions: false, combatActions: true }
+  }
   const explicit = feature.sheetDisplay
   if (explicit && typeof explicit === "object") {
     const inferred = inferFeatureSheetDisplay(feature)

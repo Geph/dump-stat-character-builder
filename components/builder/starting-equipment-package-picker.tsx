@@ -78,7 +78,7 @@ export function StartingEquipmentPackagePicker({
         enabled={swipeLayout}
         className={cn(
           swipeLayout
-            ? getCinematicPickerContainerClass()
+            ? getCinematicPickerContainerClass(2)
             : "grid grid-cols-1 lg:grid-cols-2 gap-4",
         )}
       >

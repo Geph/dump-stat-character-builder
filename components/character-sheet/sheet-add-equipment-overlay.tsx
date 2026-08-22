@@ -20,6 +20,7 @@ import {
   groupEquipmentByCategory,
 } from "@/lib/compendium/equipment-categories"
 import { formatEquipmentCost, getEquipmentCostGp } from "@/lib/builder/equipment-utils"
+import { ownedEquipmentQuantity, type EquipmentQuantities } from "@/lib/character/equipment-quantities"
 import { paginateList } from "@/lib/builder/picker-pagination"
 import { usePickerPageSize } from "@/hooks/use-picker-page-size"
 import type { Equipment } from "@/lib/types"
@@ -36,6 +37,7 @@ type SheetAddEquipmentOverlayProps = {
   onClose: () => void
   catalog: Equipment[]
   ownedIds: string[]
+  ownedQuantities?: EquipmentQuantities
   currentGold: number
   onAddItem: (item: Equipment, options: AddEquipmentOptions) => void
 }
@@ -45,6 +47,7 @@ export function SheetAddEquipmentOverlay({
   onClose,
   catalog,
   ownedIds,
+  ownedQuantities,
   currentGold,
   onAddItem,
 }: SheetAddEquipmentOverlayProps) {
@@ -58,8 +61,6 @@ export function SheetAddEquipmentOverlay({
   const [pendingItem, setPendingItem] = useState<Equipment | null>(null)
   const [pendingBaseId, setPendingBaseId] = useState<string>("")
   const [pendingDeductCost, setPendingDeductCost] = useState(false)
-
-  const ownedSet = useMemo(() => new Set(ownedIds), [ownedIds])
 
   const categoryOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -85,8 +86,7 @@ export function SheetAddEquipmentOverlay({
   }, [catalog])
 
   const equipmentGroups = useMemo(() => {
-    const available = catalog.filter((item) => !ownedSet.has(item.id))
-    const searched = filterEquipmentList(available, deferredSearch)
+    const searched = filterEquipmentList(catalog, deferredSearch)
     const byCategory =
       categoryFilter === "all"
         ? searched
@@ -94,7 +94,7 @@ export function SheetAddEquipmentOverlay({
     const byMagic = filterEquipmentByMagicKind(byCategory, magicKindFilter)
     const filtered = filterEquipmentByMagicCategory(byMagic, magicCategoryFilter)
     return groupEquipmentByCategory(filtered)
-  }, [catalog, ownedSet, deferredSearch, categoryFilter, magicKindFilter, magicCategoryFilter])
+  }, [catalog, deferredSearch, categoryFilter, magicKindFilter, magicCategoryFilter])
 
   const pendingBaseOptions = useMemo(() => {
     if (!pendingItem) return []
@@ -224,7 +224,7 @@ export function SheetAddEquipmentOverlay({
                     value={search}
                     onChange={setSearch}
                     suggestions={rankSearchResults(
-                      catalog.filter((item) => !ownedSet.has(item.id)),
+                      catalog,
                       deferredSearch,
                       {
                         name: (item) => item.name,
@@ -312,6 +312,11 @@ export function SheetAddEquipmentOverlay({
                               const costGp = getEquipmentCostGp(item)
                               const canBuy = costGp > 0 && currentGold >= costGp
                               const summary = magicItemSummaryLine(item)
+                              const ownedQty = ownedEquipmentQuantity(
+                                ownedIds,
+                                ownedQuantities,
+                                item.id,
+                              )
                               return (
                                 <div
                                   key={item.id}
@@ -340,7 +345,7 @@ export function SheetAddEquipmentOverlay({
                                       className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-lg border border-border bg-card hover:border-primary/50 transition-colors"
                                     >
                                       <Plus className="w-3.5 h-3.5" />
-                                      Add
+                                      {ownedQty > 0 ? "Add another" : "Add"}
                                     </button>
                                     {costGp > 0 && (
                                       <button

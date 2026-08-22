@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { motion, AnimatePresence } from "framer-motion"
 import { MainNav } from "@/components/main-nav"
@@ -96,11 +96,15 @@ import {
 import { StartingEquipmentPackagePicker } from "@/components/builder/starting-equipment-package-picker"
 import { SwipeVisualPicker } from "@/components/builder/swipe-visual-picker"
 import { BuilderCatalogEmptyPrompt } from "@/components/builder/builder-catalog-empty-prompt"
+import { BuilderCompletableSection } from "@/components/builder/builder-completable-section"
+import { BuilderSelectedChoiceChips } from "@/components/builder/builder-selected-choice-chips"
+import { BuilderSelectedCatalogItem } from "@/components/builder/builder-selected-catalog-item"
 import {
   BuilderSpellCompactPick,
   SpellSelectionCard,
 } from "@/components/builder/spell-selection-card"
 import { compendiumCardBlurb, getCompendiumCardBlurb, getCompendiumCardImageUrl } from "@/lib/compendium/card-image"
+import { getCompendiumDetailFlavor } from "@/lib/compendium/class-detail-flavor"
 import { buildCustomSkillIconByName } from "@/lib/compendium/skill-icons"
 import { getClassDetailBaseFeatures } from "@/lib/builder/class-detail-features"
 import { subclassFeatureTitleRows } from "@/lib/builder/subclass-detail-display"
@@ -155,6 +159,8 @@ import {
   validateOriginStepChoices,
   collectClassStepBlockers,
   collectOriginStepBlockers,
+  collectSpeciesOptionBlockers,
+  collectBackgroundOptionBlockers,
   proficientSkillsInBuilder,
 } from "@/lib/builder/choices"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
@@ -186,9 +192,15 @@ import {
   hasMartialWeaponProficiency,
   isGoldOnlyOption,
   packageOptionRequiresMartialProficiency,
-  resolvePackageEquipmentIds,
+  resolvePackageEquipment,
   sumEquipmentGoldCost,
 } from "@/lib/builder/equipment-utils"
+import {
+  holdingsFromRepeatedIds,
+  mergeEquipmentHoldings,
+  normalizeEquipmentQuantities,
+  ownedEquipmentQuantity,
+} from "@/lib/character/equipment-quantities"
 import {
   canSelectSpell,
   countSelectedSpells,
@@ -274,11 +286,13 @@ import {
 } from "@/lib/builder/asi-allocation"
 import { generateRandomCharacterDetails } from "@/lib/builder/random-character-details"
 import {
+  CINEMATIC_TWO_COL_PAGE_SIZE,
   getCinematicPickerContainerClass,
   getCinematicSpellPickerContainerClass,
   getDenseSpellPickerGridClass,
   paginateList,
 } from "@/lib/builder/picker-pagination"
+import { pruneMissingClassSelections } from "@/lib/builder/prune-missing-class-picks"
 import { resolveSpellCardImageUrl } from "@/lib/compendium/enrich-srd-spells"
 import {
   BUILDER_ABILITY_NAMES,
@@ -793,6 +807,52 @@ export default function BuilderPageClient() {
 
     void hydrateFromCharacter()
   }, [loading, editIdParam, classes, backgrounds, spells])
+
+  useEffect(() => {
+    if (loading || !draftReady || classes.length === 0) return
+    const pruned = pruneMissingClassSelections({
+      knownClassIds: classes.map((cls) => cls.id),
+      classLevels: activeClassLevels,
+      classAddOrder: activeClassAddOrder,
+      primaryClassId,
+      subclassByClassId,
+      classSkillPicks,
+      classToolPicks,
+      featureChoicePicks,
+      spellPicksByClassId,
+      extraSkillProficiencies: character.skill_proficiencies ?? [],
+    })
+    if (!pruned.changed) return
+    setClassLevels(pruned.classLevels)
+    setClassAddOrder(pruned.classAddOrder)
+    setPrimaryClassId(pruned.primaryClassId)
+    setSubclassByClassId(pruned.subclassByClassId)
+    setClassSkillPicks(pruned.classSkillPicks)
+    setClassToolPicks(pruned.classToolPicks)
+    setFeatureChoicePicks(pruned.featureChoicePicks)
+    setSpellPicksByClassId(pruned.spellPicksByClassId)
+    setCharacter((prev) => ({
+      ...prev,
+      class_id: pruned.primaryClassId,
+      subclass_id: pruned.primaryClassId
+        ? (pruned.subclassByClassId[pruned.primaryClassId] ?? null)
+        : null,
+      skill_proficiencies: pruned.extraSkillProficiencies,
+    }))
+  }, [
+    loading,
+    draftReady,
+    classes,
+    activeClassLevels,
+    activeClassAddOrder,
+    primaryClassId,
+    subclassByClassId,
+    classSkillPicks,
+    classToolPicks,
+    featureChoicePicks,
+    spellPicksByClassId,
+    character.skill_proficiencies,
+  ])
 
   useEffect(() => {
     if (!draftReady) return
@@ -1562,11 +1622,11 @@ export default function BuilderPageClient() {
     })
   }
 
-  const packageEquipmentIds = useMemo(() => {
-    const ids: string[] = []
+  const packageEquipment = useMemo(() => {
+    const groups = []
     if (selectedStartingOption && !useGoldEquipment) {
-      ids.push(
-        ...resolvePackageEquipmentIds(
+      groups.push(
+        resolvePackageEquipment(
           selectedStartingOption.items ?? [],
           equipment,
           startingEquipmentCategoryPicks,
@@ -1575,16 +1635,16 @@ export default function BuilderPageClient() {
       )
     }
     if (selectedBackgroundStartingOption && !useBackgroundGoldEquipment) {
-      for (const id of resolvePackageEquipmentIds(
-        selectedBackgroundStartingOption.items ?? [],
-        equipment,
-        backgroundStartingEquipmentCategoryPicks,
-        `${backgroundStartingEquipmentOptionIndex}:`,
-      )) {
-        if (!ids.includes(id)) ids.push(id)
-      }
+      groups.push(
+        resolvePackageEquipment(
+          selectedBackgroundStartingOption.items ?? [],
+          equipment,
+          backgroundStartingEquipmentCategoryPicks,
+          `${backgroundStartingEquipmentOptionIndex}:`,
+        ),
+      )
     }
-    return ids
+    return mergeEquipmentHoldings(...groups)
   }, [
     selectedStartingOption,
     selectedBackgroundStartingOption,
@@ -1621,28 +1681,32 @@ export default function BuilderPageClient() {
       !inGoldShoppingMode
     if (preserveLoadedEquipment) return
 
-    const merged = [
-      ...new Set([
-        ...packageEquipmentIds,
-        ...modifierGrantedEquipmentIds,
-        ...(inGoldShoppingMode ? goldPurchasedEquipmentIds : []),
-      ]),
-    ]
+    const merged = mergeEquipmentHoldings(
+      packageEquipment,
+      { ids: modifierGrantedEquipmentIds },
+      inGoldShoppingMode ? holdingsFromRepeatedIds(goldPurchasedEquipmentIds) : { ids: [] },
+    )
     setCharacter((prev) => {
-      if (
-        prev.equipment_ids.length === merged.length &&
-        prev.equipment_ids.every((id) => merged.includes(id))
-      ) {
-        return prev
+      const sameIds =
+        prev.equipment_ids.length === merged.ids.length &&
+        prev.equipment_ids.every((id) => merged.ids.includes(id))
+      const prevQty = prev.equipment_quantities ?? {}
+      const sameQty =
+        Object.keys(prevQty).length === Object.keys(merged.quantities).length &&
+        Object.entries(merged.quantities).every(([id, qty]) => prevQty[id] === qty)
+      if (sameIds && sameQty) return prev
+      return {
+        ...prev,
+        equipment_ids: merged.ids,
+        equipment_quantities: merged.quantities,
       }
-      return { ...prev, equipment_ids: merged }
     })
   }, [
     draftReady,
     editingCharacterId,
     startingEquipmentOptionIndex,
     backgroundStartingEquipmentOptionIndex,
-    packageEquipmentIds,
+    packageEquipment,
     modifierGrantedEquipmentIds,
     goldPurchasedEquipmentIds,
     inGoldShoppingMode,
@@ -1680,12 +1744,36 @@ export default function BuilderPageClient() {
       if (!item) return
       const nextCost = goldSpent + getEquipmentCostGp(item)
       if (nextCost > totalGoldBudget) return
-      setGoldPurchasedEquipmentIds((prev) =>
-        prev.includes(itemId) ? prev : [...prev, itemId],
-      )
-        } else {
+      setGoldPurchasedEquipmentIds((prev) => [...prev, itemId])
+    } else {
       setGoldPurchasedEquipmentIds((prev) => prev.filter((id) => id !== itemId))
     }
+  }
+
+  const adjustGoldPurchasedQuantity = (itemId: string, delta: number) => {
+    const item = equipment.find((entry) => entry.id === itemId)
+    if (!item || delta === 0) return
+    if (delta > 0) {
+      const cost = getEquipmentCostGp(item)
+      const affordable =
+        cost <= 0 ? delta : Math.max(0, Math.floor((totalGoldBudget - goldSpent) / cost))
+      const add = Math.min(delta, affordable)
+      if (add <= 0) return
+      setGoldPurchasedEquipmentIds((prev) => [...prev, ...Array.from({ length: add }, () => itemId)])
+      return
+    }
+    setGoldPurchasedEquipmentIds((prev) => {
+      let remaining = -delta
+      const next: string[] = []
+      for (const id of [...prev].reverse()) {
+        if (id === itemId && remaining > 0) {
+          remaining -= 1
+          continue
+        }
+        next.push(id)
+      }
+      return next.reverse()
+    })
   }
 
   const selectStartingEquipmentOption = (index: number) => {
@@ -1726,8 +1814,14 @@ export default function BuilderPageClient() {
 
   const pickerGridClass =
     cardViewMode === "cinematic"
-      ? getCinematicPickerContainerClass()
+      ? getCinematicPickerContainerClass(3)
       : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 px-1 py-2"
+  const backgroundPickerGridClass =
+    cardViewMode === "cinematic"
+      ? getCinematicPickerContainerClass(2)
+      : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 px-1 py-2"
+  const backgroundPickerPageSize =
+    cardViewMode === "cinematic" ? CINEMATIC_TWO_COL_PAGE_SIZE : pickerPageSize
   const cinematicPickerPaginationClass = useSwipeVisualPicker ? "max-sm:hidden" : undefined
 
   const compactPickerLayout = (cardViewMode === "dense" ? "compact" : "default") as "compact" | "default"
@@ -2228,6 +2322,10 @@ export default function BuilderPageClient() {
         armor_proficiencies: snapshot.armor_proficiencies,
         languages: snapshot.languages,
         equipment_ids: filterEnabledIds(character.equipment_ids, equipment),
+        equipment_quantities: normalizeEquipmentQuantities(
+          filterEnabledIds(character.equipment_ids, equipment),
+          character.equipment_quantities,
+        ),
         gold: inGoldShoppingMode
           ? goldRemaining
           : editingCharacterId
@@ -2489,6 +2587,654 @@ export default function BuilderPageClient() {
       backgroundGrantedFeat?.id,
     ],
   )
+
+  const speciesStepFeatSelectionEntries = useMemo(
+    () =>
+      featSelectionEntries.filter((entry) =>
+        speciesFeatPickSlots.some((slot) => featChoicePickKey(slot.key) === entry.choicePickKey),
+      ),
+    [featSelectionEntries, speciesFeatPickSlots],
+  )
+
+  const backgroundStepFeatSelectionEntries = useMemo(
+    () =>
+      featSelectionEntries.filter(
+        (entry) =>
+          backgroundFeatPickSlots.some(
+            (slot) => featChoicePickKey(slot.key) === entry.choicePickKey,
+          ) ||
+          entry.choicePickKey ===
+            (backgroundGrantedFeat?.id
+              ? grantedFeatChoicePickKey(backgroundGrantedFeat.id)
+              : ""),
+      ),
+    [featSelectionEntries, backgroundFeatPickSlots, backgroundGrantedFeat?.id],
+  )
+
+  const speciesStepModifierSlots = useMemo(
+    () =>
+      nonSpellModifierPlayerChoiceSlots(
+        modifierPlayerChoiceSlots.filter(
+          (slot) =>
+            speciesFeatPickSlots.some(
+              (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
+            ) ||
+            (character.species_id != null &&
+              slot.sourceKey.startsWith(`species:${character.species_id}:`)),
+        ),
+      ),
+    [modifierPlayerChoiceSlots, speciesFeatPickSlots, character.species_id],
+  )
+
+  const backgroundStepModifierSlots = useMemo(
+    () =>
+      nonSpellModifierPlayerChoiceSlots(
+        modifierPlayerChoiceSlots.filter(
+          (slot) =>
+            backgroundFeatPickSlots.some(
+              (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
+            ) ||
+            (character.background_id != null &&
+              slot.sourceKey.startsWith(`background:${character.background_id}:`)) ||
+            slot.sourceKey ===
+              (backgroundGrantedFeat?.id
+                ? grantedFeatChoicePickKey(backgroundGrantedFeat.id)
+                : ""),
+        ),
+      ),
+    [
+      modifierPlayerChoiceSlots,
+      backgroundFeatPickSlots,
+      character.background_id,
+      backgroundGrantedFeat?.id,
+    ],
+  )
+
+  const classLevelSectionComplete = activeClassLevels.length > 0
+
+  const classOptionsSectionComplete = useMemo(() => {
+    if (!classLevelSectionComplete) return false
+    return (
+      collectClassStepBlockers(
+        activeClassLevels,
+        classes,
+        subclasses,
+        classSkillPicks,
+        subclassByClassId,
+        featureChoicePicks,
+        resolvedPrimaryClassId,
+        activeClassAddOrder,
+        classToolPicks,
+      ).length === 0 &&
+      validateModifierPlayerChoices(classStepClassFeatureModifierSlots, modifierPlayerPicks)
+    )
+  }, [
+    classLevelSectionComplete,
+    activeClassLevels,
+    classes,
+    subclasses,
+    classSkillPicks,
+    subclassByClassId,
+    featureChoicePicks,
+    resolvedPrimaryClassId,
+    activeClassAddOrder,
+    classToolPicks,
+    classStepClassFeatureModifierSlots,
+    modifierPlayerPicks,
+  ])
+
+  const classFeatsSectionComplete = useMemo(() => {
+    if (requiredFeatSlots <= 0) return true
+    return (
+      selectedFeatCount === requiredFeatSlots &&
+      validateFeatModifierChoices(feats, classStepFeatSelectionEntries, featChoicePicks) &&
+      validateModifierPlayerChoices(classStepFeatModifierSlots, modifierPlayerPicks)
+    )
+  }, [
+    requiredFeatSlots,
+    selectedFeatCount,
+    feats,
+    classStepFeatSelectionEntries,
+    featChoicePicks,
+    classStepFeatModifierSlots,
+    modifierPlayerPicks,
+  ])
+
+  const speciesPickerComplete = Boolean(character.species_id)
+
+  const hasSpeciesOptionsSection = Boolean(
+    selectedSpecies &&
+      ((selectedSpecies.traits ?? []).some(
+        (t) => t.isChoice && (t.choices?.options?.length ?? 0) > 0,
+      ) ||
+        speciesFeatPickSlots.length > 0 ||
+        (selectedSpecies.size_options?.length ?? 0) > 1 ||
+        speciesStepModifierSlots.length > 0),
+  )
+
+  const speciesOptionsSectionComplete = useMemo(() => {
+    if (!speciesPickerComplete || !selectedSpecies) return false
+    if (!hasSpeciesOptionsSection) return true
+    return (
+      collectSpeciesOptionBlockers(
+        selectedSpecies,
+        speciesTraitPicks,
+        speciesFeatPickSlots.map((slot) => slot.key),
+        featureChoicePicks,
+      ).length === 0 &&
+      validateFeatModifierChoices(feats, speciesStepFeatSelectionEntries, featChoicePicks) &&
+      validateModifierPlayerChoices(speciesStepModifierSlots, modifierPlayerPicks)
+    )
+  }, [
+    speciesPickerComplete,
+    selectedSpecies,
+    hasSpeciesOptionsSection,
+    speciesTraitPicks,
+    speciesFeatPickSlots,
+    featureChoicePicks,
+    feats,
+    speciesStepFeatSelectionEntries,
+    featChoicePicks,
+    speciesStepModifierSlots,
+    modifierPlayerPicks,
+  ])
+
+  const backgroundPickerComplete = Boolean(character.background_id)
+
+  const hasBackgroundOptionsSection = Boolean(
+    selectedBackground &&
+      (isLegacyBackground(selectedBackground) ||
+        backgroundFeatPickSlots.length > 0 ||
+        Boolean(backgroundGrantedFeat) ||
+        backgroundStepModifierSlots.length > 0),
+  )
+
+  const backgroundOptionsSectionComplete = useMemo(() => {
+    if (!backgroundPickerComplete || !selectedBackground) return false
+    if (!hasBackgroundOptionsSection) return true
+    return (
+      collectBackgroundOptionBlockers(
+        backgroundFeatPickSlots.map((slot) => slot.key),
+        featureChoicePicks,
+        selectedBackground,
+      ).length === 0 &&
+      validateFeatModifierChoices(feats, backgroundStepFeatSelectionEntries, featChoicePicks) &&
+      validateModifierPlayerChoices(backgroundStepModifierSlots, modifierPlayerPicks)
+    )
+  }, [
+    backgroundPickerComplete,
+    selectedBackground,
+    hasBackgroundOptionsSection,
+    backgroundFeatPickSlots,
+    featureChoicePicks,
+    feats,
+    backgroundStepFeatSelectionEntries,
+    featChoicePicks,
+    backgroundStepModifierSlots,
+    modifierPlayerPicks,
+  ])
+
+  const classLevelSectionSummary = useMemo(() => {
+    if (activeClassLevels.length === 0) return null
+    return activeClassLevels
+      .map((cl) => {
+        const cls = classes.find((c) => c.id === cl.classId)
+        return `${cls?.name ?? "Class"} ${cl.level}`
+      })
+      .join(" · ")
+  }, [activeClassLevels, classes])
+
+  const classOptionsSectionPreview = useMemo(() => {
+    if (!classOptionsSectionComplete) return null
+    const chipLayout = skillPickerLayout
+    const groups: ReactNode[] = []
+
+    for (const entry of activeClassLevels) {
+      const cls = classes.find((c) => c.id === entry.classId)
+      if (!cls) continue
+      const subclassId = subclassByClassId[entry.classId]
+      const subclass = subclassId ? subclasses.find((sc) => sc.id === subclassId) : null
+      const skills = classSkillPicks[entry.classId] ?? []
+      const tools = classToolPicks[entry.classId] ?? []
+      const featureGroups: { title: string; names: string[]; showSkillIcons: boolean }[] = []
+      for (const feature of cls.features ?? []) {
+        if (feature.level > entry.level || !feature.isChoice || !feature.choices) continue
+        if (isClassAbilityFeatureChoice(feature, cls.name)) continue
+        const key = featureChoiceKey(entry.classId, feature.name, feature.level)
+        const picks = featureChoicePicks[key] ?? []
+        if (!picks.length) continue
+        const isSkillCategory = feature.choices.category.toLowerCase().includes("skill")
+        featureGroups.push({
+          title: feature.name,
+          names: picks,
+          showSkillIcons: isSkillCategory && chipLayout === "visual",
+        })
+      }
+
+      const hasChips = skills.length > 0 || tools.length > 0 || featureGroups.length > 0
+      const showSubclassChip = Boolean(subclass) && cardViewMode !== "cinematic"
+      if (!hasChips && !showSubclassChip) continue
+
+      groups.push(
+        <div key={entry.classId} className="space-y-3">
+          {activeClassLevels.length > 1 ? (
+            <p className="text-sm font-semibold text-foreground">{cls.name}</p>
+          ) : null}
+          {showSubclassChip && subclass ? (
+            <BuilderSelectedChoiceChips
+              title="Subclass"
+              names={[subclass.name]}
+              layout={chipLayout}
+              accentClass="border-primary bg-primary/10"
+            />
+          ) : null}
+          {skills.length > 0 ? (
+            <BuilderSelectedChoiceChips
+              title="Skills"
+              names={skills}
+              layout={chipLayout}
+              showSkillIcons={chipLayout === "visual"}
+              skillIconByName={customSkillIconByName}
+              accentClass="border-primary bg-primary/10"
+            />
+          ) : null}
+          {tools.length > 0 ? (
+            <BuilderSelectedChoiceChips
+              title="Tools"
+              names={tools}
+              layout={chipLayout}
+              accentClass="border-primary bg-primary/10"
+            />
+          ) : null}
+          {featureGroups.map((group) => (
+            <BuilderSelectedChoiceChips
+              key={`${entry.classId}-${group.title}`}
+              title={group.title}
+              names={group.names}
+              layout={chipLayout}
+              showSkillIcons={group.showSkillIcons}
+              skillIconByName={group.showSkillIcons ? customSkillIconByName : undefined}
+              accentClass="border-accent bg-accent/10"
+            />
+          ))}
+        </div>,
+      )
+    }
+
+    if (groups.length === 0 && cardViewMode === "cinematic") return null
+    if (groups.length === 0) {
+      return (
+        <p className="text-sm font-medium text-foreground/90">Class options complete.</p>
+      )
+    }
+    return <div className="space-y-4">{groups}</div>
+  }, [
+    classOptionsSectionComplete,
+    activeClassLevels,
+    classes,
+    subclasses,
+    subclassByClassId,
+    classSkillPicks,
+    classToolPicks,
+    featureChoicePicks,
+    skillPickerLayout,
+    cardViewMode,
+    customSkillIconByName,
+  ])
+
+  const classFeatsSectionPreview = useMemo(() => {
+    if (!classFeatsSectionComplete || requiredFeatSlots <= 0) return null
+    const chipLayout = skillPickerLayout
+    const showIcons = chipLayout === "visual"
+    const featCards: ReactNode[] = []
+    const groups: ReactNode[] = []
+
+    for (const slot of classStepFeatSlots) {
+      const id = featureChoicePicks[slot.key]?.[0]
+      const feat = id ? feats.find((entry) => entry.id === id) : null
+      if (!feat) continue
+      if (cardViewMode === "cinematic") {
+        featCards.push(
+          <BuilderSelectedCatalogItem
+            key={slot.key}
+            item={feat}
+            cardViewMode={cardViewMode}
+            portrait={useCinematicPortraitCards}
+            selectionVariant="secondary"
+            badge={
+              <span className="rounded bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
+                {slot.label}
+              </span>
+            }
+          />,
+        )
+      } else {
+        groups.push(
+          <BuilderSelectedChoiceChips
+            key={slot.key}
+            title={slot.label}
+            names={[feat.name]}
+            layout={chipLayout}
+            accentClass="border-accent bg-accent/10"
+          />,
+        )
+      }
+      const choiceKey = featChoicePickKey(slot.key)
+      const optionPicks = featChoicePicks[choiceKey] ?? []
+      if (optionPicks.length) {
+        groups.push(
+          <BuilderSelectedChoiceChips
+            key={`${choiceKey}-opts`}
+            title={feat.name}
+            names={optionPicks}
+            layout={chipLayout}
+            showSkillIcons={showIcons}
+            skillIconByName={customSkillIconByName}
+            accentClass="border-accent bg-accent/10"
+          />,
+        )
+      }
+    }
+
+    if (featCards.length === 0 && groups.length === 0) {
+      return (
+        <p className="text-sm font-medium text-foreground/90">
+          {selectedFeatCount}/{requiredFeatSlots} selected
+        </p>
+      )
+    }
+
+    return (
+      <div className="space-y-3">
+        {featCards.length > 0 ? (
+          <div className="flex flex-wrap gap-3">{featCards}</div>
+        ) : null}
+        {groups.length > 0 ? <div className="space-y-3">{groups}</div> : null}
+      </div>
+    )
+  }, [
+    classFeatsSectionComplete,
+    requiredFeatSlots,
+    classStepFeatSlots,
+    featureChoicePicks,
+    featChoicePicks,
+    feats,
+    selectedFeatCount,
+    skillPickerLayout,
+    cardViewMode,
+    useCinematicPortraitCards,
+    customSkillIconByName,
+  ])
+
+  const speciesOptionsSectionPreview = useMemo(() => {
+    if (!speciesOptionsSectionComplete || !selectedSpecies) return null
+    const chipLayout = skillPickerLayout
+    const showIcons = chipLayout === "visual"
+    const groups: ReactNode[] = []
+    const featCards: ReactNode[] = []
+    const speciesAccent = "border-secondary bg-secondary/10"
+
+    if (character.size) {
+      groups.push(
+        <BuilderSelectedChoiceChips
+          key="species-size"
+          title="Size"
+          names={[character.size]}
+          layout={chipLayout}
+          accentClass={speciesAccent}
+        />,
+      )
+    }
+
+    for (const [index, picks] of Object.entries(speciesTraitPicks)) {
+      if (!picks?.length) continue
+      const trait = selectedSpecies.traits?.[Number(index)]
+      groups.push(
+        <BuilderSelectedChoiceChips
+          key={`species-trait-${index}`}
+          title={trait?.name ?? "Trait"}
+          names={picks}
+          layout={chipLayout}
+          showSkillIcons={showIcons}
+          skillIconByName={customSkillIconByName}
+          accentClass={speciesAccent}
+        />,
+      )
+    }
+
+    for (const slot of speciesStepModifierSlots) {
+      const picks = modifierPlayerPicks[slot.slotKey] ?? []
+      if (!picks.length) continue
+      const isSkillOrTool =
+        slot.kind === "skill" ||
+        slot.kind === "tool" ||
+        slot.kind === "skill_or_tool" ||
+        slot.kind === "language"
+      groups.push(
+        <BuilderSelectedChoiceChips
+          key={slot.slotKey}
+          title={slot.label}
+          names={picks}
+          layout={chipLayout}
+          showSkillIcons={showIcons && isSkillOrTool}
+          skillIconByName={customSkillIconByName}
+          accentClass={speciesAccent}
+        />,
+      )
+    }
+
+    for (const slot of speciesFeatPickSlots) {
+      const id = featureChoicePicks[slot.key]?.[0]
+      const feat = id ? feats.find((entry) => entry.id === id) : null
+      if (!feat) continue
+      if (cardViewMode === "cinematic") {
+        featCards.push(
+          <BuilderSelectedCatalogItem
+            key={slot.key}
+            item={feat}
+            cardViewMode={cardViewMode}
+            portrait={useCinematicPortraitCards}
+            selectionVariant="secondary"
+            badge={
+              <span className="rounded bg-secondary px-2 py-0.5 text-xs font-bold text-secondary-foreground">
+                Feat
+              </span>
+            }
+          />,
+        )
+      } else {
+        groups.push(
+          <BuilderSelectedChoiceChips
+            key={slot.key}
+            title="Feat"
+            names={[feat.name]}
+            layout={chipLayout}
+            accentClass={speciesAccent}
+          />,
+        )
+      }
+      const choiceKey = featChoicePickKey(slot.key)
+      const optionPicks = featChoicePicks[choiceKey] ?? []
+      if (optionPicks.length) {
+        groups.push(
+          <BuilderSelectedChoiceChips
+            key={`${choiceKey}-opts`}
+            title={feat.name}
+            names={optionPicks}
+            layout={chipLayout}
+            showSkillIcons={showIcons}
+            skillIconByName={customSkillIconByName}
+            accentClass={speciesAccent}
+          />,
+        )
+      }
+    }
+
+    if (featCards.length === 0 && groups.length === 0) {
+      return (
+        <p className="text-sm font-medium text-foreground/90">Species choices are set.</p>
+      )
+    }
+
+    return (
+      <div className="space-y-3">
+        {featCards.length > 0 ? (
+          <div className="flex flex-wrap gap-3">{featCards}</div>
+        ) : null}
+        {groups.length > 0 ? <div className="space-y-3">{groups}</div> : null}
+      </div>
+    )
+  }, [
+    speciesOptionsSectionComplete,
+    selectedSpecies,
+    character.size,
+    speciesTraitPicks,
+    speciesStepModifierSlots,
+    modifierPlayerPicks,
+    speciesFeatPickSlots,
+    featureChoicePicks,
+    featChoicePicks,
+    feats,
+    skillPickerLayout,
+    cardViewMode,
+    useCinematicPortraitCards,
+    customSkillIconByName,
+  ])
+
+  const backgroundOptionsSectionPreview = useMemo(() => {
+    if (!backgroundOptionsSectionComplete || !selectedBackground) return null
+    const chipLayout = skillPickerLayout
+    const showIcons = chipLayout === "visual"
+    const groups: ReactNode[] = []
+    const featCards: ReactNode[] = []
+
+    const pushFeat = (feat: (typeof feats)[number] | null | undefined, key: string) => {
+      if (!feat) return
+      if (cardViewMode === "cinematic") {
+        featCards.push(
+          <BuilderSelectedCatalogItem
+            key={key}
+            item={feat}
+            cardViewMode={cardViewMode}
+            portrait={useCinematicPortraitCards}
+            selectionVariant="secondary"
+            badge={
+              <span className="rounded bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
+                Feat
+              </span>
+            }
+          />,
+        )
+      } else {
+        groups.push(
+          <BuilderSelectedChoiceChips
+            key={key}
+            title="Feat"
+            names={[feat.name]}
+            layout={chipLayout}
+            accentClass="border-accent bg-accent/10"
+          />,
+        )
+      }
+    }
+
+    for (const slot of backgroundFeatPickSlots) {
+      const id = featureChoicePicks[slot.key]?.[0]
+      const feat = id ? feats.find((entry) => entry.id === id) : null
+      pushFeat(feat, `bg-feat-slot-${slot.key}`)
+      if (feat) {
+        const choiceKey = featChoicePickKey(slot.key)
+        const optionPicks = featChoicePicks[choiceKey] ?? []
+        if (optionPicks.length) {
+          groups.push(
+            <BuilderSelectedChoiceChips
+              key={`${choiceKey}-opts`}
+              title={feat.name}
+              names={optionPicks}
+              layout={chipLayout}
+              showSkillIcons={showIcons}
+              skillIconByName={customSkillIconByName}
+              accentClass="border-accent bg-accent/10"
+            />,
+          )
+        }
+      }
+    }
+
+    if (backgroundGrantedFeat) {
+      pushFeat(backgroundGrantedFeat, `bg-granted-${backgroundGrantedFeat.id}`)
+      const grantedChoiceKey = grantedFeatChoicePickKey(backgroundGrantedFeat.id)
+      const grantedOptionPicks = featChoicePicks[grantedChoiceKey] ?? []
+      if (grantedOptionPicks.length) {
+        groups.push(
+          <BuilderSelectedChoiceChips
+            key={`${grantedChoiceKey}-opts`}
+            title={backgroundGrantedFeat.name}
+            names={grantedOptionPicks}
+            layout={chipLayout}
+            showSkillIcons={showIcons}
+            skillIconByName={customSkillIconByName}
+            accentClass="border-accent bg-accent/10"
+          />,
+        )
+      }
+    }
+
+    const legacyKey = legacyBackgroundOriginFeatPickKey(selectedBackground.id)
+    const legacyId = featureChoicePicks[legacyKey]?.[0]
+    const legacyFeat = legacyId ? feats.find((entry) => entry.id === legacyId) : null
+    pushFeat(legacyFeat, `bg-legacy-${legacyKey}`)
+
+    for (const slot of backgroundStepModifierSlots) {
+      const picks = modifierPlayerPicks[slot.slotKey] ?? []
+      if (!picks.length) continue
+      const isSkillOrTool =
+        slot.kind === "skill" ||
+        slot.kind === "tool" ||
+        slot.kind === "skill_or_tool" ||
+        slot.kind === "language"
+      groups.push(
+        <BuilderSelectedChoiceChips
+          key={slot.slotKey}
+          title={slot.label}
+          names={picks}
+          layout={chipLayout}
+          showSkillIcons={showIcons && isSkillOrTool}
+          skillIconByName={customSkillIconByName}
+          accentClass="border-accent bg-accent/10"
+        />,
+      )
+    }
+
+    if (featCards.length === 0 && groups.length === 0) {
+      return (
+        <p className="text-sm font-medium text-foreground/90">Background choices are set.</p>
+      )
+    }
+
+    return (
+      <div className="space-y-3">
+        {featCards.length > 0 ? (
+          <div className="flex flex-wrap gap-3">{featCards}</div>
+        ) : null}
+        {groups.length > 0 ? <div className="space-y-3">{groups}</div> : null}
+      </div>
+    )
+  }, [
+    backgroundOptionsSectionComplete,
+    selectedBackground,
+    backgroundFeatPickSlots,
+    featureChoicePicks,
+    featChoicePicks,
+    feats,
+    backgroundGrantedFeat,
+    backgroundStepModifierSlots,
+    modifierPlayerPicks,
+    skillPickerLayout,
+    cardViewMode,
+    useCinematicPortraitCards,
+    customSkillIconByName,
+  ])
 
   const canProceed = () => {
     switch (currentStep) {
@@ -3099,9 +3845,41 @@ export default function BuilderPageClient() {
               >
             {/* Step 1: Class Selection */}
             {currentStep === 1 && (
-              <div id="builder-class-skills">
-                <h2 className="text-2xl font-black text-foreground mb-2">Choose Class & Level</h2>
-                <p className={`${pageFloatingHintClass} mb-4`}>Your class determines your combat abilities and special features.</p>
+              <div id="builder-class-skills" className="space-y-6">
+                <BuilderCompletableSection
+                  title="Choose Class & Level"
+                  description="Your class determines your combat abilities and special features."
+                  complete={classLevelSectionComplete}
+                  collapseMode="confirm"
+                  doneLabel="Done with class selections"
+                  summary={classLevelSectionSummary}
+                  pinnedWhenComplete={
+                    activeClassLevels.length > 0 ? (
+                      <div className="flex flex-wrap gap-3">
+                        {activeClassLevels.map((cl) => {
+                          const cls = classes.find((c) => c.id === cl.classId)
+                          if (!cls) return null
+                          const isPrimary = cl.classId === resolvedPrimaryClassId
+                          return (
+                            <BuilderSelectedCatalogItem
+                              key={cl.classId}
+                              item={cls}
+                              cardViewMode={cardViewMode}
+                              portrait={useCinematicPortraitCards}
+                              selectionVariant={isPrimary ? "primary" : "secondary"}
+                              badge={
+                                <span className="rounded bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
+                                  Lv {cl.level}
+                                  {isPrimary ? "" : " · MC"}
+                                </span>
+                              }
+                            />
+                          )
+                        })}
+                      </div>
+                    ) : null
+                  }
+                >
                 
                 {/* Search + source filter */}
                 <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -3281,6 +4059,7 @@ export default function BuilderPageClient() {
                               imageCrop="top"
                               onSelect={selectClass}
                               onLearnMore={() => setDetailsModal({ type: "class", item: cls })}
+                              showBlurb={false}
                             />
                           )
                         })}
@@ -3411,13 +4190,61 @@ export default function BuilderPageClient() {
                     </p>
                   </div>
                 )}
+                </BuilderCompletableSection>
 
                 {activeClassLevels.length > 0 && (
-                  <div className="mt-6 space-y-2 border-t border-border pt-6">
-                    <h3 className="text-lg font-bold text-foreground">Class Options</h3>
-                    <p className={`${pageFloatingHintClass} text-xs mb-2`}>
-                      Complete choices for your selected class(es) before continuing.
-                    </p>
+                  <BuilderCompletableSection
+                    title="Class Options"
+                    description="Complete choices for your selected class(es) before continuing."
+                    complete={classOptionsSectionComplete}
+                    headingLevel={3}
+                    pinnedWhenComplete={
+                      classOptionsSectionComplete ? (
+                        <div className="space-y-3">
+                          {cardViewMode === "cinematic" ? (
+                            <div className="flex flex-wrap gap-3">
+                              {activeClassLevels.map((entry) => {
+                                const cls = classes.find((c) => c.id === entry.classId)
+                                if (!cls) return null
+                                const subclassId = subclassByClassId[entry.classId]
+                                const subclass = subclassId
+                                  ? subclasses.find((sc) => sc.id === subclassId)
+                                  : null
+                                if (!subclass) return null
+                                const displaySubclass = enrichSubclassDisplayDefaults(
+                                  subclass,
+                                  cls.name,
+                                )
+                                const cardItem = {
+                                  ...displaySubclass,
+                                  icon:
+                                    displaySubclass.icon?.trim() ||
+                                    getCompendiumItemIcon("subclasses", {
+                                      ...(displaySubclass as unknown as Record<string, unknown>),
+                                      class_name: cls.name,
+                                    }),
+                                }
+                                return (
+                                  <BuilderSelectedCatalogItem
+                                    key={`${entry.classId}-${subclass.id}`}
+                                    item={cardItem}
+                                    cardViewMode={cardViewMode}
+                                    portrait={useCinematicPortraitCards}
+                                    badge={
+                                      <span className="rounded bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
+                                        {cls.name}
+                                      </span>
+                                    }
+                                  />
+                                )
+                              })}
+                            </div>
+                          ) : null}
+                          {classOptionsSectionPreview}
+                        </div>
+                      ) : null
+                    }
+                  >
                     {activeClassLevels.map((entry) => {
                       const cls = classes.find((c) => c.id === entry.classId)
                       if (!cls) return null
@@ -3532,7 +4359,7 @@ export default function BuilderPageClient() {
                                 enabled={useSwipeVisualPicker}
                                 className={
                                   useSwipeVisualPicker
-                                    ? getCinematicPickerContainerClass()
+                                    ? getCinematicPickerContainerClass(3)
                                     : cardViewMode === "dense"
                                       ? "grid grid-cols-1 xl:grid-cols-2 gap-3 px-1 py-2"
                                       : pickerGridClass
@@ -3599,6 +4426,7 @@ export default function BuilderPageClient() {
                                       onLearnMore={() =>
                                         setDetailsModal({ type: "subclass", item: displaySubclass })
                                       }
+                                      showBlurb={false}
                                     />
                                   )
                                 })}
@@ -3820,24 +4648,25 @@ export default function BuilderPageClient() {
                         </div>
                       )
                     })}
-                  </div>
+                  </BuilderCompletableSection>
                 )}
 
                 {/* Feats granted by class features (ASI / General / Epic Boon — not Metamagic etc.) */}
                 {activeClassLevels.length > 0 && requiredFeatSlots > 0 && (
-                  <div className="mt-6 p-4 bg-muted/40 rounded-xl border border-border">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div>
-                        <h3 className="text-lg font-bold text-foreground">Feats</h3>
-                        <p className="text-xs text-muted-foreground">
-                          Choose feats granted by linked common modifiers (Gain a Feat with category filters).
-                          Ability-score bonuses apply on later steps. Metamagic, invocations, and similar
-                          class ability pools are on the Class Abilities step.
-                        </p>
-                      </div>
+                  <BuilderCompletableSection
+                    title="Feats"
+                    description="Choose feats granted by linked common modifiers (Gain a Feat with category filters). Ability-score bonuses apply on later steps. Metamagic, invocations, and similar class ability pools are on the Class Abilities step."
+                    complete={classFeatsSectionComplete}
+                    headingLevel={3}
+                    className="p-4 bg-muted/40 rounded-xl border border-border"
+                    pinnedWhenComplete={
+                      classFeatsSectionComplete ? classFeatsSectionPreview : null
+                    }
+                  >
+                    <div className="mb-2 flex justify-end">
                       <span className="text-xs font-bold text-muted-foreground">
                         {selectedFeatCount}/{requiredFeatSlots}
-                                </span>
+                      </span>
                     </div>
 
                     {featsLoadError && (
@@ -3993,7 +4822,7 @@ export default function BuilderPageClient() {
                         {requiredFeatSlots - selectedFeatCount === 1 ? "" : "s"} to continue.
                       </p>
                     )}
-                </div>
+                  </BuilderCompletableSection>
                 )}
               </div>
             )}
@@ -4047,9 +4876,21 @@ export default function BuilderPageClient() {
             {/* Step 2: Origin (Species + Background) */}
             {currentStep === 2 && (
               <div id="builder-origin-species" className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Species</h2>
-                  <p className={`${pageFloatingHintClass} mb-3`}>Your species grants unique traits and abilities.</p>
+                <BuilderCompletableSection
+                  title="Choose Your Species"
+                  description="Your species grants unique traits and abilities."
+                  complete={speciesPickerComplete}
+                  summary={selectedSpecies?.name}
+                  pinnedWhenComplete={
+                    selectedSpecies ? (
+                      <BuilderSelectedCatalogItem
+                        item={selectedSpecies}
+                        cardViewMode={cardViewMode}
+                        portrait={useCinematicPortraitCards}
+                      />
+                    ) : null
+                  }
+                >
                   
                   {/* Search + source filter */}
                   <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -4193,7 +5034,6 @@ export default function BuilderPageClient() {
                         key={sp.id}
                         item={sp}
                         subtitle={sp.source || "Custom"}
-                        description={compendiumCardBlurb(sp.description, 100)}
                         accentColor={accent}
                         selected={isSelected}
                         size="md"
@@ -4201,6 +5041,7 @@ export default function BuilderPageClient() {
                         imageCrop="top"
                         onSelect={selectSpecies}
                         onLearnMore={() => setDetailsModal({ type: "species", item: sp })}
+                        showBlurb={false}
                       />
                         )
                       })}
@@ -4219,18 +5060,17 @@ export default function BuilderPageClient() {
                       </>
                     )
                   })()}
+                </BuilderCompletableSection>
 
-                  {selectedSpecies &&
-                    ((selectedSpecies.traits ?? []).some(
-                      (t) => t.isChoice && (t.choices?.options?.length ?? 0) > 0,
-                    ) ||
-                      speciesFeatPickSlots.length > 0 ||
-                      (selectedSpecies.size_options?.length ?? 0) > 1 ||
-                      modifierPlayerChoiceSlots.some((s) =>
-                        s.sourceKey.startsWith(`species:${selectedSpecies.id}:`),
-                      )) && (
-                    <div className="mt-4 space-y-2 border-t border-border pt-4">
-                      <h3 className="text-lg font-bold text-foreground">Species Options</h3>
+                  {hasSpeciesOptionsSection && selectedSpecies ? (
+                    <BuilderCompletableSection
+                      title="Species Options"
+                      complete={speciesOptionsSectionComplete}
+                      headingLevel={3}
+                      pinnedWhenComplete={
+                        speciesOptionsSectionComplete ? speciesOptionsSectionPreview : null
+                      }
+                    >
                       {(selectedSpecies.size_options?.length ?? 0) > 1 && (
                         <div className="mb-2">
                           <p className="text-sm font-semibold text-foreground mb-1">Size</p>
@@ -4470,13 +5310,24 @@ export default function BuilderPageClient() {
                           </div>
                         )
                       })}
-                    </div>
-                  )}
-                </div>
+                    </BuilderCompletableSection>
+                  ) : null}
 
-                <div>
-                  <h2 className="text-2xl font-black text-foreground mb-2">Choose Your Background</h2>
-                  <p className={`${pageFloatingHintClass} mb-3`}>Your background provides ability bonuses and a 1st-level feat.</p>
+                <BuilderCompletableSection
+                  title="Choose Your Background"
+                  description="Your background provides ability bonuses and a 1st-level feat."
+                  complete={backgroundPickerComplete}
+                  summary={selectedBackground?.name}
+                  pinnedWhenComplete={
+                    selectedBackground ? (
+                      <BuilderSelectedCatalogItem
+                        item={selectedBackground}
+                        cardViewMode={cardViewMode}
+                        portrait={false}
+                      />
+                    ) : null
+                  }
+                >
                   
                   {/* Search + source filter */}
                   <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -4561,7 +5412,7 @@ export default function BuilderPageClient() {
                       items: visibleBackgrounds,
                       pageCount: backgroundPageCount,
                       safePage: safeBackgroundPage,
-                    } = paginateList(filteredBackgrounds, backgroundPickerPage, pickerPageSize)
+                    } = paginateList(filteredBackgrounds, backgroundPickerPage, backgroundPickerPageSize)
 
                     if (backgrounds.length === 0) {
                       return <BuilderCatalogEmptyPrompt itemLabel="backgrounds" tab="backgrounds" />
@@ -4588,7 +5439,7 @@ export default function BuilderPageClient() {
                           nextLabel="Next backgrounds"
                           className={cn("mb-2 mt-0", cinematicPickerPaginationClass)}
                         />
-                        <SwipeVisualPicker enabled={useSwipeVisualPicker} className={pickerGridClass}>
+                        <SwipeVisualPicker enabled={useSwipeVisualPicker} className={backgroundPickerGridClass}>
                           {visibleBackgrounds.map((bg) => {
                         const accent = getCompendiumItemAccentColor(bg as unknown as Record<string, unknown>)
                         const isSelected = character.background_id === bg.id
@@ -4664,13 +5515,13 @@ export default function BuilderPageClient() {
                         key={bg.id}
                         item={bg}
                         subtitle={bg.source || "Custom"}
-                        description={compendiumCardBlurb(bg.description, 100)}
                         accentColor={accent}
                         selected={isSelected}
                         size="md"
                         imageAspect="21/9"
                         onSelect={selectBackground}
                         onLearnMore={() => setDetailsModal({ type: "background", item: bg })}
+                        showBlurb={false}
                       />
                         )
                       })}
@@ -4689,8 +5540,17 @@ export default function BuilderPageClient() {
                       </>
                     )
                   })()}
+                </BuilderCompletableSection>
 
-                  {selectedBackground ? (
+                  {hasBackgroundOptionsSection && selectedBackground ? (
+                    <BuilderCompletableSection
+                      title="Background Options"
+                      complete={backgroundOptionsSectionComplete}
+                      headingLevel={3}
+                      pinnedWhenComplete={
+                        backgroundOptionsSectionComplete ? backgroundOptionsSectionPreview : null
+                      }
+                    >
                     <ModifierPlayerChoicePanel
                       sourceKey={backgroundFeatureModsSourceKey(selectedBackground.id)}
                       sourceLabel={selectedBackground.name}
@@ -4716,9 +5576,8 @@ export default function BuilderPageClient() {
                         )
                       }}
                     />
-                  ) : null}
 
-                  {selectedBackground && isLegacyBackground(selectedBackground) ? (
+                  {isLegacyBackground(selectedBackground) ? (
                     <div className="mt-4 space-y-2 border-t border-border pt-4">
                       <h3 className="text-lg font-bold text-foreground">Background Origin Feat</h3>
                       <p className="text-sm text-muted-foreground">
@@ -4758,7 +5617,7 @@ export default function BuilderPageClient() {
                     </div>
                   ) : null}
 
-                  {selectedBackground && backgroundFeatPickSlots.length > 0 ? (
+                  {backgroundFeatPickSlots.length > 0 ? (
                     <div className="mt-4 space-y-2 border-t border-border pt-4">
                       <h3 className="text-lg font-bold text-foreground">Background Feat</h3>
                       {backgroundFeatPickSlots.map((slot) => {
@@ -4953,7 +5812,8 @@ export default function BuilderPageClient() {
                       }}
                     />
                   ) : null}
-                </div>
+                    </BuilderCompletableSection>
+                  ) : null}
               </div>
             )}
 
@@ -5470,23 +6330,29 @@ export default function BuilderPageClient() {
                     </div>
                   )}
 
-                  {(packageEquipmentIds.length > 0 || inGoldShoppingMode) && (
+                  {(packageEquipment.ids.length > 0 || inGoldShoppingMode) && (
                     <div className="space-y-4">
-                      {packageEquipmentIds.length > 0 && (
+                      {packageEquipment.ids.length > 0 && (
                         <div className="p-3 rounded-lg bg-muted/50 border border-border">
                           <p className="text-xs font-bold text-primary uppercase mb-2 flex items-center gap-1.5">
                             <Backpack className="w-3.5 h-3.5" />
                             Included from packages
                           </p>
                           <div className="flex flex-wrap gap-2">
-                            {packageEquipmentIds.map((id) => {
+                            {packageEquipment.ids.map((id) => {
                               const item = equipment.find((e) => e.id === id)
                               if (!item) return null
+                              const quantity = ownedEquipmentQuantity(
+                                packageEquipment.ids,
+                                packageEquipment.quantities,
+                                id,
+                              )
                               return (
                                 <span
                                   key={id}
                                   className="text-xs px-2 py-1 rounded-full bg-primary/10 text-foreground"
                                 >
+                                  {quantity > 1 ? `${quantity}× ` : ""}
                                   {item.name}
                                 </span>
                               )
@@ -5506,6 +6372,7 @@ export default function BuilderPageClient() {
                           goldSpent={goldSpent}
                           totalGoldBudget={totalGoldBudget}
                           onTogglePurchase={toggleGoldPurchasedEquipment}
+                          onAdjustQuantity={adjustGoldPurchasedQuantity}
                           onShowDetails={(item) => setDetailsModal({ type: "equipment", item })}
                         />
                       )}
@@ -6485,6 +7352,7 @@ export default function BuilderPageClient() {
           const classSubclasses = getSubclassesForClass(subclasses, cls.id)
             .sort((a, b) => a.name.localeCompare(b.name))
           const complexityBadge = getClassComplexityHeroBadge(cls)
+          const classFlavor = getCompendiumDetailFlavor(cls, "class")
           return (
             <CompendiumDetailOverlay
               open
@@ -6511,9 +7379,15 @@ export default function BuilderPageClient() {
                     Class highlights
                   </p>
                   <h3 className={portraitDetailHeading}>How it feels to play</h3>
-                  <p className={cn("mt-1 text-white/75", portraitDetailBody)}>
-                    {getCompendiumCardBlurb(cls) || compendiumCardBlurb(cls.description)}
-                  </p>
+                  {classFlavor ? (
+                    <div className={cn("mt-1 text-white/75", portraitDetailBody)}>
+                      <RichTextContent html={classFlavor} />
+                    </div>
+                  ) : (
+                    <p className={cn("mt-1 text-white/75", portraitDetailBody)}>
+                      No description listed yet.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <h3 className={portraitDetailHeading}>Class features</h3>
@@ -6530,7 +7404,12 @@ export default function BuilderPageClient() {
                   )}
                   {classSubclasses.length > 0 ? (
                     <ul className="mt-2 space-y-2">
-                      {classSubclasses.map((subclass) => (
+                      {classSubclasses.map((subclass) => {
+                        const pathFlavor = getCompendiumDetailFlavor(
+                          { ...subclass, class_name: cls.name },
+                          "subclass",
+                        )
+                        return (
                         <li key={subclass.id} className="min-w-0">
                           <p className={cn(portraitDetailTitle, "text-white/90")}>
                             {subclass.name}
@@ -6538,13 +7417,14 @@ export default function BuilderPageClient() {
                               Subclass
                             </span>
                           </p>
-                          {subclass.description ? (
+                          {pathFlavor ? (
                             <p className={cn(portraitDetailSummary, "text-white/60")}>
-                              {compendiumCardBlurb(subclass.description)}
+                              {compendiumCardBlurb(pathFlavor)}
                             </p>
                           ) : null}
                         </li>
-                      ))}
+                        )
+                      })}
                     </ul>
                   ) : null}
                 </div>
@@ -6558,6 +7438,10 @@ export default function BuilderPageClient() {
           const accentStyles = compendiumAccentColorStyles(accent)
           const parentClass = classes.find((row) => row.id === subclass.class_id) ?? null
           const features = subclassFeatureTitleRows(subclass.features ?? [])
+          const subclassFlavor = getCompendiumDetailFlavor(
+            { ...subclass, class_name: parentClass?.name },
+            "subclass",
+          )
           const cardItem = {
             ...subclass,
             icon:
@@ -6586,9 +7470,9 @@ export default function BuilderPageClient() {
                     Subclass highlights
                   </p>
                   <h3 className={portraitDetailHeading}>What this path offers</h3>
-                  {subclass.description?.trim() ? (
+                  {subclassFlavor ? (
                     <div className={cn("mt-1 text-white/75", portraitDetailBody)}>
-                      <RichTextContent html={subclass.description} />
+                      <RichTextContent html={subclassFlavor} />
                     </div>
                   ) : (
                     <p className={cn("mt-1 text-white/75", portraitDetailBody)}>

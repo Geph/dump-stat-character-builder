@@ -343,6 +343,7 @@ CREATE TABLE IF NOT EXISTS characters (
   armor_proficiencies JSON,
   languages JSON,
   equipment_ids JSON,
+  equipment_quantities JSON,
   gold INT NOT NULL DEFAULT 0,
   equipped_armor_id CHAR(36),
   equipped_shield_id CHAR(36),

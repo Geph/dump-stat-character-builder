@@ -23,9 +23,9 @@ describe("getPickerPageSize", () => {
     expect(getPickerPageSize("dense", true)).toBe(12)
   })
 
-  it("paginates cinematic class/species grids with 2 cols × 3 rows", () => {
-    expect(getPickerPageSize("cinematic", false)).toBe(6)
-    expect(getPickerPageSize("cinematic", true)).toBe(6)
+  it("paginates cinematic class/species grids with 3 cols × 3 rows", () => {
+    expect(getPickerPageSize("cinematic", false)).toBe(9)
+    expect(getPickerPageSize("cinematic", true)).toBe(9)
   })
 })
 

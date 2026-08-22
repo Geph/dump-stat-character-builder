@@ -16,34 +16,94 @@ const WEAPON_MASTERY_PICKER_CATALOG_IDS = new Set([
 
 export type WeaponMasteryPool = "melee" | "all" | "rogue"
 
+/** Classes whose Weapon Mastery column scales (Barbarian-like: 2 → 3 → 4). */
+const BARBARIAN_LIKE_WEAPON_MASTERY: { level: number; count: number }[] = [
+  { level: 1, count: 2 },
+  { level: 4, count: 3 },
+  { level: 10, count: 4 },
+]
+
 const WEAPON_MASTERY_COUNT_BY_CLASS: Record<string, { level: number; count: number }[]> = {
-  Barbarian: [
-    { level: 1, count: 2 },
-    { level: 4, count: 3 },
-    { level: 10, count: 4 },
-  ],
+  Barbarian: BARBARIAN_LIKE_WEAPON_MASTERY,
   Fighter: [
     { level: 1, count: 3 },
     { level: 4, count: 4 },
     { level: 10, count: 5 },
     { level: 16, count: 6 },
   ],
+  // Mage Hand Press — Weapon Mastery column on the class table
+  Craftsman: BARBARIAN_LIKE_WEAPON_MASTERY,
+  Gunslinger: BARBARIAN_LIKE_WEAPON_MASTERY,
+  Vagabond: BARBARIAN_LIKE_WEAPON_MASTERY,
+  Warden: BARBARIAN_LIKE_WEAPON_MASTERY,
+  "Warden (Mage Hand Press)": BARBARIAN_LIKE_WEAPON_MASTERY,
 }
 
-/** Book-agnostic default when no per-class table is defined (matches Fighter progression). */
-export const DEFAULT_WEAPON_MASTERY_CHOICE_COUNT_BY_LEVEL: { level: number; count: number }[] =
-  WEAPON_MASTERY_COUNT_BY_CLASS.Fighter
+/** Fixed two masteries for the whole career (no Weapon Mastery column / no scaling prose). */
+const FIXED_TWO_WEAPON_MASTERY_CLASSES = new Set([
+  "Paladin",
+  "Ranger",
+  "Rogue",
+  "Captain",
+  "Investigator",
+  "Martyr",
+  "Dancer",
+])
 
 const FIXED_WEAPON_MASTERY_COUNT = [{ level: 1, count: 2 }]
 
+/** Safe default for unknown classes: stay at description count (usually two), never Fighter's ladder. */
+export const DEFAULT_WEAPON_MASTERY_CHOICE_COUNT_BY_LEVEL: { level: number; count: number }[] =
+  FIXED_WEAPON_MASTERY_COUNT
+
+function classNameBase(name: string): string {
+  return name.replace(/\s*\(.*\)\s*$/, "").trim() || name
+}
+
 export function weaponMasteryChoiceCountByLevel(className: string): { level: number; count: number }[] {
-  if (WEAPON_MASTERY_COUNT_BY_CLASS[className]) {
-    return WEAPON_MASTERY_COUNT_BY_CLASS[className]
-  }
-  if (className === "Paladin" || className === "Ranger" || className === "Rogue") {
+  const trimmed = className.trim()
+  const base = classNameBase(trimmed)
+  if (WEAPON_MASTERY_COUNT_BY_CLASS[trimmed]) return WEAPON_MASTERY_COUNT_BY_CLASS[trimmed]
+  if (WEAPON_MASTERY_COUNT_BY_CLASS[base]) return WEAPON_MASTERY_COUNT_BY_CLASS[base]
+  if (FIXED_TWO_WEAPON_MASTERY_CLASSES.has(trimmed) || FIXED_TWO_WEAPON_MASTERY_CLASSES.has(base)) {
     return FIXED_WEAPON_MASTERY_COUNT
   }
   return DEFAULT_WEAPON_MASTERY_CHOICE_COUNT_BY_LEVEL
+}
+
+function hasCuratedWeaponMasteryTable(className: string): boolean {
+  const trimmed = className.trim()
+  const base = classNameBase(trimmed)
+  return (
+    trimmed in WEAPON_MASTERY_COUNT_BY_CLASS ||
+    base in WEAPON_MASTERY_COUNT_BY_CLASS ||
+    FIXED_TWO_WEAPON_MASTERY_CLASSES.has(trimmed) ||
+    FIXED_TWO_WEAPON_MASTERY_CLASSES.has(base)
+  )
+}
+
+/** True when a stamped ladder matches the old mistaken Fighter fallback. */
+function looksLikeFighterWeaponMasteryLadder(
+  table: { level: number; count: number }[] | null | undefined,
+): boolean {
+  if (!table?.length) return false
+  const fighter = WEAPON_MASTERY_COUNT_BY_CLASS.Fighter
+  if (table.length !== fighter.length) return false
+  return table.every((row, i) => row.level === fighter[i]?.level && row.count === fighter[i]?.count)
+}
+
+/**
+ * Ladder used for builder/sheet counts. Prefer curated class tables; ignore a mistaken
+ * Fighter fallback left on fixed-2 classes from older imports.
+ */
+export function effectiveWeaponMasteryChoiceCountByLevel(
+  className: string,
+  incoming?: { level: number; count: number }[] | null,
+): { level: number; count: number }[] {
+  const curated = weaponMasteryChoiceCountByLevel(className)
+  if (hasCuratedWeaponMasteryTable(className)) return curated
+  if (!incoming?.length || looksLikeFighterWeaponMasteryLadder(incoming)) return curated
+  return incoming
 }
 
 const WEAPON_MASTERY_POOL_BY_CLASS: Record<string, WeaponMasteryPool> = {
@@ -220,9 +280,10 @@ export function enrichWeaponMasteryFeature(
     category: incoming?.category?.trim() ? incoming.category : built.category,
     count: incoming?.count && incoming.count > 0 ? incoming.count : built.count,
     swappableOnRest: incoming?.swappableOnRest ?? built.swappableOnRest,
-    choiceCountByLevel: incoming?.choiceCountByLevel?.length
-      ? incoming.choiceCountByLevel
-      : built.choiceCountByLevel,
+    choiceCountByLevel: effectiveWeaponMasteryChoiceCountByLevel(
+      className,
+      incoming?.choiceCountByLevel,
+    ),
     resourceKey: incoming?.resourceKey ?? built.resourceKey,
     options: incoming?.options?.length ? incoming.options : built.options,
   }

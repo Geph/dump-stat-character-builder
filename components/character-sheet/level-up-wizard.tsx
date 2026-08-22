@@ -14,10 +14,18 @@ import {
 } from "@/lib/character/character-classes"
 import { collectAsiPoolsFromFeat } from "@/lib/character/feat-asi-pools"
 import {
+  levelUpFeatAllocationPrefix,
+  levelUpFeatSlotKey,
+  mergeLevelUpFeatPersist,
+  normalizeAsiAllocationsMap,
+} from "@/lib/character/level-up-feat"
+import {
   averageHpGain,
   rollHitDie,
   rolledHpGain,
 } from "@/lib/character/level-up-improvements"
+import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
+import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import {
   buildLevelUpPlan,
   countReplacedPicks,
@@ -58,6 +66,7 @@ type Loaded = {
   feats: Feat[]
   spells: Spell[]
   customAbilities: CustomAbility[]
+  modifierCatalog: ModifierCatalogEntry[]
 }
 
 type HpMethod = "average" | "roll"
@@ -106,6 +115,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         { data: feats },
         { data: spells },
         { data: customAbilities },
+        modifierCatalog,
       ] = await Promise.all([
         db.from("characters").select("*").eq("id", characterId).single(),
         db.from("classes").select("*"),
@@ -113,6 +123,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         db.from("feats").select("*"),
         db.from("spells").select("*"),
         db.from("custom_abilities").select("*"),
+        loadModifierCatalog(db),
       ])
       if (cancelled) return
       if (!character) {
@@ -136,6 +147,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         feats: enrichedFeats,
         spells: asCompendiumRows(spells) as unknown as Spell[],
         customAbilities: asCompendiumRows(customAbilities) as unknown as CustomAbility[],
+        modifierCatalog,
       })
       setClassId(classDetails[0]?.row.class_id ?? null)
       setChoicePicks(mergeAlchemistDiscoveryPicks(char.feature_choice_picks ?? {}))
@@ -205,10 +217,19 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
     [featId, loaded],
   )
 
+  const featStep = wizardSteps.find((step) => step.kind === "feat_or_asi") ?? null
+  const featSlotKey = featStep
+    ? levelUpFeatSlotKey(featStep.classId, featStep.featureName, featStep.level)
+    : null
+
   const featAsiPools = useMemo(() => {
-    if (!selectedFeat) return []
-    return collectAsiPoolsFromFeat(selectedFeat, `feat:${selectedFeat.id}`)
-  }, [selectedFeat])
+    if (!selectedFeat || !featSlotKey) return []
+    return collectAsiPoolsFromFeat(
+      selectedFeat,
+      levelUpFeatAllocationPrefix(featSlotKey),
+      loaded?.modifierCatalog ?? [],
+    )
+  }, [featSlotKey, loaded?.modifierCatalog, selectedFeat])
 
   const knownSpellNames = useMemo(() => {
     if (!loaded) return []
@@ -284,24 +305,37 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           ? { ...row, level: plan.toLevel, subclass_id: subclassId ?? row.subclass_id }
           : row,
       )
-      const nextPicks = mergeAlchemistDiscoveryPicks({
+      const mergedPicks = mergeAlchemistDiscoveryPicks({
         ...(loaded.character.feature_choice_picks ?? {}),
         ...choicePicks,
       })
+      const featPersist = featId && featSlotKey
+        ? mergeLevelUpFeatPersist({
+            featId,
+            slotKey: featSlotKey,
+            pendingAllocations: featAsiAllocations,
+            existingFeatIds: loaded.character.feat_ids ?? [],
+            existingPicks: mergedPicks,
+            existingAllocations: loaded.character.asi_allocations,
+          })
+        : {
+            featIds: loaded.character.feat_ids ?? [],
+            featureChoicePicks: mergedPicks,
+            asiAllocations: {
+              ...normalizeAsiAllocationsMap(loaded.character.asi_allocations),
+              ...featAsiAllocations,
+            },
+          }
+      const nextPicks = featPersist.featureChoicePicks
       const builderPicks = normalizeBuilderPicks(loaded.character.builder_picks)
       const existingSpells = builderPicks.spell_picks_by_class_id?.[plan.classId] ?? []
       const nextSpellPicks = {
         ...(builderPicks.spell_picks_by_class_id ?? {}),
         [plan.classId]: [...existingSpells, ...cantripIds, ...spellIds],
       }
-      const nextFeatIds = featId
-        ? [...new Set([...(loaded.character.feat_ids ?? []), featId])]
-        : loaded.character.feat_ids ?? []
+      const nextFeatIds = featPersist.featIds
       const nextSpellIds = [...new Set([...(loaded.character.spell_ids ?? []), ...cantripIds, ...spellIds])]
-      const nextAsi: AsiAllocationsByFeatId = { ...(loaded.character.asi_allocations ?? {}) }
-      for (const [key, allocation] of Object.entries(featAsiAllocations)) {
-        nextAsi[key] = allocation
-      }
+      const nextAsi = featPersist.asiAllocations
 
       const hpGain =
         hpMethod === "roll" && hpNatural != null

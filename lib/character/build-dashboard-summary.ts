@@ -281,6 +281,7 @@ function buildCompanionSummaries(
     customAbilities: sheetCustomAbilities,
     ctx,
     knownSpells: spells,
+    featureChoicePicks: character.feature_choice_picks ?? {},
     formSelections: formSelectionsFromState(character.companion_state ?? []),
   })
   const merged = mergeCompanionState(resolved, character.companion_state ?? [])

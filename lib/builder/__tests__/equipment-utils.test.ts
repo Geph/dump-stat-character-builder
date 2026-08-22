@@ -4,6 +4,7 @@ import {
   filterStartingEquipmentOptionsByWeaponProficiency,
   formatPackageOptionTitle,
   isGoldOnlyOption,
+  resolvePackageEquipment,
   resolvePackageEquipmentIds,
 } from "@/lib/builder/equipment-utils"
 import type { Equipment } from "@/lib/types"
@@ -128,5 +129,13 @@ describe("collapseWeaponCategoryPackageOptions", () => {
       { "0": "longsword" },
     )
     expect(ids).toEqual(["longsword"])
+  })
+
+  it("keeps package line quantities for stacked weapons", () => {
+    const equipment = [weapon("dagger", "Dagger", "Simple Melee")]
+    expect(resolvePackageEquipment([{ name: "Dagger", quantity: 2 }], equipment)).toEqual({
+      ids: ["dagger"],
+      quantities: { dagger: 2 },
+    })
   })
 })

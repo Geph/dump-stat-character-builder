@@ -57,7 +57,7 @@ export function SheetStandardActionButtons({
               transition={{ duration: 0.18 }}
               className="overflow-hidden"
             >
-              <div className="flex flex-wrap gap-1.5 pt-0.5">
+              <div className="grid w-full grid-cols-4 gap-1.5 pt-0.5 sm:grid-cols-8">
                 {COMBAT_STANDARD_ACTIONS.map((action) => (
                   <button
                     key={action.id}
@@ -69,7 +69,7 @@ export function SheetStandardActionButtons({
                       setDetail(action)
                     }}
                     className={cn(
-                      "rounded-md border border-border/80 bg-muted/30 px-2 py-1 text-[11px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10",
+                      "flex min-h-11 w-full items-center justify-center rounded-md border border-border/80 bg-muted/30 px-1.5 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10",
                       disabled && "pointer-events-none opacity-50",
                     )}
                   >

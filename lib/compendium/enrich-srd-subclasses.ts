@@ -2,6 +2,7 @@ import { enrichSubclassFeaturesWithResources } from "@/lib/compendium/class-reso
 import { enrichSubclassFeaturesWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 import { enrichSubclassSpellTableFeatures } from "@/lib/compendium/enrich-subclass-spell-features"
 import { applyFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
+import { applySrdFlavorDescription } from "@/lib/compendium/srd-flavor-descriptions"
 import type { NamedSourceRow } from "@/lib/compendium/prefer-same-source"
 import { applyBundledSubclassCardImage } from "@/lib/compendium/subclass-card-images-defaults"
 import { applySubclassIcon } from "@/lib/compendium/subclass-icons-defaults"
@@ -27,9 +28,12 @@ export function enrichSrdSubclassRow(
     ? enrichSubclassSpellTableFeatures(withPresets, spellCatalog, preferredSource)
     : withPresets
   // Card art is keyed by parent class + subclass name (avoids Reanimator-style collisions).
-  return applyBundledSubclassCardImage(
-    applySubclassIcon(withSpells, parentClassName),
-    parentClassName,
+  return applySrdFlavorDescription(
+    applyBundledSubclassCardImage(
+      applySubclassIcon(withSpells, parentClassName),
+      parentClassName,
+    ),
+    "subclass",
   )
 }
 

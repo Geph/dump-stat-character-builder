@@ -1036,6 +1036,8 @@ export interface Character {
   armor_proficiencies: string[] | null
   languages: string[] | null
   equipment_ids: string[]
+  /** Counts for stacked mundane gear (daggers, handaxes). Missing keys default to 1. */
+  equipment_quantities?: Record<string, number> | null
   gold?: number | null
   equipped_armor_id?: string | null
   equipped_shield_id?: string | null
@@ -1090,6 +1092,7 @@ export interface CharacterDraft {
   armor_proficiencies?: string[]
   languages: string[]
   equipment_ids: string[]
+  equipment_quantities?: Record<string, number> | null
   gold?: number
   spell_ids: string[]
   feat_ids?: string[]

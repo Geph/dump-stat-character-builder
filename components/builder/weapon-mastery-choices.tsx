@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { Check, Info, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import equipmentSeed from "@/lib/srd/seed-data/equipment.json"
 import { buildWeaponMasteryDescriptionsLookup } from "@/lib/compendium/weapon-mastery"
 import { weaponIconSlug } from "@/lib/compendium/weapon-icons"
 import { GameIcon } from "@/components/game-icon-picker"
+import { cn } from "@/lib/utils"
 
 type ChoiceOption = { name: string; description?: string }
 
@@ -23,12 +25,66 @@ type WeaponMasteryChoicesProps = {
   masteryDescriptions?: Record<string, string>
 }
 
-/** Extract the mastery property name from an option description (e.g. "Topple — ..."). */
+type WeaponFilter = "all" | "simple" | "martial" | "melee" | "ranged"
+
+type SeedWeapon = {
+  name: string
+  category?: string
+  subcategory?: string | null
+}
+
+const SEED_WEAPONS = equipmentSeed as SeedWeapon[]
+
+const WEAPON_FILTER_OPTIONS: { id: WeaponFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "simple", label: "Simple" },
+  { id: "martial", label: "Martial" },
+  { id: "melee", label: "Melee" },
+  { id: "ranged", label: "Ranged" },
+]
+
 function masteryNameFromDescription(description?: string): string | null {
   if (!description) return null
   const [head] = description.split("—")
   const trimmed = head.trim()
   return trimmed || null
+}
+
+function weaponSubcategory(name: string): string {
+  const hit = SEED_WEAPONS.find(
+    (weapon) => weapon.name.trim().toLowerCase() === name.trim().toLowerCase(),
+  )
+  return (hit?.subcategory ?? "").toLowerCase()
+}
+
+function matchesWeaponFilter(subcategory: string, filter: WeaponFilter): boolean {
+  if (filter === "all") return true
+  return subcategory.includes(filter)
+}
+
+function FilterChip({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-lg border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors",
+        active
+          ? "border-primary bg-primary/15 text-primary"
+          : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
+  )
 }
 
 export function WeaponMasteryChoices({
@@ -44,6 +100,7 @@ export function WeaponMasteryChoices({
 }: WeaponMasteryChoicesProps) {
   const [showInfo, setShowInfo] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
+  const [weaponFilter, setWeaponFilter] = useState<WeaponFilter>("all")
   const unavailable = new Set(unavailableOptions)
   const masteryRules = masteryDescriptions ?? buildWeaponMasteryDescriptionsLookup()
 
@@ -55,7 +112,6 @@ export function WeaponMasteryChoices({
     options.map((option) => [option.name, masteryNameFromDescription(option.description)]),
   )
 
-  // Render exactly maxCount slots; map the compact `selected` array onto them in order.
   const slotValues: string[] = Array.from({ length: maxCount }, (_, i) => selected[i] ?? "")
 
   const setSlot = (index: number, value: string) => {
@@ -73,6 +129,13 @@ export function WeaponMasteryChoices({
     if (unavailable.has(name) || selected.length >= maxCount) return
     onChange([...selected, name])
   }
+
+  const filteredOptions = useMemo(() => {
+    return options.filter((option) => {
+      if (selectedSet.has(option.name)) return true
+      return matchesWeaponFilter(weaponSubcategory(option.name), weaponFilter)
+    })
+  }, [options, weaponFilter, selected])
 
   const masteriesPresent = Array.from(
     new Set(
@@ -105,8 +168,18 @@ export function WeaponMasteryChoices({
 
         {layout === "visual" ? (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {options.map((option) => {
+            <div className="mb-3 flex flex-wrap justify-end gap-1.5" role="group" aria-label="Weapon filter">
+              {WEAPON_FILTER_OPTIONS.map(({ id, label }) => (
+                <FilterChip
+                  key={id}
+                  label={label}
+                  active={weaponFilter === id}
+                  onClick={() => setWeaponFilter(id)}
+                />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {filteredOptions.map((option) => {
                 const isSelected = selectedSet.has(option.name)
                 const optionMastery = masteryByWeapon.get(option.name) ?? null
                 const disabled =
@@ -151,6 +224,11 @@ export function WeaponMasteryChoices({
                 )
               })}
             </div>
+            {filteredOptions.length === 0 ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                No weapons match these filters.
+              </p>
+            ) : null}
             {selected.length > 0 && (
               <div className="mt-3 space-y-1">
                 {selected.map((name) => {

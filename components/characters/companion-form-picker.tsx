@@ -48,8 +48,13 @@ export function CompanionFormPicker({
       return (
         <div className="bg-card rounded-xl border border-border p-3 space-y-1.5">
           <p className="text-[10px] uppercase font-bold text-muted-foreground">
-            {group.featureName} — Creature
+            {group.featureName === "Cohort" ? "Cohort" : group.featureName} — Choose one
           </p>
+          {/^cohort$/i.test(group.featureName) ? (
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Initiate one Cohort. Only the chosen companion appears on this tab.
+            </p>
+          ) : null}
           <select
             value={selected}
             onChange={(event) => onChange(event.target.value ? [event.target.value] : [])}

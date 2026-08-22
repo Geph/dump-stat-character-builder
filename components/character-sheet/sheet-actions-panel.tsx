@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { AlertTriangle, Dices, X } from "lucide-react"
 import { GameIcon } from "@/components/game-icon-picker"
@@ -14,8 +14,10 @@ import { useSheetRollContext } from "@/components/character-sheet/sheet-roll-con
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 import {
   ACTION_KIND_LABELS,
+  selectableEconomyKinds,
   type ActionEconomyKind,
   type SheetActionEntry,
+  type SheetActionTalentAlert,
 } from "@/lib/character/sheet-actions"
 import { talentAlertAppliesToVariant } from "@/lib/character/alchemist-bomb-sheet"
 import { guardianTacticsToggleIdForOption, sheetToggleIdActivatedByAction } from "@/lib/compendium/sheet-toggle-registry"
@@ -26,6 +28,7 @@ import {
   SHEET_ACTION_USAGE_DOT,
 } from "@/lib/character/sheet-status-colors"
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
+import { firstSentenceFromText } from "@/lib/builder/feature-choice-hint"
 import { cn } from "@/lib/utils"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
@@ -134,6 +137,94 @@ function actionEquipmentChoiceKey(action: SheetActionEntry, choiceId: string): s
   return `player-equipment:${action.id}:${choiceId}`
 }
 
+const ACTION_DETAIL_TAB_TRIGGER_CLASS =
+  "w-full rounded-lg border border-transparent px-2 py-2 text-xs font-semibold"
+
+function attackProfileActionLabel(profile: SpecialAttackCharacteristic): string {
+  return profile.attackVariant === "explode"
+    ? "Explode"
+    : profile.attackVariant === "primed"
+      ? "Primed"
+      : profile.attackVariant === "attack"
+        ? "Attack"
+        : profile.label || profile.attackName || "Use"
+}
+
+function ActionSelectableRiders({
+  riders,
+  selectedRiderNames,
+  onToggle,
+}: {
+  riders: SheetActionTalentAlert[]
+  selectedRiderNames: string[]
+  onToggle: (name: string) => void
+}) {
+  if (!riders.length) return null
+  return (
+    <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        Add riders
+      </p>
+      {riders.map((alert) => {
+        const checked = selectedRiderNames.includes(alert.name)
+        return (
+          <label
+            key={`${alert.name}:${alert.summary}`}
+            className="flex cursor-pointer items-start gap-2"
+          >
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={checked}
+              onChange={() => onToggle(alert.name)}
+            />
+            <span className="min-w-0 space-y-1">
+              <span className="block text-xs font-semibold text-foreground">{alert.name}</span>
+              <span className="block text-xs text-foreground/90 leading-relaxed">
+                {alert.summary}
+              </span>
+            </span>
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
+function ActionInfoTalentAlerts({ alerts }: { alerts: SheetActionTalentAlert[] }) {
+  if (!alerts.length) return null
+  return (
+    <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+        Related talents
+      </p>
+      {alerts.map((alert) => (
+        <div key={`${alert.name}:${alert.summary}`} className="flex gap-2">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="min-w-0 space-y-1">
+            <p className="text-xs font-semibold text-foreground">{alert.name}</p>
+            <p className="text-xs text-foreground/90 leading-relaxed">{alert.summary}</p>
+            {alert.parentMenuOptionNames?.length ? (
+              <p className="text-[10px] text-muted-foreground">
+                Applies to: {alert.parentMenuOptionNames.join(", ")}
+              </p>
+            ) : null}
+            {alert.sourceLabel ? (
+              <p className="text-[10px] text-muted-foreground">{alert.sourceLabel}</p>
+            ) : null}
+            {alert.description ? (
+              <RichTextContent
+                html={alert.description}
+                className="text-xs text-foreground/80 leading-relaxed [&_p]:mb-1 [&_p:last-child]:mb-0"
+              />
+            ) : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function resolveActionMax(
   uses: UsesConfig | null | undefined,
   classLevel: number,
@@ -218,6 +309,74 @@ function specialAttackDamageModifier(
       ? specialAttackModifier(attack, ctx)
       : abilityModifierFromContext(ctx, configured)
   return Math.max(attack.damageAbilityMinimum ?? Number.NEGATIVE_INFINITY, modifier)
+}
+
+function formatSignedModifier(value: number): string {
+  return value >= 0 ? `+${value}` : `${value}`
+}
+
+function specialAttackRangeLabel(attack: SpecialAttackCharacteristic): string | null {
+  const parts: string[] = []
+  if (attack.rangeFeet != null && attack.rangeFeet > 0) {
+    parts.push(`${attack.rangeFeet} ft.`)
+  }
+  if (attack.areaLengthFeet != null && attack.areaShape) {
+    const shape = attack.areaShape.replace(/_/g, " ")
+    if (attack.areaWidthFeet) {
+      parts.push(`${attack.areaLengthFeet}×${attack.areaWidthFeet} ft. ${shape}`)
+    } else {
+      parts.push(`${attack.areaLengthFeet}-ft. ${shape}`)
+    }
+  }
+  return parts.length ? parts.join(" · ") : null
+}
+
+function specialAttackDamageLabel(
+  attack: SpecialAttackCharacteristic,
+  ctx: ResolveUsesContext,
+  hitDieSides?: number | null,
+): string | null {
+  if (attack.useWeaponDamage) return "Weapon damage"
+  if (!(attack.damageDiceCount > 0)) return null
+  const sides =
+    hitDieSides != null && hitDieSides > 0 ? hitDieSides : dieSides(attack.damageDieType)
+  const modifier = specialAttackDamageModifier(attack, ctx)
+  const type = attack.damageTypes[0]
+  return `${attack.damageDiceCount}d${sides}${
+    modifier ? ` ${formatSignedModifier(modifier)}` : ""
+  }${type ? ` ${type}` : ""}`
+}
+
+function specialAttackProfileLabel(attack: SpecialAttackCharacteristic): string | null {
+  if (attack.attackProfile === "ranged") return "Ranged"
+  if (attack.attackProfile === "melee") return "Melee"
+  if (attack.attackProfile === "force_save") return "Save"
+  if (attack.attackProfile === "emanation") return "Emanation"
+  return null
+}
+
+function actionSummaryLine(entry: SheetActionEntry): string | null {
+  const fromDescription = firstSentenceFromText(entry.description ?? "")
+  if (fromDescription) {
+    return fromDescription.length > 140 ? `${fromDescription.slice(0, 137).trimEnd()}…` : fromDescription
+  }
+  const meta = [entry.castingTime, entry.range, entry.duration].filter(Boolean)
+  return meta.length ? meta.join(" · ") : null
+}
+
+function ActionStatTile({
+  caption,
+  value,
+}: {
+  caption: string
+  value: string
+}) {
+  return (
+    <div className="rounded-lg border border-primary/40 bg-primary/10 px-2 py-1.5 text-center">
+      <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">{caption}</p>
+      <p className="text-sm font-black tabular-nums leading-tight text-foreground">{value}</p>
+    </div>
+  )
 }
 
 function UseDots({
@@ -499,6 +658,7 @@ function ActionDetailOverlay({
   onSpendSpellSlot,
   primedBombUsedThisTurn = false,
   onPrimedBombUsed,
+  initialEconomyKind = null,
 }: {
   action: SheetActionEntry
   usage: ActionUsage | null
@@ -548,6 +708,7 @@ function ActionDetailOverlay({
   onSpendSpellSlot?: (minSpellLevel: number) => string | null
   primedBombUsedThisTurn?: boolean
   onPrimedBombUsed?: () => void
+  initialEconomyKind?: ActionEconomyKind | null
 }) {
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
   const [step, setStep] = useState<"detail" | "roll" | "target">("detail")
@@ -569,6 +730,21 @@ function ActionDetailOverlay({
   const [selectedMenuOption, setSelectedMenuOption] = useState<string | null>(
     menuOptions[0]?.name ?? null,
   )
+  const economyChoices = selectableEconomyKinds(
+    action.kinds,
+    action.spendsEconomy,
+    action.trigger,
+  )
+  const [selectedEconomyKind, setSelectedEconomyKind] = useState<ActionEconomyKind>(
+    initialEconomyKind && action.kinds.includes(initialEconomyKind)
+      ? initialEconomyKind
+      : (action.kinds[0] ?? "action"),
+  )
+  const overlayScrollRef = useRef<HTMLDivElement>(null)
+  const useActionTabs = attackProfiles.length > 1
+  const [detailTab, setDetailTab] = useState(
+    attackProfiles[0] ? `profile:${attackProfiles[0].id}` : "description",
+  )
 
   const psionicAugments =
     action.psionicAugments ??
@@ -584,11 +760,18 @@ function ActionDetailOverlay({
     attackProfiles.find((profile) => profile.id === selectedAttackProfileId) ??
     attackProfiles[0] ??
     null
-  const visibleTalentAlerts = (action.relatedTalentAlerts ?? []).filter((alert) =>
+  const allTalentAlerts = action.relatedTalentAlerts ?? []
+  const visibleTalentAlerts = allTalentAlerts.filter((alert) =>
     talentAlertAppliesToVariant(alert.appliesToAttackVariants, specialAttack?.attackVariant),
   )
   const selectableRiders = visibleTalentAlerts.filter((alert) => alert.selectable)
   const infoTalentAlerts = visibleTalentAlerts.filter((alert) => !alert.selectable)
+  const staticInfoTalentAlerts = allTalentAlerts.filter(
+    (alert) => !alert.selectable && !alert.appliesToAttackVariants?.length,
+  )
+  const variantInfoTalentAlerts = visibleTalentAlerts.filter(
+    (alert) => !alert.selectable && Boolean(alert.appliesToAttackVariants?.length),
+  )
   const psiCost = psionicAugments
     ? totalPsionicAugmentCost(psionicAugments, augmentSelections)
     : 0
@@ -598,6 +781,7 @@ function ActionDetailOverlay({
       : null
 
   const selectedOption = menuOptions.find((option) => option.name === selectedMenuOption)
+  const showEconomyPicker = economyChoices.length > 1 && !selectedOption?.actionKind
   const hitDiceCost =
     selectedOption?.hitDiceCost ??
     action.spendHitDice ??
@@ -685,11 +869,17 @@ function ActionDetailOverlay({
     setStep("detail")
     setUseFeedback(null)
     setResourceSpendAmount(1)
-    setEmpowerSpend(0)
+    setEmpowerSpend(attackProfiles[0]?.attackVariant === "primed" ? 1 : 0)
     setOverloadedChargeActive(false)
     setSelectedRiderNames([])
     setSelectedAttackProfileId(attackProfiles[0]?.id ?? null)
     setSelectedMenuOption(menuOptions[0]?.name ?? null)
+    setDetailTab(attackProfiles[0] ? `profile:${attackProfiles[0].id}` : "description")
+    setSelectedEconomyKind(
+      initialEconomyKind && action.kinds.includes(initialEconomyKind)
+        ? initialEconomyKind
+        : (action.kinds[0] ?? "action"),
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the opened action changes
   }, [action.id])
 
@@ -822,7 +1012,11 @@ function ActionDetailOverlay({
     }
 
     if (action.spendsEconomy !== false && onMarkEconomy) {
-      const economyKinds = selectedOption?.actionKind ? [selectedOption.actionKind] : action.kinds
+      const economyKinds = selectedOption?.actionKind
+        ? [selectedOption.actionKind]
+        : economyChoices.length
+          ? [selectedEconomyKind]
+          : action.kinds
       for (const kind of economyKinds) {
         onMarkEconomy(kind)
       }
@@ -1006,6 +1200,28 @@ function ActionDetailOverlay({
       ? empower.radiusFeetPerResource * empowerApplied
       : 0
 
+  const selectAttackProfile = (profile: SpecialAttackCharacteristic) => {
+    setSelectedAttackProfileId(profile.id)
+    setEmpowerSpend(profile.attackVariant === "primed" ? 1 : 0)
+    setOverloadedChargeActive(false)
+    setSelectedRiderNames([])
+  }
+
+  const handleDetailTabChange = (value: string) => {
+    setDetailTab(value)
+    if (value.startsWith("profile:")) {
+      const profile = attackProfiles.find((entry) => `profile:${entry.id}` === value)
+      if (profile) selectAttackProfile(profile)
+    }
+    overlayScrollRef.current?.scrollTo({ top: 0 })
+  }
+
+  const toggleRider = (name: string) => {
+    setSelectedRiderNames((current) =>
+      current.includes(name) ? current.filter((entry) => entry !== name) : [...current, name],
+    )
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -1018,33 +1234,89 @@ function ActionDetailOverlay({
         initial={{ y: 24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 24, opacity: 0 }}
+        ref={overlayScrollRef}
         className="w-full max-w-3xl max-h-[85vh] overflow-y-auto bg-card border-2 border-border rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 flex items-start justify-between gap-3 p-4 border-b border-border bg-card/95 backdrop-blur-sm">
-          <div>
-            <h2 className="flex items-center gap-2 text-lg font-black text-foreground">
-              {specialAttack?.icon ? (
-                <GameIcon name={specialAttack.icon} className="h-5 w-5 shrink-0 text-primary" />
-              ) : null}
-              {action.name}
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              {action.sourceLabel}
-              {" · "}
+        <div className="sticky top-0 z-[1] space-y-3 border-b border-border bg-card/95 p-4 backdrop-blur-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-black text-foreground">
+                {specialAttack?.icon ? (
+                  <GameIcon name={specialAttack.icon} className="h-5 w-5 shrink-0 text-primary" />
+                ) : null}
+                {action.name}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {action.sourceLabel}
+                {" · "}
               {action.trigger
                 ? action.trigger
-                : action.kinds.map((kind) => ACTION_KIND_LABELS[kind]).join(", ")}
-            </p>
+                : showEconomyPicker
+                  ? economyChoices.map((kind) => ACTION_KIND_LABELS[kind]).join(" or ")
+                  : action.kinds.map((kind) => ACTION_KIND_LABELS[kind]).join(", ")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          {useActionTabs && step === "detail" ? (
+            <div
+              role="tablist"
+              aria-label={`${action.name} details`}
+              className={cn(
+                "grid gap-1",
+                attackProfiles.length >= 3 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3",
+              )}
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={detailTab === "description"}
+                onClick={() => handleDetailTabChange("description")}
+                className={cn(
+                  ACTION_DETAIL_TAB_TRIGGER_CLASS,
+                  detailTab === "description"
+                    ? "border-border bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/50",
+                )}
+              >
+                Description
+              </button>
+              {attackProfiles.map((profile) => {
+                const tabValue = `profile:${profile.id}`
+                const selected = detailTab === tabValue
+                return (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => handleDetailTabChange(tabValue)}
+                    className={cn(
+                      ACTION_DETAIL_TAB_TRIGGER_CLASS,
+                      "inline-flex items-center justify-center gap-1.5",
+                      selected
+                        ? "border-border bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted/50",
+                      profile.attackVariant === "primed" && primedBombUsedThisTurn && "opacity-60",
+                    )}
+                  >
+                    {profile.icon ? (
+                      <GameIcon name={profile.icon} className="h-3.5 w-3.5 shrink-0" />
+                    ) : null}
+                    {attackProfileActionLabel(profile)}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
         </div>
 
         {step === "roll" && specialAttack ? (
@@ -1124,6 +1396,191 @@ function ActionDetailOverlay({
           </div>
         ) : (
           <>
+            {useActionTabs ? (
+              detailTab === "description" ? (
+                <div className="space-y-3 p-4">
+                  <ActionInfoTalentAlerts alerts={staticInfoTalentAlerts} />
+                  {(action.castingTime || action.range || action.duration) ? (
+                    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                      {action.castingTime ? (
+                        <>
+                          <dt className="text-muted-foreground">Casting Time</dt>
+                          <dd className="text-foreground">{action.castingTime}</dd>
+                        </>
+                      ) : null}
+                      {action.range ? (
+                        <>
+                          <dt className="text-muted-foreground">Range</dt>
+                          <dd className="text-foreground">{action.range}</dd>
+                        </>
+                      ) : null}
+                      {action.components?.length ? (
+                        <>
+                          <dt className="text-muted-foreground">Components</dt>
+                          <dd className="text-foreground">{action.components.join(", ")}</dd>
+                        </>
+                      ) : null}
+                      {action.duration ? (
+                        <>
+                          <dt className="text-muted-foreground">Duration</dt>
+                          <dd className="text-foreground">
+                            {action.duration}
+                            {action.concentration ? " (Concentration)" : ""}
+                          </dd>
+                        </>
+                      ) : null}
+                    </dl>
+                  ) : null}
+                  <RichTextContent
+                    html={action.description}
+                    className="text-sm text-foreground/90 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
+                  />
+                  {action.equipmentChoices?.map((choice) => {
+                    const key = actionEquipmentChoiceKey(action, choice.id)
+                    const listId = `${key}:options`
+                    return (
+                      <label key={key} className="block space-y-1">
+                        <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                          {choice.label}
+                        </span>
+                        <input
+                          key={`${key}:${playerNoteValues[key]?.[0] ?? ""}`}
+                          type="text"
+                          list={choice.options.length ? listId : undefined}
+                          defaultValue={playerNoteValues[key]?.[0] ?? ""}
+                          onBlur={(event) =>
+                            onEquipmentChoiceChange?.(key, event.target.value.trim())
+                          }
+                          placeholder={
+                            choice.allowCustom
+                              ? "Choose an item or enter another name…"
+                              : "Choose an item…"
+                          }
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                        />
+                        {choice.options.length ? (
+                          <datalist id={listId}>
+                            {choice.options.map((option) => (
+                              <option key={option} value={option} />
+                            ))}
+                          </datalist>
+                        ) : null}
+                        <span className="block text-[11px] text-muted-foreground">
+                          Change this after completing the relinking rest or ritual described above.
+                        </span>
+                      </label>
+                    )
+                  })}
+                  {action.playerNotes?.map((note) => {
+                    const key = actionPlayerNoteKey(action, note.id)
+                    return (
+                      <label key={key} className="block space-y-1">
+                        <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                          {note.prompt}
+                        </span>
+                        <textarea
+                          key={`${key}:${playerNoteValues[key]?.[0] ?? ""}`}
+                          defaultValue={playerNoteValues[key]?.[0] ?? ""}
+                          onBlur={(event) => onPlayerNoteChange?.(key, event.target.value)}
+                          rows={3}
+                          placeholder={note.placeholder}
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                        />
+                      </label>
+                    )
+                  })}
+                  <p className="text-xs text-muted-foreground">
+                    Choose a mode above to use this feature.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 p-4">
+                    {specialAttack?.attackVariant !== "explode" &&
+                    attackProfiles.some((entry) => entry.attackVariant === "primed") ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Extra Attack lets you throw more regular bombs; only one can be Primed per
+                        Attack action.
+                        {primedBombUsedThisTurn ? " Primed already used this turn." : ""}
+                      </p>
+                    ) : null}
+                    {usage ? (
+                      <p className="text-xs font-semibold text-foreground">
+                        {usage.resourceName ? `${usage.resourceName}: ` : "Uses: "}
+                        <span className="tabular-nums">
+                          {usage.max - usage.used} / {usage.max} remaining
+                        </span>
+                      </p>
+                    ) : null}
+                    {hitDiceNeeded > 0 ||
+                    menuOptions.some((option) => (option.hitDiceCost ?? 0) > 0) ? (
+                      <p className="text-xs text-muted-foreground">
+                        Hit Dice available:{" "}
+                        <span className="tabular-nums font-semibold text-foreground">
+                          {hitDiceRemaining}
+                        </span>
+                      </p>
+                    ) : null}
+                    {menuOptions.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                          Choose option
+                        </p>
+                        <div className="grid gap-2">
+                          {menuOptions.map((option) => {
+                            const selected = option.name === selectedMenuOption
+                            const cost = option.hitDiceCost ?? 0
+                            const affordable = cost <= 0 || cost <= hitDiceRemaining
+                            return (
+                              <button
+                                key={option.name}
+                                type="button"
+                                disabled={!affordable}
+                                onClick={() => setSelectedMenuOption(option.name)}
+                                className={cn(
+                                  "rounded-lg border px-3 py-2 text-left text-xs transition-colors",
+                                  selected
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:border-primary/40",
+                                  !affordable && "opacity-50",
+                                )}
+                              >
+                                <span className="font-semibold text-foreground">{option.name}</span>
+                                {cost > 0 ? (
+                                  <span className="ml-2 text-muted-foreground">{cost} Hit Dice</span>
+                                ) : option.costLabel ? (
+                                  <span className="ml-2 text-muted-foreground">{option.costLabel}</span>
+                                ) : null}
+                                {option.description ? (
+                                  <RichTextContent
+                                    html={option.description}
+                                    className="mt-1 text-xs text-muted-foreground leading-relaxed [&_p]:mb-0"
+                                    fallback=""
+                                  />
+                                ) : null}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                    {psionicAugments ? (
+                      <PsionicAugmentPicker
+                        config={psionicAugments}
+                        psiLimit={psiLimit}
+                        availablePsiPoints={availablePsiPoints}
+                        selections={augmentSelections}
+                        onChange={setAugmentSelections}
+                      />
+                    ) : null}
+                    <ActionSelectableRiders
+                      riders={selectableRiders}
+                      selectedRiderNames={selectedRiderNames}
+                      onToggle={toggleRider}
+                    />
+                    <ActionInfoTalentAlerts alerts={variantInfoTalentAlerts} />
+                </div>
+              )
+            ) : (
             <div className="p-4 space-y-3">
               {attackProfiles.length > 1 ? (
                 <div className="space-y-2">
@@ -1135,24 +1592,11 @@ function ActionDetailOverlay({
                       const selected = profile.id === specialAttack?.id
                       const primedLocked =
                         profile.attackVariant === "primed" && primedBombUsedThisTurn
-                      const label =
-                        profile.attackVariant === "explode"
-                          ? "Explode"
-                          : profile.attackVariant === "primed"
-                            ? "Primed"
-                            : profile.attackVariant === "attack"
-                              ? "Attack"
-                              : profile.label || profile.attackName || "Use"
                       return (
                         <button
                           key={profile.id}
                           type="button"
-                          onClick={() => {
-                            setSelectedAttackProfileId(profile.id)
-                            setEmpowerSpend(profile.attackVariant === "primed" ? 1 : 0)
-                            setOverloadedChargeActive(false)
-                            setSelectedRiderNames([])
-                          }}
+                          onClick={() => selectAttackProfile(profile)}
                           className={cn(
                             "inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
                             selected
@@ -1164,7 +1608,7 @@ function ActionDetailOverlay({
                           {profile.icon ? (
                             <GameIcon name={profile.icon} className="h-3.5 w-3.5 shrink-0" />
                           ) : null}
-                          {label}
+                          {attackProfileActionLabel(profile)}
                         </button>
                       )
                     })}
@@ -1278,71 +1722,12 @@ function ActionDetailOverlay({
                   onChange={setAugmentSelections}
                 />
               ) : null}
-              {selectableRiders.length ? (
-                <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                    Add riders
-                  </p>
-                  {selectableRiders.map((alert) => {
-                    const checked = selectedRiderNames.includes(alert.name)
-                    return (
-                      <label
-                        key={`${alert.name}:${alert.summary}`}
-                        className="flex cursor-pointer items-start gap-2"
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-0.5"
-                          checked={checked}
-                          onChange={() => {
-                            setSelectedRiderNames((current) =>
-                              current.includes(alert.name)
-                                ? current.filter((name) => name !== alert.name)
-                                : [...current, alert.name],
-                            )
-                          }}
-                        />
-                        <span className="min-w-0 space-y-1">
-                          <span className="block text-xs font-semibold text-foreground">{alert.name}</span>
-                          <span className="block text-xs text-foreground/90 leading-relaxed">
-                            {alert.summary}
-                          </span>
-                        </span>
-                      </label>
-                    )
-                  })}
-                </div>
-              ) : null}
-              {infoTalentAlerts.length ? (
-                <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
-                    Related talents
-                  </p>
-                  {infoTalentAlerts.map((alert) => (
-                    <div key={`${alert.name}:${alert.summary}`} className="flex gap-2">
-                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-xs font-semibold text-foreground">{alert.name}</p>
-                        <p className="text-xs text-foreground/90 leading-relaxed">{alert.summary}</p>
-                        {alert.parentMenuOptionNames?.length ? (
-                          <p className="text-[10px] text-muted-foreground">
-                            Applies to: {alert.parentMenuOptionNames.join(", ")}
-                          </p>
-                        ) : null}
-                        {alert.sourceLabel ? (
-                          <p className="text-[10px] text-muted-foreground">{alert.sourceLabel}</p>
-                        ) : null}
-                        {alert.description ? (
-                          <RichTextContent
-                            html={alert.description}
-                            className="text-xs text-foreground/80 leading-relaxed [&_p]:mb-1 [&_p:last-child]:mb-0"
-                          />
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
+              <ActionSelectableRiders
+                riders={selectableRiders}
+                selectedRiderNames={selectedRiderNames}
+                onToggle={toggleRider}
+              />
+              <ActionInfoTalentAlerts alerts={infoTalentAlerts} />
               <RichTextContent
                 html={action.description}
                 className="text-sm text-foreground/90 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
@@ -1398,7 +1783,9 @@ function ActionDetailOverlay({
                 )
               })}
             </div>
+            )}
 
+            {(!useActionTabs || detailTab !== "description") ? (
             <div className="sticky bottom-0 space-y-2 border-t border-border bg-card/95 p-4 backdrop-blur-sm">
               {usage &&
               action.classResourceKey &&
@@ -1513,6 +1900,35 @@ function ActionDetailOverlay({
                   {psiLimit != null ? ` (limit ${psiLimit})` : ""}.
                 </p>
               ) : null}
+              {showEconomyPicker ? (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                    Use as
+                  </p>
+                  <div
+                    className={cn(
+                      "grid gap-2",
+                      economyChoices.length >= 3 ? "grid-cols-3" : "grid-cols-2",
+                    )}
+                  >
+                    {economyChoices.map((kind) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        onClick={() => setSelectedEconomyKind(kind)}
+                        className={cn(
+                          "rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
+                          selectedEconomyKind === kind
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border hover:border-primary/40",
+                        )}
+                      >
+                        {ACTION_KIND_LABELS[kind]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <button
                 type="button"
                 disabled={!canUse}
@@ -1520,6 +1936,10 @@ function ActionDetailOverlay({
                 className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Use {action.name}
+                {useActionTabs && specialAttack
+                  ? ` — ${attackProfileActionLabel(specialAttack)}`
+                  : ""}
+                {showEconomyPicker ? ` (${ACTION_KIND_LABELS[selectedEconomyKind]})` : ""}
                 {usage && action.classResourceKey
                   ? resourceSpend < 0
                     ? ` (refund ${Math.abs(resourceSpend)} ${usage.resourceName ?? "resource"})`
@@ -1534,6 +1954,7 @@ function ActionDetailOverlay({
                 {psiCost > 0 ? ` (${psiCost} psi)` : ""}
               </button>
             </div>
+            ) : null}
           </>
         )}
       </motion.div>
@@ -1569,7 +1990,7 @@ export function SheetActionsPanel({
   onBankBalanceOfPower,
   allyCandidates = [],
   healContext = null,
-  singleColumn = false,
+  singleColumn = true,
   playerNoteValues = {},
   onPlayerNoteChange,
   onEquipmentChoiceChange,
@@ -1581,6 +2002,7 @@ export function SheetActionsPanel({
   onPrimedBombUsed,
 }: SheetActionsPanelProps) {
   const [openActionId, setOpenActionId] = useState<string | null>(null)
+  const [openEconomyKind, setOpenEconomyKind] = useState<ActionEconomyKind | null>(null)
 
   const resourceById = useMemo(
     () => new Map(resourceEntries.map((entry) => [entry.id, entry])),
@@ -1753,24 +2175,99 @@ export function SheetActionsPanel({
     const usage = usageFor(entry)
     const usesClassResource = Boolean(entry.classResourceKey)
     const interactive = !incapacitated
+    const attackProfiles = entry.specialAttacks?.length
+      ? entry.specialAttacks
+      : entry.specialAttack
+        ? [entry.specialAttack]
+        : []
+    const primaryAttack = attackProfiles[0] ?? null
+    const isSpecialAttack = Boolean(
+      primaryAttack &&
+        (primaryAttack.damageDiceCount > 0 ||
+          primaryAttack.attackProfile ||
+          primaryAttack.saveAbility),
+    )
+    const proficiencyBonus = resolveContext.proficiencyBonus ?? 0
+    const attackMod = primaryAttack
+      ? specialAttackModifier(primaryAttack, resolveContext)
+      : 0
+    const saveProfile =
+      attackProfiles.find((profile) => profile.saveAbility?.trim()) ??
+      (primaryAttack?.attackProfile === "force_save" || primaryAttack?.attackProfile === "emanation"
+        ? primaryAttack
+        : null)
+    const saveMod = saveProfile ? specialAttackSaveModifier(saveProfile, resolveContext) : 0
+    const isAttackRoll = attackProfiles.some(
+      (profile) => profile.attackProfile === "melee" || profile.attackProfile === "ranged",
+    )
+    const saveAbility = saveProfile?.saveAbility?.trim() || null
+    const saveDc = saveProfile
+      ? (saveProfile.saveDCBase ?? 8) + proficiencyBonus + saveMod
+      : 0
+    const damageLabel = primaryAttack
+      ? specialAttackDamageLabel(primaryAttack, resolveContext, entry.hitDieSides)
+      : null
+    const rangeLabel = primaryAttack ? specialAttackRangeLabel(primaryAttack) : null
+    const extraModeLabels = attackProfiles
+      .slice(1)
+      .map((profile) =>
+        profile.attackVariant
+          ? profile.attackVariant.replace(/^\w/, (ch) => ch.toUpperCase())
+          : specialAttackProfileLabel(profile),
+      )
+      .filter((label): label is string => Boolean(label))
+    const summary = isSpecialAttack ? null : actionSummaryLine(entry)
+    const sourceLine = [
+      entry.trigger,
+      entry.sourceLabel,
+      isSpecialAttack ? specialAttackProfileLabel(primaryAttack!) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ")
+    const resourceCostLabel = usage && usesClassResource
+      ? `Costs ${
+          entry.limitedUses?.classResourceCostMode === "up_to_proficiency_bonus"
+            ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}PB`
+            : entry.limitedUses?.classResourceCostMode === "up_to_ability_modifier"
+              ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}${entry.limitedUses.classResourceCostAbility ?? "ability"} mod`
+              : entry.limitedUses?.classResourceAmount ?? 1
+        }${usage.resourceName ? ` ${usage.resourceName}` : ""}`
+      : null
+
     return (
       <div
         key={`${keyPrefix}-${entry.id}`}
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
-        onClick={interactive ? () => setOpenActionId(entry.id) : undefined}
+        onClick={
+          interactive
+            ? () => {
+                setOpenEconomyKind(
+                  keyPrefix === "action" || keyPrefix === "bonus" || keyPrefix === "reaction"
+                    ? keyPrefix
+                    : null,
+                )
+                setOpenActionId(entry.id)
+              }
+            : undefined
+        }
         onKeyDown={
           interactive
             ? (e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault()
+                  setOpenEconomyKind(
+                    keyPrefix === "action" || keyPrefix === "bonus" || keyPrefix === "reaction"
+                      ? keyPrefix
+                      : null,
+                  )
                   setOpenActionId(entry.id)
                 }
               }
             : undefined
         }
         className={cn(
-          "relative flex flex-col gap-2 rounded border px-2 py-1.5",
+          "relative flex min-w-0 flex-col gap-1.5 rounded border px-2.5 py-2",
           usesClassResource ? SHEET_ACTION_CARD.classResource : SHEET_ACTION_CARD.default,
           interactive &&
             (usesClassResource
@@ -1779,71 +2276,118 @@ export function SheetActionsPanel({
           incapacitated ? "opacity-50" : "",
         )}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-              {entry.specialAttacks?.[0]?.icon || entry.specialAttack?.icon ? (
-                <GameIcon
-                  name={(entry.specialAttacks?.[0]?.icon || entry.specialAttack?.icon)!}
-                  className="h-3.5 w-3.5 shrink-0 text-primary"
-                />
+        <div className="flex items-stretch justify-between gap-2">
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex flex-wrap items-center gap-x-1.5">
+              {entry.icon ? (
+                <span
+                  className="rounded text-primary"
+                  title={
+                    entry.relatedTalentAlerts?.length
+                      ? entry.relatedTalentAlerts
+                          .map((alert) => `${alert.name}: ${alert.summary}`)
+                          .join(" · ")
+                      : undefined
+                  }
+                >
+                  <GameIcon name={entry.icon} className="h-5 w-5 shrink-0" />
+                </span>
+              ) : entry.relatedTalentAlerts?.length ? (
+                <span
+                  className="rounded text-amber-600 dark:text-amber-400"
+                  title={entry.relatedTalentAlerts
+                    .map((alert) => `${alert.name}: ${alert.summary}`)
+                    .join(" · ")}
+                >
+                  <AlertTriangle className="h-5 w-5 shrink-0" />
+                </span>
               ) : null}
-              <span className="truncate">{entry.name}</span>
-            </p>
-            <p className="text-[10px] text-muted-foreground truncate">
-              {entry.trigger ? `${entry.trigger} · ` : ""}
-              {entry.sourceLabel}
-            </p>
+              <p className="text-xs font-semibold text-foreground">{entry.name}</p>
+              {sourceLine ? (
+                <p className="text-[10px] text-muted-foreground">{sourceLine}</p>
+              ) : null}
+            </div>
+
+            {isSpecialAttack ? (
+              <>
+                {damageLabel || rangeLabel ? (
+                  <p className="text-[10px] text-foreground">
+                    {damageLabel ? <span className="font-medium">{damageLabel}</span> : null}
+                    {rangeLabel ? (
+                      <span className="text-muted-foreground">
+                        {damageLabel ? <span className="mx-1">·</span> : null}
+                        {rangeLabel}
+                      </span>
+                    ) : null}
+                  </p>
+                ) : null}
+                {primaryAttack!.properties.length > 0 || extraModeLabels.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {primaryAttack!.properties.map((property) => (
+                      <span
+                        key={property}
+                        className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground"
+                      >
+                        {property}
+                      </span>
+                    ))}
+                    {extraModeLabels.map((label) => (
+                      <span
+                        key={label}
+                        className="rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            ) : summary ? (
+              <p className="text-[10px] leading-snug text-muted-foreground">{summary}</p>
+            ) : entry.menuOptions?.length ? (
+              <p className="text-[10px] text-muted-foreground">
+                {entry.menuOptions.length} options
+              </p>
+            ) : null}
+
+            {resourceCostLabel ? (
+              <p className="text-[10px] tabular-nums text-muted-foreground">{resourceCostLabel}</p>
+            ) : usage ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] tabular-nums text-muted-foreground">
+                  {usage.max - usage.used} / {usage.max}
+                  {usage.resourceName ? (
+                    <span className="ml-1 text-muted-foreground/70">{usage.resourceName}</span>
+                  ) : null}
+                </span>
+                <UseDots
+                  usage={usage}
+                  label={entry.name}
+                  tone={usesClassResource ? "classResource" : "default"}
+                />
+              </div>
+            ) : null}
           </div>
-          <div className="flex shrink-0 items-center gap-0.5">
-            {entry.relatedTalentAlerts?.length ? (
-              <span
-                className="rounded p-0.5 text-amber-600 dark:text-amber-400"
-                title={entry.relatedTalentAlerts
-                  .map((alert) => `${alert.name}: ${alert.summary}`)
-                  .join(" · ")}
-              >
-                <AlertTriangle className="w-3.5 h-3.5" />
-              </span>
+
+          <div className="flex w-[5.5rem] shrink-0 flex-col items-stretch gap-1 self-start">
+            {isSpecialAttack && isAttackRoll ? (
+              <ActionStatTile
+                caption="To Hit"
+                value={formatSignedModifier(attackMod + proficiencyBonus)}
+              />
+            ) : null}
+            {isSpecialAttack && saveAbility ? (
+              <ActionStatTile caption={`${saveAbility} DC`} value={String(saveDc)} />
             ) : null}
           </div>
         </div>
-        {usage && usesClassResource ? (
-          <span className="text-[10px] tabular-nums text-muted-foreground">
-            Costs{" "}
-            {entry.limitedUses?.classResourceCostMode === "up_to_proficiency_bonus"
-              ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}PB`
-              : entry.limitedUses?.classResourceCostMode === "up_to_ability_modifier"
-                ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}${entry.limitedUses.classResourceCostAbility ?? "ability"} mod`
-                : entry.limitedUses?.classResourceAmount ?? 1}
-            {usage.resourceName ? ` ${usage.resourceName}` : ""}
-          </span>
-        ) : usage ? (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] tabular-nums text-muted-foreground">
-              {usage.max - usage.used} / {usage.max}
-              {usage.resourceName ? (
-                <span className="ml-1 text-muted-foreground/70">{usage.resourceName}</span>
-              ) : null}
-            </span>
-            <UseDots
-              usage={usage}
-              label={entry.name}
-              tone={usesClassResource ? "classResource" : "default"}
-            />
-          </div>
-        ) : entry.menuOptions?.length ? (
-          <span className="text-[10px] text-muted-foreground">
-            {entry.menuOptions.length} options
-          </span>
-        ) : null}
       </div>
     )
   }
 
   const gridClass = cn(
     "grid gap-2",
-    singleColumn ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+    singleColumn ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
   )
 
   return (
@@ -1896,7 +2440,11 @@ export function SheetActionsPanel({
             onMarkEconomy={onMarkEconomy}
             incapacitated={incapacitated}
             resolveContext={resolveContext}
-            onClose={() => setOpenActionId(null)}
+            onClose={() => {
+              setOpenActionId(null)
+              setOpenEconomyKind(null)
+            }}
+            initialEconomyKind={openEconomyKind}
             characterId={characterId}
             onApplySelfHeal={onApplySelfHeal}
             onApplySelfInspiration={onApplySelfInspiration}

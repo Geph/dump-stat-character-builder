@@ -19,6 +19,7 @@ import {
 import { templateFromFeature } from "@/lib/character/parse-companion-stat-block"
 import { SRD_BEAST_FORMS, isDruidWildShapeFeature } from "@/lib/character/srd-beast-forms"
 import { SRD_FAMILIAR, isFamiliarFeature, isFindFamiliarSpell } from "@/lib/character/srd-familiar"
+import { featureChoiceKey } from "@/lib/builder/choices"
 import {
   creatureNamesFromAbility,
   creatureNamesFromFeature,
@@ -70,6 +71,63 @@ export function formSelectionsFromState(
     if (row.knownForms?.length) selections[row.key] = row.knownForms
   }
   return selections
+}
+
+/** Builder / level-up picks for grant_creature choice features (e.g. Captain Cohort). */
+export function formSelectionsFromFeaturePicks(
+  classDetails: CharacterClassDetail[],
+  featureChoicePicks: Record<string, string[]> | null | undefined,
+): CompanionFormSelections {
+  if (!featureChoicePicks) return {}
+  const selections: CompanionFormSelections = {}
+  for (const entry of classDetails) {
+    const className = entry.class?.name ?? "Class"
+    const scan = (
+      features: FeatureCarrier[] | undefined,
+      subclassId: string | null,
+      subclassName: string | null,
+    ) => {
+      for (const feature of features ?? []) {
+        if ((feature.level ?? 1) > entry.row.level) continue
+        const picks =
+          featureChoicePicks[featureChoiceKey(entry.row.class_id, feature.name, feature.level)] ??
+          featureChoicePicks[featureChoiceKey(entry.row.class_id, feature.name)] ??
+          []
+        if (!picks.length) continue
+        const source: CompanionSource = {
+          featureName: feature.name,
+          featureLevel: feature.level,
+          className,
+          subclassName,
+          classId: entry.row.class_id,
+          subclassId,
+        }
+        selections[companionKey(source)] = picks
+      }
+    }
+    scan(entry.class?.features as FeatureCarrier[] | undefined, null, null)
+    if (entry.subclass) {
+      scan(
+        entry.subclass.features as FeatureCarrier[] | undefined,
+        entry.subclass.id,
+        entry.subclass.name,
+      )
+    }
+  }
+  return selections
+}
+
+export function mergeFormSelections(
+  ...groups: Array<CompanionFormSelections | null | undefined>
+): CompanionFormSelections {
+  const merged: CompanionFormSelections = {}
+  for (const group of groups) {
+    if (!group) continue
+    for (const [key, names] of Object.entries(group)) {
+      if (names?.length) merged[key] = names
+    }
+  }
+  return merged
 }
 
 /** Build a name → stat-block lookup from compendium creature rows. */
@@ -125,6 +183,43 @@ function scanFeatures(
     if (feature.level > ctx.maxLevel) continue
 
     // Compendium creatures linked by name or grant_creature modifiers.
+    const grants = grantCreaturesFromLinkedModifiers(
+      modifierCatalog,
+      feature.linkedModifiers,
+      feature.modifierRefs,
+    )
+    const choiceGrants = grants.filter((grant) => (grant.choiceOptions?.length ?? 0) > 0)
+    if (choiceGrants.length) {
+      const formGroups = extras.formGroups ?? []
+      for (const grant of choiceGrants) {
+        pushChoiceGrant({
+          source: baseSource(feature.name, feature.level),
+          optionNames: grant.choiceOptions ?? grant.creatureNames,
+          maxKnown: grant.count ?? 1,
+          creatureLookup,
+          formSelections: extras.formSelections,
+          formGroups,
+          into,
+        })
+      }
+      const fixedNames = [
+        ...(feature.companion_creature_names ?? []),
+        ...grants
+          .filter((grant) => !(grant.choiceOptions?.length ?? 0))
+          .flatMap((grant) => grant.creatureNames),
+      ]
+      for (const template of [
+        ...collectLinkedCreatureTemplates(fixedNames, creatureLookup),
+        ...(feature.companion_stat_blocks ?? []),
+      ]) {
+        into.push({
+          source: { ...baseSource(feature.name, feature.level), formName: template.name },
+          template,
+        })
+      }
+      continue
+    }
+
     const linkedNames = creatureNamesFromFeature(feature as Feature, modifierCatalog)
     const linkedCreatures = collectLinkedCreatureTemplates(linkedNames, creatureLookup)
 
@@ -284,11 +379,19 @@ export function collectCompanionCandidatesFromAbilities(
       subclassId: null,
     }
 
+    const linkedNames = creatureNamesFromAbility(ability, modifierCatalog)
+    // Class-feature prose imported as an ability named "Cohort" is not itself a stat block.
+    if (
+      /^cohort$/i.test(ability.name.trim()) &&
+      !linkedNames.length &&
+      !row.companion_stat_block &&
+      !(row.companion_stat_blocks?.length)
+    ) {
+      continue
+    }
+
     const forms = [
-      ...collectLinkedCreatureTemplates(
-        creatureNamesFromAbility(ability, modifierCatalog),
-        creatureLookup,
-      ),
+      ...collectLinkedCreatureTemplates(linkedNames, creatureLookup),
       ...(row.companion_stat_blocks ?? []),
     ]
     if (forms.length) {
@@ -341,6 +444,8 @@ type ResolveCompanionsParams = {
   modifierCatalog?: ModifierCatalogEntry[]
   /** Player-selected forms per group key (from CharacterCompanionState.knownForms). */
   formSelections?: CompanionFormSelections
+  /** Builder picks for class feature companions (Captain Cohort, etc.). */
+  featureChoicePicks?: Record<string, string[]>
 }
 
 function classHasPactOfTheChain(classDetails: CharacterClassDetail[]): boolean {
@@ -559,7 +664,10 @@ export function resolveCharacterCompanionsDetailed(params: ResolveCompanionsPara
   const formGroups: CompanionFormGroup[] = []
   const extras: ScanExtras = {
     creatures: params.creatures,
-    formSelections: params.formSelections,
+    formSelections: mergeFormSelections(
+      formSelectionsFromFeaturePicks(params.classDetails, params.featureChoicePicks),
+      params.formSelections,
+    ),
     formGroups,
   }
   const spellcastingEntry =

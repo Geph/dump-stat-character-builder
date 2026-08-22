@@ -53,6 +53,8 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
       expect(prompt).toContain("120 characters or fewer")
       expect(prompt).toContain("player-facing summary")
       expect(prompt).toContain("How it feels to play")
+      expect(prompt).toContain("What this path offers")
+      expect(prompt).toContain("Becoming a [Class]")
       expect(prompt).toContain("core gameplay loop")
     }
   })

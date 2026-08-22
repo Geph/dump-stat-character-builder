@@ -19,8 +19,14 @@ import {
   type EquipmentSheetFilter,
 } from "@/lib/compendium/equipment-display"
 import { isArmorItem, isShieldItem } from "@/lib/compendium/combat-stats"
+import {
+  canDualWieldSameWeapon,
+  ownedEquipmentQuantity,
+  type EquipmentQuantities,
+} from "@/lib/character/equipment-quantities"
 import { isWieldableWeaponItem } from "@/lib/compendium/magic-item-weapon-base"
 import { isLightWeapon } from "@/lib/compendium/two-weapon-fighting"
+import { EquipmentQuantityStepper } from "@/components/character-sheet/equipment-quantity-stepper"
 import { MagicEquipmentBadges } from "@/components/character-sheet/magic-equipment-badges"
 import type { Equipment } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -60,6 +66,9 @@ type SheetEquipmentPanelProps = {
   onEquipOffHandWeapon: (id: string | null) => void
   onToggleAttune: (id: string) => void
   onShowDetails: (item: Equipment) => void
+  ownedIds: string[]
+  equipmentQuantities?: EquipmentQuantities
+  onQuantityChange: (id: string, quantity: number) => void
 }
 
 function EquipRow({
@@ -119,6 +128,9 @@ export function SheetEquipmentPanel({
   onEquipOffHandWeapon,
   onToggleAttune,
   onShowDetails,
+  ownedIds,
+  equipmentQuantities,
+  onQuantityChange,
 }: SheetEquipmentPanelProps) {
   const [categoryFilter, setCategoryFilter] = useState<EquipmentSheetFilter>("all")
   const deferredSearchQuery = useDeferredValue(searchQuery)
@@ -261,6 +273,11 @@ export function SheetEquipmentPanel({
             const selectedBaseId =
               equipmentBaseSelections[item.id] ?? item.selected_base_equipment_id ?? ""
             const pinned = pinnedEquipmentIds.includes(item.id)
+            const inInventory = ownedIds.includes(item.id)
+            const quantity = inInventory
+              ? ownedEquipmentQuantity(ownedIds, equipmentQuantities, item.id)
+              : 1
+            const dualWieldSame = canDualWieldSameWeapon(quantity)
 
             return (
               <div
@@ -299,7 +316,24 @@ export function SheetEquipmentPanel({
                     <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
                     <MagicEquipmentBadges item={item} />
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onShowDetails(item)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/80 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary shrink-0"
+                    aria-label={`Details for ${item.name}`}
+                  >
+                    <Info className="w-4 h-4" />
+                  </button>
+                </div>
+                {inInventory || isArmor || isShield || isWeapon || attunable ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    {inInventory ? (
+                      <EquipmentQuantityStepper
+                        value={quantity}
+                        onChange={(next) => onQuantityChange(item.id, next)}
+                        ariaLabel={`${item.name} quantity`}
+                      />
+                    ) : null}
                     {isArmor && (
                       <EquipRow
                         label="Wear"
@@ -327,7 +361,7 @@ export function SheetEquipmentPanel({
                           title={equipBlocked && equippedWeaponId !== item.id ? equipBlockedTitle : undefined}
                           onChange={(checked) => {
                             if (checked) {
-                              if (equippedOffHandWeaponId === item.id) {
+                              if (equippedOffHandWeaponId === item.id && !dualWieldSame) {
                                 onEquipOffHandWeapon(null)
                               }
                               onEquipWeapon(item.id)
@@ -340,10 +374,16 @@ export function SheetEquipmentPanel({
                           label="Off-hand"
                           checked={equippedOffHandWeaponId === item.id}
                           disabled={equipBlocked && equippedOffHandWeaponId !== item.id}
-                          title={equipBlocked && equippedOffHandWeaponId !== item.id ? equipBlockedTitle : undefined}
+                          title={
+                            equipBlocked && equippedOffHandWeaponId !== item.id
+                              ? equipBlockedTitle
+                              : !dualWieldSame && equippedWeaponId === item.id
+                                ? "Carry at least two to wield one in each hand"
+                                : undefined
+                          }
                           onChange={(checked) => {
                             if (checked) {
-                              if (equippedWeaponId === item.id) {
+                              if (equippedWeaponId === item.id && !dualWieldSame) {
                                 onEquipWeapon(null)
                               }
                               onEquipOffHandWeapon(item.id)
@@ -371,16 +411,8 @@ export function SheetEquipmentPanel({
                         onChange={() => onToggleAttune(item.id)}
                       />
                     )}
-                    <button
-                      type="button"
-                      onClick={() => onShowDetails(item)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/80 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary shrink-0"
-                      aria-label={`Details for ${item.name}`}
-                    >
-                      <Info className="w-4 h-4" />
-                    </button>
-                  </div>
                 </div>
+                ) : null}
                 {showBasePicker ? (
                   <select
                     value={selectedBaseId}

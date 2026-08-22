@@ -26,7 +26,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/alchemist/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p><strong>Becoming an Alchemist</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all the traits in the Core Alchemist Traits table.</li><li>Gain the Alchemist's level 1 features, which are listed in the Alchemist Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Alchemist Traits table: Hit Point Die, proficiency in one skill of your choice from the Alchemist's skill list, proficiency with Alchemist's Supplies, and training with Light armor.</li><li>Gain the Alchemist's level 1 features, which are listed in the Alchemist Features table.</li></ul>",
+      "You treat the fight like a lab bench: bombs for the cluster, potions for the mutation, reagents spent as fast as you can mix them.",
     card_image_slug: "alchemist",
   },
   Captain: {
@@ -36,7 +36,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/captain/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p><strong>Becoming a Captain</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Captain Traits table.</li><li>Gain the Captain's level 1 features, which are listed in the Captain Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Captain Traits table: Hit Point Die, proficiency with Martial weapons, and training with Light and Medium armor and Shields.</li><li>Gain the Captain's level 1 features, which are listed in the Captain Features table.</li></ul>",
+      "You lead from the front with a loyal cohort and a pouch of battle dice. Maneuvers keep the whole line pointed the same way.",
     card_image_slug: "captain",
   },
   Craftsman: {
@@ -46,7 +46,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/craftsman/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p><strong>Becoming a Craftsman</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Craftsman Traits table.</li><li>Gain the Craftsman's level 1 features, which are listed in the Craftsman Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Craftsman Traits table: Hit Point Die, Tool Proficiencies, proficiency with Martial weapons, and training with Light and Medium armor and Shields.</li><li>Gain the Craftsman's level 1 features, which are listed in the Craftsman Features table.</li></ul>",
+      "You walk in with tools and walk out with a custom weapon or a patched suit of plate. Combat and the workbench are the same craft.",
     card_image_slug: "craftsman",
   },
   Dancer: {
@@ -56,7 +56,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/dancer/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p><strong>Becoming a Dancer</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Dancer Traits table.</li><li>Gain the Dancer's level 1 features, which are listed in the Dancer Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Dancer Traits table: Hit Point Die, proficiency with Simple weapons, and training with Light armor.</li><li>Gain the Dancer's level 1 features, which are listed in the Dancer Features table.</li></ul>",
+      "Footwork is the armor. You skim the melee, turn small weapons lethal, and make looking graceful the same as not getting hit.",
     card_image_slug: "dancer",
   },
   Gunslinger: {
@@ -66,7 +66,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/gunslinger/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p><strong>Becoming a Gunslinger</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Gunslinger Traits table.</li><li>Gain the Gunslinger's level 1 features, which are listed in the Gunslinger Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Gunslinger Traits table: Hit Point Die, and proficiency with Martial Ranged weapons.</li><li>Gain the Gunslinger's level 1 features, which are listed in the Gunslinger Features table.</li></ul>",
+      "You bet hit points on risk dice for ugly criticals. Reload, gamble, and make the next shot the one they remember.",
     card_image_slug: "gunslinger",
   },
   Investigator: {
@@ -76,7 +76,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/investigator/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p><strong>Becoming an Investigator</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all the traits in the Core Investigator Traits table.</li><li>Gain the Investigator's level 1 features, which are listed in the Investigator Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Investigator Traits table: Hit Point Die, proficiency in one skill of your choice from the Investigator's skill list, proficiency with Martial Weapons, and training with Light Armor.</li><li>Gain the Investigator's level 1 features, which are listed in the Investigator Features table.</li></ul>",
+      "You hunt the thing that should not be in town: rituals in a grimoire, silvered shots, and a habit of pulling threads until the monster shows.",
     card_image_slug: "investigator",
   },
   Martyr: {
@@ -86,7 +86,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/martyr/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p><strong>Becoming a Martyr</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Martyr Traits table.</li><li>Gain the Martyr's level 1 features, which are listed in the Martyr Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Martyr Traits table: Hit Point Die, proficiency with the Martial weapons, and training with Light armor and Shields.</li><li>Gain the Martyr's level 1 features, which are listed in the Martyr Features table.</li></ul>",
+      "You spend your own blood to buy miracles, then crawl back from the brink. Faith is a resource track measured in hit points.",
     card_image_slug: "martyr",
   },
   Necromancer: {
@@ -96,7 +96,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/necromancer/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p><strong>Becoming a Necromancer</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Necromancer Traits table.</li><li>Gain the Necromancer's level 1 features, which are listed in the Necromancer Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the Hit Point Die from the Core Necromancer Traits table.</li><li>Gain the Necromancer's level 1 features, which are listed in the Necromancer Features table. See the</li></ul>",
+      "You spend soul and slot alike on death magic, then fill the gaps with things that used to be people. The ethics argument is part of the class.",
     card_image_slug: "necromancer",
   },
   Vagabond: {
@@ -106,7 +106,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/vagabond/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p><strong>Becoming a Vagabond</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Vagabond Traits table.</li><li>Gain the Vagabond's level 1 features, which are listed in the Vagabond Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Vagabond Traits table: Hit Point Die, proficiency with Martial weapons, and training with Light and Medium armor and Shields.</li><li>Gain the Vagabond's level 1 features, which are listed in the Vagabond Features table.</li></ul>",
+      "You survive on grit, a secret you will not name, and maneuvers learned the hard way. The road is the class feature.",
     card_image_slug: "vagabond",
   },
   Warmage: {
@@ -116,7 +116,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/warmage/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p>You gain proficiency with Simple weapons, training with Light armor, and proficiency with one Gaming Set of your choice.</p><p><strong>Becoming a Warmage</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Warmage Traits table.</li><li>Gain the Warmage's level 1 features, which are listed in the Warmage Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the Hit Point Die trait from the Core Warmage Traits table.</li><li>Gain the Warmage's level 1 features, which are listed in the Warmage Features table.</li></ul>",
+      "Cantrips are the whole arsenal. You stack tricks until a simple bolt looks like a siege engine, then do it again next turn.",
     card_image_slug: "warmage",
   },
   Witch: {
@@ -126,13 +126,23 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     creator_url:
       "https://magehandpress.com/category/content/mage-hand-press-classes/witch/\nIn accordance with https://magehandpress.com/content-usage-policy/",
     description:
-      "<p>You have proficiency with the Herbalism Kit and training with Light armor.</p><p><strong>Becoming a Witch</strong></p><p><em>As a Level 1 Character</em></p><ul><li>Gain all of the traits in the Core Witch Traits table.</li><li>Gain the Witch's level 1 features, which are listed in the Witch Features table.</li></ul><p><em>As a Multiclass Character</em></p><ul><li>Gain the following traits from the Core Witch Traits table: Hit Point Die, proficiency with the Herbalism Kit, and training with Light armor.</li><li>Gain the Witch's level 1 features, which are listed in the Witch Features table. See the</li></ul>",
+      "Hexes soften the target; the familiar finishes the job. You cast from a curse you learned to aim instead of merely suffer.",
     card_image_slug: "witch",
+  },
+  Warden: {
+    icon: "rosa-shield",
+    card_blurb:
+      "Armed with a shield and stubborn resolve, you hold the line for allies and the wilds they still call home.",
+    creator_url:
+      "https://magehandpress.com/category/content/mage-hand-press-classes/warden/\nIn accordance with https://magehandpress.com/content-usage-policy/",
+    description:
+      "You plant yourself between the threat and everyone else—marks, stubborn defense, and a shield that makes the wilds feel guarded.",
+    card_image_slug: "warden",
   },
 }
 
-/** Classes with only flavor prose in source — strip to empty for the default load set. */
-export const MHP_CLASSES_STRIP_DESCRIPTION_ONLY = ["Warden"] as const
+/** @deprecated Warden now has curated flavor; kept so older stamp scripts still import. */
+export const MHP_CLASSES_STRIP_DESCRIPTION_ONLY = [] as const
 
 export const MHP_WARDEN_CARD_IMAGE_SLUG = "warden"
 

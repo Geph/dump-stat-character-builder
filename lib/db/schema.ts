@@ -313,6 +313,7 @@ export const characters = mysqlTable("characters", {
   armor_proficiencies: json("armor_proficiencies").$type<string[]>(),
   languages: json("languages").$type<string[]>(),
   equipment_ids: json("equipment_ids").$type<string[]>().default([]),
+  equipment_quantities: json("equipment_quantities").$type<Record<string, number>>(),
   gold: int("gold").notNull().default(0),
   equipped_armor_id: char("equipped_armor_id", { length: 36 }),
   equipped_shield_id: char("equipped_shield_id", { length: 36 }),

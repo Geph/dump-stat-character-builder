@@ -752,8 +752,27 @@ describe("enrichImportContentModifiers integration", () => {
       | import("@/lib/types").Feature
       | undefined
     expect(mixologist?.activation?.bonusAction).toBe(true)
-    expect(mixologist?.sheetDisplay).toMatchObject({ combatActions: true })
+    expect(mixologist?.sheetDisplay).toMatchObject({
+      combatActions: true,
+      featuresTab: true,
+    })
     expect(mixologist?.sheetDisplay?.abilitiesActions).toBeFalsy()
+  })
+
+  it("rewires a seed-shaped Potion Mixologist onto Combat during class sanitize", () => {
+    const features = sanitizeAlchemistFeatures([
+      {
+        name: "Potion Mixologist",
+        level: 15,
+        description: "Mix two potions together and drink them as a Bonus Action.",
+        activation: { bonusAction: true },
+        sheetDisplay: { abilitiesActions: true },
+      },
+    ] as never)
+    expect(features?.[0]).toMatchObject({
+      activation: { bonusAction: true },
+      sheetDisplay: { combatActions: true, abilitiesActions: false, featuresTab: true },
+    })
   })
 
   it("clears false-positive immunity on Alchemical Romance and wires Poisoner grant", () => {

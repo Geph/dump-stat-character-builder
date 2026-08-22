@@ -124,3 +124,10 @@ export function defaultActionsByCategory(): Record<DefaultActionCategory, Defaul
     other: DEFAULT_SHEET_ACTIONS.filter((action) => action.category === "other"),
   }
 }
+
+/** Help, Influence, Search, and other actions typically used outside combat. */
+export function nonCombatStandardActions(): DefaultSheetAction[] {
+  return DEFAULT_SHEET_ACTIONS.filter((action) => action.category === "other").sort((a, b) =>
+    a.name.localeCompare(b.name),
+  )
+}

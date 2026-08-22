@@ -100,6 +100,56 @@ describe("maneuver spend hooks", () => {
     })
     expect(bolster?.kinds).toEqual(["bonus"])
     expect(bolster?.classId).toBe("captain-1")
+    expect(bolster?.healEffects?.some((effect) => effect.healTarget === "choose_ally")).toBe(true)
+  })
+
+  it("lets Rally heal and Blitz command a chosen ally or cohort", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        {
+          row: { class_id: "captain-1", level: 5, subclass_id: null, order: 0 },
+          class: {
+            id: "captain-1",
+            name: "Captain",
+            class_resources: [battleDice],
+            features: [
+              {
+                level: 5,
+                name: "Blitz",
+                description:
+                  "Once on each of your turns, you can direct your Cohort or an ally within 60 feet of yourself that can see or hear you. The chosen creature can take a Reaction to move up to its Speed or make one attack with a weapon or Unarmed Strike.",
+              },
+            ],
+          } as unknown as CharacterClassDetail["class"],
+          subclass: null,
+        },
+      ],
+      species: null,
+      customAbilities: [
+        {
+          id: "rally",
+          name: "Rally",
+          description:
+            "<p>As a Bonus Action on your turn, you can expend one Battle Die to choose one ally within 60 feet of yourself that can see or hear you. That creature regains Hit Points equal to the number rolled + your Charisma modifier.</p>",
+          ability_role: "knack",
+          attached_to_type: "class",
+          attached_to_id: "captain-1",
+        } as CustomAbility,
+      ],
+    })
+    const rally = actions.find((action) => action.name === "Rally")
+    expect(rally?.healEffects?.[0]).toMatchObject({
+      kind: "heal_self",
+      healTarget: "choose_ally",
+      healAbility: "CHA",
+    })
+    const blitz = actions.find((action) => action.name === "Blitz")
+    expect(blitz).toBeDefined()
+    expect(blitz?.healEffects?.[0]).toMatchObject({
+      kind: "modify_creature",
+      healTarget: "choose_ally",
+    })
+    expect(blitz?.spendsEconomy).toBe(false)
   })
 
   it("surfaces Warmage Kings disciplines that spend a Battle Die with no listed action", () => {

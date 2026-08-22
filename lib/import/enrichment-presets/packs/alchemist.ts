@@ -143,7 +143,7 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     target: "class_feature",
     match: {
       className: /alchemist/i,
-      name: /^(?!potion brewing$).+/i,
+      name: /^(?!potion brewing$|potion mixologist$).+/i,
       description: /brew the following potions|craftable potions|potions table/i,
     },
     operations: [
@@ -274,7 +274,10 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     match: { className: /alchemist/i, name: /^potion mixologist$/i },
     operations: [
       { op: "setActivation", activation: { bonusAction: true } },
-      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { combatActions: true, abilitiesActions: false, featuresTab: true },
+      },
       {
         op: "appendDescription",
         text: "Bonus Action: drink two potions at once with no unexpected mixing effects.",

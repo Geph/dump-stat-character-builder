@@ -141,9 +141,10 @@ describe("compendiumItemSupportsCardImage", () => {
 })
 
 describe("compendium graphic card gradient", () => {
-  it("uses a 65/15/20 scrim ramp for class portrait cards", () => {
+  it("uses a taller title-band scrim for class portrait cards", () => {
     expect(COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS).toContain("rgba(0,0,0,0.8)_0%")
-    expect(COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS).toContain("transparent_35%")
+    expect(COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS).toContain("rgba(0,0,0,0.8)_30%")
+    expect(COMPENDIUM_PORTRAIT_CARD_GRADIENT_CLASS).toContain("transparent_52%")
   })
 
   it("uses a 60/20/20 scrim ramp for spells and backgrounds", () => {

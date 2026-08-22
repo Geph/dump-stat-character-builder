@@ -164,6 +164,9 @@ export function prepareCharacterImportRow(item: CharacterExportItem): Record<str
   }
 
   if (!Array.isArray(row.equipment_ids)) row.equipment_ids = []
+  if (!row.equipment_quantities || typeof row.equipment_quantities !== "object") {
+    row.equipment_quantities = {}
+  }
   if (!Array.isArray(row.spell_ids)) row.spell_ids = []
   if (!Array.isArray(row.feat_ids)) row.feat_ids = []
   if (typeof row.experience !== "number" || !Number.isFinite(row.experience)) row.experience = 0

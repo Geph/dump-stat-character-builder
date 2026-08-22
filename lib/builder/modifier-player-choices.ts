@@ -871,12 +871,26 @@ export function nonSpellModifierPlayerChoiceSlots(
 export function dedupeModifierPlayerChoiceSlots(
   slots: ModifierPlayerChoiceSlot[],
 ): ModifierPlayerChoiceSlot[] {
-  const seen = new Set<string>()
+  const seen = new Map<string, number>()
   const deduped: ModifierPlayerChoiceSlot[] = []
   for (const slot of slots) {
-    const key = `${slot.sourceKey}\0${slot.kind}\0${slot.label}\0${slot.maxCount}`
-    if (seen.has(key)) continue
-    seen.add(key)
+    const optionKey =
+      slot.kind === "spellcasting_ability"
+        ? (slot.options ?? [])
+            .map((option) => option.name.trim().toLowerCase())
+            .sort()
+            .join("|")
+        : slot.label
+    const key = `${slot.sourceKey}\0${slot.kind}\0${optionKey}\0${slot.maxCount}`
+    const existingIndex = seen.get(key)
+    if (existingIndex != null) {
+      // Prefer the later slot for casting-ability picks (option presets over trait prose detect).
+      if (slot.kind === "spellcasting_ability") {
+        deduped[existingIndex] = slot
+      }
+      continue
+    }
+    seen.set(key, deduped.length)
     deduped.push(slot)
   }
   return deduped

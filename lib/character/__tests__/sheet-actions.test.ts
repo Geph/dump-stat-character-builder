@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 
-import { collectSheetActions } from "@/lib/character/sheet-actions"
+import {
+  collectSheetActions,
+  flexibleEconomyKindsFromText,
+  selectableEconomyKinds,
+} from "@/lib/character/sheet-actions"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
 import classes from "@/lib/srd/seed-data/classes.json"
@@ -438,7 +442,8 @@ describe("collectSheetActions", () => {
       "explode",
     ])
     expect(bomb?.specialAttacks?.map((profile) => profile.damageDiceCount)).toEqual([2, 2])
-    expect(bomb?.spendsEconomy).toBe(false)
+    expect(bomb?.spendsEconomy).not.toBe(false)
+    expect(bomb?.icon).toBe("rolling-bomb")
   })
 
   it("folds Prime Bomb into Bombs and keeps formula riders on regular attacks", () => {
@@ -622,6 +627,31 @@ describe("collectSheetActions", () => {
     })
     expect(actions.find((action) => action.name === "Potion Brewing")?.category).toBe("utility")
     expect(actions.find((action) => action.name === "Potion Mixologist")?.category).toBe("combat")
+  })
+
+  it("keeps Potion Mixologist on Combat when seed data filed it as Abilities-only", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 15,
+              name: "Potion Mixologist",
+              description:
+                "You can mix two potions together and drink them as a Bonus Action.",
+              activation: { bonusAction: true },
+              sheetDisplay: { abilitiesActions: true },
+            },
+          ],
+          15,
+        ),
+      ],
+      species: null,
+    })
+    const mixologist = actions.find((action) => action.name === "Potion Mixologist")
+    expect(mixologist?.category).toBe("combat")
+    expect(mixologist?.kinds).toEqual(["bonus"])
+    expect(actions.filter((action) => action.name === "Potion Mixologist")).toHaveLength(1)
   })
 
   it("lists Action Surge on the combat tab only", () => {
@@ -1238,5 +1268,62 @@ describe("combat / utility tab classification", () => {
       species: null,
     })
     expect(actions.find((action) => action.name === "Magnum Opus")?.category).toBe("utility")
+  })
+
+  it("lets action-or-bonus powers list both economies", () => {
+    expect(
+      flexibleEconomyKindsFromText("You can use this as an action or a bonus action."),
+    ).toEqual(["action", "bonus"])
+    expect(selectableEconomyKinds(["action", "bonus"])).toEqual(["action", "bonus"])
+    expect(selectableEconomyKinds(["action", "bonus"], false)).toEqual([])
+
+    const featureActions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 1,
+            name: "Remedy",
+            description: "x",
+            activation: { action: true, bonusAction: true },
+          },
+        ]),
+      ],
+      species: null,
+    })
+    expect(featureActions.find((action) => action.name === "Remedy")?.kinds).toEqual([
+      "action",
+      "bonus",
+    ])
+
+    const powerActions = collectSheetActions({
+      classDetails: [classDetail([], 5)],
+      species: null,
+      customAbilities: [
+        {
+          id: "necrobiology",
+          name: "Necrobiology",
+          description: "<p>You can use this as an action or a bonus action.</p>",
+          prerequisites: null,
+          characteristics: null,
+          attached_to_type: "class",
+          attached_to_id: "class-1",
+          uses: null,
+          show_in_builder: true,
+          ability_role: "psionic_power",
+          casting_time: "1 action",
+          range: "Self",
+          duration: null,
+          icon: null,
+          source: "Test",
+          creator_url: null,
+          created_at: "",
+          updated_at: "",
+        },
+      ],
+    })
+    expect(powerActions.find((action) => action.name === "Necrobiology")?.kinds).toEqual([
+      "action",
+      "bonus",
+    ])
   })
 })

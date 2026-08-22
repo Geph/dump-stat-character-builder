@@ -1,3 +1,7 @@
+import {
+  mergeEquipmentHoldings,
+  type EquipmentQuantities,
+} from "@/lib/character/equipment-quantities"
 import { normalizeStartingEquipmentGroups } from "@/lib/compendium/normalize-class-data"
 import type { DndClass, Equipment } from "@/lib/types"
 
@@ -219,25 +223,35 @@ export function findEquipmentByName(name: string, equipment: Equipment[]): Equip
   })
 }
 
+export function resolvePackageEquipment(
+  items: { name: string; quantity: number }[],
+  equipment: Equipment[],
+  categoryPicks: Record<string, string> = {},
+  pickKeyPrefix = "",
+): { ids: string[]; quantities: EquipmentQuantities } {
+  const holdings: { ids: string[]; quantities: EquipmentQuantities }[] = []
+  items.forEach((item, index) => {
+    if (item.name.toLowerCase() === "gold pieces") return
+    const quantity = item.quantity > 0 ? item.quantity : 1
+    const category = equipmentCategoryKind(item.name)
+    if (category) {
+      const pickedId = categoryPicks[`${pickKeyPrefix}${index}`]
+      if (pickedId) holdings.push({ ids: [pickedId], quantities: { [pickedId]: quantity } })
+      return
+    }
+    const match = findEquipmentByName(item.name, equipment)
+    if (match) holdings.push({ ids: [match.id], quantities: { [match.id]: quantity } })
+  })
+  return mergeEquipmentHoldings(...holdings)
+}
+
 export function resolvePackageEquipmentIds(
   items: { name: string; quantity: number }[],
   equipment: Equipment[],
   categoryPicks: Record<string, string> = {},
   pickKeyPrefix = "",
 ): string[] {
-  const ids: string[] = []
-  items.forEach((item, index) => {
-    if (item.name.toLowerCase() === "gold pieces") return
-    const category = equipmentCategoryKind(item.name)
-    if (category) {
-      const pickedId = categoryPicks[`${pickKeyPrefix}${index}`]
-      if (pickedId && !ids.includes(pickedId)) ids.push(pickedId)
-      return
-    }
-    const match = findEquipmentByName(item.name, equipment)
-    if (match && !ids.includes(match.id)) ids.push(match.id)
-  })
-  return ids
+  return resolvePackageEquipment(items, equipment, categoryPicks, pickKeyPrefix).ids
 }
 
 function goldQuantityFromItem(item: { name: string; quantity: number }): number {

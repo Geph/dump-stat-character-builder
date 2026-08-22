@@ -185,3 +185,38 @@ export function filterCustomAbilitiesForCharacterSheet(
 ): CustomAbility[] {
   return abilities.filter((ability) => customAbilityAppliesOnCharacterSheet(ability, ctx))
 }
+
+function abilityHasCompanionPayload(ability: CustomAbility): boolean {
+  const row = ability as CustomAbility & {
+    companion_stat_block?: unknown
+    companion_stat_blocks?: unknown[] | null
+    companion_creature_names?: string[] | null
+  }
+  if (row.companion_stat_block) return true
+  if (row.companion_stat_blocks?.length) return true
+  if (row.companion_creature_names?.length) return true
+  return false
+}
+
+/**
+ * Custom abilities for the Features tab: character-scoped rows that are not already
+ * surfaced as Combat / Abilities actions (or companion stat blocks).
+ */
+export function filterFeatureTabCustomAbilities(
+  abilities: CustomAbility[],
+  options?: {
+    sheetActionCustomAbilityIds?: Iterable<string>
+    sheetActionNames?: Iterable<string>
+  },
+): CustomAbility[] {
+  const actionIds = new Set(options?.sheetActionCustomAbilityIds ?? [])
+  const actionNames = new Set(
+    [...(options?.sheetActionNames ?? [])].map((name) => name.trim().toLowerCase()).filter(Boolean),
+  )
+  return abilities.filter((ability) => {
+    if (actionIds.has(ability.id)) return false
+    if (actionNames.has(ability.name.trim().toLowerCase())) return false
+    if (abilityHasCompanionPayload(ability)) return false
+    return true
+  })
+}
