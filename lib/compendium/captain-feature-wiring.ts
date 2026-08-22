@@ -87,7 +87,7 @@ function sanitizeCaptainCohortFeature(feature: Feature): Feature {
   const options =
     existingOptions.length > 0
       ? existingOptions
-      : CAPTAIN_COHORT_TYPES.map((name) => ({ name }))
+      : CAPTAIN_COHORT_TYPES.map((name) => ({ name, description: `${name} cohort.` }))
   const alreadyChoice =
     feature.isChoice === true &&
     (feature.choices?.count ?? 0) === 1 &&

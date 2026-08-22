@@ -3350,9 +3350,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       }
     })
     const seen = new Set(
-      merged
-        .filter((row) => row.kind === "companion" && row.characterId === character?.id)
-        .map((row) => row.companionKey),
+      merged.flatMap((row) =>
+        row.kind === "companion" && row.characterId === character?.id ? [row.companionKey] : [],
+      ),
     )
     if (character) {
       for (const companion of companionRows) {
