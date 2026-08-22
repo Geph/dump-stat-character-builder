@@ -2,6 +2,7 @@ import {
   CAPTAIN_BASE_MANEUVERS,
   isCaptainBaseManeuverName,
   sanitizeCaptainFeature,
+  sanitizeCaptainSubclassFeatures,
 } from "@/lib/compendium/captain-feature-wiring"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { EnrichmentPreset } from "@/lib/import/enrichment-presets/types"
@@ -136,12 +137,19 @@ export function sanitizeCaptainImportContent(content: ImportContent): ImportCont
     }
   })
 
+  const subclasses = (content.subclasses ?? []).map((subclass) => {
+    if (!/captain/i.test(subclass.class_name ?? "")) return subclass
+    const features = sanitizeCaptainSubclassFeatures(subclass.features as Feature[] | undefined)
+    return features ? { ...subclass, features: features as typeof subclass.features } : subclass
+  })
+
   const shouldWriteProposals =
     Boolean(content.import_proposals) || missingFallbacks.length > 0
 
   return {
     ...content,
     classes,
+    ...(content.subclasses ? { subclasses } : {}),
     ...(content.abilities
       ? { abilities: abilityRows as NonNullable<ImportContent["abilities"]> }
       : {}),
@@ -195,5 +203,32 @@ export const CAPTAIN_PRESETS: EnrichmentPreset[] = [
     target: "subclass_feature",
     match: { subclassClassName: /captain/i, name: /\[maneuver\]/i },
     operations: [{ op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } }],
+  },
+  {
+    id: "captain.subclass.vantage_point",
+    pack: "captain",
+    target: "subclass_feature",
+    match: { subclassClassName: /captain/i, name: /^vantage\s*point$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "captain_eagle_vantage_climb",
+          catalogRefId: "cat_char_speed",
+          characteristics: [
+            {
+              id: "mod_captain_eagle_vantage_climb",
+              type: "speed",
+              speedType: "climb",
+              mode: "equal_to_walk",
+              value: 0,
+              label: "Climb Speed equal to your Speed",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["speed"],
+      },
+    ],
   },
 ]

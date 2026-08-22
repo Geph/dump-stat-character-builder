@@ -130,3 +130,17 @@ export function isShortRestActivityText(
   if (/^potion brewing$/i.test((parts[0] ?? "").trim())) return true
   return SPEND_MINUTES_RE.test(haystack) || DURING_REST_RE.test(haystack)
 }
+
+/**
+ * "When you finish a Long Rest, you can …" — an activity the player may choose to perform,
+ * not a recharge. Recharge wording ("you regain all expended uses") never reaches "you can",
+ * which keeps this from firing on every long-rest pool.
+ */
+const LONG_REST_ACTIVITY_RE =
+  /\b(?:when|after|whenever) you (?:finish|complete) a long rest,? you can\b/i
+
+export function isLongRestActivityText(
+  ...parts: Array<string | null | undefined>
+): boolean {
+  return LONG_REST_ACTIVITY_RE.test(parts.filter(Boolean).join(" "))
+}

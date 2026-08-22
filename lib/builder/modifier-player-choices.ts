@@ -31,6 +31,7 @@ import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { mergeToolNameLists, toolNamesForPool, type ToolChoicePool } from "@/lib/compendium/tool-options"
 import { SRD_TOOL_NAMES, getAllSeedToolNames } from "@/lib/compendium/srd-tools"
 import { languageOptionsForPool } from "@/lib/compendium/srd-languages"
+import { resolveSpeciesTraitPicks } from "@/lib/builder/species-trait-picks"
 import type { CustomAbility, DndClass, Feat, Feature, Spell, Species, Subclass } from "@/lib/types"
 
 export type ModifierPlayerChoiceKind =
@@ -541,7 +542,7 @@ export function collectSpeciesModifierPlayerChoiceSlots(
     slots.push(...slotsFromCharacteristics(baseMods, sourceKey, trait.name))
 
     if (trait.isChoice && trait.choices?.options?.length) {
-      const picked = speciesTraitPicks[String(index)] ?? []
+      const picked = resolveSpeciesTraitPicks(speciesTraitPicks, trait, index)
       for (const optionName of picked) {
         const option = trait.choices.options.find((entry) => entry.name === optionName)
         if (!option) continue
@@ -925,6 +926,82 @@ export function validateModifierPlayerChoices(
   picks: Record<string, string[]>,
 ): boolean {
   return collectModifierPlayerChoiceBlockers(slots, picks).length === 0
+}
+
+function slotKindSuffix(kind: ModifierPlayerChoiceKind): string {
+  return `::${kind}`
+}
+
+/**
+ * Keep picks for current slots. When a slot key changed (mod id / trait index moved),
+ * remap orphaned picks onto the matching empty slot instead of dropping them — this is
+ * what made Elf languages / lineage ability picks look "reset" on character edit.
+ */
+export function reconcileModifierPlayerPicks(
+  picks: Record<string, string[]>,
+  slots: ModifierPlayerChoiceSlot[],
+): Record<string, string[]> {
+  const validKeys = new Set(slots.map((slot) => slot.slotKey))
+  const next: Record<string, string[]> = {}
+  const orphans: [string, string[]][] = []
+
+  for (const [key, value] of Object.entries(picks)) {
+    if (!Array.isArray(value) || !value.length) continue
+    if (validKeys.has(key)) next[key] = value
+    else orphans.push([key, value])
+  }
+
+  if (!orphans.length) {
+    // Still drop empty / invalid keys when nothing to remap.
+    if (Object.keys(next).length === Object.keys(picks).length) {
+      let identical = true
+      for (const key of Object.keys(picks)) {
+        if (!validKeys.has(key)) {
+          identical = false
+          break
+        }
+      }
+      if (identical) return picks
+    }
+    return next
+  }
+
+  const takeOrphan = (predicate: (key: string, value: string[]) => boolean): string[] | null => {
+    const index = orphans.findIndex(([key, value]) => predicate(key, value))
+    if (index < 0) return null
+    const [, value] = orphans[index]!
+    orphans.splice(index, 1)
+    return value
+  }
+
+  for (const slot of slots) {
+    if ((next[slot.slotKey] ?? []).length) continue
+    const kindSuffix = slotKindSuffix(slot.kind)
+    const speciesMatch = slot.sourceKey.match(/^species:([^:]+)/)
+    const speciesId = speciesMatch?.[1] ?? null
+
+    const remapped =
+      takeOrphan(
+        (key) =>
+          key.startsWith(`${slot.sourceKey}::`) &&
+          (key.endsWith(kindSuffix) || key.includes(`${kindSuffix}:`)),
+      ) ??
+      (speciesId
+        ? takeOrphan(
+            (key) =>
+              key.startsWith(`species:${speciesId}:`) &&
+              (key.endsWith(kindSuffix) || key.includes(`${kindSuffix}:`)),
+          )
+        : null) ??
+      (slot.kind === "language" &&
+      slots.filter((candidate) => candidate.kind === "language").length === 1
+        ? takeOrphan((key) => key.endsWith("::language") || key.includes("::language:"))
+        : null)
+
+    if (remapped?.length) next[slot.slotKey] = remapped
+  }
+
+  return next
 }
 
 export function setModifierPlayerPickValue(

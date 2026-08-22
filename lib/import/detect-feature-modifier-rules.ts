@@ -2516,9 +2516,10 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     scope: "full",
     // Explicit grants that omit the literal word "spell": "You can cast minor
     // illusion with your psionic powers" / "You gain the ability to cast plane
-    // shift and teleport." Stop before "at will" so spell.cast_named_at_will wins.
+    // shift and teleport." Stop before "at will" so spell.cast_named_at_will wins,
+    // and before "without" so the slot/component clause never lands in a spell name.
     test:
-      /\byou\s+(?:gain\s+the\s+ability\s+to|can)\s+cast\s+([A-Za-z][A-Za-z'\/ -]{2,80}?)(?=\s+with\s+your\s+psionic\s+powers|\s+at\s+will\b|\s*[.;])/i,
+      /\byou\s+(?:gain\s+the\s+ability\s+to|can)\s+cast\s+([A-Za-z][A-Za-z'\/ -]{2,80}?)(?=\s+with\s+your\s+psionic\s+powers|\s+at\s+will\b|\s+without\b|\s*[.;])/i,
     build: (match, ctx, text) => {
       if (/\bat\s+will\b/i.test(text) && /\bcast\s+[A-Za-z][A-Za-z'\/ -]{2,60}?\s+at\s+will\b/i.test(text)) {
         return null
@@ -2579,6 +2580,33 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           label: "Cast without a spell slot",
         },
       ]),
+  },
+  {
+    // "You can cast Identify and Locate Object without a spell slot or components."
+    // spell.gain_cast_named makes the spells known; this adds the free cast itself so the
+    // grant is usable from the sheet instead of only appearing in the spell list.
+    id: "spell.cast_named_without_slot",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\byou can cast\s+([A-Za-z][A-Za-z',\/ -]{2,120}?)\s+without\s+(?:expending\s+)?a\s+spell\s+slot\b/i,
+    build: (match, ctx, text) => {
+      const names = parseSpellNameList(match[1])
+      if (!names.length) return null
+      const withoutComponents = /\bwithout[^.]{0,60}\bcomponents?\b/i.test(text)
+      return fxInstance(newInstanceId(), effectCatalogRefId("cast_spell"), {
+        action: true,
+        effects: names.map((name) => ({
+          id: modId(instanceKey(ctx, `cast_no_slot_${name}`)),
+          kind: "cast_spell" as const,
+          castSpellName: name,
+          castSpellWithoutSlot: true,
+          label: withoutComponents
+            ? `${name} without a spell slot or components`
+            : `${name} without a spell slot`,
+        })),
+      })
+    },
   },
   {
     // "cast antimagic field by expending 8 psi points" / "expend 5 psi points to cast

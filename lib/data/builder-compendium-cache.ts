@@ -3,6 +3,7 @@ import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
+import { sanitizeCaptainSubclassFeatures } from "@/lib/compendium/captain-feature-wiring"
 import { enrichSubclassDisplayList } from "@/lib/compendium/enrich-subclass-display"
 import { enrichPsionicTalentGrantFeatures } from "@/lib/builder/aggregate-psionic-talents"
 import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
@@ -250,7 +251,12 @@ async function fetchBuilderCompendium(db: DataClient): Promise<BuilderCompendium
   const subclasses = enrichSubclassDisplayList(
     filterEnabled(asCompendiumRows(subclassesRes.data)) as unknown as Subclass[],
     classNameById,
-  )
+  ).map((subclass) => {
+    const parentName = classNameById.get(subclass.class_id ?? "") ?? ""
+    if (!/captain/i.test(parentName)) return subclass
+    const features = sanitizeCaptainSubclassFeatures(subclass.features)
+    return features ? { ...subclass, features } : subclass
+  })
   const species = filterEnabled(
     enrichSpeciesList(
       asCompendiumRows<Parameters<typeof enrichSpeciesList>[0][number]>(speciesRes.data),

@@ -51,6 +51,7 @@ import {
   buildCharacterSaveSnapshot,
   computeDerivedCharacter,
 } from "@/lib/character/compute-derived"
+import { filterDisplaySpeedEntries } from "@/lib/character/resolve-all-speeds"
 import {
   findBackgroundGrantedFeat,
   formatBackgroundAbilityBonuses,
@@ -237,6 +238,7 @@ import { ModifierPlayerChoicePanel } from "@/components/builder/modifier-player-
 import {
   clearModifierPicksForSource,
   collectModifierPlayerChoiceSlots,
+  reconcileModifierPlayerPicks,
   setModifierPlayerPickValue,
   speciesModsSourceKey,
   speciesTraitSourceKey,
@@ -245,6 +247,11 @@ import {
   nonSpellModifierPlayerChoiceSlots,
   spellModifierPlayerChoiceSlots,
 } from "@/lib/builder/modifier-player-choices"
+import {
+  normalizeSpeciesTraitPicksForSpecies,
+  resolveSpeciesTraitPicks,
+  speciesTraitPickKey,
+} from "@/lib/builder/species-trait-picks"
 import { backgroundFeatureModsSourceKey } from "@/lib/compendium/wire-background-proficiency-choices"
 import {
   allAbilityScorePoolAllocationsValid,
@@ -797,6 +804,7 @@ export default function BuilderPageClient() {
         characterToBuilderState(saved, {
           dndClass,
           background,
+          species: species.find((row) => row.id === saved.species_id) ?? null,
           allClasses: classes,
           spells,
         }),
@@ -806,7 +814,7 @@ export default function BuilderPageClient() {
     }
 
     void hydrateFromCharacter()
-  }, [loading, editIdParam, classes, backgrounds, spells])
+  }, [loading, editIdParam, classes, backgrounds, spells, species])
 
   useEffect(() => {
     if (loading || !draftReady || classes.length === 0) return
@@ -1114,19 +1122,32 @@ export default function BuilderPageClient() {
     const sizeTraitIndex = findSpeciesSizeChoiceTraitIndex(selectedSpecies)
     if (sizeTraitIndex < 0) return
     const size = character.size ?? selectedSpecies.size ?? null
-    const key = String(sizeTraitIndex)
+    const sizeTrait = selectedSpecies.traits?.[sizeTraitIndex]
+    const key = sizeTrait
+      ? speciesTraitPickKey(sizeTrait, sizeTraitIndex)
+      : String(sizeTraitIndex)
     setSpeciesTraitPicks((prev) => {
       if (!size) {
-        if (!(key in prev)) return prev
+        if (!(key in prev) && !(String(sizeTraitIndex) in prev)) return prev
         const next = { ...prev }
         delete next[key]
+        delete next[String(sizeTraitIndex)]
         return next
       }
-      const current = prev[key] ?? []
+      const current = resolveSpeciesTraitPicks(prev, sizeTrait ?? { name: "" }, sizeTraitIndex)
       if (current.length === 1 && current[0] === size) return prev
       return { ...prev, [key]: [size] }
     })
   }, [selectedSpecies, character.size])
+
+  // Prefer trait-name keys so lineage picks survive trait reordering on edit.
+  useEffect(() => {
+    if (!selectedSpecies) return
+    setSpeciesTraitPicks((prev) => {
+      const next = normalizeSpeciesTraitPicksForSpecies(prev, selectedSpecies)
+      return JSON.stringify(next) === JSON.stringify(prev) ? prev : next
+    })
+  }, [selectedSpecies])
 
   const effectiveBackgroundFeatGranted = getEffectiveBackgroundFeatGranted(
     selectedBackground,
@@ -1432,18 +1453,9 @@ export default function BuilderPageClient() {
 
   useEffect(() => {
     if (!editHydrated) return
-    const validKeys = new Set(modifierPlayerChoiceSlots.map((slot) => slot.slotKey))
     setModifierPlayerPicks((prev) => {
-      const next: Record<string, string[]> = {}
-      let changed = false
-      for (const [key, picks] of Object.entries(prev)) {
-        if (validKeys.has(key)) {
-          next[key] = picks
-        } else {
-          changed = true
-        }
-      }
-      return changed ? next : prev
+      const next = reconcileModifierPlayerPicks(prev, modifierPlayerChoiceSlots)
+      return next === prev ? prev : next
     })
   }, [editHydrated, modifierPlayerChoiceSlots.map((slot) => slot.slotKey).join("|")])
 
@@ -2100,6 +2112,11 @@ export default function BuilderPageClient() {
   const maxHp = characterDerived.maxHp
   const armorClass = characterDerived.armorClass
   const speed = characterDerived.speed
+  const speedEntries = filterDisplaySpeedEntries(
+    characterDerived.speeds?.length
+      ? characterDerived.speeds
+      : [{ type: "walk", label: "walk", feet: speed }],
+  )
   const passivePerception = characterDerived.passivePerception
   const initiative = characterDerived.initiative
 
@@ -2885,40 +2902,26 @@ export default function BuilderPageClient() {
   const classFeatsSectionPreview = useMemo(() => {
     if (!classFeatsSectionComplete || requiredFeatSlots <= 0) return null
     const chipLayout = skillPickerLayout
-    const showIcons = chipLayout === "visual"
-    const featCards: ReactNode[] = []
     const groups: ReactNode[] = []
 
     for (const slot of classStepFeatSlots) {
       const id = featureChoicePicks[slot.key]?.[0]
       const feat = id ? feats.find((entry) => entry.id === id) : null
       if (!feat) continue
-      if (cardViewMode === "cinematic") {
-        featCards.push(
-          <BuilderSelectedCatalogItem
-            key={slot.key}
-            item={feat}
-            cardViewMode={cardViewMode}
-            portrait={useCinematicPortraitCards}
-            selectionVariant="secondary"
-            badge={
-              <span className="rounded bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
-                {slot.label}
-              </span>
-            }
-          />,
-        )
-      } else {
-        groups.push(
-          <BuilderSelectedChoiceChips
-            key={slot.key}
-            title={slot.label}
-            names={[feat.name]}
-            layout={chipLayout}
-            accentClass="border-accent bg-accent/10"
-          />,
-        )
-      }
+      groups.push(
+        <BuilderSelectedChoiceChips
+          key={slot.key}
+          title={slot.label}
+          names={[feat.name]}
+          layout={chipLayout}
+          showSkillIcons
+          skillIconByName={{
+            ...customSkillIconByName,
+            [feat.name]: getCompendiumItemIcon("feats", feat as unknown as Record<string, unknown>),
+          }}
+          accentClass="border-accent bg-accent/10"
+        />,
+      )
       const choiceKey = featChoicePickKey(slot.key)
       const optionPicks = featChoicePicks[choiceKey] ?? []
       if (optionPicks.length) {
@@ -2928,7 +2931,7 @@ export default function BuilderPageClient() {
             title={feat.name}
             names={optionPicks}
             layout={chipLayout}
-            showSkillIcons={showIcons}
+            showSkillIcons
             skillIconByName={customSkillIconByName}
             accentClass="border-accent bg-accent/10"
           />,
@@ -2936,7 +2939,7 @@ export default function BuilderPageClient() {
       }
     }
 
-    if (featCards.length === 0 && groups.length === 0) {
+    if (groups.length === 0) {
       return (
         <p className="text-sm font-medium text-foreground/90">
           {selectedFeatCount}/{requiredFeatSlots} selected
@@ -2944,14 +2947,7 @@ export default function BuilderPageClient() {
       )
     }
 
-    return (
-      <div className="space-y-3">
-        {featCards.length > 0 ? (
-          <div className="flex flex-wrap gap-3">{featCards}</div>
-        ) : null}
-        {groups.length > 0 ? <div className="space-y-3">{groups}</div> : null}
-      </div>
-    )
+    return <div className="space-y-3">{groups}</div>
   }, [
     classFeatsSectionComplete,
     requiredFeatSlots,
@@ -2961,8 +2957,6 @@ export default function BuilderPageClient() {
     feats,
     selectedFeatCount,
     skillPickerLayout,
-    cardViewMode,
-    useCinematicPortraitCards,
     customSkillIconByName,
   ])
 
@@ -2971,7 +2965,6 @@ export default function BuilderPageClient() {
     const chipLayout = skillPickerLayout
     const showIcons = chipLayout === "visual"
     const groups: ReactNode[] = []
-    const featCards: ReactNode[] = []
     const speciesAccent = "border-secondary bg-secondary/10"
 
     if (character.size) {
@@ -3027,32 +3020,20 @@ export default function BuilderPageClient() {
       const id = featureChoicePicks[slot.key]?.[0]
       const feat = id ? feats.find((entry) => entry.id === id) : null
       if (!feat) continue
-      if (cardViewMode === "cinematic") {
-        featCards.push(
-          <BuilderSelectedCatalogItem
-            key={slot.key}
-            item={feat}
-            cardViewMode={cardViewMode}
-            portrait={useCinematicPortraitCards}
-            selectionVariant="secondary"
-            badge={
-              <span className="rounded bg-secondary px-2 py-0.5 text-xs font-bold text-secondary-foreground">
-                Feat
-              </span>
-            }
-          />,
-        )
-      } else {
-        groups.push(
-          <BuilderSelectedChoiceChips
-            key={slot.key}
-            title="Feat"
-            names={[feat.name]}
-            layout={chipLayout}
-            accentClass={speciesAccent}
-          />,
-        )
-      }
+      groups.push(
+        <BuilderSelectedChoiceChips
+          key={slot.key}
+          title="Feat"
+          names={[feat.name]}
+          layout={chipLayout}
+          showSkillIcons
+          skillIconByName={{
+            ...customSkillIconByName,
+            [feat.name]: getCompendiumItemIcon("feats", feat as unknown as Record<string, unknown>),
+          }}
+          accentClass={speciesAccent}
+        />,
+      )
       const choiceKey = featChoicePickKey(slot.key)
       const optionPicks = featChoicePicks[choiceKey] ?? []
       if (optionPicks.length) {
@@ -3070,20 +3051,13 @@ export default function BuilderPageClient() {
       }
     }
 
-    if (featCards.length === 0 && groups.length === 0) {
+    if (groups.length === 0) {
       return (
         <p className="text-sm font-medium text-foreground/90">Species choices are set.</p>
       )
     }
 
-    return (
-      <div className="space-y-3">
-        {featCards.length > 0 ? (
-          <div className="flex flex-wrap gap-3">{featCards}</div>
-        ) : null}
-        {groups.length > 0 ? <div className="space-y-3">{groups}</div> : null}
-      </div>
-    )
+    return <div className="space-y-3">{groups}</div>
   }, [
     speciesOptionsSectionComplete,
     selectedSpecies,
@@ -3096,8 +3070,6 @@ export default function BuilderPageClient() {
     featChoicePicks,
     feats,
     skillPickerLayout,
-    cardViewMode,
-    useCinematicPortraitCards,
     customSkillIconByName,
   ])
 
@@ -3106,36 +3078,23 @@ export default function BuilderPageClient() {
     const chipLayout = skillPickerLayout
     const showIcons = chipLayout === "visual"
     const groups: ReactNode[] = []
-    const featCards: ReactNode[] = []
 
     const pushFeat = (feat: (typeof feats)[number] | null | undefined, key: string) => {
       if (!feat) return
-      if (cardViewMode === "cinematic") {
-        featCards.push(
-          <BuilderSelectedCatalogItem
-            key={key}
-            item={feat}
-            cardViewMode={cardViewMode}
-            portrait={useCinematicPortraitCards}
-            selectionVariant="secondary"
-            badge={
-              <span className="rounded bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
-                Feat
-              </span>
-            }
-          />,
-        )
-      } else {
-        groups.push(
-          <BuilderSelectedChoiceChips
-            key={key}
-            title="Feat"
-            names={[feat.name]}
-            layout={chipLayout}
-            accentClass="border-accent bg-accent/10"
-          />,
-        )
-      }
+      groups.push(
+        <BuilderSelectedChoiceChips
+          key={key}
+          title="Feat"
+          names={[feat.name]}
+          layout={chipLayout}
+          showSkillIcons
+          skillIconByName={{
+            ...customSkillIconByName,
+            [feat.name]: getCompendiumItemIcon("feats", feat as unknown as Record<string, unknown>),
+          }}
+          accentClass="border-accent bg-accent/10"
+        />,
+      )
     }
 
     for (const slot of backgroundFeatPickSlots) {
@@ -3206,20 +3165,13 @@ export default function BuilderPageClient() {
       )
     }
 
-    if (featCards.length === 0 && groups.length === 0) {
+    if (groups.length === 0) {
       return (
         <p className="text-sm font-medium text-foreground/90">Background choices are set.</p>
       )
     }
 
-    return (
-      <div className="space-y-3">
-        {featCards.length > 0 ? (
-          <div className="flex flex-wrap gap-3">{featCards}</div>
-        ) : null}
-        {groups.length > 0 ? <div className="space-y-3">{groups}</div> : null}
-      </div>
-    )
+    return <div className="space-y-3">{groups}</div>
   }, [
     backgroundOptionsSectionComplete,
     selectedBackground,
@@ -3231,8 +3183,6 @@ export default function BuilderPageClient() {
     backgroundStepModifierSlots,
     modifierPlayerPicks,
     skillPickerLayout,
-    cardViewMode,
-    useCinematicPortraitCards,
     customSkillIconByName,
   ])
 
@@ -5108,19 +5058,24 @@ export default function BuilderPageClient() {
                           return null
                         }
                         const choices = trait.choices!
+                        const traitKey = speciesTraitPickKey(trait, index)
                         return (
                           <MultiSelectChoices
-                            key={`${selectedSpecies.id}-${index}`}
+                            key={`${selectedSpecies.id}-${traitKey}`}
                             title={trait.name}
                             hint={choices.category}
                             options={choices.options}
                             maxCount={choices.count}
-                            selected={speciesTraitPicks[String(index)] ?? []}
+                            selected={resolveSpeciesTraitPicks(speciesTraitPicks, trait, index)}
                             unavailableOptions={[
                               ...getTakenSkills(skillPickSources, `species:${index}`),
                             ]}
                             onChange={(selected) =>
-                              setSpeciesTraitPicks((prev) => ({ ...prev, [String(index)]: selected }))
+                              setSpeciesTraitPicks((prev) => {
+                                const next = { ...prev, [traitKey]: selected }
+                                delete next[String(index)]
+                                return next
+                              })
                             }
                             accentClass="border-secondary bg-secondary/10"
                             layout={compactPickerLayout}
@@ -7092,7 +7047,22 @@ export default function BuilderPageClient() {
                         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
                           <GameIcon name={PREVIEW_STAT_ICONS.speed} className="w-3 h-3 mx-auto text-accent mb-0.5" />
                           <p className="text-[7px] text-muted-foreground uppercase">Speed</p>
-                          <p className="text-base font-black text-accent">{speed} ft</p>
+                          {speedEntries.length > 1 ? (
+                            <div className="flex flex-col items-center gap-0.5 text-accent">
+                              {speedEntries.map((entry) => (
+                                <p
+                                  key={entry.type}
+                                  className="text-[9px] font-black leading-tight tabular-nums"
+                                >
+                                  {entry.feet} ft {entry.label}
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-base font-black text-accent tabular-nums">
+                              {speedEntries[0]?.feet ?? speed} ft
+                            </p>
+                          )}
                         </div>
                         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
                           <GameIcon name={PREVIEW_STAT_ICONS.initiative} className="w-3 h-3 mx-auto text-lime mb-0.5" />

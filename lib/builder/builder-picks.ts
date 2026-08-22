@@ -9,9 +9,26 @@ export type CharacterBuilderPicks = {
   gold_purchased_equipment_ids?: string[]
 }
 
+function parseMaybeJsonObject(raw: unknown): Record<string, unknown> | null {
+  if (!raw) return null
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+    } catch {
+      return null
+    }
+    return null
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, unknown>
+  return null
+}
+
 export function normalizeBuilderPicks(raw: unknown): CharacterBuilderPicks {
-  if (!raw || typeof raw !== "object") return {}
-  const row = raw as CharacterBuilderPicks
+  const row = parseMaybeJsonObject(raw) as CharacterBuilderPicks | null
+  if (!row) return {}
   return {
     class_skill_picks: normalizeStringRecord(row.class_skill_picks),
     class_tool_picks: normalizeStringRecord(row.class_tool_picks),
@@ -31,10 +48,22 @@ export function normalizeBuilderPicks(raw: unknown): CharacterBuilderPicks {
   }
 }
 
+/** Normalize modifier_player_picks from DB (object or JSON string). */
+export function normalizeModifierPlayerPicks(raw: unknown): Record<string, string[]> {
+  if (typeof raw === "string") {
+    try {
+      return normalizeStringRecord(JSON.parse(raw)) ?? {}
+    } catch {
+      return {}
+    }
+  }
+  return normalizeStringRecord(raw) ?? {}
+}
+
 function normalizeStringRecord(raw: unknown): Record<string, string[]> | undefined {
   if (!raw || typeof raw !== "object") return undefined
   const out: Record<string, string[]> = {}
-  for (const [key, value] of Object.entries(raw as unknown as Record<string, unknown>)) {
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!Array.isArray(value)) continue
     const picks = value.filter((entry): entry is string => typeof entry === "string")
     if (picks.length) out[key] = picks

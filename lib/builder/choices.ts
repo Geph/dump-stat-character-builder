@@ -11,6 +11,7 @@ import {
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { legacyBackgroundOriginFeatPickComplete } from "@/lib/compendium/background-origin-feat"
 import { DND_SKILLS } from "@/lib/compendium/constants"
+import { resolveSpeciesTraitPicks } from "@/lib/builder/species-trait-picks"
 import type { Background, DndClass, Species, Subclass } from "@/lib/types"
 
 export {
@@ -216,7 +217,7 @@ export function collectSpeciesOptionBlockers(
   for (let index = 0; index < (selectedSpecies.traits?.length ?? 0); index++) {
     const trait = selectedSpecies.traits[index]
     if (!trait.isChoice || !trait.choices) continue
-    const picks = speciesTraitPicks[String(index)] ?? []
+    const picks = resolveSpeciesTraitPicks(speciesTraitPicks, trait, index)
     if (!choiceCountMet(picks, trait.choices.count)) {
       blockers.push(
         `${selectedSpecies.name}: complete “${trait.name}” (${picks.length}/${trait.choices.count}).`,

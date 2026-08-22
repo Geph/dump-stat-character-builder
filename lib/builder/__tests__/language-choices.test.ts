@@ -3,6 +3,7 @@ import {
   applyModifierPlayerPicks,
   modifierPlayerChoiceSlotKey,
   optionsForProficiencyGrantSlot,
+  reconcileModifierPlayerPicks,
   type ModifierPlayerChoiceSlot,
 } from "@/lib/builder/modifier-player-choices"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
@@ -108,5 +109,26 @@ describe("optionsForProficiencyGrantSlot — languages", () => {
       currentSelection: ["elvish"],
     })
     expect(options.map((option) => option.name)).toContain("Elvish")
+  })
+})
+
+describe("reconcileModifierPlayerPicks", () => {
+  it("remaps orphaned species language picks onto the current slot key", () => {
+    const currentSlot: ModifierPlayerChoiceSlot = {
+      slotKey: "species:elf-id:mods::mod_species_languages::language",
+      sourceKey: "species:elf-id:mods",
+      sourceLabel: "Elf",
+      modId: "mod_species_languages",
+      kind: "language",
+      label: "Languages (Common + two of your choice)",
+      maxCount: 2,
+    }
+    const remapped = reconcileModifierPlayerPicks(
+      {
+        "species:elf-id:trait:0::mod_old_languages::language": ["Draconic", "Elvish"],
+      },
+      [currentSlot],
+    )
+    expect(remapped[currentSlot.slotKey]).toEqual(["Draconic", "Elvish"])
   })
 })

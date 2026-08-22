@@ -448,6 +448,41 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "free casts without a spell slot (Craftsman Eye for Quality)",
+      text: "You can cast Identify and Locate Object without a spell slot or components. When you cast Identify, you also appraise the target item, learning its market value in Gold Pieces. Intelligence is your spellcasting ability for these spells.",
+      ruleId: "spell.cast_named_without_slot",
+      assert: (detections) => {
+        const effects = detections.find((d) => d.ruleId === "spell.cast_named_without_slot")
+          ?.instance.activation?.effects
+        expect(effects?.map((effect) => effect.castSpellName)).toEqual([
+          "Identify",
+          "Locate Object",
+        ])
+        expect(effects?.every((effect) => effect.kind === "cast_spell")).toBe(true)
+        expect(effects?.every((effect) => effect.castSpellWithoutSlot === true)).toBe(true)
+
+        // The spells still have to become known, and the slot/component clause must never
+        // leak into a spell name.
+        const known = modOf(
+          detections.find((d) => d.ruleId === "spell.gain_cast_named")?.instance
+            .characteristics?.[0],
+          "spells_known",
+        )
+        expect(known?.spells?.map((entry) => entry.spellId)).toEqual([
+          "import_spell_name:Identify",
+          "import_spell_name:Locate Object",
+        ])
+
+        // "Intelligence is your spellcasting ability for these spells" overrides the class ability.
+        const ability = modOf(
+          detections.find((d) => d.ruleId === "spellcasting.ability")?.instance
+            .characteristics?.[0],
+          "spellcasting_ability",
+        )
+        expect(ability?.ability).toBe("intelligence")
+      },
+    },
+    {
       label: "named psionic casting grant without the word spell",
       text: "You can cast minor illusion with your psionic powers.",
       ruleId: "spell.gain_cast_named",

@@ -47,7 +47,9 @@ export function BuilderSelectedChoiceChips({
   return (
     <div className={cn("space-y-1.5", className)}>
       {title ? (
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {title} selected
+        </p>
       ) : null}
       <div className={gridClass}>
         {names.map((name) => {

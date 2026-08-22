@@ -11,6 +11,7 @@ import {
   speciesModsSourceKey,
   speciesTraitSourceKey,
 } from "@/lib/builder/modifier-player-choices"
+import { resolveSpeciesTraitPicks } from "@/lib/builder/species-trait-picks"
 import { featureChoiceKey, resolveSubclassUnlockLevel } from "@/lib/builder/choices"
 import {
   normalizeCharacteristics,
@@ -30,6 +31,7 @@ import {
 import { resolveModifierRefIds, type ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
+import { sanitizeCaptainSubclassFeatures } from "@/lib/compendium/captain-feature-wiring"
 import { tagModifierSource } from "@/lib/character/tag-modifier-source"
 import {
   abilitySpecializationChoice,
@@ -82,7 +84,13 @@ function collectLinkedFromFeature(
   instances: LinkedModifierInstance[],
 ): void {
   const feature = migrateFeatureOptionPickers(rawFeature)
-  instances.push(...effectiveLinkedModifiers(feature.linkedModifiers, feature.modifierRefs, catalog))
+  instances.push(
+    ...effectiveLinkedModifiers(
+      readLinkedModifiers(feature as unknown as Record<string, unknown>, catalog),
+      feature.modifierRefs,
+      catalog,
+    ),
+  )
 
   if (feature.isChoice && feature.choices?.options?.length) {
     const key = featureChoiceKey(classId, feature.name, feature.level)
@@ -90,7 +98,13 @@ function collectLinkedFromFeature(
     for (const optionName of picked) {
       const option = feature.choices.options.find((entry) => entry.name === optionName)
       if (!option) continue
-      instances.push(...effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog))
+      instances.push(
+        ...effectiveLinkedModifiers(
+          readLinkedModifiers(option as unknown as Record<string, unknown>, catalog),
+          option.modifierRefs,
+          catalog,
+        ),
+      )
     }
   }
 }
@@ -148,8 +162,11 @@ export function classAndSubclassLinkedModifiers(params: {
     if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
       const subclass = subclasses.find((s) => s.id === subclassId)
       if (subclass) {
+        const subclassFeatures = /captain/i.test(cls.name)
+          ? sanitizeCaptainSubclassFeatures(subclass.features) ?? subclass.features ?? []
+          : subclass.features ?? []
         collectLinkedFromFeatures(
-          subclass.features ?? [],
+          subclassFeatures,
           entry.classId,
           entry.level,
           featureChoicePicks,
@@ -231,7 +248,12 @@ function classCharacteristicsWithPlayerPicks(params: {
     const subclassId = subclassByClassId[entry.classId]
     if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
       const subclass = subclasses.find((candidate) => candidate.id === subclassId)
-      if (subclass) processFeatures(subclass.features ?? [])
+      if (subclass) {
+        const subclassFeatures = /captain/i.test(cls.name)
+          ? sanitizeCaptainSubclassFeatures(subclass.features) ?? subclass.features ?? []
+          : subclass.features ?? []
+        processFeatures(subclassFeatures)
+      }
     }
   }
 
@@ -249,7 +271,7 @@ export function speciesTraitLinkedModifiers(
   species.traits.forEach((trait, index) => {
     instances.push(...effectiveLinkedModifiers(trait.linkedModifiers, trait.modifierRefs, catalog))
     if (trait.isChoice && trait.choices?.options?.length) {
-      const picked = speciesTraitPicks[String(index)] ?? []
+      const picked = resolveSpeciesTraitPicks(speciesTraitPicks, trait, index)
       for (const optionName of picked) {
         const option = trait.choices.options.find((entry) => entry.name === optionName)
         if (!option) continue
@@ -297,7 +319,7 @@ function speciesCharacteristicsWithPlayerPicks(
       ...effectiveLinkedModifiers(trait.linkedModifiers, trait.modifierRefs, catalog),
     ]
     if (trait.isChoice && trait.choices?.options?.length) {
-      const picked = speciesTraitPicks[String(index)] ?? []
+      const picked = resolveSpeciesTraitPicks(speciesTraitPicks, trait, index)
       for (const optionName of picked) {
         const option = trait.choices.options.find((entry) => entry.name === optionName)
         if (!option) continue

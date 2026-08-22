@@ -105,7 +105,58 @@ function sanitizeCaptainCohortFeature(feature: Feature): Feature {
   }
 }
 
+export const CAPTAIN_VANTAGE_POINT_CLIMB_ID = "modinst_captain_eagle_vantage_climb"
+
+/** Eagle Banner Vantage Point: Climb Speed equal to Speed. */
+export function captainVantagePointClimbModifier(): LinkedModifierInstance {
+  return charInstance(CAPTAIN_VANTAGE_POINT_CLIMB_ID, characteristicCatalogRefId("speed"), [
+    {
+      id: modId("captain_eagle_vantage_climb"),
+      type: "speed",
+      speedType: "climb",
+      mode: "equal_to_walk",
+      value: 0,
+      label: "Climb Speed equal to your Speed",
+    },
+  ])
+}
+
+function featureHasClimbEqualToWalk(feature: Feature): boolean {
+  return (feature.linkedModifiers ?? []).some((instance) =>
+    (instance.characteristics ?? []).some(
+      (char) =>
+        char.type === "speed" && char.speedType === "climb" && char.mode === "equal_to_walk",
+    ),
+  )
+}
+
+/** Ensure Vantage Point grants climb speed equal to walk (idempotent). */
+export function ensureCaptainVantagePointClimb(feature: Feature): Feature {
+  if (!/^vantage\s*point$/i.test(feature.name.trim())) return feature
+  if (featureHasClimbEqualToWalk(feature)) return feature
+  // Drop a broken climb stub (e.g. add/0) so equal_to_walk is the sole climb grant.
+  const withoutClimb = (feature.linkedModifiers ?? []).filter(
+    (instance) =>
+      !(instance.characteristics ?? []).some(
+        (char) => char.type === "speed" && char.speedType === "climb",
+      ),
+  )
+  return syncModifierRefs({
+    ...feature,
+    linkedModifiers: [...withoutClimb, captainVantagePointClimbModifier()],
+  })
+}
+
 export function sanitizeCaptainFeature(
+  feature: Feature,
+  extraManeuverNames: readonly string[] = [],
+): Feature {
+  return ensureCaptainVantagePointClimb(
+    sanitizeCaptainBattleTacticsOrCohort(feature, extraManeuverNames),
+  )
+}
+
+function sanitizeCaptainBattleTacticsOrCohort(
   feature: Feature,
   extraManeuverNames: readonly string[] = [],
 ): Feature {
@@ -134,4 +185,12 @@ export function sanitizeCaptainFeatures(
 ): Feature[] | undefined {
   if (!features?.length) return features
   return features.map((feature) => sanitizeCaptainFeature(feature, extraManeuverNames))
+}
+
+/** Subclass features (Eagle Banner Vantage Point, etc.). */
+export function sanitizeCaptainSubclassFeatures(
+  features: Feature[] | undefined,
+): Feature[] | undefined {
+  if (!features?.length) return features
+  return features.map((feature) => ensureCaptainVantagePointClimb(feature))
 }

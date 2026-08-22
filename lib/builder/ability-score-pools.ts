@@ -18,6 +18,7 @@ import {
 import { catalogEntryById, type ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { linkedModifiersForFeat, type FeatSelectionEntry } from "@/lib/builder/feat-choices"
+import { resolveSpeciesTraitPicks } from "@/lib/builder/species-trait-picks"
 import type { DndClass, Feat, Feature, Species, Subclass } from "@/lib/types"
 import { isAsiFeat, milestoneAsiPointTotal } from "@/lib/builder/asi-allocation"
 
@@ -154,7 +155,7 @@ export function collectAbilityScorePoolGrants(params: {
       ),
     )
     if (!trait.isChoice || !trait.choices?.options?.length) return
-    const picked = speciesTraitPicks[String(index)] ?? []
+    const picked = resolveSpeciesTraitPicks(speciesTraitPicks, trait, index)
     for (const optionName of picked) {
       const option = trait.choices.options.find((entry) => entry.name === optionName)
       if (!option) continue

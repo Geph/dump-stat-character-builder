@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   aggregateAsiBonuses,
+  formatAsiAllocationSummary,
   isValidAsiAllocation,
   type AsiAllocationsByFeatId,
 } from "@/lib/builder/asi-allocation"
@@ -63,5 +64,13 @@ describe("isValidAsiAllocation with allowedAbilities", () => {
   it("rejects points spent outside the allowed set", () => {
     expect(isValidAsiAllocation({ charisma: 1 }, 1, ["strength", "dexterity"])).toBe(false)
     expect(isValidAsiAllocation({ strength: 1 }, 1, ["strength", "dexterity"])).toBe(true)
+  })
+})
+
+describe("formatAsiAllocationSummary", () => {
+  it("lists positive ability bonuses in score order", () => {
+    expect(formatAsiAllocationSummary({ wisdom: 1, strength: 2 })).toBe(
+      "+2 Strength, +1 Wisdom",
+    )
   })
 })

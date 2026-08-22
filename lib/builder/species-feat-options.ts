@@ -1,5 +1,6 @@
 import { grantFeatsFromLinkedModifiers, type ResolvedGrantFeat } from "@/lib/compendium/grant-feat-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
+import { resolveSpeciesTraitPicks } from "@/lib/builder/species-trait-picks"
 import type { Species } from "@/lib/types"
 
 export type SpeciesFeatPickSlot = {
@@ -52,7 +53,7 @@ export function getSpeciesFeatPickSlots(
 
   species.traits?.forEach((trait, index) => {
     if (trait.isChoice && trait.choices?.options?.length) {
-      const picked = speciesTraitPicks[String(index)] ?? []
+      const picked = resolveSpeciesTraitPicks(speciesTraitPicks, trait, index)
       for (const optionName of picked) {
         const option = trait.choices.options.find((entry) => entry.name === optionName)
         if (!option) continue

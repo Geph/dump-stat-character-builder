@@ -44,6 +44,8 @@ type SpellDetailOverlayProps = {
     arcanumUsed?: boolean
   }) => void
   canUseSlot: boolean
+  /** A feature grants this spell without expending a slot (Eye for Quality, Third Eye, …). */
+  freeCast?: boolean
   psiLimit?: number | null
   castCost?: ResolvedSpellCastCost | null
   metamagicOptions?: MetamagicCastOption[]
@@ -60,6 +62,7 @@ export function SpellDetailOverlay({
   onClose,
   onCast,
   canUseSlot,
+  freeCast = false,
   psiLimit,
   castCost = null,
   metamagicOptions = [],
@@ -99,7 +102,7 @@ export function SpellDetailOverlay({
         : true
     : spendsResourcePoints
       ? (castCost?.canCast ?? false)
-      : canUseSlot && metamagicReady
+      : (canUseSlot || freeCast) && metamagicReady
 
   useEffect(() => {
     setConcentrationWarningOpen(false)
@@ -168,10 +171,12 @@ export function SpellDetailOverlay({
       } else if (castCost?.metamagicCost) {
         result.psiPointsSpent = castCost.metamagicCost
         feedbackParts.push(`Spent ${castCost.metamagicCost} ${resourceLabel} on Metamagic`)
-        if (!isCantrip) {
+        if (!isCantrip && !freeCast) {
           result.slotUsed = true
           feedbackParts.push(`Used 1 level ${spell.level} slot`)
         }
+      } else if (freeCast) {
+        feedbackParts.push("No spell slot spent")
       } else if (!isCantrip) {
         result.slotUsed = true
         feedbackParts.push(`Used 1 level ${spell.level} slot`)
@@ -318,6 +323,11 @@ export function SpellDetailOverlay({
           {showEmpoweredReroll ? (
             <EmpoweredSpellReroll maxRerolls={Math.max(1, empoweredRerollCap)} />
           ) : null}
+          {freeCast && !isCantrip && (
+            <p className="text-xs text-center font-semibold text-accent bg-accent/10 rounded-lg px-3 py-2">
+              A feature grants this spell without a spell slot — casting it spends none.
+            </p>
+          )}
           {castFeedback && (
             <p className="text-xs text-center font-semibold text-primary bg-primary/10 rounded-lg px-3 py-2">
               {castFeedback}

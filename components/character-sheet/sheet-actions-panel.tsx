@@ -127,6 +127,11 @@ type SheetActionsPanelProps = {
   /** One Primed Bomb per Attack action; Extra Attack still allows extra regular bombs. */
   primedBombUsedThisTurn?: boolean
   onPrimedBombUsed?: () => void
+  /**
+   * Which buckets to show. Combat layout puts triggered entries under weapons
+   * (`triggered`) and action/bonus/reaction in the actions column (`economy`).
+   */
+  sections?: "all" | "economy" | "triggered"
 }
 
 function actionPlayerNoteKey(action: SheetActionEntry, noteId: string): string {
@@ -2000,6 +2005,7 @@ export function SheetActionsPanel({
   onSpendSpellSlot,
   primedBombUsedThisTurn = false,
   onPrimedBombUsed,
+  sections = "all",
 }: SheetActionsPanelProps) {
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [openEconomyKind, setOpenEconomyKind] = useState<ActionEconomyKind | null>(null)
@@ -2390,28 +2396,40 @@ export function SheetActionsPanel({
     singleColumn ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
   )
 
+  const showEconomy = sections === "all" || sections === "economy"
+  const showTriggered = sections === "all" || sections === "triggered"
+  const hasEconomyEntries =
+    showEconomy &&
+    (Object.keys(grouped) as ActionEconomyKind[]).some((kind) => grouped[kind].length > 0)
+  const hasTriggeredEntries = showTriggered && triggeredEntries.length > 0
+  if (!hasEconomyEntries && !hasTriggeredEntries && !incapacitated) {
+    return null
+  }
+
   return (
     <div className="space-y-3">
-      {incapacitated ? (
+      {incapacitated && showEconomy ? (
         <p className="text-xs text-destructive font-medium">
           Incapacitated — you cannot take actions, bonus actions, or reactions.
         </p>
       ) : null}
-      {(Object.keys(grouped) as ActionEconomyKind[]).map((kind) => {
-        const entries = grouped[kind]
-        if (!entries.length) return null
-        return (
-          <div key={kind}>
-            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-              {ACTION_KIND_LABELS[kind]}
-            </p>
-            <div className={gridClass}>
-              {entries.map((entry) => renderEntryCard(entry, kind))}
-            </div>
-          </div>
-        )
-      })}
-      {triggeredEntries.length ? (
+      {showEconomy
+        ? (Object.keys(grouped) as ActionEconomyKind[]).map((kind) => {
+            const entries = grouped[kind]
+            if (!entries.length) return null
+            return (
+              <div key={kind}>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                  {ACTION_KIND_LABELS[kind]}
+                </p>
+                <div className={gridClass}>
+                  {entries.map((entry) => renderEntryCard(entry, kind))}
+                </div>
+              </div>
+            )
+          })
+        : null}
+      {showTriggered && triggeredEntries.length ? (
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
             Triggered (no action)

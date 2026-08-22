@@ -1,0 +1,16 @@
+# Not indexed for search/embeddings, but still readable by the agent on request.
+# Build output and caches (rewritten constantly by next dev).
+.next/
+out/
+.static-build-stash/
+node_modules/
+.pnpm-store/
+.tools/
+
+# Lockfiles and generated manifests carry no useful semantic signal.
+pnpm-lock.yaml
+public/icons/manifest.json
+
+# Scratch diagnostics and audit dumps.
+tmp-*
+agent-tools-*.txt

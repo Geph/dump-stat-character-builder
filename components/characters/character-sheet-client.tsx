@@ -182,10 +182,12 @@ import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import { resolvePsiLimit } from "@/lib/character/resolve-psi-limit"
 import { collectAlternateAbilityChecks } from "@/lib/character/alternate-ability-checks"
 import { collectSubclassAlwaysPreparedSpells } from "@/lib/character/subclass-granted-spells"
+import { collectFreeCastSpellKeys, isFreeCastSpell } from "@/lib/character/free-cast-spells"
 import { featureChoiceKey } from "@/lib/builder/choices"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { collectSelectedCustomAbilityNames } from "@/lib/builder/picked-custom-abilities"
+import { normalizeAsiAllocationsMap } from "@/lib/character/level-up-feat"
 import { catalogFeatPickIdsFromPicks } from "@/lib/builder/catalog-feat-options"
 import { collectKnownDisciplineNames } from "@/lib/builder/aggregate-psionic-talents"
 import { filterCustomAbilitiesForCharacterSheet, filterFeatureTabCustomAbilities } from "@/lib/character/filter-sheet-custom-abilities"
@@ -324,7 +326,10 @@ import { useManualSkillAbility } from "@/components/settings/use-manual-skill-ab
 import { setSkillAbilityOverride } from "@/lib/character/skill-ability-overrides"
 import { FeatureCardMenu } from "@/components/character-sheet/feature-card-menu"
 import { LevelUpWizard } from "@/components/character-sheet/level-up-wizard"
-import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
+import {
+  looksLikeChoicePickId,
+  withChosenOptionChrome,
+} from "@/lib/character/chosen-option-label"
 import {
   applyOrder,
   defaultFeatureLayout,
@@ -853,21 +858,28 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           setCreatures(asCompendiumRows<Creature & Record<string, unknown>>(creatureData) as Creature[])
         }
 
-        const featIds = (row.feat_ids ?? []).filter(Boolean)
+        const featurePicks = row.feature_choice_picks ?? {}
+        const featIdsFromPicks = Object.values(featurePicks)
+          .flat()
+          .filter((value): value is string => typeof value === "string" && looksLikeChoicePickId(value))
+        const featIds = [...new Set([...(row.feat_ids ?? []), ...featIdsFromPicks].filter(Boolean))]
         if (featIds.length) {
-          const uniqueFeatIds = [...new Set(featIds)]
-          const { data: featData } = await db.from("feats").select("*").in("id", uniqueFeatIds)
+          const { data: featData } = await db.from("feats").select("*").in("id", featIds)
           if (featData) {
             const rows = asCompendiumRows<Feat & Record<string, unknown>>(featData) as Feat[]
             const byId = new Map(rows.map((feat) => [feat.id, feat]))
-            setCharacterFeats(
-              featIds.map((id) => byId.get(id)).filter((feat): feat is Feat => Boolean(feat)),
-            )
+            const orderedOwned = (row.feat_ids ?? [])
+              .map((id) => byId.get(id))
+              .filter((feat): feat is Feat => Boolean(feat))
+            const extras = featIds
+              .filter((id) => !(row.feat_ids ?? []).includes(id))
+              .map((id) => byId.get(id))
+              .filter((feat): feat is Feat => Boolean(feat))
+            setCharacterFeats([...orderedOwned, ...extras])
           }
         }
 
         const bg = row.backgrounds
-        const featurePicks = row.feature_choice_picks ?? {}
         const effectiveOriginGrant = getEffectiveBackgroundFeatGranted(bg, featurePicks)
         if (effectiveOriginGrant) {
           const { data: featCatalog } = await db.from("feats").select("*")
@@ -2434,6 +2446,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     })
   }, [characterFeats, originFeat, effectiveBackgroundFeatGranted])
 
+  const choiceLabelByPickId = useMemo(() => {
+    const labels: Record<string, string> = {}
+    for (const feat of characterFeats) {
+      if (feat.id && feat.name?.trim()) labels[feat.id] = feat.name.trim()
+    }
+    if (originFeat?.id && originFeat.name?.trim()) {
+      labels[originFeat.id] = originFeat.name.trim()
+    }
+    return labels
+  }, [characterFeats, originFeat])
+
   const featureTabSections = useMemo(
     () =>
       buildFeatureTabSections({
@@ -2445,15 +2468,22 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         originFeatFallbackDescription: originFeat?.description ?? "Granted by your background at 1st level.",
         feats: characterFeatsForDisplay,
         featureChoicePicks,
+        asiAllocations: normalizeAsiAllocationsMap(character?.asi_allocations),
+        featIds: character?.feat_ids ?? characterFeats.map((feat) => feat.id),
+        choiceLabelByPickId,
       }),
     [
       classDetails,
       character?.species,
       character?.backgrounds?.feature,
+      character?.asi_allocations,
+      character?.feat_ids,
       originFeat,
       effectiveBackgroundFeatGranted,
       characterFeatsForDisplay,
+      characterFeats,
       featureChoicePicks,
+      choiceLabelByPickId,
     ],
   )
 
@@ -3676,6 +3706,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     forcedSaveRemaps.length > 0 ||
     movementEffectNotes.length > 0 ||
     extraTurns.length > 0
+
+  const freeCastSpellKeys = collectFreeCastSpellKeys(
+    classDetails.flatMap((entry) =>
+      [...(entry.class?.features ?? []), ...(entry.subclass?.features ?? [])].filter(
+        (feature) => (feature.level ?? 1) <= entry.row.level,
+      ),
+    ),
+  )
 
   const alwaysPreparedSpellIds = (() => {
     const ids = new Set<string>()
@@ -5185,61 +5223,76 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       onUse={(kind) => markActionEconomy(kind)}
                     />
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 min-w-0">
-                      <SheetEquippedWeaponsPanel
-                        weapons={equippedWeaponCards}
-                        buildInputs={characterBuildInputs}
-                        weaponProficiencies={derived?.weaponProficiencies ?? []}
-                        extraMasteryByWeaponId={extraMasteryByWeaponId}
-                        onExtraMasteryChange={persistExtraWeaponMasteries}
-                        onAttackRoll={() => markActionEconomy("action")}
-                        onDamageRoll={markRampageDamageDealtThisTurn}
-                      />
-                      <div id="sheet-combat-actions">
-                      <SheetActionsPanel
-                        actions={combatActions}
-                        usedByActionId={usedActionUsesById}
-                        onUsedChange={setUsedActionUsesById}
-                        playerNoteValues={featureChoicePicks}
-                        onPlayerNoteChange={(key, value) =>
-                          void persistFeatureChoicePicks(key, value.trim() ? [value] : [])
+                      {(() => {
+                        const combatActionPanelProps = {
+                          actions: combatActions,
+                          usedByActionId: usedActionUsesById,
+                          onUsedChange: setUsedActionUsesById,
+                          playerNoteValues: featureChoicePicks,
+                          onPlayerNoteChange: (key: string, value: string) =>
+                            void persistFeatureChoicePicks(key, value.trim() ? [value] : []),
+                          onEquipmentChoiceChange: (key: string, value: string) =>
+                            void persistLinkedEquipmentChoice(key, value),
+                          resolveContext: usesResolveContext,
+                          resourceEntries,
+                          usedResourcesById,
+                          onResourceUsedChange: setUsedResourcesById,
+                          incapacitated,
+                          psiLimit,
+                          hitDiceRemaining: hitDiceRemainingTotal,
+                          onSpendHitDice: spendHitDiceForAction,
+                          onActivateSheetToggle: activateSheetToggle,
+                          onSpawnIllusionToken: spawnIllusionToken,
+                          onGrantMutationDie: grantMutationDieFromAction,
+                          onMarkEconomy: markActionEconomy,
+                          characterId: character.id,
+                          onApplySelfHeal: applySelfHeal,
+                          onApplySelfInspiration: applySelfInspiration,
+                          onApplySelfConditions: applySelfConditions,
+                          onAddDurationReminder: addDurationReminderFromAction,
+                          onApplyCompanionState: patchCompanionState,
+                          perfectedEnhancementBonus: perfectedEnhancementBonusValue,
+                          empoweredPsionicsBonus: empoweredPsionicsBonusValue,
+                          onMarkDamageDealt: markRampageDamageDealtThisTurn,
+                          onBankBalanceOfPower: hasBalanceOfPowerMechanic
+                            ? bankIntoBalanceOfPower
+                            : undefined,
+                          allyCandidates,
+                          healContext,
+                          singleColumn: true as const,
+                          onRestorePactSlots: handleRestorePactSlots,
+                          onRestoreSpellSlotsByCombinedLevel: handleRestoreSpellSlotsByCombinedLevel,
+                          onRestoreResourceFromSpellSlot: handleRestoreResourceFromSpellSlot,
+                          onSpendSpellSlot: handleSpendSpellSlot,
+                          primedBombUsedThisTurn,
+                          onPrimedBombUsed: () => setPrimedBombUsedThisTurn(true),
                         }
-                        onEquipmentChoiceChange={(key, value) =>
-                          void persistLinkedEquipmentChoice(key, value)
-                        }
-                        resolveContext={usesResolveContext}
-                        resourceEntries={resourceEntries}
-                        usedResourcesById={usedResourcesById}
-                        onResourceUsedChange={setUsedResourcesById}
-                        incapacitated={incapacitated}
-                        psiLimit={psiLimit}
-                        hitDiceRemaining={hitDiceRemainingTotal}
-                        onSpendHitDice={spendHitDiceForAction}
-                        onActivateSheetToggle={activateSheetToggle}
-                        onSpawnIllusionToken={spawnIllusionToken}
-                        onGrantMutationDie={grantMutationDieFromAction}
-                        onMarkEconomy={markActionEconomy}
-                        characterId={character.id}
-                        onApplySelfHeal={applySelfHeal}
-                        onApplySelfInspiration={applySelfInspiration}
-                        onApplySelfConditions={applySelfConditions}
-                        onAddDurationReminder={addDurationReminderFromAction}
-                        onApplyCompanionState={patchCompanionState}
-                        perfectedEnhancementBonus={perfectedEnhancementBonusValue}
-                        empoweredPsionicsBonus={empoweredPsionicsBonusValue}
-                        onMarkDamageDealt={markRampageDamageDealtThisTurn}
-                        onBankBalanceOfPower={
-                          hasBalanceOfPowerMechanic ? bankIntoBalanceOfPower : undefined
-                        }
-                        allyCandidates={allyCandidates}
-                        healContext={healContext}
-                        singleColumn
-                        onRestorePactSlots={handleRestorePactSlots}
-                        onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
-                        onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
-                        onSpendSpellSlot={handleSpendSpellSlot}
-                        primedBombUsedThisTurn={primedBombUsedThisTurn}
-                        onPrimedBombUsed={() => setPrimedBombUsedThisTurn(true)}
-                      />
+                        return (
+                          <>
+                            <div className="space-y-3 min-w-0">
+                              <SheetEquippedWeaponsPanel
+                                weapons={equippedWeaponCards}
+                                buildInputs={characterBuildInputs}
+                                weaponProficiencies={derived?.weaponProficiencies ?? []}
+                                extraMasteryByWeaponId={extraMasteryByWeaponId}
+                                onExtraMasteryChange={persistExtraWeaponMasteries}
+                                onAttackRoll={() => markActionEconomy("action")}
+                                onDamageRoll={markRampageDamageDealtThisTurn}
+                              />
+                              <SheetActionsPanel
+                                {...combatActionPanelProps}
+                                sections="triggered"
+                              />
+                            </div>
+                            <div id="sheet-combat-actions">
+                              <SheetActionsPanel
+                                {...combatActionPanelProps}
+                                sections="economy"
+                              />
+                            </div>
+                          </>
+                        )
+                      })()}
                     </div>
                     {!equippedWeaponCards.length && !combatActions.length ? (
                       <p className="text-xs text-muted-foreground italic">
@@ -5303,7 +5356,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
                 )}
                 </div>
-              </div>
 
                 <div className="space-y-3 min-w-0">
                 <div id="sheet-saves" className={`${SHEET_COMBAT_PANEL.savingThrows} rounded-xl p-3 border border-border`}>
@@ -6185,6 +6237,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   )
                 })())
             }
+            freeCast={isFreeCastSpell(freeCastSpellKeys, selectedSpell.name)}
           />
         ) : null}
         {portraitZoomOpen && character.portrait_url ? (

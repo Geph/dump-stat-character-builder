@@ -45,6 +45,26 @@ export function getAsiPointsUsed(allocation: AsiAllocation): number {
   return ABILITY_KEYS.reduce((sum, key) => sum + (allocation[key] ?? 0), 0)
 }
 
+const ABILITY_DISPLAY_NAMES: Record<AbilityScoreKey, string> = {
+  strength: "Strength",
+  dexterity: "Dexterity",
+  constitution: "Constitution",
+  intelligence: "Intelligence",
+  wisdom: "Wisdom",
+  charisma: "Charisma",
+}
+
+/** Sheet/builder chrome: "+2 Strength" or "+1 Dexterity, +1 Wisdom". */
+export function formatAsiAllocationSummary(allocation: AsiAllocation | null | undefined): string {
+  if (!allocation) return ""
+  const parts: string[] = []
+  for (const key of ABILITY_KEYS) {
+    const bonus = allocation[key] ?? 0
+    if (bonus > 0) parts.push(`+${bonus} ${ABILITY_DISPLAY_NAMES[key]}`)
+  }
+  return parts.join(", ")
+}
+
 export function getAsiAllocatorHelpText(totalPoints: number, pickCount: number): string {
   if (pickCount <= 0 || totalPoints <= 0) return ""
   if (totalPoints === ASI_POINTS_PER_PICK) {

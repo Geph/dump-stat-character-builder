@@ -7,7 +7,7 @@ import {
   rowsToClassLevels,
   rowsToSubclassMap,
 } from "@/lib/character/character-classes"
-import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
+import { normalizeBuilderPicks, normalizeModifierPlayerPicks } from "@/lib/builder/builder-picks"
 import {
   inferClassSkillPicks,
   inferSpellPicksByClassId,
@@ -15,6 +15,7 @@ import {
 import { getBuilderLayout, layoutToCardViewMode } from "@/lib/site-settings/builder-layout"
 import { mergeAlchemistDiscoveryPicks } from "@/lib/compendium/alchemist-feature-wiring"
 import { pruneMissingClassSelections } from "@/lib/builder/prune-missing-class-picks"
+import { normalizeSpeciesTraitPicksForSpecies } from "@/lib/builder/species-trait-picks"
 
 export function characterToDraft(character: Character): CharacterDraft {
   return {
@@ -59,6 +60,7 @@ export function characterToBuilderState(
   options: {
     dndClass?: DndClass | null
     background?: Background | null
+    species?: import("@/lib/types").Species | null
     allClasses?: DndClass[]
     allSubclasses?: import("@/lib/types").Subclass[]
     spells?: Spell[]
@@ -90,7 +92,10 @@ export function characterToBuilderState(
     builderPicks.spell_picks_by_class_id ??
     inferSpellPicksByClassId(character, allClasses, options.spells ?? [])
 
-  const speciesTraitPicks = builderPicks.species_trait_picks ?? {}
+  const speciesTraitPicks = normalizeSpeciesTraitPicksForSpecies(
+    builderPicks.species_trait_picks ?? {},
+    options.species ?? null,
+  )
   const featureChoicePicks = mergeAlchemistDiscoveryPicks(
     (character.feature_choice_picks as Record<string, string[]>) ?? {},
   )
@@ -144,7 +149,7 @@ export function characterToBuilderState(
     classToolPicks: pruned?.classToolPicks ?? classToolPicks,
     featureChoicePicks: pruned?.featureChoicePicks ?? featureChoicePicks,
     featChoicePicks: (character.feat_choice_picks as Record<string, string[]>) ?? {},
-    modifierPlayerPicks: (character.modifier_player_picks as Record<string, string[]>) ?? {},
+    modifierPlayerPicks: normalizeModifierPlayerPicks(character.modifier_player_picks),
     primaryClassId: pruned?.primaryClassId ?? character.class_id,
     classAddOrder: pruned?.classAddOrder ?? classAddOrder,
     speciesTraitPicks,

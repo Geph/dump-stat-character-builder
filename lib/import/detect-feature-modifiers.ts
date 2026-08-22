@@ -85,7 +85,7 @@ export function modifierInstanceFingerprint(instance: LinkedModifierInstance): s
       return `${instance.catalogRefId}:immune:${normalizeList(char.conditions)}`
     }
     if (char.type === "speed") {
-      return `${instance.catalogRefId}:speed:${char.speedType}:${char.value}`
+      return `${instance.catalogRefId}:speed:${char.speedType}:${char.mode}:${char.value}`
     }
     if (char.type === "vision") {
       return `${instance.catalogRefId}:vision:${char.visionType}:${char.rangeFeet}`

@@ -349,6 +349,64 @@ describe("applySheetRest", () => {
     expect(result.summary).toContain("Available: Potion Brewing")
   })
 
+  it("lists a Long Rest crafting activity as available, but only after a long rest", () => {
+    const magazine = {
+      id: "craftsman:6:Magazine",
+      name: "Magazine",
+      sourceLabel: "Calibarons' Guild",
+      kinds: ["action" as const],
+      category: "combat" as const,
+      limitedUses: null,
+      classLevel: 6,
+      description:
+        "<p>When you finish a Long Rest, you can use your Crafting Tools and materials worth 50+ GP to modify a Ranged weapon that has the Loading or Reload property.</p>",
+    }
+    const args = {
+      maxHp: 20,
+      activeConditions: [],
+      usedSpellSlotsByKey: {},
+      spellSlotTables: [],
+      usedResourcesById: {},
+      resourceEntries: [],
+      usedActionUsesById: {},
+      sheetActions: [magazine],
+      resolveContext,
+    }
+
+    expect(applySheetRest({ ...args, rest: "long_rest" }).summary).toContain("Available: Magazine")
+    expect(applySheetRest({ ...args, rest: "short_rest" }).summary).not.toContain(
+      "Available: Magazine",
+    )
+  })
+
+  it("does not treat a long-rest recharge as an available activity", () => {
+    const result = applySheetRest({
+      rest: "long_rest",
+      maxHp: 20,
+      activeConditions: [],
+      usedSpellSlotsByKey: {},
+      spellSlotTables: [],
+      usedResourcesById: {},
+      resourceEntries: [],
+      usedActionUsesById: {},
+      sheetActions: [
+        {
+          id: "fighter:1:Second Wind",
+          name: "Second Wind",
+          sourceLabel: "Fighter",
+          kinds: ["bonus"],
+          category: "combat",
+          limitedUses: null,
+          classLevel: 5,
+          description:
+            "You regain all expended uses when you finish a Short or Long Rest.",
+        },
+      ],
+      resolveContext,
+    })
+    expect(result.summary.some((line) => line.startsWith("Available:"))).toBe(false)
+  })
+
   it("restores HP, spell slots, death saves, and long-rest resources on long rest", () => {
     const result = applySheetRest({
       rest: "long_rest",

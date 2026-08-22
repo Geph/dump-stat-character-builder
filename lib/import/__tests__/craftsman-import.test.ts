@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest"
+import { featureChoiceKey } from "@/lib/builder/choices"
 import { aggregateUpgradeOptions } from "@/lib/builder/upgrade-choices"
+import { collectFreeCastSpellKeys } from "@/lib/character/free-cast-spells"
+import { filterDisplaySpeedEntries, resolveAllSpeeds } from "@/lib/character/resolve-all-speeds"
+import { inferActivatableActionCategory } from "@/lib/character/sheet-actions"
+import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
+import { aggregateCharacteristics } from "@/lib/compendium/characteristic-modifiers"
+import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
+import { canonicalSpellLookupKey } from "@/lib/compendium/spell-name-aliases"
 import { detectFeatureModifiers } from "@/lib/import/detect-feature-modifiers"
+import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
+import craftsmanSeed from "@/lib/seed-packs/mage-hand-press/magehandpress-craftsman-class.json"
 import type { ImportContent } from "@/lib/import/content-schema"
-import type { CustomAbility, Feature } from "@/lib/types"
+import type { CustomAbility, DndClass, Feature } from "@/lib/types"
 
 describe("Craftsman enrichment", () => {
   it("wires Expert Crafting Instant uses and Customize Armor choices", () => {
@@ -41,6 +51,165 @@ describe("Craftsman enrichment", () => {
     const armor = enriched.classes?.[0]?.features?.[1] as Feature
     expect(armor.choices?.category).toBe("Armor Customization")
     expect(armor.choices?.options?.some((opt) => opt.name === "Climbing")).toBe(true)
+    const climbing = armor.choices?.options?.find((opt) => opt.name === "Climbing")
+    expect(
+      (climbing?.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? []).some(
+        (char) => char.type === "speed" && char.speedType === "climb" && char.mode === "equal_to_walk",
+      ),
+    ).toBe(true)
+  })
+
+  it("Climbing Customize Armor pick grants climb speed equal to walk", () => {
+    const enriched = applyImportEnrichmentPresets({
+      classes: [
+        {
+          name: "Craftsman",
+          description: "",
+          hit_die: 10,
+          primary_ability: ["Strength", "Dexterity"],
+          features: [
+            {
+              level: 6,
+              name: "Customize Armor",
+              description: "Customize Masterwork armor with one benefit.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+
+    const cls = {
+      ...(enriched.classes![0] as object),
+      id: "class_craftsman",
+      features: enriched.classes![0]!.features as Feature[],
+    } as DndClass
+
+    const pickKey = featureChoiceKey("class_craftsman", "Customize Armor", 6)
+    const mods = collectBuilderModifierRefIds({
+      catalog: [],
+      speciesTraitPicks: {},
+      feats: [],
+      selectedFeatIds: [],
+      classLevels: [{ classId: "class_craftsman", level: 6 }],
+      classes: [cls],
+      subclasses: [],
+      subclassByClassId: {},
+      featureChoicePicks: { [pickKey]: ["Climbing"] },
+    })
+
+    expect(
+      mods.some((m) => m.type === "speed" && m.speedType === "climb" && m.mode === "equal_to_walk"),
+    ).toBe(true)
+
+    const aggregated = aggregateCharacteristics(mods)
+    const speeds = filterDisplaySpeedEntries(
+      resolveAllSpeeds({
+        walkSpeed: 30,
+        aggregatedSpeed: aggregated.speed,
+        speedEqualToWalk: aggregated.speedEqualToWalk,
+      }),
+    )
+    expect(speeds.some((e) => e.type === "climb" && e.feet === 30)).toBe(true)
+  })
+
+  it("keeps Magazine on the Combat tab despite its Crafting Tools wording", () => {
+    const description =
+      "<p>When you finish a Long Rest, you can use your Crafting Tools and materials worth 50+ GP to modify a Ranged weapon that has the Loading or Reload property.</p><p><strong>Reload.</strong> If you are proficient with the weapon, reloading it takes an action or a Bonus Action; otherwise, reloading it takes an action.</p>"
+    const enriched = applyImportEnrichmentPresets({
+      subclasses: [
+        {
+          name: "Calibarons' Guild",
+          class_name: "Craftsman",
+          description: null,
+          features: [{ level: 6, name: "Magazine", description }],
+        },
+      ],
+    } as unknown as ImportContent)
+
+    const magazine = enriched.subclasses?.[0]?.features?.[0] as Feature
+    expect(magazine.sheetDisplay).toMatchObject({ combatActions: true, featuresTab: true })
+    expect(resolveFeatureSheetDisplay(magazine).combatActions).toBe(true)
+
+    // Without the preset the "Crafting Tools" wording files it under Non-Combat.
+    expect(
+      inferActivatableActionCategory({ name: "Magazine", description }),
+    ).toBe("utility")
+  })
+
+  it("wires Eye for Quality free casts with Intelligence, whichever order presets run in", () => {
+    const description =
+      "<p>You can cast Identify and Locate Object without a spell slot or components. When you cast Identify, you also appraise the target item, learning its market value in Gold Pieces.</p>"
+    const content = () =>
+      ({
+        classes: [
+          {
+            name: "Craftsman",
+            description: "",
+            hit_die: 10,
+            primary_ability: ["Strength"],
+            features: [{ level: 9, name: "Eye for Quality", description }],
+          },
+        ],
+      }) as unknown as ImportContent
+
+    // enrichImportContentModifiers applies presets after phrase detection, while the seed build
+    // applies them before as well. Both orders must land the same wiring, exactly once.
+    for (const enriched of [
+      enrichImportContentModifiers(content()),
+      enrichImportContentModifiers(applyImportEnrichmentPresets(content())),
+    ]) {
+      const feature = enriched.classes?.[0]?.features?.[0] as Feature
+      const instances = feature.linkedModifiers ?? []
+
+      const freeCasts = instances.flatMap((instance) =>
+        (instance.activation?.effects ?? []).filter(
+          (effect) => effect.kind === "cast_spell" && effect.castSpellWithoutSlot,
+        ),
+      )
+      expect(freeCasts.map((effect) => effect.castSpellName)).toEqual([
+        "Identify",
+        "Locate Object",
+      ])
+
+      // Craftsman has no class spellcasting ability, so the grant must carry Intelligence itself.
+      const known = instances
+        .flatMap((instance) => instance.characteristics ?? [])
+        .filter((characteristic) => characteristic.type === "spells_known")
+      expect(known).toHaveLength(1)
+      expect(known[0]).toMatchObject({ castingAbility: "intelligence" })
+      expect(
+        known[0]?.type === "spells_known" ? known[0].spells?.map((s) => s.spellId) : [],
+      ).toEqual(["import_spell_name:Identify", "import_spell_name:Locate Object"])
+    }
+  })
+
+  it("ships Eye for Quality free casts in the Craftsman seed pack", () => {
+    const feature = craftsmanSeed.classes
+      ?.find((row) => row.name === "Craftsman")
+      ?.features?.find((row) => row.name === "Eye for Quality") as Feature
+
+    const freeCastNames = (feature.linkedModifiers ?? []).flatMap((instance) =>
+      (instance.activation?.effects ?? [])
+        .filter((effect) => effect.kind === "cast_spell" && effect.castSpellWithoutSlot)
+        .map((effect) => effect.castSpellName),
+    )
+    expect(freeCastNames).toEqual(["Identify", "Locate Object"])
+    expect(collectFreeCastSpellKeys([feature])).toEqual(
+      new Set([canonicalSpellLookupKey("Identify"), canonicalSpellLookupKey("Locate Object")]),
+    )
+
+    // An older bake swept the slot clause into the spell name; keep that from coming back.
+    const grantedSpellIds = (feature.linkedModifiers ?? [])
+      .flatMap((instance) => instance.characteristics ?? [])
+      .flatMap((characteristic) =>
+        characteristic.type === "spells_known"
+          ? (characteristic.spells ?? []).map((spell) => spell.spellId)
+          : [],
+      )
+    expect(grantedSpellIds).toEqual([
+      "import_spell_name:Identify",
+      "import_spell_name:Locate Object",
+    ])
   })
 
   it("wires Zeroed Sights cover flags and Fortify Masterwork-scaled uses", () => {

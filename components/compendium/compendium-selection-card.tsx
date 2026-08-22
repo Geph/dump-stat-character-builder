@@ -84,7 +84,7 @@ function CardContent({
 
   return (
     <div className="relative z-10 flex flex-col">
-      <h3 className="font-serif text-2xl font-black text-white leading-tight drop-shadow-md">
+      <h3 className="font-serif text-[1.35rem] font-black text-white leading-tight drop-shadow-md">
         {item.name}
       </h3>
 

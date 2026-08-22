@@ -710,6 +710,67 @@ export const CRAFTSMAN_PRESETS: EnrichmentPreset[] = [
     ],
   },
   {
+    // The published feature ends with "Intelligence is your spellcasting ability for these
+    // spells", but the extracted text drops that sentence, so nothing tells the importer the
+    // free casts use INT. Restoring the sentence lets the normal phrase rules wire the ability
+    // alongside the spells and the without-a-slot casts.
+    id: "craftsman.eye_for_quality",
+    pack: "craftsman",
+    target: "class_feature",
+    match: {
+      className: /craftsman/i,
+      name: /^eye for quality$/i,
+      description: /without a spell slot/i,
+    },
+    operations: [
+      {
+        op: "appendDescription",
+        text: "Intelligence is your spellcasting ability for these spells.",
+      },
+      // Craftsman has no class spellcasting ability, so these two spells would land on the
+      // sheet with no ability at all. Pin it on the spells_known grant rather than adding a
+      // class-wide spellcasting_ability: the feature scopes INT to "these spells". Replacing
+      // the type keeps this idempotent whichever side of phrase detection the presets run on.
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "eye_for_quality_spells",
+          catalogRefId: "cat_char_spells_known",
+          characteristics: [
+            {
+              id: "char_eye_for_quality_spells",
+              type: "spells_known",
+              spells: [
+                { spellId: "import_spell_name:Identify", alwaysPrepared: true },
+                { spellId: "import_spell_name:Locate Object", alwaysPrepared: true },
+              ],
+              alwaysPrepared: true,
+              castingAbility: "intelligence",
+              label: "Identify, Locate Object",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["spells_known"],
+      },
+    ],
+  },
+  {
+    id: "craftsman.subclass.magazine",
+    pack: "craftsman",
+    target: "subclass_feature",
+    match: { subclassClassName: /craftsman/i, name: /^magazine$/i },
+    operations: [
+      // The embedded Reload rules ("reloading it takes an action or a Bonus Action") are what the
+      // player needs mid-fight, so keep the card on Combat instead of letting the "Crafting Tools"
+      // wording file it under Non-Combat. The Long Rest modification surfaces as a rest notice.
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { combatActions: true, featuresTab: true },
+      },
+    ],
+  },
+  {
     id: "craftsman.subclass.zeroed_sights",
     pack: "craftsman",
     target: "subclass_feature",

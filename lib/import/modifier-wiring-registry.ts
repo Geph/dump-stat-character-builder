@@ -76,6 +76,8 @@ export const AI_MECHANICS_NARRATIVE_CATALOG_SUFFIXES = new Set([
   "feature_option_picker",
   // Complex nested characteristic — auto-wired by phrase detection, not hand-authored by the LLM.
   "on_cast_spell_trigger",
+  // Free casts come from "without a spell slot" phrasing; there is no cast_spell mechanics kind.
+  "cast_spell",
   "*",
 ])
 
@@ -860,6 +862,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: ["You can cast it without a spell slot"],
     mechanicsKind: "uses",
     notes: 'uses: { type: "unlimited" }',
+  },
+  {
+    ruleId: "spell.cast_named_without_slot",
+    trigger: "description",
+    catalog: "cat_fx_cast_spell",
+    examples: [
+      "You can cast Identify and Locate Object without a spell slot or components",
+      "You can cast Misty Step without a spell slot",
+    ],
+    notes:
+      'Adds the free cast itself (cast_spell + castSpellWithoutSlot) so the grant is usable on the sheet, not just listed as a known spell. spell.gain_cast_named still makes the spells known. Add "X is your spellcasting ability for these spells" when the feature overrides the class ability, and a uses/rest sentence when the free cast is limited.',
   },
   {
     ruleId: "spell.cast_via_psi_points",
@@ -1713,6 +1726,7 @@ function formatMechanicsCheatsheet(): string {
     "- languages: languages [\"Sylvan\"] OR languageChoiceCount N; choicePool standard|standard_and_rare",
     "- spells_known: spellNames [\"Beast Sense\", \"Speak with Animals\"]; castAsRitual true for ritual-only grants; spellChoiceGrants [{ level: 0, count: 1 }]; spellChoiceLabel for filters. For subclass spell tables that unlock more spells at higher levels (e.g. \"at level 5 you also always have Conjure Animals prepared\"), emit ONE spells_known mechanic PER level tier with unlocksAtClassLevel set to that tier's level — do not lump every tier's spells into one mechanic without it, or they'll all become available at the feature's own (lowest) level.",
     "- spellcasting_ability: spellcastingAbility intelligence|wisdom|charisma. When the source lets the PLAYER choose (\"your spellcasting ability for it is Intelligence, Wisdom, or Charisma (choose when you select this feat)\"), emit ONE spellcasting_ability mechanic on the PARENT feat/feature and keep that sentence in its description — do not pick one ability yourself and do not repeat the mechanic on each choices option. Dump Stat turns the three-way wording into a build-time pick, and spell grants from the same feat/feature inherit whichever ability the player picks.",
+    "- Free casts (\"without a spell slot\"): there is no cast_spell mechanics kind — keep the sentence verbatim (\"You can cast Identify and Locate Object without a spell slot or components\") and the phrase matcher wires both the known spells and the free cast so it is usable on the sheet. Name the spells directly after \"cast\" and put the slot/component clause after them. Add \"Intelligence is your spellcasting ability for these spells\" when the feature overrides the class ability, and keep any \"Once you do, you can't … until you finish a Long Rest\" sentence so the use limit wires too.",
     "- tool_proficiencies: tools [\"Smith's Tools\"]; grantExpertise true for doubled tool checks",
     "- equipment_and_magic_items: itemOptions [\"Bag\", \"Cloak\", \"Backpack\"], choiceCount 1, allowCustom true when the player may name another item",
     "- player_note: notePrompt, notePlaceholder, noteTarget feature|equipment — adds a persistent editable note on the character sheet",

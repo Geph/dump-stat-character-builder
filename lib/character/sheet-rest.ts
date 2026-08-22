@@ -14,7 +14,10 @@ import {
 } from "@/lib/compendium/spell-slots"
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import type { SheetActionEntry } from "@/lib/character/sheet-actions"
-import { isShortRestActivityText } from "@/lib/character/alchemist-bomb-sheet"
+import {
+  isLongRestActivityText,
+  isShortRestActivityText,
+} from "@/lib/character/alchemist-bomb-sheet"
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
 import {
   applyFeatureResourceRefresh,
@@ -323,7 +326,10 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
   if (rest === "short_rest" || rest === "long_rest") {
     const seenActivities = new Set<string>()
     for (const action of sheetActions) {
-      if (!isShortRestActivityText(action.name, action.description)) continue
+      const isActivity =
+        isShortRestActivityText(action.name, action.description) ||
+        (rest === "long_rest" && isLongRestActivityText(action.name, action.description))
+      if (!isActivity) continue
       const key = action.name.trim().toLowerCase()
       if (seenActivities.has(key)) continue
       seenActivities.add(key)
