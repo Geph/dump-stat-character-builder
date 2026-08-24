@@ -27,6 +27,30 @@ describe("collectMissingBackgroundFeatGrants", () => {
     })
     expect(missing.map((row) => row.name)).toContain("Mark of Making")
     expect(missing.map((row) => row.name)).not.toContain("Choose one Dark Gift feat")
+    expect(missing.map((row) => row.name)).not.toContain("Crafter")
+    expect(missing.map((row) => row.name)).not.toContain("Gain a Feat (Dark Gift)")
+  })
+
+  it("does not warn for preset-backed Origin grants or Gain a Feat labels", () => {
+    const missing = collectMissingBackgroundFeatGrants({
+      backgrounds: [
+        {
+          name: "Artisan",
+          description: null,
+          skill_proficiencies: null,
+          feat_granted: "Crafter",
+          ability_bonuses: null,
+        },
+        {
+          name: "Investigator",
+          description: null,
+          skill_proficiencies: null,
+          feat_granted: "Gain a Feat (Dark Gift)",
+          ability_bonuses: null,
+        },
+      ],
+    })
+    expect(missing).toEqual([])
   })
 
   it("skips feats included in the same import batch", () => {
@@ -62,13 +86,57 @@ describe("collectBackgroundFeatGrantGaps", () => {
     ability_bonuses: { constitution: 0, wisdom: 0, charisma: 0 },
   }
 
-  it("flags missing named feat and empty Dark Gift category", () => {
-    const gaps = collectBackgroundFeatGrantGaps({ backgrounds: [hauntedOne] })
+  it("does not flag Survivor / Dark Gift when name presets already cover them", () => {
+    expect(collectBackgroundFeatGrantGaps({ backgrounds: [hauntedOne] })).toEqual([])
+  })
+
+  it("does not flag Gain a Feat (Dark Gift) detector labels or preset Origin grants", () => {
+    expect(
+      collectBackgroundFeatGrantGaps({
+        backgrounds: [
+          {
+            name: "Investigator",
+            description: null,
+            skill_proficiencies: null,
+            feat_granted: "Gain a Feat (Dark Gift)",
+            ability_bonuses: { intelligence: 0, wisdom: 0 },
+          },
+          {
+            name: "Artisan",
+            description: null,
+            skill_proficiencies: null,
+            feat_granted: "Crafter",
+            ability_bonuses: { strength: 0, dexterity: 0, intelligence: 0 },
+          },
+          {
+            name: "Gate Warden",
+            description: null,
+            skill_proficiencies: null,
+            feat_granted: "Scion of the Outer Planes",
+            ability_bonuses: { charisma: 0 },
+          },
+        ],
+      }),
+    ).toEqual([])
+  })
+
+  it("still flags an unknown named feat plus an empty unknown category", () => {
+    const gaps = collectBackgroundFeatGrantGaps({
+      backgrounds: [
+        {
+          name: "Pact Seeker",
+          description: null,
+          skill_proficiencies: null,
+          feat_granted: "Mark of Making or a House Mark feat of your choice",
+          ability_bonuses: { intelligence: 0 },
+        },
+      ],
+    })
     expect(gaps).toHaveLength(1)
     expect(gaps[0]).toMatchObject({
-      backgroundName: "Haunted One",
-      missingFeatNames: ["Survivor"],
-      missingCategory: "Dark Gift",
+      backgroundName: "Pact Seeker",
+      missingFeatNames: ["Mark of Making"],
+      missingCategory: "House Mark",
     })
   })
 

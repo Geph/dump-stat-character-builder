@@ -3,10 +3,56 @@ import {
   parseBackgroundFeatGrantChoice,
   parseBackgroundOriginFeat,
 } from "@/lib/compendium/background-origin-feat"
+import { CUSTOM_FEAT_MODIFIER_PRESETS } from "@/lib/compendium/custom-feat-modifier-presets"
+import { FEAT_MODIFIER_PRESETS } from "@/lib/compendium/feat-modifier-presets"
 import { normalizeFeatCategory } from "@/lib/builder/feat-selection"
 import featsSeed from "@/lib/srd/seed-data/feats.json"
 
 export type KnownFeat = { name: string; category?: string | null }
+
+/** Ravenloft Dark Gift names that have hand-written presets. */
+const DARK_GIFT_PRESET_NAMES = new Set([
+  "Aberrant Anatomy",
+  "Echoing Soul",
+  "Gathered Whispers",
+  "Living Shadow",
+  "Mist Walker",
+  "Second Skin",
+  "Symbiotic Being",
+  "Touch of Death",
+])
+
+/** 2024 Origin / Planescape Origin names that have hand-written presets. */
+const ORIGIN_PRESET_NAMES = new Set([
+  "Alert",
+  "Crafter",
+  "Healer",
+  "Lucky",
+  "Magic Initiate",
+  "Musician",
+  "Savage Attacker",
+  "Skilled",
+  "Tavern Brawler",
+  "Tough",
+  "Scion of the Outer Planes",
+  "Sharp Eye",
+  "Survivor",
+])
+
+function knownFeatsFromNamePresets(): KnownFeat[] {
+  const names = new Set([
+    ...Object.keys(CUSTOM_FEAT_MODIFIER_PRESETS),
+    ...Object.keys(FEAT_MODIFIER_PRESETS),
+  ])
+  return [...names].map((name) => ({
+    name,
+    category: DARK_GIFT_PRESET_NAMES.has(name)
+      ? "Dark Gift"
+      : ORIGIN_PRESET_NAMES.has(name)
+        ? "Origin"
+        : null,
+  }))
+}
 
 /** A background feat grant whose dependent feats are not available yet. */
 export type BackgroundFeatGrantGap = {
@@ -23,7 +69,7 @@ function normalizeFeatNameKey(name: string): string {
 }
 
 function collectKnownFeats(content: ImportContent, libraryFeats: KnownFeat[] = []): KnownFeat[] {
-  const known: KnownFeat[] = []
+  const known: KnownFeat[] = [...knownFeatsFromNamePresets()]
   for (const feat of featsSeed as { name: string; category?: string | null }[]) {
     known.push({ name: feat.name, category: feat.category ?? null })
   }

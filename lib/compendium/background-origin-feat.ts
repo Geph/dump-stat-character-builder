@@ -47,8 +47,18 @@ export type BackgroundFeatGrantChoice = {
 export function parseBackgroundFeatGrantChoice(
   featGranted: string | null | undefined,
 ): BackgroundFeatGrantChoice | null {
+  const original = featGranted?.trim() ?? ""
+  if (!original) return null
+
+  // Detector / catalog label: "Gain a Feat (Dark Gift)" — must run before the
+  // trailing-paren strip, which would otherwise leave the unusable "Gain a Feat".
+  const gainLabel = original.match(/^gain\s+a\s+feat\s*\(([^)]+)\)\s*$/i)
+  if (gainLabel?.[1]?.trim()) {
+    return { category: gainLabel[1].trim() }
+  }
+
   // Strip trailing recommendations like "(Mist Walker recommended)"
-  const text = (featGranted?.trim() ?? "").replace(/\s*\([^)]*\)\s*$/g, "").trim()
+  const text = original.replace(/\s*\([^)]*\)\s*$/g, "").trim()
   if (!text) return null
 
   // "Survivor or a Dark Gift feat of your choice"

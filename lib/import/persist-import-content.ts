@@ -30,6 +30,7 @@ import {
 import { buildGatedClassResourceRowsForSubclass } from "@/lib/compendium/subclass-gated-class-resources"
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { buildCreaturePersistRows } from "@/lib/import/build-creature-persist-rows"
+import { mergeIncomingSpellsWithExisting } from "@/lib/import/merge-spell-persist"
 import { normalizeAbilityImportRows } from "@/lib/import/normalize-ability-import"
 import { enrichAbilityImportRows } from "@/lib/import/enrich-ability-import"
 import { resolveAbilityAttachmentRow } from "@/lib/import/resolve-ability-attachment"
@@ -268,7 +269,11 @@ export async function persistImportedContent(
   }
 
   if (sanitized.spells?.length) {
-    await upsertByName("spells", sanitized.spells.map((s) => stampSource({ ...s }, source)))
+    const incomingSpells = mergeIncomingSpellsWithExisting(
+      sanitized.spells.map((s) => stampSource({ ...s }, source)),
+      await listRows("spells"),
+    )
+    await upsertByName("spells", incomingSpells)
     breakdown.spells = sanitized.spells.length
     totalImported += sanitized.spells.length
     spellCatalog = await loadSpellCatalog()

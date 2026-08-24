@@ -54,6 +54,7 @@ import {
   mergeRowForUpdate,
   shouldMergeClassResources,
 } from "@/lib/import/merge-collision-update"
+import { mergeIncomingSpellsWithExisting } from "@/lib/import/merge-spell-persist"
 
 function withResolvedFeatureSpells(
   rows: Record<string, unknown>[],
@@ -272,7 +273,11 @@ async function persistImportedContentLocalBody(
   }
 
   if (sanitized.spells?.length) {
-    await upsertByNameLocal("spells", sanitized.spells.map((s) => stampSource({ ...s }, source)))
+    const incomingSpells = mergeIncomingSpellsWithExisting(
+      sanitized.spells.map((s) => stampSource({ ...s }, source)),
+      await listRowsLocal("spells"),
+    )
+    await upsertByNameLocal("spells", incomingSpells)
     breakdown.spells = sanitized.spells.length
     totalImported += sanitized.spells.length
     spellCatalog = await loadSpellCatalogLocal()

@@ -1,4 +1,5 @@
 import type { ImportContent, NewToggleImport } from "@/lib/import/content-schema"
+import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
 import { markFeatureModifierReviewForPersist } from "@/lib/compendium/modifier-review"
 import { alignImportParentClassNames } from "@/lib/import/resolve-parent-class"
 import type { Feature } from "@/lib/types"
@@ -91,5 +92,5 @@ export function sanitizeImportContentForPersist(content: ImportContent): ImportC
     ) as typeof content.feats
   }
 
-  return next as unknown as ImportContent
+  return applyClassSpellListsToImport(next) as unknown as ImportContent
 }

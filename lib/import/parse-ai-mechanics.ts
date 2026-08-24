@@ -25,6 +25,7 @@ import type {
   DetectionConfidence,
 } from "@/lib/import/detect-feature-modifiers"
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
+import { inferSpellListClassNames } from "@/lib/compendium/investigator-spell-list"
 import { createModifierLimitation } from "@/lib/compendium/modifier-limitations"
 import { buildEvasionModifier } from "@/lib/compendium/shared-feature-modifier-builders"
 import type { FeatureActivation, UsesConfig } from "@/lib/types"
@@ -1071,6 +1072,7 @@ function buildFromMechanic(
             alwaysPrepared: mechanic.alwaysPrepared ?? (spellNames.length > 0 ? true : undefined),
             castingAbility: mechanic.spellcastingAbility,
             label: mechanic.spellChoiceLabel,
+            spellListClassOptions: inferSpellListClassNames(mechanic.spellChoiceLabel),
           },
         ]),
       }

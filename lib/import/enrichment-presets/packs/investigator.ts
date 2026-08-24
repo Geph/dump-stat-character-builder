@@ -1,3 +1,7 @@
+import {
+  buildInvestigatorGrimoireChoiceGrants,
+  INVESTIGATOR_SPELLS_BY_LEVEL,
+} from "@/lib/compendium/investigator-spell-list"
 import { createModifierInstanceId, syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { charInstance, modId, usesInstance } from "@/lib/compendium/modifier-instance-builders"
@@ -9,6 +13,7 @@ function isRestRechargeRule(rule: RechargeRule): rule is RestRechargeRule {
 }
 
 const TRINKETS_KEY = "trinkets"
+const GRIMOIRE_GRANTS = buildInvestigatorGrimoireChoiceGrants()
 
 function remapFinisherResourceKey(resourceKey: string): string {
   if (/^finisher(?:_dice)?$/i.test(resourceKey)) return "finisher"
@@ -39,6 +44,40 @@ function normalizeFinisherResourceRow<
       row.description ??
       "Bonus damage dice dealt by Finisher / Improved Finisher (e.g. 1d8 → 3d8). A damage rider, not a spendable pool.",
   }
+}
+
+function grimoireGrantsLookComplete(
+  grants: { count?: number; unlocksAtClassLevel?: number; upToLevel?: boolean }[],
+): boolean {
+  const levelUps = grants.filter((grant) => (grant.unlocksAtClassLevel ?? 0) >= 2)
+  return levelUps.length >= 19 && levelUps.every((grant) => grant.count === 2 && grant.upToLevel)
+}
+
+function pinInvestigatorSpellList<T extends { linkedModifiers?: Feature["linkedModifiers"] }>(
+  feature: T,
+): T {
+  const existing = feature.linkedModifiers ?? []
+  if (!existing.length) return feature
+  let changed = false
+  const linkedModifiers = existing.map((mod) => {
+    const characteristics = (mod.characteristics ?? []).map((char) => {
+      if (char.type !== "spells_known") return char
+      const grants = char.choiceGrants ?? []
+      const needsList = !char.spellListClassOptions?.some((name) => /investigator/i.test(name))
+      const needsGrants = !grimoireGrantsLookComplete(grants)
+      if (!needsList && !needsGrants) return char
+      changed = true
+      return {
+        ...char,
+        choiceGrants: needsGrants ? GRIMOIRE_GRANTS : grants,
+        spellListClassOptions: ["Investigator"],
+        label: char.label || "Investigator spell list",
+      }
+    })
+    return { ...mod, characteristics }
+  })
+  if (!changed) return feature
+  return { ...feature, linkedModifiers }
 }
 
 function grantSubclassTrinkets(abilityNames: string[]) {
@@ -104,9 +143,16 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
       ...next,
       classes: next.classes.map((cls) => {
         if (!/investigator/i.test(cls.name ?? "")) return cls
+        const officialList = Object.values(INVESTIGATOR_SPELLS_BY_LEVEL).flat()
+        const existingList = (cls.spell_list ?? []).map((name) => String(name).trim()).filter(Boolean)
+        const spellList = [...new Set([...existingList, ...officialList])]
         return {
           ...cls,
+          spell_list: spellList,
           features: (cls.features ?? []).map((feature) => {
+            if (/^ritualist$/i.test(feature.name ?? "")) {
+              return pinInvestigatorSpellList(feature)
+            }
             if (!/^trinkets$/i.test(feature.name ?? "")) return feature
             // Pool tracker lives on class_resources.trinkets; options are auto-granted by subclass.
             const { isChoice: _dropChoice, choices: _dropChoices, ...rest } = feature

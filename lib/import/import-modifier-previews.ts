@@ -132,11 +132,12 @@ export function collectUnmatchedModifierFeatures(
   for (const background of content.backgrounds ?? []) {
     if (background.feature) {
       const featGranted = background.feat_granted?.trim()
+      const choiceGrant = Boolean(parseBackgroundFeatGrantChoice(featGranted))
       const fixedFeatGrant =
         Boolean(featGranted) &&
-        !parseBackgroundFeatGrantChoice(featGranted) &&
+        !choiceGrant &&
         Boolean(parseBackgroundOriginFeat(featGranted))
-      if (fixedFeatGrant) continue
+      if (fixedFeatGrant || choiceGrant) continue
       collectUnmatchedFromFeature(
         `Background: ${background.name}`,
         background.feature as unknown as Feature,

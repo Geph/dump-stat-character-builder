@@ -12,6 +12,7 @@ import { normalizeAiImportContent } from "@/lib/import/import-content-ai-schema"
 import { parseClassProgressionTable } from "@/lib/import/parse-class-progression-table"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { Feature } from "@/lib/types"
+import { sanitizeInvestigatorImportContent } from "@/lib/import/enrichment-presets/packs/investigator"
 
 const FIXTURE_PATH = join(__dirname, "fixtures", "investigator-class.json")
 
@@ -135,5 +136,43 @@ describe("Investigator class import wiring", () => {
     expect(wired(content, "Expertise", "Class: Investigator")).toBe(true)
     expect(wired(content, "Ability Score Improvement", "Class: Investigator")).toBe(true)
     expect(wired(content, "Epic Boon", "Class: Investigator")).toBe(true)
+  })
+})
+
+describe("Investigator Ritualist spell list", () => {
+  it("pins Ritualist choices to the Investigator class list", () => {
+    const seed = JSON.parse(
+      readFileSync(
+        join(__dirname, "../../seed-packs/mage-hand-press/magehandpress-investigator-class.json"),
+        "utf8",
+      ),
+    ) as ImportContent
+    const stripped = {
+      ...seed,
+      classes: seed.classes?.map((cls) => ({
+        ...cls,
+        features: (cls.features ?? []).map((feature) => {
+          if (feature.name !== "Ritualist") return feature
+          const linkedModifiers = (feature.linkedModifiers ?? []).map((mod) => ({
+            ...mod,
+            characteristics: (mod.characteristics ?? []).map((char) =>
+              char.type === "spells_known"
+                ? { ...char, spellListClassOptions: undefined }
+                : char,
+            ),
+          }))
+          return { ...feature, linkedModifiers }
+        }),
+      })),
+    }
+    const next = sanitizeInvestigatorImportContent(stripped)
+    const ritualist = next.classes?.[0]?.features?.find((feature) => feature.name === "Ritualist")
+    const known = ritualist?.linkedModifiers
+      ?.flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "spells_known")
+    expect(known && "spellListClassOptions" in known ? known.spellListClassOptions : []).toEqual([
+      "Investigator",
+    ])
+    expect(next.classes?.[0]?.spell_list).toEqual(expect.arrayContaining(["Alarm", "Detect Magic", "Identify"]))
   })
 })

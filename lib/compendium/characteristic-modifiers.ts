@@ -413,6 +413,11 @@ export interface SkillsCharacteristic extends CharacteristicModifierBase {
   fromClassSkillList?: boolean
   /** When set, player chooses this many skills from entries / any-skill pool. */
   choiceCount?: number | null
+  /**
+   * Extra picks that unlock later on the same feature (e.g. Investigator Expertise
+   * grants two more at class level 9). Added to `choiceCount` when collecting slots.
+   */
+  choiceCountUnlocks?: { unlocksAtClassLevel: number; count: number }[]
   /** When true, chosen or listed skills grant Expertise instead of proficiency. */
   grantExpertise?: boolean
   /**
@@ -830,12 +835,17 @@ export interface SpellGrantCharacteristic extends CharacteristicModifierBase {
 }
 
 export interface SpellsKnownChoiceGrant {
-  /** Spell level (0 = cantrip). */
+  /** Spell level (0 = cantrip). When `upToLevel` is true, this is the maximum level. */
   level: number
   /** How many spells the player chooses at this level. */
   count: number
   /** Class level when this grant becomes available (Innate Arcanum tiers). */
   unlocksAtClassLevel?: number
+  /**
+   * When true, `level` is an inclusive maximum (e.g. Investigator grimoire: any spell
+   * of that level or lower), not an exact spell-level match.
+   */
+  upToLevel?: boolean
   /** Optional per-grant class list override; otherwise uses spellListClassOptions + player pick. */
   classNames?: string[]
   /** Player may pick from any prepared-caster class list (Magical Secrets). */

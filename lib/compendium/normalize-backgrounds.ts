@@ -40,6 +40,25 @@ function parseStoredAbilityBonuses(raw: unknown): Record<string, number> {
   return normalizeBackgroundAbilityBonuses(raw as Record<string, number> | null | undefined)
 }
 
+function featureHasGrantFeat(feature: Record<string, unknown> | null): boolean {
+  if (!feature) return false
+  const linked = (feature.linkedModifiers ?? feature.linked_modifiers) as unknown[] | undefined
+  if (!Array.isArray(linked)) return false
+  return linked.some((instance) => {
+    if (!instance || typeof instance !== "object") return false
+    const characteristics = (instance as { characteristics?: unknown }).characteristics
+    if (!Array.isArray(characteristics)) return false
+    return characteristics.some(
+      (characteristic) =>
+        Boolean(
+          characteristic &&
+            typeof characteristic === "object" &&
+            (characteristic as { type?: unknown }).type === "grant_feat",
+        ),
+    )
+  })
+}
+
 function wireBackgroundFeatGrantChoice(row: Record<string, unknown>): Record<string, unknown> {
   const parsed = parseBackgroundFeatGrantChoice(
     typeof row.feat_granted === "string" ? row.feat_granted : null,
@@ -47,15 +66,20 @@ function wireBackgroundFeatGrantChoice(row: Record<string, unknown>): Record<str
   if (!parsed) return row
 
   const feature = (row.feature ?? null) as unknown as Record<string, unknown> | null
-  const linked = (feature?.linkedModifiers ?? feature?.linked_modifiers) as unknown[] | undefined
-  if (linked?.length) return row
+  // Phrase detection often wires tools/languages first. Don't leave feat_granted as a
+  // fake named feat ("Gain a Feat (Dark Gift)") just because other modifiers exist.
+  if (featureHasGrantFeat(feature)) {
+    return { ...row, feat_granted: null }
+  }
 
+  const existing = ((feature?.linkedModifiers ?? feature?.linked_modifiers) as unknown[] | undefined) ?? []
   const characteristic = grantFeatCharacteristic([parsed.category as FeatPickCategory], 1)
   if (parsed.alsoFeatNames?.length) {
     characteristic.alsoFeatNames = [...parsed.alsoFeatNames]
   }
 
   const linkedModifiers = [
+    ...existing,
     {
       instanceId: createModifierInstanceId(),
       catalogRefId: GRANT_FEAT_CATALOG_ID,
