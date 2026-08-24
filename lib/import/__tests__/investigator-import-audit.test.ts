@@ -173,6 +173,26 @@ describe("Investigator Ritualist spell list", () => {
     expect(known && "spellListClassOptions" in known ? known.spellListClassOptions : []).toEqual([
       "Investigator",
     ])
+    const grants =
+      known && "choiceGrants" in known && Array.isArray(known.choiceGrants) ? known.choiceGrants : []
+    expect(grants[0]).toEqual({ level: 1, count: 4 })
+    expect(grants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          count: 2,
+          unlocksAtClassLevel: 2,
+          upToLevel: true,
+          level: 1,
+        }),
+        expect.objectContaining({
+          count: 2,
+          unlocksAtClassLevel: 3,
+          upToLevel: true,
+          level: 2,
+        }),
+      ]),
+    )
+    expect(grants).toHaveLength(20)
     expect(next.classes?.[0]?.spell_list).toEqual(expect.arrayContaining(["Alarm", "Detect Magic", "Identify"]))
   })
 })

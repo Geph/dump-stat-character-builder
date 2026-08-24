@@ -75,6 +75,8 @@ type CompendiumDetailOverlayProps = {
   panelWidth?: "default" | "narrow" | "slim" | "widescreen" | "compact" | PortraitPanelWidth
   /** `balanced` splits hero and detail strip evenly; `widescreen` locks the hero to 21:9. */
   heroLayout?: "default" | "balanced" | "widescreen"
+  /** Extra classes on the fixed backdrop (e.g. a higher z-index above another modal). */
+  backdropClassName?: string
 }
 
 export function CompendiumDetailOverlay({
@@ -92,6 +94,7 @@ export function CompendiumDetailOverlay({
   enableCardImage = true,
   panelWidth = "default",
   heroLayout = "default",
+  backdropClassName,
 }: CompendiumDetailOverlayProps) {
   const isCompactPanel = panelWidth === "compact"
   const imageUrl = !isCompactPanel && enableCardImage ? getCompendiumCardImageUrl(item) : null
@@ -131,7 +134,10 @@ export function CompendiumDetailOverlay({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 md:p-6"
+          className={cn(
+            "fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 md:p-6",
+            backdropClassName,
+          )}
           onClick={onClose}
         >
           <motion.div

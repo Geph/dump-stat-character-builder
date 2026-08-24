@@ -1,4 +1,5 @@
 import type { DndClass } from "@/lib/types"
+import { spellMatchesClassName } from "@/lib/compendium/investigator-spell-list"
 import { getSpellSlotTable } from "@/lib/compendium/spell-slots"
 
 export type SpellProgressionEntry = {
@@ -56,15 +57,23 @@ export function getSpellLimits(
     ? slotTable.slotsByLevel.reduce((max, count, idx) => (count > 0 ? idx + 1 : max), 0)
     : Math.min(9, Math.ceil(classLevel / 2))
   const totalSlots = slotTable ? slotTable.slotsByLevel.reduce((sum, count) => sum + count, 0) : 0
+  const authoredCantrips =
+    spellcasting?.cantrips ??
+    progression.find((entry) => entry.level <= classLevel && entry.cantrips > 0)?.cantrips
+  const mayAssumeCantrips = Boolean(spellcasting?.caster_progression) || Boolean(spellcasting?.point_pool)
 
   return {
-    cantrips: spellcasting?.cantrips ?? defaultCantripsKnown(classLevel),
-    prepared: spellcasting?.spells_known ?? Math.max(1, totalSlots),
-    maxSpellLevel,
+    // Ability-only ritualists (Investigator) have no cantrips. Do not treat an inferred
+    // full-caster slot table as permission to invent the default 3.
+    cantrips: authoredCantrips ?? (mayAssumeCantrips ? defaultCantripsKnown(classLevel) : 0),
+    // Do not invent a fake "1 prepared" budget when there are no slots and no authored known count
+    // (Warmage / Investigator ability tags without a spell-slot model).
+    prepared: spellcasting?.spells_known ?? totalSlots,
+    maxSpellLevel: totalSlots > 0 || spellcasting?.spells_known != null ? maxSpellLevel : 0,
   }
 }
 
-type SpellRow = { id: string; level: number; classes?: string[] | null }
+type SpellRow = { id: string; name?: string; level: number; classes?: string[] | null }
 
 export function countSelectedSpells(
   spellIds: string[],
@@ -74,7 +83,7 @@ export function countSelectedSpells(
   const selected = spells.filter(
     (s) =>
       spellIds.includes(s.id) &&
-      (className == null || s.classes?.includes(className)),
+      (className == null || spellMatchesClassName({ name: s.name ?? "", classes: s.classes }, className)),
   )
   return {
     cantrips: selected.filter((s) => s.level === 0).length,
@@ -90,7 +99,12 @@ export function canSelectSpell(
   className?: string,
 ): boolean {
   if (spellIds.includes(spell.id)) return true
-  if (className && !spell.classes?.includes(className)) return false
+  if (
+    className &&
+    !spellMatchesClassName({ name: spell.name ?? "", classes: spell.classes }, className)
+  ) {
+    return false
+  }
   const counts = countSelectedSpells(spellIds, spells, className)
   if (spell.level === 0) return counts.cantrips < limits.cantrips
   if (spell.level > limits.maxSpellLevel) return false

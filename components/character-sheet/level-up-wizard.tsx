@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowUp, Check, ChevronLeft, ChevronRight, Dices, X } from "lucide-react"
 import { AsiAllocator } from "@/components/builder/asi-allocator"
+import { FeatModifierChoicePicker } from "@/components/builder/feat-modifier-choice-picker"
+import { ModifierPlayerChoicePanel } from "@/components/builder/modifier-player-choice-panel"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { createClient } from "@/lib/db/client"
@@ -39,7 +41,25 @@ import {
   type AsiAllocation,
   type AsiAllocationsByFeatId,
 } from "@/lib/builder/asi-allocation"
+import {
+  featChoicePickKey,
+  validateFeatModifierChoices,
+} from "@/lib/builder/feat-choices"
 import { isFeatEligibleForCategories } from "@/lib/builder/feat-selection"
+import {
+  clearModifierPicksForSource,
+  collectModifierPlayerChoiceSlots,
+  optionsForExpertiseSlot,
+  optionsForProficiencyGrantSlot,
+  setModifierPlayerPickValue,
+  validateModifierPlayerChoices,
+} from "@/lib/builder/modifier-player-choices"
+import {
+  isSkillProficiencyChoice,
+  mergeSkillProficiencyNames,
+  resolveSkillChoiceOptions,
+  type SkillChoiceOption,
+} from "@/lib/builder/skill-overlap"
 import {
   characterHasFightingStyleAccess,
   levelUpFeatCategories,
@@ -52,6 +72,10 @@ import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { asCompendiumRows } from "@/lib/data/types"
 import type { Character, CustomAbility, DndClass, Feat, Spell, Subclass } from "@/lib/types"
 import { ABILITY_SCORE_KEYS, type AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
+import { LevelUpSubclassPicker } from "@/components/character-sheet/level-up-subclass-picker"
+import { useBuilderLayout } from "@/components/settings/use-builder-layout"
+import { useIsPhonePickerScreen } from "@/hooks/use-picker-page-size"
+import { cn } from "@/lib/utils"
 
 type LevelUpWizardProps = {
   characterId: string
@@ -95,13 +119,18 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
   const [classId, setClassId] = useState<string | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
   const [choicePicks, setChoicePicks] = useState<Record<string, string[]>>({})
+  const [modifierPicks, setModifierPicks] = useState<Record<string, string[]>>({})
   const [subclassId, setSubclassId] = useState<string | null>(null)
   const [featId, setFeatId] = useState<string | null>(null)
   const [featAsiAllocations, setFeatAsiAllocations] = useState<AsiAllocationsByFeatId>({})
+  const [featChoicePicks, setFeatChoicePicks] = useState<Record<string, string[]>>({})
   const [spellIds, setSpellIds] = useState<string[]>([])
   const [cantripIds, setCantripIds] = useState<string[]>([])
   const [hpMethod, setHpMethod] = useState<HpMethod>("average")
   const [hpNatural, setHpNatural] = useState<number | null>(null)
+  const { layout: builderLayout } = useBuilderLayout()
+  const isPhonePickerScreen = useIsPhonePickerScreen()
+  const visualBuilder = builderLayout === "visual"
 
   useEffect(() => {
     if (!open || !characterId) return
@@ -155,10 +184,12 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       })
       setClassId(classDetails[0]?.row.class_id ?? null)
       setChoicePicks(mergeAlchemistDiscoveryPicks(char.feature_choice_picks ?? {}))
+      setModifierPicks(char.modifier_player_picks ?? {})
       setStepIndex(0)
       setSubclassId(null)
       setFeatId(null)
       setFeatAsiAllocations({})
+      setFeatChoicePicks(char.feat_choice_picks ?? {})
       setSpellIds([])
       setCantripIds([])
       setHpMethod("average")
@@ -178,12 +209,15 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       subclasses: loaded.subclasses,
       currentTotalLevel: loaded.character.level,
       featureChoicePicks: loaded.character.feature_choice_picks ?? {},
+      modifierPlayerPicks: loaded.character.modifier_player_picks ?? {},
+      modifierCatalog: loaded.modifierCatalog,
     })
   }, [loaded, selectedEntry])
 
   const wizardSteps = plan?.steps ?? []
   const current = wizardSteps[stepIndex] ?? null
   const isReview = Boolean(plan) && stepIndex >= wizardSteps.length
+  const visualSubclassScreen = visualBuilder && current?.kind === "subclass"
 
   const eligibleFeats = useMemo(() => {
     if (!loaded) return []
@@ -225,6 +259,9 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
   const featSlotKey = featStep
     ? levelUpFeatSlotKey(featStep.classId, featStep.featureName, featStep.level)
     : null
+  const featSourceKey = featSlotKey ? featChoicePickKey(featSlotKey) : null
+  const pendingFeatEntry =
+    featId && featSourceKey ? { featId, choicePickKey: featSourceKey } : null
 
   const featAsiPools = useMemo(() => {
     if (!selectedFeat || !featSlotKey) return []
@@ -235,15 +272,40 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
     )
   }, [featSlotKey, loaded?.modifierCatalog, selectedFeat])
 
+  const pendingFeatModifierSlots = useMemo(() => {
+    if (!loaded || !pendingFeatEntry) return []
+    return collectModifierPlayerChoiceSlots({
+      featEntries: [pendingFeatEntry],
+      feats: loaded.feats,
+      featChoicePicks,
+      catalog: loaded.modifierCatalog,
+      customAbilities: loaded.customAbilities,
+    })
+  }, [featChoicePicks, loaded, pendingFeatEntry])
+
   const knownSpellNames = useMemo(() => {
     if (!loaded) return []
     const knownIds = new Set(loaded.character.spell_ids ?? [])
     return loaded.spells.filter((spell) => knownIds.has(spell.id)).map((spell) => spell.name)
   }, [loaded])
 
-  const featureChoiceOptions = useMemo(() => {
+  const featChoiceOptionContext = useMemo(() => {
+    if (!loaded || !plan || !selectedEntry) return undefined
+    return {
+      customAbilities: loaded.customAbilities,
+      featureChoicePicks: { ...(loaded.character.feature_choice_picks ?? {}), ...choicePicks },
+      classNames: [plan.className],
+      classIds: [plan.classId],
+      classLevel: plan.toLevel,
+      classWeaponProficiencies: selectedEntry.class?.weapon_proficiencies ?? null,
+      knownSpellNames,
+      subclassName: selectedEntry.subclass?.name ?? null,
+    }
+  }, [choicePicks, knownSpellNames, loaded, plan, selectedEntry])
+
+  const featureChoiceOptions = useMemo((): SkillChoiceOption[] => {
     if (!loaded || !plan || !selectedEntry || current?.kind !== "feature_choice") return []
-    return resolveFeatureChoiceOptions(current.feature, {
+    const options = resolveFeatureChoiceOptions(current.feature, {
       customAbilities: loaded.customAbilities,
       featureChoicePicks: choicePicks,
       classNames: [plan.className],
@@ -253,10 +315,61 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       knownSpellNames,
       subclassName: selectedEntry.subclass?.name ?? null,
     })
+    const isSkillChoice = isSkillProficiencyChoice({
+      category: current.feature.choices?.category,
+      featureName: current.feature.name,
+    })
+    if (!isSkillChoice) return options
+    // Proficiencies never stack: drop skills the character already has, and top the pool
+    // back up from the class skill list so the grant is not silently wasted.
+    return resolveSkillChoiceOptions(options, {
+      heldSkills: loaded.character.skill_proficiencies ?? [],
+      currentSelection: choicePicks[current.id] ?? [],
+      required: current.required,
+      fallbackOptions: selectedEntry.class?.skill_choices?.options ?? [],
+    })
   }, [choicePicks, current, knownSpellNames, loaded, plan, selectedEntry])
+
+  const modifierChoiceOptions = useMemo(() => {
+    if (!loaded || current?.kind !== "modifier_choice") return []
+    const slot = current.slot
+    const selected = modifierPicks[current.id] ?? []
+    if (slot.grantsExpertise) {
+      return optionsForExpertiseSlot(slot, {
+        proficientSkills: loaded.character.skill_proficiencies ?? [],
+        proficientTools: loaded.character.tool_proficiencies ?? [],
+        existingExpertiseSkills: loaded.character.skill_expertise ?? [],
+        currentSelection: selected,
+      })
+    }
+    return optionsForProficiencyGrantSlot(slot, {
+      proficientSkills: loaded.character.skill_proficiencies ?? [],
+      proficientTools: loaded.character.tool_proficiencies ?? [],
+      knownLanguages: loaded.character.languages ?? [],
+      currentSelection: selected,
+    })
+  }, [current, loaded, modifierPicks])
 
   /** Picks as they stood before this level-up, so swap steps can measure what changed. */
   const originalPicks = loaded?.character.feature_choice_picks ?? {}
+
+  /** Skills chosen during this level-up, so they land on the saved proficiency list. */
+  const levelUpSkillPicks = useMemo(() => {
+    const names: string[] = []
+    for (const step of plan?.steps ?? []) {
+      if (step.kind !== "feature_choice") continue
+      if (
+        !isSkillProficiencyChoice({
+          category: step.feature.choices?.category,
+          featureName: step.feature.name,
+        })
+      ) {
+        continue
+      }
+      names.push(...(choicePicks[step.id] ?? []))
+    }
+    return names
+  }, [choicePicks, plan])
 
   const pendingConMod = useMemo(() => {
     if (!loaded) return 0
@@ -278,15 +391,23 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       if (current.mode !== "swap") return picks.length >= current.required
       return countReplacedPicks(originalPicks[current.id] ?? [], picks) !== null
     }
+    if (current.kind === "modifier_choice") {
+      return (modifierPicks[current.id] ?? []).length >= current.required
+    }
     if (current.kind === "feat_or_asi") {
-      if (!featId || !selectedFeat) return false
-      return featAsiPools.every((grant) =>
+      if (!featId || !selectedFeat || !pendingFeatEntry) return false
+      const asiOk = featAsiPools.every((grant) =>
         isValidAsiAllocation(
           featAsiAllocations[grant.allocationKey] ?? {},
           grant.points,
           grant.allowedAbilities,
         ),
       )
+      if (!asiOk) return false
+      if (!validateFeatModifierChoices(loaded?.feats ?? [], [pendingFeatEntry], featChoicePicks)) {
+        return false
+      }
+      return validateModifierPlayerChoices(pendingFeatModifierSlots, modifierPicks)
     }
     if (current.kind === "spells") {
       return cantripIds.length === current.extraCantrips && spellIds.length === current.extraPrepared
@@ -358,6 +479,15 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
               ? (subclassId ?? loaded.character.subclass_id)
               : loaded.character.subclass_id,
           feature_choice_picks: nextPicks,
+          feat_choice_picks: featChoicePicks,
+          modifier_player_picks: {
+            ...(loaded.character.modifier_player_picks ?? {}),
+            ...modifierPicks,
+          },
+          skill_proficiencies: mergeSkillProficiencyNames(
+            loaded.character.skill_proficiencies,
+            levelUpSkillPicks,
+          ),
           feat_ids: nextFeatIds,
           spell_ids: nextSpellIds,
           builder_picks: { ...builderPicks, spell_picks_by_class_id: nextSpellPicks },
@@ -393,7 +523,10 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
-          className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-primary/40 bg-card p-5 shadow-2xl"
+          className={cn(
+            "relative max-h-[90vh] w-full overflow-y-auto rounded-2xl border-2 border-primary/40 bg-card p-5 shadow-2xl",
+            visualSubclassScreen ? "max-w-6xl" : "max-w-lg",
+          )}
           onClick={(event) => event.stopPropagation()}
         >
           <button
@@ -439,7 +572,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                 </p>
               )}
 
-              {plan.standardizedNotes.length > 0 ? (
+              {!visualSubclassScreen && plan.standardizedNotes.length > 0 ? (
                 <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
                   <p className="text-xs font-bold uppercase tracking-wide text-primary">
                     Standardized improvements
@@ -455,7 +588,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                 </div>
               ) : null}
 
-              {plan.newFeatures.length > 0 ? (
+              {!visualSubclassScreen && plan.newFeatures.length > 0 ? (
                 <div className="rounded-xl border border-border bg-muted/30 p-3">
                   <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                     New features
@@ -475,36 +608,24 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                     ))}
                   </ul>
                 </div>
-              ) : (
+              ) : !visualSubclassScreen ? (
                 <p className="text-sm text-muted-foreground">
                   No named features unlock at this level — resources and proficiency still scale.
                 </p>
-              )}
+              ) : null}
 
               {current?.kind === "subclass" ? (
-                <div>
-                  <p className="mb-2 text-sm font-semibold">
-                    Choose subclass (level {current.unlockLevel}+)
-                  </p>
-                  <div className="grid gap-2">
-                    {loaded.subclasses
-                      .filter((sub) => sub.class_id === current.classId)
-                      .map((sub) => (
-                        <button
-                          key={sub.id}
-                          type="button"
-                          onClick={() => setSubclassId(sub.id)}
-                          className={`rounded-lg border px-3 py-2 text-left text-sm ${
-                            subclassId === sub.id
-                              ? "border-primary bg-primary/10"
-                              : "border-border hover:border-primary/40"
-                          }`}
-                        >
-                          {sub.name}
-                        </button>
-                      ))}
-                  </div>
-                </div>
+                <LevelUpSubclassPicker
+                  subclasses={loaded.subclasses}
+                  classId={current.classId}
+                  className={current.className}
+                  unlockLevel={current.unlockLevel}
+                  selectedId={subclassId}
+                  onSelect={setSubclassId}
+                  visual={visualBuilder}
+                  cinematicPortrait={visualBuilder && !isPhonePickerScreen}
+                  swipeOnPhone={visualBuilder && isPhonePickerScreen}
+                />
               ) : null}
 
               {current?.kind === "feature_choice" ? (
@@ -524,7 +645,32 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                   onChange={(selected) =>
                     setChoicePicks((prev) => ({ ...prev, [current.id]: selected }))
                   }
-                  showOptionInfo
+                  showOptionInfo={
+                    !isSkillProficiencyChoice({
+                      category: current.feature.choices?.category,
+                      featureName: current.feature.name,
+                    })
+                  }
+                />
+              ) : null}
+
+              {current?.kind === "modifier_choice" ? (
+                <MultiSelectChoices
+                  title={withChosenOptionChrome(current.title, modifierPicks[current.id] ?? [])}
+                  hint={
+                    current.slot.grantsExpertise
+                      ? "Choose skills you are already proficient in. Your proficiency bonus is doubled for those checks."
+                      : undefined
+                  }
+                  options={modifierChoiceOptions}
+                  maxCount={current.required}
+                  selected={modifierPicks[current.id] ?? []}
+                  onChange={(selected) =>
+                    setModifierPicks((prev) => ({ ...prev, [current.id]: selected }))
+                  }
+                  showOptionInfo={
+                    current.slot.kind !== "skill" && current.slot.kind !== "skill_or_tool"
+                  }
                 />
               ) : null}
 
@@ -539,6 +685,14 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                     value={featId ?? ""}
                     onChange={(event) => {
                       const nextId = event.target.value || null
+                      if (featSourceKey) {
+                        setModifierPicks((prev) => clearModifierPicksForSource(prev, featSourceKey))
+                        setFeatChoicePicks((prev) => {
+                          const next = { ...prev }
+                          delete next[featSourceKey]
+                          return next
+                        })
+                      }
                       setFeatId(nextId)
                       setFeatAsiAllocations({})
                     }}
@@ -574,6 +728,50 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                       )}
                     />
                   ))}
+                  {selectedFeat?.isChoice &&
+                  (selectedFeat.choices?.options?.length || selectedFeat.choices?.optionsSource) &&
+                  pendingFeatEntry ? (
+                    <FeatModifierChoicePicker
+                      entry={pendingFeatEntry}
+                      feat={selectedFeat}
+                      choiceOptionContext={featChoiceOptionContext}
+                      selected={featChoicePicks[pendingFeatEntry.choicePickKey] ?? []}
+                      onChange={(selected) => {
+                        const choiceKey = pendingFeatEntry.choicePickKey
+                        setFeatChoicePicks((prev) => ({ ...prev, [choiceKey]: selected }))
+                        setModifierPicks((prev) => clearModifierPicksForSource(prev, choiceKey))
+                      }}
+                    />
+                  ) : null}
+                  {featId && selectedFeat && featSourceKey ? (
+                    <ModifierPlayerChoicePanel
+                      sourceKey={featSourceKey}
+                      sourceLabel={selectedFeat.name}
+                      slots={pendingFeatModifierSlots}
+                      picks={modifierPicks}
+                      spells={loaded.spells}
+                      unavailableOptions={loaded.character.skill_proficiencies ?? []}
+                      proficientSkills={loaded.character.skill_proficiencies ?? []}
+                      proficientTools={loaded.character.tool_proficiencies ?? []}
+                      knownLanguages={loaded.character.languages ?? []}
+                      existingExpertiseSkills={loaded.character.skill_expertise ?? []}
+                      showSkillInfo={false}
+                      onChange={(slotKey, selected) => {
+                        const slotEntry = pendingFeatModifierSlots.find(
+                          (entry) => entry.slotKey === slotKey,
+                        )
+                        if (!slotEntry) return
+                        setModifierPicks((prev) =>
+                          setModifierPlayerPickValue(
+                            prev,
+                            slotEntry,
+                            pendingFeatModifierSlots,
+                            selected,
+                          ),
+                        )
+                      }}
+                    />
+                  ) : null}
                 </div>
               ) : null}
 

@@ -53,6 +53,14 @@ function grimoireGrantsLookComplete(
   return levelUps.length >= 19 && levelUps.every((grant) => grant.count === 2 && grant.upToLevel)
 }
 
+/** Ensure Ritualist carries the full grimoire pick schedule + Investigator spell list. */
+export function ensureInvestigatorRitualistFeature<
+  T extends { name?: string; linkedModifiers?: Feature["linkedModifiers"] },
+>(feature: T): T {
+  if (!/^ritualist$/i.test(feature.name ?? "")) return feature
+  return pinInvestigatorSpellList(feature)
+}
+
 function pinInvestigatorSpellList<T extends { linkedModifiers?: Feature["linkedModifiers"] }>(
   feature: T,
 ): T {
@@ -151,7 +159,7 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
           spell_list: spellList,
           features: (cls.features ?? []).map((feature) => {
             if (/^ritualist$/i.test(feature.name ?? "")) {
-              return pinInvestigatorSpellList(feature)
+              return ensureInvestigatorRitualistFeature(feature)
             }
             if (!/^trinkets$/i.test(feature.name ?? "")) return feature
             // Pool tracker lives on class_resources.trinkets; options are auto-granted by subclass.

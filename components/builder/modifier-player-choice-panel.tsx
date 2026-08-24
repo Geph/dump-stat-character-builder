@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { ToolGroupedChoices } from "@/components/builder/tool-grouped-choices"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { useFeatSpellGrantPickerPageSize } from "@/hooks/use-picker-page-size"
 import { paginateList } from "@/lib/builder/picker-pagination"
+import { filterSpellsBySchool, uniqueSpellSchools } from "@/lib/builder/spell-grant-filters"
 import { builderChoiceTargetId } from "@/lib/builder/proceed-blockers"
 import {
   filterMagicInitiateSpellListSlotOptions,
@@ -23,6 +24,7 @@ import type { Spell } from "@/lib/types"
 import { SearchBox } from "@/components/search/search-box"
 import { rankSearchResults, searchItems } from "@/lib/search/ranked-search"
 import { spellAliasLookupKeys } from "@/lib/compendium/spell-name-aliases"
+import { cn } from "@/lib/utils"
 
 type ModifierPlayerChoicePanelProps = {
   sourceKey: string
@@ -52,6 +54,11 @@ type ModifierPlayerChoicePanelProps = {
   knownLanguages?: string[]
   /** Skills that already have Expertise from earlier features. */
   existingExpertiseSkills?: string[]
+  /**
+   * When false, skill / skill-or-tool pickers omit the per-option info buttons
+   * (level-up uses this; the character builder keeps the default).
+   */
+  showSkillInfo?: boolean
 }
 
 function SpellGrantPicker({
@@ -71,12 +78,21 @@ function SpellGrantPicker({
   const availableSpells = spellOptionsForModifierSlot(slot, spells, picks)
   const selectedIds = picks[slot.slotKey] ?? []
   const [filter, setFilter] = useState("")
+  const [schoolFilter, setSchoolFilter] = useState("all")
   const [page, setPage] = useState(0)
   const pageSize = useFeatSpellGrantPickerPageSize()
 
+  const schoolOptions = useMemo(() => uniqueSpellSchools(availableSpells), [availableSpells])
+
   useEffect(() => {
     setPage(0)
-  }, [filter, listClass, slot.slotKey, pageSize])
+  }, [filter, schoolFilter, listClass, slot.slotKey, pageSize])
+
+  useEffect(() => {
+    if (schoolFilter !== "all" && !schoolOptions.includes(schoolFilter)) {
+      setSchoolFilter("all")
+    }
+  }, [schoolFilter, schoolOptions])
 
   if (slot.requiresSpellListPick && !listClass) {
     return (
@@ -86,7 +102,8 @@ function SpellGrantPicker({
     )
   }
 
-  const filtered = searchItems(availableSpells, filter, {
+  const schoolScoped = filterSpellsBySchool(availableSpells, schoolFilter)
+  const filtered = searchItems(schoolScoped, filter, {
     name: (spell) => spell.name,
     aliases: (spell) => spellAliasLookupKeys(spell.name),
     fields: [
@@ -108,6 +125,11 @@ function SpellGrantPicker({
     onChange(slot.slotKey, [...selectedIds, spellId])
   }
 
+  const filterSelectClass =
+    "rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+  const filterLabelClass =
+    "text-[10px] font-bold uppercase tracking-wide text-muted-foreground"
+
   return (
     <div className="p-4 bg-muted/40 rounded-xl border border-border">
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -118,31 +140,59 @@ function SpellGrantPicker({
       </div>
       {listClass && (
         <p className="text-xs text-muted-foreground mb-3">
-          {listClass} list · {slot.spellLevel === 0 ? "Cantrips" : `Level ${slot.spellLevel}`}
+          {listClass} list ·{" "}
+          {slot.spellLevel === 0
+            ? "Cantrips"
+            : slot.spellLevelIsMax
+              ? `Up to level ${slot.spellLevel}`
+              : `Level ${slot.spellLevel}`}
         </p>
       )}
-      <SearchBox
-        value={filter}
-        onChange={setFilter}
-        suggestions={rankSearchResults(availableSpells, filter, {
-          name: (spell) => spell.name,
-          aliases: (spell) => spellAliasLookupKeys(spell.name),
-          fields: [{ name: "school", value: (spell) => spell.school, weight: 1.3 }],
-          limit: 8,
-        }).map((match) => ({
-          id: match.item.id,
-          label: match.item.name,
-          detail: `${match.item.level === 0 ? "Cantrip" : `Level ${match.item.level}`} · ${match.item.school}`,
-          item: match.item,
-          matchKind: match.kind,
-        }))}
-        onSelect={(suggestion) => setFilter(suggestion.label)}
-        scope={`modifier-spells:${slot.slotKey}`}
-        placeholder="Filter spells…"
-        ariaLabel={`Search ${slot.label} spells`}
-        className="mb-3"
-        inputClassName="border text-sm"
-      />
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchBox
+          value={filter}
+          onChange={setFilter}
+          suggestions={rankSearchResults(schoolScoped, filter, {
+            name: (spell) => spell.name,
+            aliases: (spell) => spellAliasLookupKeys(spell.name),
+            fields: [{ name: "school", value: (spell) => spell.school, weight: 1.3 }],
+            limit: 8,
+          }).map((match) => ({
+            id: match.item.id,
+            label: match.item.name,
+            detail: `${match.item.level === 0 ? "Cantrip" : `Level ${match.item.level}`} · ${match.item.school}`,
+            item: match.item,
+            matchKind: match.kind,
+          }))}
+          onSelect={(suggestion) => setFilter(suggestion.label)}
+          scope={`modifier-spells:${slot.slotKey}`}
+          placeholder="Filter spells…"
+          ariaLabel={`Search ${slot.label} spells`}
+          className="min-w-[10rem] flex-1 basis-[10rem]"
+          inputClassName="border text-sm"
+        />
+        {schoolOptions.length > 1 ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <label className={filterLabelClass} htmlFor={`spell-school-${slot.slotKey}`}>
+              School
+            </label>
+            <select
+              id={`spell-school-${slot.slotKey}`}
+              value={schoolFilter}
+              onChange={(event) => setSchoolFilter(event.target.value)}
+              className={cn(filterSelectClass, "max-w-[12rem]")}
+              aria-label={`Filter ${slot.label} spells by school`}
+            >
+              <option value="all">All schools</option>
+              {schoolOptions.map((school) => (
+                <option key={school} value={school}>
+                  {school}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+      </div>
       {filtered.length === 0 ? (
         <p className="text-xs text-muted-foreground">No spells match this filter.</p>
       ) : (
@@ -206,6 +256,7 @@ export function ModifierPlayerChoicePanel({
   proficientTools = [],
   knownLanguages = [],
   existingExpertiseSkills = [],
+  showSkillInfo = true,
 }: ModifierPlayerChoicePanelProps) {
   const relevant = modifierPlayerChoiceSlotsForSource(slots, sourceKey)
     .filter((slot) => {
@@ -335,7 +386,7 @@ export function ModifierPlayerChoicePanel({
             selected={currentSelection}
             onChange={(selected) => onChange(slot.slotKey, selected)}
             accentClass={accentClass}
-            showSkillInfo={isSkillKind}
+            showSkillInfo={showSkillInfo && isSkillKind}
             showOptionInfo={isToolKind && !isSkillKind}
             layout={
               isSkillKind

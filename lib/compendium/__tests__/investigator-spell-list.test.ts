@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
+  buildInvestigatorGrimoireChoiceGrants,
   inferSpellListClassNames,
+  investigatorRitualLevelAt,
   isInvestigatorListSpell,
   spellMatchesClassName,
 } from "@/lib/compendium/investigator-spell-list"
@@ -16,6 +18,43 @@ describe("inferSpellListClassNames", () => {
     expect(inferSpellListClassNames("Innate Arcanum")).toEqual([])
     expect(inferSpellListClassNames("Hexes")).toEqual([])
     expect(inferSpellListClassNames("")).toEqual([])
+  })
+})
+
+describe("investigatorRitualLevelAt", () => {
+  it("follows the Ritual Level column tiers", () => {
+    expect(investigatorRitualLevelAt(1)).toBe(1)
+    expect(investigatorRitualLevelAt(2)).toBe(1)
+    expect(investigatorRitualLevelAt(3)).toBe(2)
+    expect(investigatorRitualLevelAt(9)).toBe(5)
+    expect(investigatorRitualLevelAt(11)).toBe(6)
+    expect(investigatorRitualLevelAt(20)).toBe(6)
+  })
+})
+
+describe("buildInvestigatorGrimoireChoiceGrants", () => {
+  it("starts with four level-1 spells and adds two up-to-cap spells each later level", () => {
+    const grants = buildInvestigatorGrimoireChoiceGrants()
+    expect(grants).toHaveLength(20)
+    expect(grants[0]).toEqual({ level: 1, count: 4 })
+    expect(grants[1]).toEqual({
+      level: 1,
+      count: 2,
+      unlocksAtClassLevel: 2,
+      upToLevel: true,
+    })
+    expect(grants[2]).toEqual({
+      level: 2,
+      count: 2,
+      unlocksAtClassLevel: 3,
+      upToLevel: true,
+    })
+    expect(grants[10]).toEqual({
+      level: 6,
+      count: 2,
+      unlocksAtClassLevel: 11,
+      upToLevel: true,
+    })
   })
 })
 

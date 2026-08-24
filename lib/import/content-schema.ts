@@ -191,6 +191,8 @@ export const ImportMechanicSchema = z.object({
         level: z.number(),
         count: z.number(),
         unlocksAtClassLevel: z.number().optional(),
+        /** When true, `level` is an inclusive max (Investigator grimoire), not exact. */
+        upToLevel: z.boolean().optional(),
       }),
     )
     .optional(),

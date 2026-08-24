@@ -23,7 +23,7 @@ import {
 import { sanitizeAlchemistImportContent } from "@/lib/import/enrichment-presets/packs/alchemist"
 import { sanitizeCaptainImportContent } from "@/lib/import/enrichment-presets/packs/captain"
 import { sanitizeGunslingerImportContent } from "@/lib/import/enrichment-presets/packs/gunslinger"
-import { sanitizeInvestigatorImportContent } from "@/lib/import/enrichment-presets/packs/investigator"
+import { sanitizeInvestigatorImportContent, ensureInvestigatorRitualistFeature } from "@/lib/import/enrichment-presets/packs/investigator"
 import { sanitizeNecromancerImportContent } from "@/lib/import/enrichment-presets/packs/necromancer"
 import { sanitizeVagabondImportContent } from "@/lib/import/enrichment-presets/packs/vagabond"
 import { sanitizeWarmageImportContent } from "@/lib/import/enrichment-presets/packs/warmage"
@@ -435,7 +435,11 @@ export function enrichClassFeaturesWithPresets(
     for (const preset of presets) {
       next = applyPresetToFeature(next, preset, { className, hasPointPool })
     }
-    return next as Feature
+    let enriched = next as Feature
+    if (/investigator/i.test(className)) {
+      enriched = ensureInvestigatorRitualistFeature(enriched)
+    }
+    return enriched
   })
 }
 

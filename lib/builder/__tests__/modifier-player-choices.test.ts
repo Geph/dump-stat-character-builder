@@ -67,6 +67,40 @@ describe("expertise modifier player choices", () => {
     expect(options.some((option) => option.name === "Arcana")).toBe(false)
   })
 
+  it("scales Investigator Expertise from two picks at 2 to four at 9", () => {
+    const feature = enrichClassFeatureWithModifierPresets("Investigator", {
+      level: 2,
+      name: "Expertise",
+      description:
+        "<p>You gain Expertise in two of your skill proficiencies of your choice.</p><p>At Investigator level 9, you gain Expertise in two more of your skill proficiencies of your choice.</p>",
+    } as Feature)
+    const cls = {
+      id: "investigator",
+      name: "Investigator",
+      features: [feature],
+    } as unknown as DndClass
+
+    const atTwo = collectClassFeatureModifierPlayerChoiceSlots({
+      classLevels: [{ classId: "investigator", level: 2 }],
+      classes: [cls],
+      subclasses: [],
+      subclassByClassId: {},
+      featureChoicePicks: {},
+      catalog: [],
+    }).find((slot) => slot.grantsExpertise)
+    const atNine = collectClassFeatureModifierPlayerChoiceSlots({
+      classLevels: [{ classId: "investigator", level: 9 }],
+      classes: [cls],
+      subclasses: [],
+      subclassByClassId: {},
+      featureChoicePicks: {},
+      catalog: [],
+    }).find((slot) => slot.grantsExpertise)
+
+    expect(atTwo?.maxCount).toBe(2)
+    expect(atNine?.maxCount).toBe(4)
+  })
+
   it("excludes skills that already have expertise from earlier features", () => {
     const slot = {
       slotKey: "test",

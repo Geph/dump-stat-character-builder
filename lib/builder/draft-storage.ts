@@ -58,6 +58,7 @@ export type BuilderDraftSnapshot = {
   equipmentSearch: string
   equipmentFilterCategory?: string
   spellFilterLevelByClassId?: Record<string, string>
+  spellFilterSchoolByClassId?: Record<string, string>
   spellLevelPages?: Record<string, number>
   previewTab: BuilderPreviewTab
   mobilePanel: "steps" | "preview"

@@ -354,6 +354,9 @@ describe("background Planar Pact grant wiring", () => {
         "A Dark Gift feat of your choice (Mist Walker recommended)",
       ),
     ).toEqual({ category: "Dark Gift" })
+    expect(parseBackgroundFeatGrantChoice("Gain a Feat (Dark Gift)")).toEqual({
+      category: "Dark Gift",
+    })
   })
 
   it("creates a background feat pick slot from imported background data", () => {
@@ -403,5 +406,39 @@ describe("background Planar Pact grant wiring", () => {
     expect(haunted.feat_granted).toBeNull()
     expect(hauntedSlots[0]?.featCategories).toEqual(["Dark Gift"])
     expect(hauntedSlots[0]?.alsoFeatNames).toEqual(["Survivor"])
+  })
+
+  it("clears Gain a Feat (Dark Gift) after tool modifiers are already wired", () => {
+    const investigator = normalizeBackgroundRow({
+      id: "investigator",
+      name: "Investigator",
+      feat_granted: "Gain a Feat (Dark Gift)",
+      ability_bonuses: { intelligence: 0, wisdom: 0 },
+      feature: {
+        name: "Background Feature",
+        description: "You investigate.",
+        linkedModifiers: [
+          {
+            instanceId: "inst-tools",
+            catalogRefId: "cat_char_tool_proficiencies",
+            characteristics: [
+              {
+                id: "c-tools",
+                type: "tool_proficiencies",
+                values: [],
+                choiceCount: 1,
+                choicePool: "gaming",
+              },
+            ],
+          },
+        ],
+      },
+    })
+    expect(investigator.feat_granted).toBeNull()
+    const slots = getBackgroundFeatPickSlots(
+      investigator as unknown as import("@/lib/types").Background,
+      buildDefaultModifierCatalog(),
+    )
+    expect(slots[0]?.featCategories).toEqual(["Dark Gift"])
   })
 })

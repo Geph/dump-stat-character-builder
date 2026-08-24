@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { buildLevelUpPlan, countReplacedPicks } from "@/lib/character/level-up-plan"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import type { DndClass, Feature } from "@/lib/types"
+import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 
 function feature(name: string, level: number, extra: Partial<Feature> = {}): Feature {
   return {
@@ -225,6 +226,131 @@ describe("buildLevelUpPlan — Alchemist formulas and discoveries", () => {
       featureChoicePicks: {},
     })
     expect(plan?.newFeatures.some((feature) => feature.name === "Potion Mixologist")).toBe(true)
+  })
+})
+
+const INVESTIGATOR_EXPERTISE =
+  "<p>You gain Expertise in two of your skill proficiencies of your choice. Arcana and Investigation are recommended if you have proficiency in them.</p><p>At Investigator level 9, you gain Expertise in two more of your skill proficiencies of your choice.</p>"
+
+function investigatorRitualistFeature(): Feature {
+  return {
+    level: 1,
+    name: "Ritualist",
+    description: "Grimoire rituals.",
+    linkedModifiers: [
+      {
+        instanceId: "modinst_ritualist",
+        catalogRefId: "cat_char_spells_known",
+        characteristics: [
+          {
+            id: "spells_known_grimoire",
+            type: "spells_known",
+            spells: [],
+            choiceGrants: [
+              { level: 1, count: 4 },
+              { level: 1, count: 2, unlocksAtClassLevel: 2, upToLevel: true },
+              { level: 2, count: 2, unlocksAtClassLevel: 3, upToLevel: true },
+            ],
+            spellListClassOptions: ["Investigator"],
+            label: "Investigator spell list",
+          },
+        ],
+      },
+    ],
+  } as Feature
+}
+
+function investigatorAt(level: number): CharacterClassDetail {
+  const expertise = enrichClassFeatureWithModifierPresets("Investigator", {
+    level: 2,
+    name: "Expertise",
+    description: INVESTIGATOR_EXPERTISE,
+  } as Feature)
+  return {
+    row: { class_id: "investigator", level, subclass_id: null, order: 0 },
+    class: {
+      id: "investigator",
+      name: "Investigator",
+      features: [investigatorRitualistFeature(), expertise],
+    } as DndClass,
+    subclass: null,
+  } as CharacterClassDetail
+}
+
+describe("buildLevelUpPlan — Investigator Expertise", () => {
+  it("asks for two Expertise skill picks when the feature unlocks at level 2", () => {
+    const plan = buildLevelUpPlan({
+      entry: investigatorAt(1),
+      subclasses: [],
+      currentTotalLevel: 1,
+      featureChoicePicks: {},
+    })
+    const step = plan?.steps.find((entry) => entry.kind === "modifier_choice")
+    expect(step).toMatchObject({
+      kind: "modifier_choice",
+      title: "Expertise",
+      required: 2,
+    })
+    if (step?.kind === "modifier_choice") {
+      expect(step.slot.grantsExpertise).toBe(true)
+    }
+  })
+
+  it("asks for two more Expertise picks at level 9", () => {
+    const atTwo = buildLevelUpPlan({
+      entry: investigatorAt(1),
+      subclasses: [],
+      currentTotalLevel: 1,
+      featureChoicePicks: {},
+    })
+    const slotKey = atTwo?.steps.find((entry) => entry.kind === "modifier_choice")?.id
+    expect(slotKey).toBeTruthy()
+
+    const plan = buildLevelUpPlan({
+      entry: investigatorAt(8),
+      subclasses: [],
+      currentTotalLevel: 8,
+      featureChoicePicks: {},
+      modifierPlayerPicks: { [slotKey!]: ["Arcana", "Investigation"] },
+    })
+    const step = plan?.steps.find((entry) => entry.kind === "modifier_choice")
+    expect(step).toMatchObject({ kind: "modifier_choice", required: 4 })
+  })
+})
+
+describe("buildLevelUpPlan — Investigator Ritualist grimoire", () => {
+  it("offers two grimoire spells when leveling from 1 to 2", () => {
+    const plan = buildLevelUpPlan({
+      entry: investigatorAt(1),
+      subclasses: [],
+      currentTotalLevel: 1,
+      featureChoicePicks: {},
+    })
+    const spells = plan?.steps.find((entry) => entry.kind === "spells")
+    expect(spells).toMatchObject({
+      kind: "spells",
+      title: "Add spells to your grimoire",
+      extraCantrips: 0,
+      extraPrepared: 2,
+      maxSpellLevel: 1,
+      preparedCaster: false,
+    })
+  })
+
+  it("raises the Ritual Level cap when leveling into 3rd", () => {
+    const plan = buildLevelUpPlan({
+      entry: investigatorAt(2),
+      subclasses: [],
+      currentTotalLevel: 2,
+      featureChoicePicks: {},
+    })
+    const spells = plan?.steps.find((entry) => entry.kind === "spells")
+    expect(spells).toMatchObject({
+      kind: "spells",
+      extraPrepared: 2,
+      maxSpellLevel: 2,
+      preparedCaster: false,
+    })
   })
 })
 

@@ -1,6 +1,11 @@
 import { featureChoiceKey } from "@/lib/builder/choices"
 import { FEAT_MILESTONES } from "@/lib/builder/feat-selection"
 import {
+  collectClassFeatureModifierPlayerChoiceSlots,
+  type ModifierPlayerChoiceKind,
+  type ModifierPlayerChoiceSlot,
+} from "@/lib/builder/modifier-player-choices"
+import {
   classNeedsSubclass,
   resolveSubclassUnlockLevel,
 } from "@/lib/builder/subclass-unlock"
@@ -11,7 +16,18 @@ import {
   buildLevelUpStandardizedNotes,
   type LevelUpStandardizedNote,
 } from "@/lib/character/level-up-improvements"
+import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import type { Feature, Spell, Subclass } from "@/lib/types"
+import { spellMatchesClassName } from "@/lib/compendium/investigator-spell-list"
+
+const LEVEL_UP_MODIFIER_CHOICE_KINDS: ReadonlySet<ModifierPlayerChoiceKind> = new Set([
+  "skill",
+  "tool",
+  "language",
+  "skill_or_tool",
+  "damage_type",
+  "equipment",
+])
 
 export type LevelUpNewFeature = {
   name: string
@@ -63,6 +79,14 @@ export type LevelUpChoiceStep =
       extraPrepared: number
       maxSpellLevel: number
       preparedCaster: boolean
+    }
+  | {
+      kind: "modifier_choice"
+      id: string
+      title: string
+      classId: string
+      slot: ModifierPlayerChoiceSlot
+      required: number
     }
 
 export type LevelUpPlan = {
@@ -138,6 +162,8 @@ export function buildLevelUpPlan(params: {
   subclasses: Subclass[]
   currentTotalLevel: number
   featureChoicePicks: Record<string, string[]>
+  modifierPlayerPicks?: Record<string, string[]>
+  modifierCatalog?: ModifierCatalogEntry[]
 }): LevelUpPlan | null {
   const cls = params.entry.class
   if (!cls) return null
@@ -247,6 +273,31 @@ export function buildLevelUpPlan(params: {
   }
   steps.push(...swapSteps)
 
+  const modifierSlots = collectClassFeatureModifierPlayerChoiceSlots({
+    classLevels: [{ classId, level: toLevel }],
+    classes: cls ? [cls] : [],
+    subclasses: params.subclasses,
+    subclassByClassId: params.entry.row.subclass_id
+      ? { [classId]: params.entry.row.subclass_id }
+      : {},
+    featureChoicePicks: params.featureChoicePicks,
+    catalog: params.modifierCatalog ?? [],
+  })
+  const modifierPicks = params.modifierPlayerPicks ?? {}
+  for (const slot of modifierSlots) {
+    if (!LEVEL_UP_MODIFIER_CHOICE_KINDS.has(slot.kind)) continue
+    const already = modifierPicks[slot.slotKey]?.length ?? 0
+    if (already >= slot.maxCount) continue
+    steps.push({
+      kind: "modifier_choice",
+      id: slot.slotKey,
+      title: slot.label || slot.sourceLabel,
+      classId,
+      slot,
+      required: slot.maxCount,
+    })
+  }
+
   if (FEAT_MILESTONES.includes(toLevel as (typeof FEAT_MILESTONES)[number])) {
     const alreadyHasAsiStep = steps.some((step) => step.kind === "feat_or_asi")
     if (!alreadyHasAsiStep) {
@@ -277,11 +328,17 @@ export function buildLevelUpPlan(params: {
     Math.max(0, (after?.prepared ?? 0) - (before?.prepared ?? 0)) + knownUnlock.leveled
   const maxSpellLevel = Math.max(after?.max_spell_level ?? 1, knownUnlock.maxSpellLevel || 0, 1)
   if (extraCantrips > 0 || extraPrepared > 0) {
+    const preparedCaster =
+      Boolean(cls.spellcasting) &&
+      cls.spellcasting?.prepared !== false &&
+      !cls.spellcasting?.pact_magic
+    const grimoireUnlock = knownUnlock.leveled > 0 && !cls.spellcasting?.progression?.length
     steps.push({
       kind: "spells",
       id: `spells:${classId}:${toLevel}`,
-      title:
-        extraPrepared > 0 && cls.spellcasting?.prepared !== false
+      title: grimoireUnlock
+        ? "Add spells to your grimoire"
+        : extraPrepared > 0 && preparedCaster
           ? "Prepare additional spells"
           : "Learn additional spells",
       classId,
@@ -289,7 +346,7 @@ export function buildLevelUpPlan(params: {
       extraCantrips,
       extraPrepared,
       maxSpellLevel,
-      preparedCaster: cls.spellcasting?.prepared !== false && !cls.spellcasting?.pact_magic,
+      preparedCaster,
     })
   }
 
@@ -334,6 +391,6 @@ export function spellsEligibleForLevelUp(
     if ((spell.level ?? 0) > maxSpellLevel) return false
     const lists = spell.classes ?? []
     if (!lists.length) return true
-    return lists.some((name) => name.toLowerCase() === className.toLowerCase())
+    return spellMatchesClassName(spell, className)
   })
 }

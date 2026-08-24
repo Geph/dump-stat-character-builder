@@ -164,6 +164,11 @@ import {
   collectBackgroundOptionBlockers,
   proficientSkillsInBuilder,
 } from "@/lib/builder/choices"
+import {
+  collectGrantedSkillNames,
+  describeReleasedClassSkills,
+  releaseOverlappingClassSkillPicks,
+} from "@/lib/builder/skill-overlap"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { getBuilderLayout, layoutToCardViewMode, cardViewModeToLayout, setBuilderLayout, BUILDER_LAYOUT_CHANGE_EVENT } from "@/lib/site-settings/builder-layout"
 import { APP_PRESENTATION_MODE_CHANGE_EVENT, isCompactOnlyPresentation } from "@/lib/site-settings/app-presentation-mode"
@@ -208,6 +213,8 @@ import {
   getSpellLimits,
   mergeSpellPicks,
 } from "@/lib/builder/spell-limits"
+import { filterSpellsBySchool, uniqueSpellSchools } from "@/lib/builder/spell-grant-filters"
+import { spellMatchesClassName } from "@/lib/compendium/investigator-spell-list"
 import {
   catalogFeatPickOptions,
   isCatalogFeatPickId,
@@ -342,6 +349,7 @@ import {
   resolveFeatureChoiceOptions,
 } from "@/lib/builder/aggregate-psionic-talents"
 import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
+import { choicePoolHint } from "@/lib/builder/choice-pool-noun"
 import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
 import {
   useIsPhonePickerScreen,
@@ -488,6 +496,7 @@ export default function BuilderPageClient() {
   const [equipmentSearch, setEquipmentSearch] = useState("")
   const [equipmentFilterCategory, setEquipmentFilterCategory] = useState("all")
   const [spellFilterLevelByClassId, setSpellFilterLevelByClassId] = useState<Record<string, string>>({})
+  const [spellFilterSchoolByClassId, setSpellFilterSchoolByClassId] = useState<Record<string, string>>({})
   const [spellLevelPages, setSpellLevelPages] = useState<Record<string, number>>({})
   const [startingEquipmentOptionIndex, setStartingEquipmentOptionIndex] = useState<number | null>(null)
   const [startingEquipmentCategoryPicks, setStartingEquipmentCategoryPicks] = useState<
@@ -524,6 +533,8 @@ export default function BuilderPageClient() {
   const [classAddOrder, setClassAddOrder] = useState<string[]>([])
   const [subclassByClassId, setSubclassByClassId] = useState<Record<string, string>>({})
   const [classSkillPicks, setClassSkillPicks] = useState<Record<string, string[]>>({})
+  /** Class picks dropped because another source granted the same skill, by class id. */
+  const [releasedClassSkills, setReleasedClassSkills] = useState<Record<string, string[]>>({})
   const [classToolPicks, setClassToolPicks] = useState<Record<string, string[]>>({})
   const [featureChoicePicks, setFeatureChoicePicks] = useState<Record<string, string[]>>({})
   const [featChoicePicks, setFeatChoicePicks] = useState<Record<string, string[]>>({})
@@ -568,6 +579,7 @@ export default function BuilderPageClient() {
     setEquipmentSearch(snapshot.equipmentSearch)
     setEquipmentFilterCategory(snapshot.equipmentFilterCategory ?? "all")
     setSpellFilterLevelByClassId(snapshot.spellFilterLevelByClassId ?? {})
+    setSpellFilterSchoolByClassId(snapshot.spellFilterSchoolByClassId ?? {})
     setSpellLevelPages(snapshot.spellLevelPages ?? {})
     setStartingEquipmentOptionIndex(snapshot.startingEquipmentOptionIndex ?? null)
     setBackgroundStartingEquipmentOptionIndex(
@@ -896,6 +908,7 @@ export default function BuilderPageClient() {
       equipmentSearch,
       equipmentFilterCategory,
       spellFilterLevelByClassId,
+      spellFilterSchoolByClassId,
       spellLevelPages,
       startingEquipmentOptionIndex,
       backgroundStartingEquipmentOptionIndex,
@@ -937,6 +950,7 @@ export default function BuilderPageClient() {
     equipmentSearch,
     equipmentFilterCategory,
     spellFilterLevelByClassId,
+    spellFilterSchoolByClassId,
     spellLevelPages,
     startingEquipmentOptionIndex,
     backgroundStartingEquipmentOptionIndex,
@@ -1952,6 +1966,37 @@ export default function BuilderPageClient() {
     skillPickerLayout,
     skillIconByName: customSkillIconByName,
   }
+  /**
+   * Skills handed out by species, background, feats and features. Sorted and re-derived
+   * from a signature so the release effect below only reruns when the set really changes.
+   */
+  const grantedSkillSignature = collectGrantedSkillNames({
+    backgroundSkills: selectedBackground?.skill_proficiencies,
+    speciesTraitPicks,
+    featureChoicePicks,
+    modifierGrantedSkills: aggregatedCharacteristics.skills,
+  }).join("|")
+  const grantedSkillNames = useMemo(
+    () => (grantedSkillSignature ? grantedSkillSignature.split("|") : []),
+    [grantedSkillSignature],
+  )
+
+  // Skill proficiencies never stack, so a class pick that another source also grants is
+  // handed back to the player: the class picker goes short and asks for a replacement.
+  useEffect(() => {
+    if (!draftReady) return
+    const next = releaseOverlappingClassSkillPicks(classSkillPicks, grantedSkillNames)
+    if (!next.changed) return
+    setClassSkillPicks(next.classSkillPicks)
+    setReleasedClassSkills((prev) => {
+      const merged = { ...prev }
+      for (const entry of next.released) {
+        merged[entry.classId] = [...new Set([...(merged[entry.classId] ?? []), ...entry.skills])]
+      }
+      return merged
+    })
+  }, [draftReady, classSkillPicks, grantedSkillNames])
+
   const featGrantedSpellIds = aggregatedCharacteristics.spellsKnown.flatMap((entry) => entry.spellIds)
   const subclassGrantedSpellIds = collectSubclassAlwaysPreparedSpellIds(
     activeClassLevels.map((cl) => ({
@@ -4287,26 +4332,38 @@ export default function BuilderPageClient() {
                           {entry.level >= 1 && (() => {
                             const skillReq = getClassSkillPickRequirement(cls, isPrimary)
                             if (!skillReq) return null
+                            const picks = classSkillPicks[entry.classId] ?? []
+                            const released = releasedClassSkills[entry.classId] ?? []
+                            const showReleasedNote =
+                              released.length > 0 && picks.length < skillReq.count
                             return (
-                            <MultiSelectChoices
-                              title={skillReq.label}
-                              hint={`Choose ${skillReq.count}${skillReq.isMulticlass ? " (SRD multiclass grant)" : ""} from the list below.`}
-                              options={skillReq.options.map((name) => ({ name }))}
-                              maxCount={skillReq.count}
-                              selected={classSkillPicks[entry.classId] ?? []}
-                              unavailableOptions={[
-                                ...getTakenSkills(skillPickSources, `class:${entry.classId}`),
-                              ]}
-                              showSkillInfo
-                              layout={skillPickerLayout}
-                              skillIconByName={customSkillIconByName}
-                              onChange={(selected) =>
-                                setClassSkillPicks((prev) => ({
-                                  ...prev,
-                                  [entry.classId]: selected,
-                                }))
-                              }
-                            />
+                              <div className="space-y-2">
+                                <MultiSelectChoices
+                                  title={skillReq.label}
+                                  hint={`Choose ${skillReq.count}${skillReq.isMulticlass ? " (SRD multiclass grant)" : ""} from the list below.`}
+                                  options={skillReq.options.map((name) => ({ name }))}
+                                  maxCount={skillReq.count}
+                                  selected={picks}
+                                  unavailableOptions={[
+                                    ...getTakenSkills(skillPickSources, `class:${entry.classId}`),
+                                    ...grantedSkillNames,
+                                  ]}
+                                  showSkillInfo
+                                  layout={skillPickerLayout}
+                                  skillIconByName={customSkillIconByName}
+                                  onChange={(selected) =>
+                                    setClassSkillPicks((prev) => ({
+                                      ...prev,
+                                      [entry.classId]: selected,
+                                    }))
+                                  }
+                                />
+                                {showReleasedNote ? (
+                                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                                    {describeReleasedClassSkills(released)}
+                                  </p>
+                                ) : null}
+                              </div>
                             )
                           })()}
 
@@ -4476,7 +4533,7 @@ export default function BuilderPageClient() {
                             const masteryHint = isWeaponMastery
                               ? `Choose ${choiceCount} weapon type${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (swap one on a Long Rest)" : ""}.`
                               : isKnackPool
-                                ? `Choose ${choiceCount} ${/trick/i.test(feature.choices?.category ?? feature.name) ? "Trick" : "Knack"}${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (replace one when you level up)" : ""}.`
+                                ? choicePoolHint(feature, choiceCount)
                                 : isUpgradePool
                                   ? `Choose ${choiceCount} Upgrade${choiceCount === 1 ? "" : "s"}${feature.choices?.swappableOnRest ? " (exchange on level-up per feature rules)" : ""}.`
                               : feature.choices!.optionsSource === "known_discipline_talents"
@@ -6552,18 +6609,29 @@ export default function BuilderPageClient() {
                       const extraSpellLists = aggregatedCharacteristics.spellListAccess
                       const classAvailableSpells = spells
                         .filter((s) => {
-                          if (s.level === 0) return s.classes?.includes(casterClass.name)
+                          if (s.level === 0) {
+                            return (
+                              spellLimits.cantrips > 0 &&
+                              spellMatchesClassName(s, casterClass.name)
+                            )
+                          }
                           if (s.level > maxSpellLevel) return false
                           return (
-                            s.classes?.includes(casterClass.name) ||
+                            spellMatchesClassName(s, casterClass.name) ||
                             s.classes?.some((c) => extraSpellLists.includes(c))
                           )
                         })
                         .filter(
                           (s) => !alreadyKnownSpellIds.has(s.id) || classSpellIds.includes(s.id),
                         )
-                      const availableSpells = searchItems(
+                      const schoolFilter = spellFilterSchoolByClassId[casterClass.id] ?? "all"
+                      const schoolOptions = uniqueSpellSchools(classAvailableSpells)
+                      const schoolScopedSpells = filterSpellsBySchool(
                         classAvailableSpells,
+                        schoolFilter,
+                      )
+                      const availableSpells = searchItems(
+                        schoolScopedSpells,
                         deferredSpellSearch,
                         {
                           name: (spell) => spell.name,
@@ -6609,9 +6677,11 @@ export default function BuilderPageClient() {
                             </p>
                           )}
                           <div className="flex flex-wrap gap-3 mb-3 text-sm">
-                            <span className="px-2 py-1 rounded bg-secondary/10 text-foreground">
-                              Cantrips: {spellCounts.cantrips} / {spellLimits.cantrips}
-                            </span>
+                            {spellLimits.cantrips > 0 ? (
+                              <span className="px-2 py-1 rounded bg-secondary/10 text-foreground">
+                                Cantrips: {spellCounts.cantrips} / {spellLimits.cantrips}
+                              </span>
+                            ) : null}
                             <span className="px-2 py-1 rounded bg-secondary/10 text-foreground">
                               Prepared (level 1+): {spellCounts.prepared} / {spellLimits.prepared}
                             </span>
@@ -6620,13 +6690,17 @@ export default function BuilderPageClient() {
                             </span>
                           </div>
 
-                          <div className="mb-3 flex flex-wrap items-center gap-2">
+                          <div className="mb-3 flex flex-nowrap items-center gap-2">
                             {spellLevels.length > 0 ? (
-                              <>
-                                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              <div className="flex shrink-0 items-center gap-2">
+                                <label
+                                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                                  htmlFor={`spell-level-${casterClass.id}`}
+                                >
                                   Level
                                 </label>
                                 <select
+                                  id={`spell-level-${casterClass.id}`}
                                   value={levelFilter}
                                   onChange={(e) => {
                                     setSpellFilterLevelByClassId((prev) => ({
@@ -6644,22 +6718,37 @@ export default function BuilderPageClient() {
                                     </option>
                                   ))}
                                 </select>
-                                {levelFilter !== "all" ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSpellFilterLevelByClassId((prev) => ({
-                                        ...prev,
-                                        [casterClass.id]: "all",
-                                      }))
-                                      setSpellLevelPages({})
-                                    }}
-                                    className="px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
-                                  >
-                                    Show all levels
-                                  </button>
-                                ) : null}
-                              </>
+                              </div>
+                            ) : null}
+                            {schoolOptions.length > 1 ? (
+                              <div className="flex shrink-0 items-center gap-2">
+                                <label
+                                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                                  htmlFor={`spell-school-${casterClass.id}`}
+                                >
+                                  School
+                                </label>
+                                <select
+                                  id={`spell-school-${casterClass.id}`}
+                                  value={schoolFilter}
+                                  onChange={(e) => {
+                                    setSpellFilterSchoolByClassId((prev) => ({
+                                      ...prev,
+                                      [casterClass.id]: e.target.value,
+                                    }))
+                                    setSpellLevelPages({})
+                                  }}
+                                  className="max-w-[11rem] rounded-xl border-2 border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+                                  aria-label={`Filter ${casterClass.name} spells by school`}
+                                >
+                                  <option value="all">All schools</option>
+                                  {schoolOptions.map((school) => (
+                                    <option key={school} value={school}>
+                                      {school}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                             ) : null}
                             <SearchBox
                               value={spellSearch}
@@ -6668,7 +6757,7 @@ export default function BuilderPageClient() {
                                 setSpellLevelPages({})
                               }}
                               suggestions={rankSearchResults(
-                                classAvailableSpells,
+                                schoolScopedSpells,
                                 deferredSpellSearch,
                                 {
                                   name: (spell) => spell.name,
@@ -6693,7 +6782,7 @@ export default function BuilderPageClient() {
                               scope={`builder:spells:${casterClass.id}`}
                               placeholder="Search spells…"
                               ariaLabel={`Search ${casterClass.name} spells`}
-                              className="min-w-[12rem] flex-1"
+                              className="min-w-[8rem] flex-1 basis-[8rem]"
                             />
                           </div>
 

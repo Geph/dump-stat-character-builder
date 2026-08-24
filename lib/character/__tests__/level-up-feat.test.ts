@@ -7,6 +7,9 @@ import {
 } from "@/lib/character/level-up-feat"
 import { buildInputsFromSavedCharacter, computeDerivedCharacter } from "@/lib/character/compute-derived"
 import { fighterClass } from "@/lib/character/__tests__/fixtures"
+import { collectModifierPlayerChoiceSlots } from "@/lib/builder/modifier-player-choices"
+import { enrichSrdFeatRow } from "@/lib/compendium/enrich-srd-feats"
+import { SRD_SOURCE } from "@/lib/srd/source"
 import type { Feat } from "@/lib/types"
 
 const CLASS_ID = fighterClass.id
@@ -52,6 +55,31 @@ describe("level-up feat persist", () => {
   it("parses stringified asi_allocations so scores still apply", () => {
     expect(normalizeAsiAllocationsMap('{"milestone_asi":{"wisdom":2}}')).toEqual({
       milestone_asi: { wisdom: 2 },
+    })
+  })
+})
+
+describe("level-up feat player choices", () => {
+  it("surfaces Skilled skill/tool picks for a milestone slot", () => {
+    const skilled = enrichSrdFeatRow({
+      id: "feat_skilled",
+      name: "Skilled",
+      source: SRD_SOURCE,
+      description: "You gain proficiency in three skills or tools of your choice.",
+    }) as unknown as Feat
+    const slotKey = levelUpFeatSlotKey(CLASS_ID, "Ability Score Improvement", 4)
+    const choicePickKey = levelUpFeatAllocationPrefix(slotKey)
+    const slots = collectModifierPlayerChoiceSlots({
+      featEntries: [{ featId: skilled.id, choicePickKey }],
+      feats: [skilled],
+      featChoicePicks: {},
+      catalog: [],
+    })
+    const shared = slots.find((slot) => slot.kind === "skill_or_tool")
+    expect(shared).toMatchObject({
+      sourceKey: choicePickKey,
+      maxCount: 3,
+      sharedChoiceGroup: "skilled_proficiencies",
     })
   })
 })

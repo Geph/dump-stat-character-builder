@@ -59,9 +59,9 @@ export function getFeatSpellGrantPickerPageSize(params: {
   isSmScreen: boolean
   isLargeScreen: boolean
 }): number {
-  if (params.isLargeScreen) return PICKER_GRID_ROWS * 3 // 3 cols × 3 rows = 9
-  if (params.isSmScreen) return 8 // 2 cols × 4 rows
-  return PICKER_GRID_ROWS * 2 // 1 col × 6 rows = 6
+  if (params.isLargeScreen) return 15 // 3 cols × 5 rows
+  if (params.isSmScreen) return 12 // 2 cols × 6 rows
+  return 8 // 1 col × 8 rows
 }
 
 /** Width/snap for one swipe carousel slide (apply to each item wrapper). */

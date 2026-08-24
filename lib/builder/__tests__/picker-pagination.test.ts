@@ -37,9 +37,9 @@ describe("getCinematicPickerItemClass", () => {
 
 describe("getFeatSpellGrantPickerPageSize", () => {
   it("matches the 1 / 2 / 3 column grant grid", () => {
-    expect(getFeatSpellGrantPickerPageSize({ isSmScreen: false, isLargeScreen: false })).toBe(6)
-    expect(getFeatSpellGrantPickerPageSize({ isSmScreen: true, isLargeScreen: false })).toBe(8)
-    expect(getFeatSpellGrantPickerPageSize({ isSmScreen: true, isLargeScreen: true })).toBe(9)
+    expect(getFeatSpellGrantPickerPageSize({ isSmScreen: false, isLargeScreen: false })).toBe(8)
+    expect(getFeatSpellGrantPickerPageSize({ isSmScreen: true, isLargeScreen: false })).toBe(12)
+    expect(getFeatSpellGrantPickerPageSize({ isSmScreen: true, isLargeScreen: true })).toBe(15)
   })
 })
 

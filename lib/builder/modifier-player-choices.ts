@@ -20,12 +20,17 @@ import {
 } from "@/lib/compendium/characteristic-modifiers"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { sanitizeBonusProficienciesFeature } from "@/lib/compendium/enrich-srd-class-features"
+import { applyExpertisePresetOverride } from "@/lib/import/apply-expertise-preset-override"
 import {
   effectiveLinkedModifiers,
   readLinkedModifiers,
   resolveLinkedModifiers,
 } from "@/lib/compendium/linked-modifiers"
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
+import {
+  inferSpellListClassNames,
+  spellMatchesClassName,
+} from "@/lib/compendium/investigator-spell-list"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { mergeToolNameLists, toolNamesForPool, type ToolChoicePool } from "@/lib/compendium/tool-options"
@@ -55,6 +60,8 @@ export type ModifierPlayerChoiceSlot = {
   maxCount: number
   options?: { name: string; description?: string }[]
   spellLevel?: number
+  /** When true, `spellLevel` is an inclusive max (grimoire-style), not an exact match. */
+  spellLevelIsMax?: boolean
   spellListClassNames?: string[]
   requiresSpellListPick?: boolean
   spellListSlotKey?: string
@@ -131,6 +138,20 @@ export function characteristicsForFeatSelection(
 
 type SlotBuildContext = { classSkillList?: string[]; classLevel?: number }
 
+/** Base choiceCount plus later-level unlocks that are active at `classLevel`. */
+export function skillChoiceCountAtLevel(
+  mod: Pick<SkillsCharacteristic, "choiceCount" | "choiceCountUnlocks">,
+  classLevel: number | undefined,
+): number {
+  let count = mod.choiceCount ?? 0
+  for (const unlock of mod.choiceCountUnlocks ?? []) {
+    if (classLevel != null && classLevel >= unlock.unlocksAtClassLevel) {
+      count += unlock.count
+    }
+  }
+  return count
+}
+
 function slotsFromCharacteristic(
   mod: CharacteristicModifier,
   sourceKey: string,
@@ -145,7 +166,7 @@ function slotsFromCharacteristic(
 
   if (mod.type === "skills") {
     const skillMod = mod as SkillsCharacteristic
-    const count = skillMod.choiceCount ?? 0
+    const count = skillChoiceCountAtLevel(skillMod, context?.classLevel)
     if (count <= 0) return slots
 
     const classSkillList = context?.classSkillList ?? []
@@ -288,6 +309,7 @@ function slotsFromCharacteristic(
     grants.forEach((grant, index) => {
       if (grant.count <= 0) return
       if (grant.unlocksAtClassLevel != null && grant.unlocksAtClassLevel > (context?.classLevel ?? 99)) return
+      const upToLevel = grant.upToLevel === true && grant.level > 0
       slots.push({
         slotKey: modifierPlayerChoiceSlotKey(sourceKey, mod.id, "spell", index),
         sourceKey,
@@ -297,10 +319,16 @@ function slotsFromCharacteristic(
         label:
           grant.level === 0
             ? `Choose ${grant.count} cantrip${grant.count === 1 ? "" : "s"}`
-            : `Choose ${grant.count} level-${grant.level} spell${grant.count === 1 ? "" : "s"}`,
+            : upToLevel
+              ? `Choose ${grant.count} spell${grant.count === 1 ? "" : "s"} (up to level ${grant.level})`
+              : `Choose ${grant.count} level-${grant.level} spell${grant.count === 1 ? "" : "s"}`,
         maxCount: grant.count,
         spellLevel: grant.level,
-        spellListClassNames: grant.classNames ?? spellMod.spellListClassOptions ?? [],
+        spellLevelIsMax: upToLevel || undefined,
+        spellListClassNames:
+          grant.classNames ??
+          spellMod.spellListClassOptions ??
+          inferSpellListClassNames(spellMod.label),
         requiresSpellListPick: spellMod.playerPicksSpellList ?? false,
         spellListSlotKey,
       })
@@ -417,7 +445,9 @@ function collectSlotsFromFeature(
   catalog: ModifierCatalogEntry[],
   context?: SlotBuildContext,
 ): ModifierPlayerChoiceSlot[] {
-  const feature = sanitizeBonusProficienciesFeature(migrateFeatureOptionPickers(rawFeature))
+  const feature = applyExpertisePresetOverride(
+    sanitizeBonusProficienciesFeature(migrateFeatureOptionPickers(rawFeature)),
+  )
   const sourceKey = featureChoiceKey(classId, feature.name, feature.level)
   const sourceLabel = `${className}: ${feature.name}`
   const slots: ModifierPlayerChoiceSlot[] = []
@@ -844,13 +874,18 @@ export function spellOptionsForModifierSlot(
   }
 
   const classSet = new Set(classNames.map((name) => name.toLowerCase()))
-  return spells.filter(
-    (spell) =>
-      spell.level === slot.spellLevel &&
-      (classSet.size === 0 ||
-        spell.classes?.some((className) => classSet.has(className.toLowerCase()))) &&
-      (!otherSlotSpellIds.has(spell.id) || ownPicks.includes(spell.id)),
-  )
+  const maxLevel = slot.spellLevel
+  return spells.filter((spell) => {
+    if (slot.spellLevelIsMax) {
+      // Grimoire-style: any leveled spell up to the Ritual Level cap (no cantrips).
+      if (spell.level < 1 || spell.level > maxLevel!) return false
+    } else if (spell.level !== maxLevel) {
+      return false
+    }
+    if (otherSlotSpellIds.has(spell.id) && !ownPicks.includes(spell.id)) return false
+    if (classSet.size === 0) return true
+    return classNames.some((className) => spellMatchesClassName(spell, className))
+  })
 }
 
 export function isSpellRelatedModifierSlot(slot: ModifierPlayerChoiceSlot): boolean {

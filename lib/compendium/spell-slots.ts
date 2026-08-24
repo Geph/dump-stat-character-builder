@@ -124,6 +124,15 @@ export function getCasterSlotType(
     return "pact"
   }
   if (HALF_CASTERS.has(className)) return "half"
+  // Ability-only ritualists / cantrip casters (Investigator Ritualist, Warmage) set
+  // spellcasting.ability without a slot model — do not invent full-caster slots.
+  if (
+    spellcasting.type !== "prepared" &&
+    !spellcasting.explicit_slot_progression?.length &&
+    !spellcasting.point_pool
+  ) {
+    return null
+  }
   return "full"
 }
 
