@@ -5,6 +5,7 @@ import { WeaponMasteryChoices } from "@/components/builder/weapon-mastery-choice
 import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import type { ClassAbilityFeatureEntry } from "@/lib/builder/class-ability-step"
 import { featureChoiceKey, getTakenSkills, type SkillPickSource } from "@/lib/builder/choices"
+import { choicePoolHint } from "@/lib/builder/choice-pool-noun"
 import { featureChoiceHintFromDescription } from "@/lib/builder/feature-choice-hint"
 import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
 import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
@@ -49,15 +50,7 @@ function choiceHint(
     }
   }
   if (feature.choices?.optionsSource === "class_knacks") {
-    return {
-      hint: `Choose ${choiceCount} ${
-        /trick|exploit|maneuver/i.test(feature.choices?.category ?? feature.name)
-          ? feature.choices?.category ?? "option"
-          : "Knack"
-      }${choiceCount === 1 ? "" : "s"}${
-        feature.choices?.swappableOnRest ? " (replace one when you level up)" : ""
-      }.`,
-    }
+    return { hint: choicePoolHint(feature, choiceCount) }
   }
   if (feature.choices?.optionsSource === "class_upgrades") {
     return {
