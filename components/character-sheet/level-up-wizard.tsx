@@ -29,6 +29,7 @@ import {
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import {
+  assignLevelUpSpellsToNewModifierSlots,
   buildLevelUpPlan,
   countReplacedPicks,
   spellsEligibleForLevelUp,
@@ -73,6 +74,9 @@ import { asCompendiumRows } from "@/lib/data/types"
 import type { Character, CustomAbility, DndClass, Feat, Spell, Subclass } from "@/lib/types"
 import { ABILITY_SCORE_KEYS, type AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { LevelUpSubclassPicker } from "@/components/character-sheet/level-up-subclass-picker"
+import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
+import { spellCastingDetailRows, spellDetailOverlayTags } from "@/lib/compendium/spell-detail-tags"
+import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
 import { useBuilderLayout } from "@/components/settings/use-builder-layout"
 import { useIsPhonePickerScreen } from "@/hooks/use-picker-page-size"
 import { cn } from "@/lib/utils"
@@ -460,8 +464,20 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         [plan.classId]: [...existingSpells, ...cantripIds, ...spellIds],
       }
       const nextFeatIds = featPersist.featIds
-      const nextSpellIds = [...new Set([...(loaded.character.spell_ids ?? []), ...cantripIds, ...spellIds])]
+      const unlockedSpellIds = [...cantripIds, ...spellIds]
+      const nextSpellIds = [...new Set([...(loaded.character.spell_ids ?? []), ...unlockedSpellIds])]
       const nextAsi = featPersist.asiAllocations
+      const grimoireModifierPicks = assignLevelUpSpellsToNewModifierSlots({
+        fromLevel: plan.fromLevel,
+        toLevel: plan.toLevel,
+        classId: plan.classId,
+        cls: selectedEntry.class,
+        subclasses: loaded.subclasses,
+        subclassId: subclassId ?? selectedEntry.row.subclass_id,
+        featureChoicePicks: nextPicks,
+        modifierCatalog: loaded.modifierCatalog,
+        spellIds: unlockedSpellIds,
+      })
 
       const hpGain =
         hpMethod === "roll" && hpNatural != null
@@ -483,6 +499,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           modifier_player_picks: {
             ...(loaded.character.modifier_player_picks ?? {}),
             ...modifierPicks,
+            ...grimoireModifierPicks,
           },
           skill_proficiencies: mergeSkillProficiencyNames(
             loaded.character.skill_proficiencies,
@@ -919,21 +936,29 @@ function SpellPickStep({
   onCantripsChange: (ids: string[]) => void
   onSpellsChange: (ids: string[]) => void
 }) {
+  const [detailSpell, setDetailSpell] = useState<Spell | null>(null)
   const eligible = useMemo(
     () => spellsEligibleForLevelUp(spells, current.className, current.maxSpellLevel, alreadyKnown),
     [alreadyKnown, current.className, current.maxSpellLevel, spells],
   )
   const cantrips = eligible.filter((spell) => (spell.level ?? 0) === 0)
   const leveled = eligible.filter((spell) => (spell.level ?? 0) > 0)
+
+  const openSpellInfo = (pool: Spell[], name: string) => {
+    const match = pool.find((spell) => spell.name === name) ?? null
+    setDetailSpell(match)
+  }
+
+  const accent = detailSpell
+    ? getCompendiumItemAccentColor(detailSpell as unknown as Record<string, unknown>)
+    : null
+
   return (
     <div className="space-y-3">
       {current.extraCantrips > 0 ? (
         <MultiSelectChoices
           title={`Cantrips (${current.extraCantrips})`}
-          options={cantrips.map((spell) => ({
-            name: spell.name,
-            description: spell.description ?? undefined,
-          }))}
+          options={cantrips.map((spell) => ({ name: spell.name }))}
           maxCount={current.extraCantrips}
           selected={cantrips
             .filter((spell) => cantripIds.includes(spell.id))
@@ -944,14 +969,21 @@ function SpellPickStep({
             )
           }
           showOptionInfo
+          onOptionInfo={(option) => openSpellInfo(cantrips, option.name)}
         />
       ) : null}
       {current.extraPrepared > 0 ? (
         <MultiSelectChoices
-          title={`${current.preparedCaster ? "Prepared" : "Known"} spells (${current.extraPrepared})`}
+          title={`${
+            /grimoire/i.test(current.title)
+              ? "Grimoire"
+              : current.preparedCaster
+                ? "Prepared"
+                : "Known"
+          } spells (${current.extraPrepared})`}
           options={leveled.map((spell) => ({
             name: spell.name,
-            description: `L${spell.level} · ${spell.description ?? ""}`,
+            sourceLabel: spell.level === 0 ? "Cantrip" : `Level ${spell.level}`,
           }))}
           maxCount={current.extraPrepared}
           selected={leveled
@@ -963,7 +995,47 @@ function SpellPickStep({
             )
           }
           showOptionInfo
+          onOptionInfo={(option) => openSpellInfo(leveled, option.name)}
         />
+      ) : null}
+
+      {detailSpell ? (
+        <CompendiumDetailOverlay
+          open
+          onClose={() => setDetailSpell(null)}
+          item={detailSpell}
+          subtitle={detailSpell.school}
+          imageCrop="top"
+          panelWidth="portrait-spell"
+          tags={spellDetailOverlayTags(detailSpell)}
+          accentColor={accent}
+          backdropClassName="z-[220]"
+        >
+          {spellCastingDetailRows(detailSpell).length > 0 ? (
+            <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
+              {spellCastingDetailRows(detailSpell).map((row) => (
+                <div key={row.label}>
+                  <span className="text-white/50">{row.label}:</span> {row.value}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {detailSpell.material?.trim() ? (
+            <p className="mb-3 text-sm text-white/70">
+              <span className="font-semibold text-white/50">Materials: </span>
+              {detailSpell.material.trim()}
+            </p>
+          ) : null}
+          <RichTextContent html={detailSpell.description} />
+          {detailSpell.higher_levels?.trim() ? (
+            <div className="mt-3">
+              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-white/50">
+                At Higher Levels
+              </p>
+              <RichTextContent html={detailSpell.higher_levels} />
+            </div>
+          ) : null}
+        </CompendiumDetailOverlay>
       ) : null}
     </div>
   )

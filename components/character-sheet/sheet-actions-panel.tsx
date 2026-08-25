@@ -19,6 +19,7 @@ import {
   type SheetActionEntry,
   type SheetActionTalentAlert,
 } from "@/lib/character/sheet-actions"
+import { grantsExtraWeaponAttack } from "@/lib/character/weapon-attack-actions"
 import { talentAlertAppliesToVariant } from "@/lib/character/alchemist-bomb-sheet"
 import { guardianTacticsToggleIdForOption, sheetToggleIdActivatedByAction } from "@/lib/compendium/sheet-toggle-registry"
 import { weaponMorphToggleIdForOption } from "@/lib/character/weapon-morph"
@@ -128,10 +129,11 @@ type SheetActionsPanelProps = {
   primedBombUsedThisTurn?: boolean
   onPrimedBombUsed?: () => void
   /**
-   * Which buckets to show. Combat layout puts triggered entries under weapons
-   * (`triggered`) and action/bonus/reaction in the actions column (`economy`).
+   * Which buckets to show. Combat layout puts extra-attack grants and triggered entries under
+   * weapons (`weapon-attacks`, `triggered`) and action/bonus/reaction in the actions column
+   * (`economy`, which therefore omits the extra-attack grants).
    */
-  sections?: "all" | "economy" | "triggered"
+  sections?: "all" | "economy" | "triggered" | "weapon-attacks"
 }
 
 function actionPlayerNoteKey(action: SheetActionEntry, noteId: string): string {
@@ -2151,6 +2153,8 @@ export function SheetActionsPanel({
     return `Restored ${Math.min(usage.used, Math.max(1, conversion.restores))} use`
   }
 
+  // Only the split combat layout has a weapon column to move extra-attack grants into.
+  const splitWeaponAttacks = sections === "economy" || sections === "weapon-attacks"
   const grouped: Record<ActionEconomyKind, SheetActionEntry[]> = {
     action: [],
     bonus: [],
@@ -2159,10 +2163,17 @@ export function SheetActionsPanel({
   // Triggered entries cost no action economy, so they get their own bucket rather than being
   // filed under Action / Bonus Action / Reaction.
   const triggeredEntries: SheetActionEntry[] = []
+  const weaponAttackEntries: SheetActionEntry[] = []
   for (const entry of actions) {
     if (entry.trigger) {
       if (!triggeredEntries.some((existing) => existing.id === entry.id)) {
         triggeredEntries.push(entry)
+      }
+      continue
+    }
+    if (splitWeaponAttacks && grantsExtraWeaponAttack(entry)) {
+      if (!weaponAttackEntries.some((existing) => existing.id === entry.id)) {
+        weaponAttackEntries.push(entry)
       }
       continue
     }
@@ -2398,11 +2409,18 @@ export function SheetActionsPanel({
 
   const showEconomy = sections === "all" || sections === "economy"
   const showTriggered = sections === "all" || sections === "triggered"
+  const showWeaponAttacks = sections === "weapon-attacks"
   const hasEconomyEntries =
     showEconomy &&
     (Object.keys(grouped) as ActionEconomyKind[]).some((kind) => grouped[kind].length > 0)
   const hasTriggeredEntries = showTriggered && triggeredEntries.length > 0
-  if (!hasEconomyEntries && !hasTriggeredEntries && !incapacitated) {
+  const hasWeaponAttackEntries = showWeaponAttacks && weaponAttackEntries.length > 0
+  if (
+    !hasEconomyEntries &&
+    !hasTriggeredEntries &&
+    !hasWeaponAttackEntries &&
+    !(incapacitated && showEconomy)
+  ) {
     return null
   }
 
@@ -2429,6 +2447,16 @@ export function SheetActionsPanel({
             )
           })
         : null}
+      {hasWeaponAttackEntries ? (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+            Extra Attacks
+          </p>
+          <div className={gridClass}>
+            {weaponAttackEntries.map((entry) => renderEntryCard(entry, "weapon-attack"))}
+          </div>
+        </div>
+      ) : null}
       {showTriggered && triggeredEntries.length ? (
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">

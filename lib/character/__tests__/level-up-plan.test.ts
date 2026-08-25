@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildLevelUpPlan, countReplacedPicks } from "@/lib/character/level-up-plan"
+import { assignLevelUpSpellsToNewModifierSlots, buildLevelUpPlan, countReplacedPicks } from "@/lib/character/level-up-plan"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import type { DndClass, Feature } from "@/lib/types"
 import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
@@ -351,6 +351,24 @@ describe("buildLevelUpPlan — Investigator Ritualist grimoire", () => {
       maxSpellLevel: 2,
       preparedCaster: false,
     })
+  })
+})
+
+describe("assignLevelUpSpellsToNewModifierSlots", () => {
+  it("writes level-up spell ids onto the newly unlocked grimoire slot", () => {
+    const entry = investigatorAt(1)
+    const assigned = assignLevelUpSpellsToNewModifierSlots({
+      fromLevel: 1,
+      toLevel: 2,
+      classId: "investigator",
+      cls: entry.class,
+      subclasses: [],
+      subclassId: null,
+      featureChoicePicks: {},
+      modifierCatalog: [],
+      spellIds: ["alarm", "detect-magic"],
+    })
+    expect(Object.values(assigned)).toEqual([["alarm", "detect-magic"]])
   })
 })
 

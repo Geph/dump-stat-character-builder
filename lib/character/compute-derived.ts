@@ -1043,6 +1043,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     extraTurns: aggregatedCharacteristics.extraTurns,
     healingReceivedModifiers: aggregatedCharacteristics.healingReceivedModifiers,
     grantedCustomAbilityNames: aggregatedCharacteristics.grantedCustomAbilityNames,
+    grantedEquipment: aggregatedCharacteristics.grantedEquipment,
     customAbilityModifications: aggregatedCharacteristics.customAbilityModifications,
     featureChoiceCountBonuses: aggregatedCharacteristics.featureChoiceCountBonuses,
     featureChoiceOptionGrants: aggregatedCharacteristics.featureChoiceOptionGrants,

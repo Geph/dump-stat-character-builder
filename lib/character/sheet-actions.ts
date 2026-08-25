@@ -854,7 +854,13 @@ function explicitActionKinds(item: ActivatableItem): ActionEconomyKind[] {
 /** Derive action-economy kinds from structured activation, modifiers, or prose. */
 export function inferActivatableActionKinds(item: ActivatableItem): ActionEconomyKind[] {
   const explicit = explicitActionKinds(item)
-  const merged = unionActionKinds(explicit, flexibleEconomyKindsFromText(item.description))
+  // An authored activation is the last word on cost. Prose such as Rushed Incantation's
+  // "a spell with a casting time of an action or a Bonus Action" describes what may be cast,
+  // not what casting it costs, so it must not add a second economy column.
+  const flexible = activationKinds(item.activation).length
+    ? []
+    : flexibleEconomyKindsFromText(item.description)
+  const merged = unionActionKinds(explicit, flexible)
   if (merged.length) return merged
   if (inferDirectCompanionEffect(item.name, item.description)) return ["action"]
   // Triggered spends have no action-economy cost; "action" only keeps them inside the

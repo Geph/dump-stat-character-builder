@@ -208,6 +208,10 @@ import {
   ownedEquipmentQuantity,
 } from "@/lib/character/equipment-quantities"
 import {
+  grantedEquipmentSignature,
+  resolveGrantedEquipmentHoldings,
+} from "@/lib/character/granted-equipment"
+import {
   canSelectSpell,
   countSelectedSpells,
   getSpellLimits,
@@ -1733,45 +1737,6 @@ export default function BuilderPageClient() {
     }
   }, [inGoldShoppingMode, goldPurchasedEquipmentIds.length])
 
-  useEffect(() => {
-    if (!draftReady) return
-    const preserveLoadedEquipment =
-      editingCharacterId != null &&
-      startingEquipmentOptionIndex == null &&
-      backgroundStartingEquipmentOptionIndex == null &&
-      !inGoldShoppingMode
-    if (preserveLoadedEquipment) return
-
-    const merged = mergeEquipmentHoldings(
-      packageEquipment,
-      { ids: modifierGrantedEquipmentIds },
-      inGoldShoppingMode ? holdingsFromRepeatedIds(goldPurchasedEquipmentIds) : { ids: [] },
-    )
-    setCharacter((prev) => {
-      const sameIds =
-        prev.equipment_ids.length === merged.ids.length &&
-        prev.equipment_ids.every((id) => merged.ids.includes(id))
-      const prevQty = prev.equipment_quantities ?? {}
-      const sameQty =
-        Object.keys(prevQty).length === Object.keys(merged.quantities).length &&
-        Object.entries(merged.quantities).every(([id, qty]) => prevQty[id] === qty)
-      if (sameIds && sameQty) return prev
-      return {
-        ...prev,
-        equipment_ids: merged.ids,
-        equipment_quantities: merged.quantities,
-      }
-    })
-  }, [
-    draftReady,
-    editingCharacterId,
-    startingEquipmentOptionIndex,
-    backgroundStartingEquipmentOptionIndex,
-    packageEquipment,
-    modifierGrantedEquipmentIds,
-    goldPurchasedEquipmentIds,
-    inGoldShoppingMode,
-  ])
 
   useEffect(() => {
     if (!draftReady) return
@@ -1932,6 +1897,58 @@ export default function BuilderPageClient() {
     }),
   ]
   const aggregatedCharacteristics = aggregateCharacteristics(builderCharacteristicMods)
+
+  // Gear handed out by unlocked features (Investigator Trinkets) is part of starting inventory
+  // for characters built at or above the granting level. Keyed off a signature because the
+  // aggregation above is rebuilt on every render.
+  const grantedEquipmentKey = grantedEquipmentSignature(aggregatedCharacteristics.grantedEquipment)
+  const featureGrantedEquipment = useMemo(
+    () => resolveGrantedEquipmentHoldings(grantedEquipmentKey, equipment),
+    [grantedEquipmentKey, equipment],
+  )
+
+  useEffect(() => {
+    if (!draftReady) return
+    const preserveLoadedEquipment =
+      editingCharacterId != null &&
+      startingEquipmentOptionIndex == null &&
+      backgroundStartingEquipmentOptionIndex == null &&
+      !inGoldShoppingMode
+    if (preserveLoadedEquipment) return
+
+    const merged = mergeEquipmentHoldings(
+      packageEquipment,
+      { ids: modifierGrantedEquipmentIds },
+      featureGrantedEquipment,
+      inGoldShoppingMode ? holdingsFromRepeatedIds(goldPurchasedEquipmentIds) : { ids: [] },
+    )
+    setCharacter((prev) => {
+      const sameIds =
+        prev.equipment_ids.length === merged.ids.length &&
+        prev.equipment_ids.every((id) => merged.ids.includes(id))
+      const prevQty = prev.equipment_quantities ?? {}
+      const sameQty =
+        Object.keys(prevQty).length === Object.keys(merged.quantities).length &&
+        Object.entries(merged.quantities).every(([id, qty]) => prevQty[id] === qty)
+      if (sameIds && sameQty) return prev
+      return {
+        ...prev,
+        equipment_ids: merged.ids,
+        equipment_quantities: merged.quantities,
+      }
+    })
+  }, [
+    draftReady,
+    editingCharacterId,
+    startingEquipmentOptionIndex,
+    backgroundStartingEquipmentOptionIndex,
+    packageEquipment,
+    modifierGrantedEquipmentIds,
+    featureGrantedEquipment,
+    goldPurchasedEquipmentIds,
+    inGoldShoppingMode,
+  ])
+
   const modifierExpertisePickerProps = {
     proficientSkills: proficientSkillsInBuilder({
       backgroundSkills: selectedBackground?.skill_proficiencies,
@@ -2423,6 +2440,9 @@ export default function BuilderPageClient() {
           filterEnabledIds(character.equipment_ids, equipment),
           character.equipment_quantities,
         ),
+        // Only names that resolved to a real item count as honored, so a trinket whose compendium
+        // row lands later still gets granted on the sheet.
+        granted_equipment_names: featureGrantedEquipment.names,
         gold: inGoldShoppingMode
           ? goldRemaining
           : editingCharacterId

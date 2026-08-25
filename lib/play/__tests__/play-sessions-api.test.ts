@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { GET, POST } from "@/app/api/play/sessions/route"
+import { createPlaySession, readPlaySession } from "@/lib/play/play-sessions"
 
 describe("play sessions API", () => {
   beforeEach(() => {
@@ -8,7 +8,7 @@ describe("play sessions API", () => {
 
   it("returns 503 when room sync disabled", async () => {
     vi.stubEnv("ENABLE_ROOM_SYNC", "false")
-    const response = await POST(
+    const response = await createPlaySession(
       new Request("http://localhost/api/play/sessions", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -20,7 +20,7 @@ describe("play sessions API", () => {
 
   it("creates and reads a session when enabled", async () => {
     vi.stubEnv("ENABLE_ROOM_SYNC", "true")
-    const create = await POST(
+    const create = await createPlaySession(
       new Request("http://localhost/api/play/sessions", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -35,7 +35,7 @@ describe("play sessions API", () => {
     }
     expect(created.characterIds).toEqual(["char-1", "char-2"])
 
-    const read = await GET(
+    const read = await readPlaySession(
       new Request(`http://localhost/api/play/sessions?room=${created.roomCode}`, {
         headers: { "x-session-token": created.sessionToken },
       }),

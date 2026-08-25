@@ -21,6 +21,7 @@ Replaces class-specific enricher modules with declarative presets under
 | Investigator | Finisher / Improved Finisher on-hit triggers | (b) | Named presets |
 | Investigator | Holy Trinkets note + clear limitedUses | (b) | |
 | Investigator | Name-match wire Amulet / Ankh / Rune effects | (b) | Recognition only — no content seed |
+| Investigator | Subclass trinkets → per-trinket abilities + equipment rows | (b) | `grant_custom_ability` + `grant_equipment` |
 | Investigator | Rushed Incantation limitedUses | (b) | |
 | Investigator | Exploit Weakness stub + note | (b) | |
 | Investigator | Enigma Arcane → innate arcanum preset | (b) | Reuses SRD factory |

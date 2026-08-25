@@ -5,6 +5,7 @@ import {
 import { createModifierInstanceId, syncModifierRefs } from "@/lib/compendium/linked-modifiers"
 import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { charInstance, modId, usesInstance } from "@/lib/compendium/modifier-instance-builders"
+import { srdSpellCastingTime } from "@/lib/compendium/srd-spell-casting-time"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { Feature, RestRechargeRule, RechargeRule, UsesConfig } from "@/lib/types"
 
@@ -100,11 +101,160 @@ function grantSubclassTrinkets(abilityNames: string[]) {
   ])
 }
 
+/** The trinkets are objects you carry, so unlocking them also puts them in the bag. */
+function grantSubclassTrinketItems(equipmentNames: string[]) {
+  if (!equipmentNames.length) return null
+  return charInstance(createModifierInstanceId(), characteristicCatalogRefId("grant_equipment"), [
+    {
+      id: modId("investigator_subclass_trinket_items"),
+      type: "grant_equipment",
+      equipmentNames,
+      label: "Gain subclass Trinket items",
+    },
+  ])
+}
+
 function trinketPoolSpendUses(): UsesConfig {
   return {
     type: "class_resource",
     classResourceKey: TRINKETS_KEY,
     classResourceAmount: 1,
+  }
+}
+
+export type ParsedTrinket = { name: string; description: string }
+
+function stripTags(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function paragraphs(html: string): string[] {
+  return html
+    .split(/<\/p>/i)
+    .map((chunk) => chunk.replace(/<p[^>]*>/gi, "").trim())
+    .filter(Boolean)
+}
+
+/**
+ * Pull the individual trinkets out of a "Trinkets" feature description, which lists each one as
+ * a bolded name followed by its rules text. Only prose already present in the import is used —
+ * no item text is invented.
+ */
+export function parseTrinketEntries(html: string | null | undefined): ParsedTrinket[] {
+  if (!html) return []
+  const entries: ParsedTrinket[] = []
+  const seen = new Set<string>()
+  for (const paragraph of paragraphs(html)) {
+    const match = /^<(strong|b)>\s*([^<]+?)\s*<\/\1>\s*([\s\S]+)$/i.exec(paragraph)
+    if (!match) continue
+    const name = match[2].replace(/[.:]\s*$/, "").trim()
+    const description = stripTags(match[3])
+    if (!name || !description) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    entries.push({ name, description })
+  }
+  return entries
+}
+
+const GRANTED_SPELL_RE =
+  /\bcast\s+([A-Z][A-Za-z'’]*(?:\s+(?:of|and|the|from)\s+[A-Za-z'’]+|\s+[A-Z][A-Za-z'’]*)*)/
+
+/**
+ * What a trinket button costs. A stated Bonus Action wins; otherwise a trinket that simply lets
+ * you cast a spell for free costs whatever that spell costs.
+ */
+export function trinketCastingTime(description: string): string | null {
+  if (/\bbonus action\b/i.test(description)) return "1 bonus action"
+  if (/\breaction\b/i.test(description)) return "1 reaction"
+  const granted = GRANTED_SPELL_RE.exec(description)
+  const castingTime = srdSpellCastingTime(granted?.[1]?.trim())
+  if (castingTime) return castingTime
+  if (/\bas an action\b/i.test(description)) return "1 action"
+  return null
+}
+
+function slugPart(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+}
+
+type TrinketSource = { subclassName: string; level: number; trinket: ParsedTrinket }
+
+/** Collect every subclass trinket an Investigator import describes. */
+function collectSubclassTrinkets(content: ImportContent): TrinketSource[] {
+  const found: TrinketSource[] = []
+  for (const subclass of content.subclasses ?? []) {
+    if (!/investigator/i.test(subclass.class_name ?? "")) continue
+    const subclassName = (subclass.name ?? "").trim()
+    if (!subclassName) continue
+    for (const feature of subclass.features ?? []) {
+      if (!/^trinkets$/i.test(feature.name ?? "")) continue
+      for (const trinket of parseTrinketEntries(feature.description)) {
+        found.push({ subclassName, level: feature.level ?? 3, trinket })
+      }
+    }
+  }
+  return found
+}
+
+type ProposedAbility = NonNullable<
+  NonNullable<ImportContent["import_proposals"]>["custom_abilities"]
+>[number]
+
+/**
+ * One ability row per trinket so each gets its own sheet button. The umbrella Trinkets feature
+ * keeps the full write-up on the Features tab.
+ */
+function trinketAbilityProposal({ subclassName, level, trinket }: TrinketSource): ProposedAbility {
+  return {
+    proposal_id: `investigator_trinket_${slugPart(subclassName)}_${slugPart(trinket.name)}`,
+    name: trinket.name,
+    description: trinket.description,
+    definition: `${subclassName} Trinket. ${trinket.description}`,
+    source_type: "subclass",
+    source_name: subclassName,
+    level_requirement: level,
+    ability_role: "upgrade",
+    casting_time: trinketCastingTime(trinket.description),
+  } as ProposedAbility
+}
+
+type EquipmentRow = NonNullable<ImportContent["equipment"]>[number]
+
+/** Trinkets are physical objects, so they also belong in the inventory as magic items. */
+function trinketEquipmentRow({ subclassName, trinket }: TrinketSource): EquipmentRow {
+  return {
+    name: trinket.name,
+    source: `Investigator (${subclassName})`,
+    category: "Adventuring Gear",
+    subcategory: null,
+    description: trinket.description,
+    requires_attunement: false,
+    magic_item_category: "Wondrous Item",
+    rarity: "Uncommon",
+    cost: null,
+    weight: null,
+    properties: null,
+    magic_effects: [
+      usesInstance(createModifierInstanceId(), trinketPoolSpendUses(), trinket.name),
+    ] as unknown as EquipmentRow["magic_effects"],
+  } as EquipmentRow
+}
+
+/** Umbrella Trinkets features describe the options; the per-trinket rows own the buttons. */
+function featuresTabOnly<T extends object>(feature: T): T {
+  return {
+    ...feature,
+    sheetDisplay: { abilitiesActions: false, combatActions: false, featuresTab: true },
   }
 }
 
@@ -139,6 +289,39 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
     }
   }
 
+  // Subclass trinkets usually arrive as bolded entries inside one "Trinkets" feature. Split them
+  // into their own ability rows so each trinket gets a single sheet button, and into equipment
+  // rows so they also appear in the inventory as magic items.
+  const trinketSources = collectSubclassTrinkets(next)
+  const authoredProposals = next.import_proposals?.custom_abilities ?? []
+  const authoredNames = new Set(
+    authoredProposals.map((ability) => (ability.name ?? "").trim().toLowerCase()).filter(Boolean),
+  )
+  const derivedProposals = trinketSources
+    .filter((source) => !authoredNames.has(source.trinket.name.toLowerCase()))
+    .map(trinketAbilityProposal)
+
+  if (derivedProposals.length) {
+    next = {
+      ...next,
+      import_proposals: {
+        ...next.import_proposals,
+        custom_abilities: [...authoredProposals, ...derivedProposals],
+      },
+    }
+  }
+
+  if (trinketSources.length) {
+    const existingEquipment = next.equipment ?? []
+    const existingNames = new Set(
+      existingEquipment.map((row) => (row.name ?? "").trim().toLowerCase()).filter(Boolean),
+    )
+    const newRows = trinketSources
+      .filter((source) => !existingNames.has(source.trinket.name.toLowerCase()))
+      .map(trinketEquipmentRow)
+    if (newRows.length) next = { ...next, equipment: [...existingEquipment, ...newRows] }
+  }
+
   const proposals = next.import_proposals?.custom_abilities ?? []
   const trinketProposals = proposals.filter(
     (ability) =>
@@ -161,6 +344,7 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
             if (/^ritualist$/i.test(feature.name ?? "")) {
               return ensureInvestigatorRitualistFeature(feature)
             }
+            if (/^holy trinkets$/i.test(feature.name ?? "")) return featuresTabOnly(feature)
             if (!/^trinkets$/i.test(feature.name ?? "")) return feature
             // Pool tracker lives on class_resources.trinkets; options are auto-granted by subclass.
             const { isChoice: _dropChoice, choices: _dropChoices, ...rest } = feature
@@ -169,13 +353,13 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
             const description = feature.description ?? ""
             const marker = `\n\n${note}`
             const escapedMarker = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-            return {
+            return featuresTabOnly({
               ...rest,
               description: description
                 .replace(new RegExp(`(?:${escapedMarker}){2,}`, "g"), marker)
                 .concat(description.includes(note) ? "" : marker)
                 .trim(),
-            }
+            })
           }),
         }
       }),
@@ -196,23 +380,24 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
           ...subclass,
           features: (subclass.features ?? []).map((feature) => {
             if (!/^trinkets$/i.test(feature.name ?? "")) return feature
-            const grant = grantSubclassTrinkets(names)
-            if (!grant) return feature
             const existing =
               ((feature as { linkedModifiers?: Feature["linkedModifiers"] }).linkedModifiers ?? [])
-            const alreadyGranted = existing.some((mod) =>
-              mod.characteristics?.some((char) => char.type === "grant_custom_ability"),
-            )
-            if (alreadyGranted) return feature
+            const hasCharacteristic = (type: string) =>
+              existing.some((mod) => mod.characteristics?.some((char) => char.type === type))
+            const additions = [
+              hasCharacteristic("grant_custom_ability") ? null : grantSubclassTrinkets(names),
+              hasCharacteristic("grant_equipment") ? null : grantSubclassTrinketItems(names),
+            ].filter((instance): instance is NonNullable<typeof instance> => Boolean(instance))
+            if (!additions.length) return featuresTabOnly(feature)
             const synced = syncModifierRefs({
               name: feature.name,
               description: feature.description ?? "",
-              linkedModifiers: [...existing, grant],
+              linkedModifiers: [...existing, ...additions],
             } as Feature)
-            return {
+            return featuresTabOnly({
               ...feature,
               linkedModifiers: synced.linkedModifiers,
-            } as typeof feature
+            }) as typeof feature
           }),
         }
       }),
@@ -230,9 +415,19 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
             (ability.source_type === "subclass" || /trinket/i.test(ability.definition ?? ""))
           if (!isTrinket) return ability
           const record = ability as Record<string, unknown>
+          // Without a stated cost the sheet has to guess from prose, which files spell-granting
+          // trinkets under Actions even when the spell they grant is a Bonus Action.
+          const withCost = ability.casting_time
+            ? ability
+            : {
+                ...ability,
+                casting_time: trinketCastingTime(
+                  `${ability.description ?? ""} ${ability.definition ?? ""}`,
+                ),
+              }
           const existingUses = record.uses as UsesConfig | undefined
           if (existingUses?.type === "class_resource" && existingUses.classResourceKey === TRINKETS_KEY) {
-            return ability
+            return withCost
           }
           const uses = trinketPoolSpendUses()
           const existingMods =
@@ -254,7 +449,7 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
                 usesInstance(createModifierInstanceId(), uses, ability.name ?? "Trinket"),
               ]
           return syncModifierRefs({
-            ...ability,
+            ...withCost,
             uses,
             linkedModifiers,
           }) as typeof ability

@@ -262,6 +262,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     hint: "Know / unlock a named custom ability (e.g. Telekinetic Weapons power)",
   },
   {
+    value: "grant_equipment",
+    label: "Grant Equipment",
+    hint: "Add named equipment / magic items to the inventory when this unlocks (e.g. Investigator Trinkets)",
+  },
+  {
     value: "modify_custom_ability",
     label: "Modify Custom Ability",
     hint: "Upgrade a named custom ability you already know (e.g. Phase Dancer improving Phase Rift)",
@@ -1313,6 +1318,17 @@ export interface GrantCustomAbilityCharacteristic extends CharacteristicModifier
 }
 
 /**
+ * Put named equipment / magic items in the character's bag when the feature unlocks
+ * (Investigator subclass Trinkets). Granted once each: removing an item does not re-add it.
+ */
+export interface GrantEquipmentCharacteristic extends CharacteristicModifierBase {
+  type: "grant_equipment"
+  equipmentNames: string[]
+  /** Copies of each named item to grant. Defaults to 1. */
+  quantityPerItem?: number | null
+}
+
+/**
  * Upgrade a named custom ability you already know, rather than granting a new one
  * (Psion cross-power upgrades such as Phase Dancer improving Phase Rift).
  */
@@ -1408,6 +1424,7 @@ export type CharacteristicModifier =
   | AbilityScoreOverrideCharacteristic
   | HealingReceivedModifierCharacteristic
   | GrantCustomAbilityCharacteristic
+  | GrantEquipmentCharacteristic
   | ModifyCustomAbilityCharacteristic
   | FeatureChoiceCountBonusCharacteristic
   | FeatureChoiceOptionGrantCharacteristic
@@ -1605,6 +1622,8 @@ export function createCharacteristicModifier(
       return { id, type, multiplier: 0.5, magicalOnly: true, includePotions: true }
     case "grant_custom_ability":
       return { id, type, abilityNames: [] }
+    case "grant_equipment":
+      return { id, type, equipmentNames: [] }
     case "modify_custom_ability":
       return { id, type, abilityNames: [], addendum: null, appendOptions: [] }
     case "feature_choice_count_bonus":
@@ -2270,9 +2289,16 @@ export type AggregatedCharacteristics = {
   abilityScoreOverrides: AbilityScoreOverrideCharacteristic[]
   healingReceivedModifiers: HealingReceivedModifierCharacteristic[]
   grantedCustomAbilityNames: string[]
+  /** Items unlocked features put in the bag, by name, deduped across features. */
+  grantedEquipment: GrantedEquipmentEntry[]
   customAbilityModifications: ModifyCustomAbilityCharacteristic[]
   featureChoiceCountBonuses: FeatureChoiceCountBonusCharacteristic[]
   featureChoiceOptionGrants: FeatureChoiceOptionGrantCharacteristic[]
+}
+
+export type GrantedEquipmentEntry = {
+  name: string
+  quantity: number
 }
 
 const UNARMED_DIE_RANK: Record<UnarmedStrikeDie, number> = {
@@ -2369,6 +2395,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   abilityScoreOverrides: [],
   healingReceivedModifiers: [],
   grantedCustomAbilityNames: [],
+  grantedEquipment: [],
   customAbilityModifications: [],
   featureChoiceCountBonuses: [],
   featureChoiceOptionGrants: [],
@@ -2377,6 +2404,24 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
 function pushUnique(list: string[], values: string[] | null | undefined) {
   for (const value of values ?? []) {
     if (value && !list.includes(value)) list.push(value)
+  }
+}
+
+/** Two features naming the same item grant it once, at the larger requested count. */
+function pushGrantedEquipment(
+  list: GrantedEquipmentEntry[],
+  mod: GrantEquipmentCharacteristic,
+) {
+  const quantity = Math.max(1, Math.floor(mod.quantityPerItem ?? 1))
+  for (const raw of mod.equipmentNames ?? []) {
+    const name = raw.trim()
+    if (!name) continue
+    const existing = list.find((entry) => entry.name.toLowerCase() === name.toLowerCase())
+    if (existing) {
+      existing.quantity = Math.max(existing.quantity, quantity)
+      continue
+    }
+    list.push({ name, quantity })
   }
 }
 
@@ -2885,6 +2930,9 @@ export function aggregateCharacteristics(
         break
       case "grant_custom_ability":
         pushUnique(result.grantedCustomAbilityNames, mod.abilityNames)
+        break
+      case "grant_equipment":
+        pushGrantedEquipment(result.grantedEquipment, mod)
         break
       case "modify_custom_ability":
         result.customAbilityModifications.push(mod)

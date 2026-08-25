@@ -2930,6 +2930,50 @@ function ModifierFields({
         </div>
       )
 
+    case "grant_equipment":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Equipment / magic item names
+            </label>
+            <textarea
+              value={(mod.equipmentNames ?? []).join("\n")}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  equipmentNames: e.target.value
+                    .split(/[\n,]/)
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                })
+              }
+              rows={3}
+              placeholder={"Fogstone Periapt\nGlass Medallion"}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Added to the inventory once when this feature unlocks. Names must match compendium
+              equipment.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Copies of each item
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={mod.quantityPerItem ?? 1}
+              onChange={(e) =>
+                onChange({ ...mod, quantityPerItem: Number(e.target.value) || 1 })
+              }
+              className="w-24 px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+        </div>
+      )
+
     case "modify_custom_ability":
       return (
         <div className="space-y-3">

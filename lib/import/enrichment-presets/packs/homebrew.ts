@@ -86,6 +86,14 @@ export const INVESTIGATOR_PRESETS: EnrichmentPreset[] = [
           classResourceAmount: 1,
         },
       },
+      // Always a Bonus Action. The "action or Bonus Action" wording limits which grimoire
+      // spells qualify, so it must not also file this under Actions.
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Sheet: Rushed Incantation always costs a Bonus Action. The action-or-Bonus-Action wording is the eligibility filter for which grimoire spells you may rush, not the cost of rushing them.",
+      },
     ],
   },
   {

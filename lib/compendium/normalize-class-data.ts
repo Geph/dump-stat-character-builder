@@ -8,6 +8,7 @@ import { applyWeaponMasteryProficiencies } from "@/lib/compendium/weapon-mastery
 import { wireClassToolProficiencyChoices } from "@/lib/compendium/class-tool-proficiencies"
 import { sanitizeAlchemistFeatures } from "@/lib/compendium/alchemist-feature-wiring"
 import { sanitizeCaptainFeatures } from "@/lib/compendium/captain-feature-wiring"
+import { ensureInvestigatorRitualistFeature } from "@/lib/import/enrichment-presets/packs/investigator"
 import bundledClasses from "@/lib/srd/seed-data/classes.json"
 import { isSrdSource } from "@/lib/srd/source"
 
@@ -186,6 +187,15 @@ export function enrichClassesList<
     if (/captain/i.test(enriched.name)) {
       const features = sanitizeCaptainFeatures((enriched as { features?: Feature[] }).features)
       if (features) enriched = { ...enriched, features }
+    }
+    if (/investigator/i.test(enriched.name)) {
+      const features = (enriched as { features?: Feature[] }).features
+      if (Array.isArray(features)) {
+        enriched = {
+          ...enriched,
+          features: features.map((feature) => ensureInvestigatorRitualistFeature(feature)),
+        }
+      }
     }
     {
       const features = (enriched as { features?: Feature[] }).features

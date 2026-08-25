@@ -379,6 +379,48 @@ export function countReplacedPicks(original: string[], next: string[]): number |
   return replaced <= 1 ? replaced : null
 }
 
+/**
+ * Map spells chosen on a level-up `spells` step onto newly unlocked `spells_known`
+ * modifier slots (e.g. Investigator grimoire +2), so builder re-edits stay in sync.
+ */
+export function assignLevelUpSpellsToNewModifierSlots(params: {
+  fromLevel: number
+  toLevel: number
+  classId: string
+  cls: CharacterClassDetail["class"]
+  subclasses: Subclass[]
+  subclassId: string | null | undefined
+  featureChoicePicks: Record<string, string[]>
+  modifierCatalog: ModifierCatalogEntry[]
+  spellIds: string[]
+}): Record<string, string[]> {
+  const cls = params.cls
+  if (!cls || params.spellIds.length === 0) return {}
+
+  const collect = (level: number) =>
+    collectClassFeatureModifierPlayerChoiceSlots({
+      classLevels: [{ classId: params.classId, level }],
+      classes: [cls],
+      subclasses: params.subclasses,
+      subclassByClassId: params.subclassId ? { [params.classId]: params.subclassId } : {},
+      featureChoicePicks: params.featureChoicePicks,
+      catalog: params.modifierCatalog,
+    }).filter((slot) => slot.kind === "spell")
+
+  const beforeKeys = new Set(collect(params.fromLevel).map((slot) => slot.slotKey))
+  const newSlots = collect(params.toLevel).filter((slot) => !beforeKeys.has(slot.slotKey))
+  if (!newSlots.length) return {}
+
+  const assigned: Record<string, string[]> = {}
+  let offset = 0
+  for (const slot of newSlots) {
+    const chunk = params.spellIds.slice(offset, offset + slot.maxCount)
+    offset += slot.maxCount
+    if (chunk.length) assigned[slot.slotKey] = chunk
+  }
+  return assigned
+}
+
 export function spellsEligibleForLevelUp(
   spells: Spell[],
   className: string,

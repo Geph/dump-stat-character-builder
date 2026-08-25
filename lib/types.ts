@@ -1038,6 +1038,11 @@ export interface Character {
   equipment_ids: string[]
   /** Counts for stacked mundane gear (daggers, handaxes). Missing keys default to 1. */
   equipment_quantities?: Record<string, number> | null
+  /**
+   * Item names already handed over by `grant_equipment` features. Kept so a level-up grants each
+   * item once and an item the player drops is not immediately re-added.
+   */
+  granted_equipment_names?: string[] | null
   gold?: number | null
   equipped_armor_id?: string | null
   equipped_shield_id?: string | null

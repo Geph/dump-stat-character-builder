@@ -84,6 +84,11 @@ type MultiSelectChoicesProps = {
    * (opens an overlay instead of clamping text onto the card).
    */
   showOptionInfo?: boolean
+  /**
+   * When set, info buttons call this instead of the built-in text overlay
+   * (e.g. open the compendium spell detail page).
+   */
+  onOptionInfo?: (option: ChoiceOption) => void
   /** Compact builder layout: denser grid, no skill info buttons. */
   layout?: "default" | "compact" | "visual"
   /** Custom skill name → game-icons slug (from compendium custom abilities). */
@@ -155,6 +160,7 @@ export function MultiSelectChoices({
   lockedLabel = "Granted",
   showSkillInfo = false,
   showOptionInfo = false,
+  onOptionInfo,
   layout = "default",
   allowCustom = false,
   customPlaceholder = "Add a custom entry...",
@@ -383,7 +389,13 @@ export function MultiSelectChoices({
           <button
             type="button"
             aria-label={`About ${option.name}`}
-            onClick={() => setInfoOption(option)}
+            onClick={() => {
+              if (onOptionInfo) {
+                onOptionInfo(option)
+                return
+              }
+              setInfoOption(option)
+            }}
             className={`shrink-0 self-center rounded-lg border border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors ${
               compact ? "p-1.5" : visual ? "p-2.5" : "p-2"
             }`}

@@ -92,6 +92,7 @@ import { SKILL_DESCRIPTIONS, getSkillDescription } from "@/lib/compendium/skill-
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 import { SheetRollProvider } from "@/components/character-sheet/sheet-roll-context"
 import { MagicItemPowersPanel } from "@/components/character-sheet/magic-item-powers-panel"
+import { planEquipmentGrants } from "@/lib/character/granted-equipment"
 import { SpellSlotTracker, consumeSpellSlot } from "@/components/character-sheet/spell-slot-tracker"
 import {
   getMulticlassSpellSlotTables,
@@ -1352,6 +1353,51 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     },
     [character, characterGold, equipmentBaseSelections],
   )
+
+  // Features that hand out gear (Investigator Trinkets) drop it in the bag the moment they
+  // unlock. Each grant is recorded so a level-up only ever adds it once and dropping it sticks.
+  const grantedEquipmentWriting = useRef(false)
+  useEffect(() => {
+    if (!character || !derived?.grantedEquipment.length || !equipmentCatalog.length) return
+    if (grantedEquipmentWriting.current) return
+    const plan = planEquipmentGrants({
+      grants: derived.grantedEquipment,
+      catalog: equipmentCatalog,
+      equipmentIds: character.equipment_ids ?? [],
+      quantities: character.equipment_quantities,
+      alreadyGrantedNames: character.granted_equipment_names,
+    })
+    if (!plan) return
+
+    grantedEquipmentWriting.current = true
+    const characterId = character.id
+    void (async () => {
+      try {
+        const db = createClient()
+        const { data, error } = await db
+          .from("characters")
+          .update({
+            equipment_ids: plan.equipmentIds,
+            equipment_quantities: plan.quantities,
+            granted_equipment_names: plan.grantedNames,
+          })
+          .eq("id", characterId)
+          .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
+          .single()
+        const row = parseCharacterQueryRow(data)
+        if (error || !row) return
+        setCharacter(row)
+        setEquipment((prev) => {
+          const missing = plan.addedItems.filter(
+            (item) => !prev.some((existing) => existing.id === item.id),
+          )
+          return missing.length ? [...prev, ...missing] : prev
+        })
+      } finally {
+        grantedEquipmentWriting.current = false
+      }
+    })()
+  }, [character, derived?.grantedEquipment, equipmentCatalog])
 
   const persistLinkedEquipmentChoice = useCallback(
     async (key: string, value: string) => {
@@ -5340,6 +5386,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                 onExtraMasteryChange={persistExtraWeaponMasteries}
                                 onAttackRoll={() => markActionEconomy("action")}
                                 onDamageRoll={markRampageDamageDealtThisTurn}
+                              />
+                              <SheetActionsPanel
+                                {...combatActionPanelProps}
+                                sections="weapon-attacks"
                               />
                               <SheetActionsPanel
                                 {...combatActionPanelProps}

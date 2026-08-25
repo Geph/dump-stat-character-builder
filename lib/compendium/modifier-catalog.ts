@@ -158,6 +158,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   ability_score_override: "Ability scores & checks",
   healing_received_modifier: "Damage mitigation",
   grant_custom_ability: "Feats & choices",
+  grant_equipment: "Equipment & items",
   modify_custom_ability: "Feats & choices",
   feature_choice_count_bonus: "Feats & choices",
   feature_choice_option_grant: "Feats & choices",
