@@ -3,6 +3,7 @@
 import type { Dispatch, SetStateAction } from "react"
 import { CatalogFeatMultiPicker } from "@/components/builder/catalog-feat-multi-picker"
 import { ClassAbilityFeatureChoices } from "@/components/builder/class-ability-feature-choices"
+import { FeatModifierChoicePicker } from "@/components/builder/feat-modifier-choice-picker"
 import { FeatPickGallery } from "@/components/builder/feat-pick-gallery"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { ModifierPlayerChoicePanel } from "@/components/builder/modifier-player-choice-panel"
@@ -29,6 +30,7 @@ import type {
   FeatureChoiceOptionGrantCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import type { CustomAbility, Equipment, Feat, Spell } from "@/lib/types"
+import type { ResolveFeatureChoiceOptionsParams } from "@/lib/builder/aggregate-psionic-talents"
 import {
   abilitySpecializationChoice,
   abilitySpecializationChoiceKey,
@@ -57,6 +59,7 @@ type ClassAbilitiesStepProps = {
   modifierPlayerChoiceSlots: ModifierPlayerChoiceSlot[]
   modifierPlayerPicks: Record<string, string[]>
   spells: Spell[]
+  featChoiceOptionContext: ResolveFeatureChoiceOptionsParams
   modifierExpertisePickerProps: {
     choiceLayout?: "default" | "compact"
     skillPickerLayout?: "default" | "compact" | "visual"
@@ -109,6 +112,7 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
     modifierPlayerChoiceSlots,
     modifierPlayerPicks,
     spells,
+    featChoiceOptionContext,
     modifierExpertisePickerProps,
     classCatalogFeatGroups,
     classAbilityRegularFeatSlots,
@@ -387,6 +391,56 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
                   <p className="text-xs text-muted-foreground mt-2">
                     Selected: <span className="font-semibold text-foreground">{picked.name}</span>
                   </p>
+                ) : null}
+                {picked?.isChoice &&
+                (picked.choices?.options?.length || picked.choices?.optionsSource) ? (
+                  <div className="mt-3">
+                    <FeatModifierChoicePicker
+                      entry={{
+                        featId: picked.id,
+                        choicePickKey: featChoicePickKey(slot.key),
+                      }}
+                      feat={picked}
+                      choiceOptionContext={featChoiceOptionContext}
+                      selected={featChoicePicks?.[featChoicePickKey(slot.key)] ?? []}
+                      onChange={(selected) => {
+                        const choiceKey = featChoicePickKey(slot.key)
+                        setFeatChoicePicks((prev) => ({
+                          ...prev,
+                          [choiceKey]: selected,
+                        }))
+                        setModifierPlayerPicks((prev) =>
+                          clearModifierPicksForSource(prev, choiceKey),
+                        )
+                      }}
+                      layout={compactPickerLayout}
+                    />
+                  </div>
+                ) : null}
+                {picked ? (
+                  <ModifierPlayerChoicePanel
+                    sourceKey={featChoicePickKey(slot.key)}
+                    sourceLabel={picked.name}
+                    slots={modifierPlayerChoiceSlots}
+                    picks={modifierPlayerPicks}
+                    spells={spells}
+                    unavailableOptions={skillPickSourcesTaken}
+                    {...modifierExpertisePickerProps}
+                    onChange={(slotKey, selected) => {
+                      const slotEntry = modifierPlayerChoiceSlots.find(
+                        (entry) => entry.slotKey === slotKey,
+                      )
+                      if (!slotEntry) return
+                      setModifierPlayerPicks((prev) =>
+                        setModifierPlayerPickValue(
+                          prev,
+                          slotEntry,
+                          modifierPlayerChoiceSlots,
+                          selected,
+                        ),
+                      )
+                    }}
+                  />
                 ) : null}
               </div>
             )

@@ -2,6 +2,8 @@
 export const WEAPON_PROPERTY_DESCRIPTIONS: Record<string, string> = {
   Ammunition:
     "You can use a weapon that has the Ammunition property to make a ranged attack only if you have ammunition to fire. Each time you attack with the weapon, you expend one piece of ammunition.",
+  Destructible:
+    "After you make an attack with this weapon, it is destroyed.",
   Finesse:
     "When making an attack with a Finesse weapon, use your choice of Strength or Dexterity for the attack and damage rolls. You must use the same modifier for both rolls.",
   Heavy:
@@ -22,6 +24,14 @@ export const WEAPON_PROPERTY_DESCRIPTIONS: Record<string, string> = {
     "This weapon requires two hands when you attack with it.",
   Versatile:
     "This weapon can be used with one or two hands. A damage value in parentheses appears with the property — the weapon's damage when used with two hands to make a melee attack.",
+  Firearm:
+    "You don't add your ability modifier to the weapon's damage, unless otherwise stated. Firearm ammunition is destroyed upon use.",
+  Recoil:
+    "After you make an attack with this weapon, you can't make ranged attacks beyond the weapon's normal range until the end of the current turn.",
+  Reload:
+    "A limited number of shots can be made with a weapon that has the Reload property (the number is shown in parentheses). You must then reload it using an action or a Bonus Action (your choice).",
+  Mounted:
+    "You can take a Bonus Action to mount this weapon in a fixed position until the end of your turn. A damage value in parentheses appears with this property. While mounted, the weapon deals that damage when used to make a ranged attack, and the weapon can't be moved.",
 }
 
 export const WEAPON_RANGE_DESCRIPTIONS: Record<string, string> = {
@@ -31,15 +41,31 @@ export const WEAPON_RANGE_DESCRIPTIONS: Record<string, string> = {
     "This weapon makes ranged attacks. See the weapon's range in its properties or range field.",
 }
 
+function lookupWeaponPropertyDescription(name: string): string | null {
+  const exact = WEAPON_PROPERTY_DESCRIPTIONS[name]
+  if (exact) return exact
+  const match = Object.entries(WEAPON_PROPERTY_DESCRIPTIONS).find(
+    ([key]) => key.toLowerCase() === name.toLowerCase(),
+  )
+  return match?.[1] ?? null
+}
+
 export function describeWeaponProperty(name: string): string | null {
   const trimmed = name.trim()
   if (!trimmed) return null
-  const exact = WEAPON_PROPERTY_DESCRIPTIONS[trimmed]
+  const exact = lookupWeaponPropertyDescription(trimmed)
   if (exact) return exact
-  const match = Object.entries(WEAPON_PROPERTY_DESCRIPTIONS).find(
-    ([key]) => key.toLowerCase() === trimmed.toLowerCase(),
+  const bare = trimmed.replace(/\s*\([^)]*\)\s*$/g, "").trim()
+  if (bare && bare !== trimmed) {
+    const stripped = lookupWeaponPropertyDescription(bare)
+    if (stripped) return stripped
+  }
+  const prefix = Object.entries(WEAPON_PROPERTY_DESCRIPTIONS).find(
+    ([key]) =>
+      trimmed.toLowerCase().startsWith(`${key.toLowerCase()} `) ||
+      trimmed.toLowerCase().startsWith(`${key.toLowerCase()}(`),
   )
-  return match?.[1] ?? null
+  return prefix?.[1] ?? null
 }
 
 export function describeWeaponRange(rangeText: string): string | null {

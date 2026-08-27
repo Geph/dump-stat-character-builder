@@ -12,6 +12,7 @@ import warden from "./magehandpress-warden-class.json"
 import warmage from "./magehandpress-warmage-class.json"
 import witch from "./magehandpress-witch-class.json"
 import masteries from "./magehandpress-masteries-custom.json"
+import weapons from "./magehandpress-weapons.json"
 import spells from "./magehandpress-spells.json"
 import manifest from "./manifest.json"
 
@@ -22,6 +23,7 @@ export function loadMageHandPressPack() {
     files: [
       // Shared catalogs first so class imports can resolve mastery / spell refs.
       masteries,
+      weapons,
       spells,
       alchemist,
       captain,

@@ -59,7 +59,10 @@ export function rollManualDice(config: ManualRollConfig): ManualRollResult {
   const modifier = clampManualModifier(config.modifier)
   const mode = config.mode
   const expression = formatManualRollExpression({ ...config, count, modifier })
-  const rolled = rollDamageWithMode({ dice: [{ count, sides: config.sides }], modifier }, mode)
+  const rolled = rollDamageWithMode(
+    { dice: [{ count, sides: config.sides }], modifier, flat: 0 },
+    mode,
+  )
   return {
     rolls: rolled.rolls,
     modifier: rolled.modifier,

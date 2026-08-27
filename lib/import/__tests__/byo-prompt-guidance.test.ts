@@ -250,6 +250,17 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(buildImportSystemPrompt("backgrounds")).toContain('never invent keys like "desktop"')
   })
 
+  it("requires class-specific weapons as full equipment[] rows in the same JSON", () => {
+    expect(CUSTOM_CLASS_IMPORT_HINT).toContain("Class-specific / non-SRD weapons")
+    expect(CUSTOM_CLASS_IMPORT_HINT).toContain("equipment[]")
+    expect(CUSTOM_CLASS_IMPORT_HINT).toContain("Revolver")
+    expect(CUSTOM_CLASS_IMPORT_HINT).toContain("flags named starting gear")
+    const prompt = buildByoExtractionPrompt("classes")
+    expect(prompt).toContain("non-SRD weapon")
+    expect(prompt).toContain("equipment[]")
+    expect(prompt).toContain("unmatched and flagged")
+  })
+
   it("requires nested starting_equipment_groups options shape for backgrounds", () => {
     const prompt = buildByoExtractionPrompt("backgrounds")
     expect(prompt).toContain("one group with description + options")

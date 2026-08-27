@@ -877,7 +877,12 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Unarmed Fighting": {
     linkedModifiers: [
-      unarmedDie("unarmed_fighting", "1d6", "Unarmed Strike: 1d6 (+1d8 if no weapons/shield); 1d4 to grappled creature at turn start"),
+      unarmedDie(
+        "unarmed_fighting",
+        "1d6",
+        "Unarmed Strike: 1d6 (+1d8 if no weapons/shield); 1d4 to grappled creature at turn start",
+        { emptyHandedDie: "1d8" },
+      ),
       turnStartFx(
         "unarmed_fighting_grapple",
         { id: "mod_unarmed_fighting_grapple", kind: "rider_damage", bonusDice: "1d4" },

@@ -37,6 +37,7 @@ import {
   LayoutGrid,
   Coins,
   Backpack,
+  ShoppingBag,
   UserCircle,
   Shield,
   Dices,
@@ -1907,6 +1908,22 @@ export default function BuilderPageClient() {
     [grantedEquipmentKey, equipment],
   )
 
+  /** Gear picked beyond starting packages: gold buys, modifier choices, and feature grants. */
+  const additionalEquipment = useMemo(
+    () =>
+      mergeEquipmentHoldings(
+        { ids: modifierGrantedEquipmentIds },
+        featureGrantedEquipment,
+        inGoldShoppingMode ? holdingsFromRepeatedIds(goldPurchasedEquipmentIds) : { ids: [] },
+      ),
+    [
+      modifierGrantedEquipmentIds,
+      featureGrantedEquipment,
+      inGoldShoppingMode,
+      goldPurchasedEquipmentIds,
+    ],
+  )
+
   useEffect(() => {
     if (!draftReady) return
     const preserveLoadedEquipment =
@@ -3625,7 +3642,8 @@ export default function BuilderPageClient() {
     })
   }, [character.name, activeClassLevels.length, multiclassAbilityIssues])
 
-  const hasSpellStep = spellcastingClasses.length > 0
+  const hasSpellStep =
+    spellcastingClasses.length > 0 || spellGrantModifierSlots.length > 0
   const hasClassAbilityStep = characterHasClassAbilityStep({
     classLevels: activeClassLevels,
     classes,
@@ -4875,7 +4893,6 @@ export default function BuilderPageClient() {
                               slots={modifierPlayerChoiceSlots}
                               picks={modifierPlayerPicks}
                               spells={spells}
-                              excludeKinds={["spell"]}
                               unavailableOptions={[...getTakenSkills(skillPickSources)]}
                               {...modifierExpertisePickerProps}
                               onChange={(slotKey, selected) => {
@@ -4934,6 +4951,7 @@ export default function BuilderPageClient() {
                 modifierPlayerChoiceSlots={modifierPlayerChoiceSlots}
                 modifierPlayerPicks={modifierPlayerPicks}
                 spells={spells}
+                featChoiceOptionContext={featChoiceOptionContext}
                 modifierExpertisePickerProps={modifierExpertisePickerProps}
                 classCatalogFeatGroups={classCatalogFeatGroups}
                 classAbilityRegularFeatSlots={classAbilityRegularFeatSlots}
@@ -5400,7 +5418,6 @@ export default function BuilderPageClient() {
                                 slots={modifierPlayerChoiceSlots}
                                 picks={modifierPlayerPicks}
                                 spells={spells}
-                                excludeKinds={["spell"]}
                                 {...modifierExpertisePickerProps}
                                 onChange={(slotKey, selected) => {
                                   const slot = modifierPlayerChoiceSlots.find(
@@ -5898,7 +5915,6 @@ export default function BuilderPageClient() {
                                 slots={modifierPlayerChoiceSlots}
                                 picks={modifierPlayerPicks}
                                 spells={spells}
-                                excludeKinds={["spell"]}
                                 unavailableOptions={[...getTakenSkills(skillPickSources)]}
                                 {...modifierExpertisePickerProps}
                                 onChange={(slotKey, selected) => {
@@ -5956,7 +5972,6 @@ export default function BuilderPageClient() {
                       slots={modifierPlayerChoiceSlots}
                       picks={modifierPlayerPicks}
                       spells={spells}
-                      excludeKinds={["spell"]}
                       unavailableOptions={[...getTakenSkills(skillPickSources)]}
                       {...modifierExpertisePickerProps}
                       onChange={(slotKey, selected) => {
@@ -6498,7 +6513,9 @@ export default function BuilderPageClient() {
                     </div>
                   )}
 
-                  {(packageEquipment.ids.length > 0 || inGoldShoppingMode) && (
+                  {(packageEquipment.ids.length > 0 ||
+                    inGoldShoppingMode ||
+                    additionalEquipment.ids.length > 0) && (
                     <div className="space-y-4">
                       {packageEquipment.ids.length > 0 && (
                         <div className="p-3 rounded-lg bg-muted/50 border border-border">
@@ -6519,6 +6536,35 @@ export default function BuilderPageClient() {
                                 <span
                                   key={id}
                                   className="text-xs px-2 py-1 rounded-full bg-primary/10 text-foreground"
+                                >
+                                  {quantity > 1 ? `${quantity}× ` : ""}
+                                  {item.name}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {additionalEquipment.ids.length > 0 && (
+                        <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                          <p className="text-xs font-bold text-primary uppercase mb-2 flex items-center gap-1.5">
+                            <ShoppingBag className="w-3.5 h-3.5" />
+                            Additional gear selected
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {additionalEquipment.ids.map((id) => {
+                              const item = equipment.find((e) => e.id === id)
+                              if (!item) return null
+                              const quantity = ownedEquipmentQuantity(
+                                additionalEquipment.ids,
+                                additionalEquipment.quantities,
+                                id,
+                              )
+                              return (
+                                <span
+                                  key={id}
+                                  className="text-xs px-2 py-1 rounded-full bg-secondary/80 text-foreground"
                                 >
                                   {quantity > 1 ? `${quantity}× ` : ""}
                                   {item.name}
@@ -6582,7 +6628,7 @@ export default function BuilderPageClient() {
                               slots={modifierPlayerChoiceSlots}
                               picks={modifierPlayerPicks}
                               spells={spells}
-                              kinds={["spell", "spell_list_class"]}
+                              kinds={["spell", "spell_list_class", "spellcasting_ability"]}
                               {...modifierExpertisePickerProps}
                               onChange={(slotKey, selected) => {
                                 const target = modifierPlayerChoiceSlots.find(

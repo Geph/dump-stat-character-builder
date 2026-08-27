@@ -160,4 +160,23 @@ describe("filterFeatureTabCustomAbilities", () => {
     )
     expect(leftover.map((entry) => entry.id)).toEqual(["homebrew"])
   })
+
+  it("keeps maneuvers even when they also appear as combat actions", () => {
+    const leftover = filterFeatureTabCustomAbilities(
+      [
+        ability({
+          id: "dodge-roll",
+          name: "Dodge Roll",
+          ability_role: "knack",
+          description: "Expend one Risk Die as a Bonus Action.",
+        }),
+        ability({ id: "rally", name: "Rally", description: "Bonus action heal." }),
+      ],
+      {
+        sheetActionCustomAbilityIds: ["dodge-roll", "rally"],
+        sheetActionNames: ["Dodge Roll", "Rally"],
+      },
+    )
+    expect(leftover.map((entry) => entry.name)).toEqual(["Dodge Roll"])
+  })
 })

@@ -482,7 +482,7 @@ export function buildImportReport(params: {
     nextSteps.push({
       severity: "action",
       title: `Import or create equipment: ${missing.name}`,
-      detail: `Referenced by ${missing.sources.join(", ")} but not found in the equipment catalog.`,
+      detail: `Referenced by ${missing.sources.join(", ")} but not found in the SRD/tools catalog or this import's equipment[]. Add a full equipment[] row (damage, properties, cost, weight) in the same JSON, or import that item first.`,
     })
   }
 

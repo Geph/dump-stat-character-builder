@@ -1,15 +1,14 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { AlertTriangle, Dices, X } from "lucide-react"
+import { AlertTriangle, Dices, GripVertical, X } from "lucide-react"
 import { GameIcon } from "@/components/game-icon-picker"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
   PsionicAugmentPicker,
   resolveAbilityPsionicAugments,
 } from "@/components/character-sheet/psionic-augment-picker"
-import { d20CriticalSuffix } from "@/components/character-sheet/d20-roll-button"
 import { useSheetRollContext } from "@/components/character-sheet/sheet-roll-context"
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 import {
@@ -59,9 +58,17 @@ import {
   type PsionicAugmentSelection,
 } from "@/lib/compendium/parse-psionic-augments"
 import type { SpecialAttackCharacteristic } from "@/lib/compendium/characteristic-modifiers"
-import { rollD20WithMode } from "@/lib/dice/d20-roll"
+import { formatD20RollSummary, rollD20WithMode } from "@/lib/dice/d20-roll"
 import { formatDamageRollResult, rollDamageWithMode } from "@/lib/dice/damage-roll"
 import { resolveRollMode } from "@/lib/character/resolve-roll-mode"
+import {
+  DEFAULT_COMBAT_ACTION_GROUP_ORDER,
+  loadActionGroupOrder,
+  moveActionGroup,
+  orderActionGroups,
+  saveActionGroupOrder,
+  type ActionGroupId,
+} from "@/lib/character/action-group-layout"
 
 type SheetActionsPanelProps = {
   actions: SheetActionEntry[]
@@ -129,11 +136,20 @@ type SheetActionsPanelProps = {
   primedBombUsedThisTurn?: boolean
   onPrimedBombUsed?: () => void
   /**
-   * Which buckets to show. Combat layout puts extra-attack grants and triggered entries under
-   * weapons (`weapon-attacks`, `triggered`) and action/bonus/reaction in the actions column
-   * (`economy`, which therefore omits the extra-attack grants).
+   * Which buckets to show. Combat layout puts extra-attack grants and passive (no-economy)
+   * entries under weapons (`weapon-attacks`) and action/bonus/reaction in the actions column
+   * (`economy`). `triggered` is an alias for the Passive heading used by older callers.
    */
   sections?: "all" | "economy" | "triggered" | "weapon-attacks"
+  /**
+   * `stack` keeps groups in one column. `responsive-grid` uses 1 column until `xl`, then 2 —
+   * each group stays one cell wide at every breakpoint.
+   */
+  groupLayout?: "stack" | "responsive-grid"
+  /** Persists drag order per character. Distinct scopes (combat vs utility) do not share order. */
+  layoutScope?: string
+  /** Optional first group (equipped weapons) included in the same reorderable grid. */
+  prependGroup?: { id: ActionGroupId; node: ReactNode } | null
 }
 
 function actionPlayerNoteKey(action: SheetActionEntry, noteId: string): string {
@@ -495,15 +511,14 @@ function ActionRollStep({
       },
     })
     const rolled = rollD20WithMode(resolved.mode, attackMod + proficiencyBonus)
-    const modeSuffix =
-      rolled.mode === "advantage" ? " (adv)" : rolled.mode === "disadvantage" ? " (dis)" : ""
-    const summary = `${rolled.natural} + ${attackMod + proficiencyBonus} = ${rolled.total}${modeSuffix}${d20CriticalSuffix(rolled.natural)}`
+    const summary = formatD20RollSummary(rolled, attackMod + proficiencyBonus)
     setAttackSummary(summary)
     history?.logRoll({
       kind: "d20",
       label: `${action.name} attack`,
       summary,
       natural: rolled.natural,
+      naturals: rolled.naturals,
     })
   }
 
@@ -518,6 +533,7 @@ function ActionRollStep({
           ...(extraDice ? [{ count: extraDice.count, sides: extraDice.sides }] : []),
         ],
         modifier: damageModifier,
+        flat: 0,
       },
       "normal",
     )
@@ -2008,9 +2024,27 @@ export function SheetActionsPanel({
   primedBombUsedThisTurn = false,
   onPrimedBombUsed,
   sections = "all",
+  groupLayout = "stack",
+  layoutScope = "default",
+  prependGroup = null,
 }: SheetActionsPanelProps) {
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [openEconomyKind, setOpenEconomyKind] = useState<ActionEconomyKind | null>(null)
+  const [groupOrder, setGroupOrder] = useState<string[]>([])
+  const dragGroupIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!characterId) {
+      setGroupOrder([])
+      return
+    }
+    setGroupOrder(loadActionGroupOrder(characterId, layoutScope))
+  }, [characterId, layoutScope])
+
+  useEffect(() => {
+    if (!characterId || !groupOrder.length) return
+    saveActionGroupOrder(characterId, layoutScope, groupOrder)
+  }, [characterId, layoutScope, groupOrder])
 
   const resourceById = useMemo(
     () => new Map(resourceEntries.map((entry) => [entry.id, entry])),
@@ -2408,20 +2442,86 @@ export function SheetActionsPanel({
   )
 
   const showEconomy = sections === "all" || sections === "economy"
-  const showTriggered = sections === "all" || sections === "triggered"
+  const showTriggered =
+    sections === "all" || sections === "triggered" || sections === "weapon-attacks"
   const showWeaponAttacks = sections === "weapon-attacks"
   const hasEconomyEntries =
     showEconomy &&
     (Object.keys(grouped) as ActionEconomyKind[]).some((kind) => grouped[kind].length > 0)
   const hasTriggeredEntries = showTriggered && triggeredEntries.length > 0
   const hasWeaponAttackEntries = showWeaponAttacks && weaponAttackEntries.length > 0
+  const hasPrependGroup = Boolean(prependGroup?.node)
   if (
     !hasEconomyEntries &&
     !hasTriggeredEntries &&
     !hasWeaponAttackEntries &&
+    !hasPrependGroup &&
     !(incapacitated && showEconomy)
   ) {
     return null
+  }
+
+  type RenderableActionGroup = {
+    id: ActionGroupId
+    label: string
+    body: ReactNode
+  }
+
+  const actionGroups: RenderableActionGroup[] = []
+  if (prependGroup?.node) {
+    actionGroups.push({
+      id: prependGroup.id,
+      label: "Weapon Attacks",
+      body: prependGroup.node,
+    })
+  }
+  if (showEconomy) {
+    for (const kind of Object.keys(grouped) as ActionEconomyKind[]) {
+      const entries = grouped[kind]
+      if (!entries.length) continue
+      actionGroups.push({
+        id: kind,
+        label: ACTION_KIND_LABELS[kind],
+        body: <div className={gridClass}>{entries.map((entry) => renderEntryCard(entry, kind))}</div>,
+      })
+    }
+  }
+  if (hasWeaponAttackEntries) {
+    actionGroups.push({
+      id: "weapon-attack",
+      label: "Extra Attacks",
+      body: (
+        <div className={gridClass}>
+          {weaponAttackEntries.map((entry) => renderEntryCard(entry, "weapon-attack"))}
+        </div>
+      ),
+    })
+  }
+  if (hasTriggeredEntries) {
+    actionGroups.push({
+      id: "triggered",
+      label: "Passive",
+      body: (
+        <div className={gridClass}>
+          {triggeredEntries.map((entry) => renderEntryCard(entry, "triggered"))}
+        </div>
+      ),
+    })
+  }
+
+  const visibleGroups = orderActionGroups(
+    actionGroups,
+    groupOrder,
+    (group) => group.id,
+    DEFAULT_COMBAT_ACTION_GROUP_ORDER,
+  )
+  const visibleGroupIds = visibleGroups.map((group) => group.id)
+
+  const dropOnGroup = (targetId: string) => {
+    const fromId = dragGroupIdRef.current
+    dragGroupIdRef.current = null
+    if (!fromId || fromId === targetId) return
+    setGroupOrder(moveActionGroup(visibleGroupIds, groupOrder, fromId, targetId))
   }
 
   return (
@@ -2431,42 +2531,41 @@ export function SheetActionsPanel({
           Incapacitated — you cannot take actions, bonus actions, or reactions.
         </p>
       ) : null}
-      {showEconomy
-        ? (Object.keys(grouped) as ActionEconomyKind[]).map((kind) => {
-            const entries = grouped[kind]
-            if (!entries.length) return null
-            return (
-              <div key={kind}>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-                  {ACTION_KIND_LABELS[kind]}
-                </p>
-                <div className={gridClass}>
-                  {entries.map((entry) => renderEntryCard(entry, kind))}
-                </div>
-              </div>
-            )
-          })
-        : null}
-      {hasWeaponAttackEntries ? (
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-            Extra Attacks
-          </p>
-          <div className={gridClass}>
-            {weaponAttackEntries.map((entry) => renderEntryCard(entry, "weapon-attack"))}
+      <div
+        className={
+          groupLayout === "responsive-grid"
+            ? "grid grid-cols-1 xl:grid-cols-2 gap-3 min-w-0"
+            : "space-y-3"
+        }
+      >
+        {visibleGroups.map((group) => (
+          <div
+            key={group.id}
+            className="min-w-0"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault()
+              dropOnGroup(group.id)
+            }}
+          >
+            <div
+              className="mb-1.5 flex cursor-grab items-center gap-1 active:cursor-grabbing"
+              draggable
+                onDragStart={(event) => {
+                  dragGroupIdRef.current = group.id
+                  event.dataTransfer.effectAllowed = "move"
+                  event.dataTransfer.setData("text/plain", group.id)
+                }}
+            >
+              <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                {group.label}
+              </p>
+            </div>
+            {group.body}
           </div>
-        </div>
-      ) : null}
-      {showTriggered && triggeredEntries.length ? (
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-            Triggered (no action)
-          </p>
-          <div className={gridClass}>
-            {triggeredEntries.map((entry) => renderEntryCard(entry, "triggered"))}
-          </div>
-        </div>
-      ) : null}
+        ))}
+      </div>
 
       <AnimatePresence>
         {openAction ? (

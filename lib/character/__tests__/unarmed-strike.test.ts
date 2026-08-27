@@ -13,6 +13,7 @@ import {
   buildUnarmedStrikeEquipment,
   characterHasFreeHand,
 } from "@/lib/character/unarmed-strike"
+import { parseDamageRoll } from "@/lib/dice/damage-roll"
 import type { DndClass, Equipment, Feat } from "@/lib/types"
 
 const longsword = {
@@ -143,6 +144,10 @@ describe("unarmed strike on the sheet", () => {
 
     expect(derived.unarmedStrikeWeapon?.name).toBe("Unarmed Strike")
     expect(derived.unarmedStrikeAttack?.damageDisplay).toMatch(/1 \+ 3 Bludgeoning/)
+    expect(parseDamageRoll(derived.unarmedStrikeAttack?.damageDisplay ?? "")).toMatchObject({
+      flat: 1,
+      modifier: 3,
+    })
     expect(derived.unarmedStrikeAttack?.attackBonus).toBe(5)
   })
 
@@ -337,6 +342,84 @@ describe("unarmed strike on the sheet", () => {
       }),
     )
     expect(derived.unarmedStrikeAttack?.attackBonus).toBe(7)
+  })
+
+  it("uses Unarmed Fighting 1d8 when empty-handed and 1d6 beside a one-handed weapon", () => {
+    const fighting = {
+      id: "feat_unarmed_fighting",
+      name: "Unarmed Fighting",
+      linkedModifiers: linked([
+        {
+          id: "uf_unarmed",
+          type: "unarmed_strike_damage",
+          die: "1d6",
+          emptyHandedDie: "1d8",
+          label: "Unarmed Fighting",
+        },
+      ]),
+    } as unknown as Feat
+
+    const empty = computeDerivedCharacter(
+      baseInputs({
+        baseAbilityScores: {
+          strength: 16,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 10,
+        },
+        classLevels: [{ classId: fighterClass.id, level: 1 }],
+        classes: [fighterClass],
+        primaryClassId: fighterClass.id,
+        selectedFeatIds: [fighting.id],
+        feats: [fighting],
+      }),
+    )
+    expect(empty.unarmedStrikeAttack?.damageDisplay).toMatch(/1d8 \+ 3 Bludgeoning/)
+    expect(parseDamageRoll(empty.unarmedStrikeAttack?.damageDisplay ?? "")).not.toBeNull()
+
+    const withSword = computeDerivedCharacter(
+      baseInputs({
+        baseAbilityScores: {
+          strength: 16,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 10,
+        },
+        classLevels: [{ classId: fighterClass.id, level: 1 }],
+        classes: [fighterClass],
+        primaryClassId: fighterClass.id,
+        selectedFeatIds: [fighting.id],
+        feats: [fighting],
+        equipment: [longsword],
+        equippedWeaponId: longsword.id,
+      }),
+    )
+    expect(withSword.unarmedStrikeAttack?.damageDisplay).toMatch(/1d6 \+ 3 Bludgeoning/)
+
+    const withShield = computeDerivedCharacter(
+      baseInputs({
+        baseAbilityScores: {
+          strength: 16,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 10,
+        },
+        classLevels: [{ classId: fighterClass.id, level: 1 }],
+        classes: [fighterClass],
+        primaryClassId: fighterClass.id,
+        selectedFeatIds: [fighting.id],
+        feats: [fighting],
+        equipment: [shieldEquipment],
+        equippedShieldId: shieldEquipment.id,
+      }),
+    )
+    expect(withShield.unarmedStrikeAttack?.damageDisplay).toMatch(/1d6 \+ 3 Bludgeoning/)
   })
 
   it("builds a synthetic Unarmed Strike with the default 1 bludgeoning die", () => {

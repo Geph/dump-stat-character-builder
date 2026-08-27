@@ -19,6 +19,7 @@ import { ClassResourcesOverview } from "@/components/compendium/class-resources-
 import { formatUsesSummary, groupClassResourcesByKey } from "@/lib/compendium/class-resource-rows"
 import { filterCompendiumClassResourcesBySubclasses } from "@/lib/compendium/subclass-gated-class-resources"
 import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
+import { displayAbilityRoleLabel } from "@/lib/compendium/ability-role-label"
 import { spellDetailOverlayTags, spellCastingDetailRows } from "@/lib/compendium/spell-detail-tags"
 import {
   COMPENDIUM_TOGGLE_LABELS,
@@ -1599,11 +1600,16 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                 </span>
               )
             })()}
-            {castCompendiumRow<{ ability_role?: string }>(data).ability_role ? (
-              <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
-                {castCompendiumRow<{ ability_role: string }>(data).ability_role.replace(/_/g, " ")}
-              </span>
-            ) : null}
+            {(() => {
+              const row = castCompendiumRow<CustomAbility>(data)
+              const label = displayAbilityRoleLabel(row) ?? row.ability_role?.replace(/_/g, " ")
+              if (!label) return null
+              return (
+                <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+                  {label}
+                </span>
+              )
+            })()}
           </div>
         )}
         </div>

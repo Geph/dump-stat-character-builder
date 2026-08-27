@@ -28,7 +28,10 @@ const SPELL_SAVE_DC_PHRASE =
   /\b(?:Spell|Your)\s+save\s+DC\s*=\s*8\s*\+\s*your\s+proficiency\s+bonus\s*\+\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier/i
 
 const TECHNIQUE_PSIONIC_SAVE_DC =
-  /\b(Technique|Psionic)(?:\s+ability)?\s+save\s+DC\s*=\s*8\s*\+\s*your\s+proficiency\s+bonus\s*\+\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier/i
+  /\b(Technique|Psionic|Maneuver)(?:\s+ability)?\s+save\s+DC\s*=\s*8\s*\+\s*your\s+proficiency\s+bonus\s*\+\s*your\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+modifier/i
+
+const MANEUVER_PROSE_SAVE_DC =
+  /If a maneuver requires a saving throw,\s*the DC equals\s*8 plus your (Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) modifier and Proficiency Bonus/i
 
 /** Detect spellcasting governing ability from class prose (Investigator Ritualist, Wizard, etc.). */
 export function detectSpellcastingAbilityFromText(
@@ -58,15 +61,29 @@ export function detectNonSpellSpecialAbilityFromText(
 ): ClassSpecialAbility | null {
   const haystack = `${description ?? ""}\n${featuresText ?? ""}`
   const match = haystack.match(TECHNIQUE_PSIONIC_SAVE_DC)
-  if (!match) return null
-
-  const ability = parseAbilityWord(match[2])
-  if (!ability) return null
-
-  const label = match[1].toLowerCase() === "psionic" ? "Psionic ability" : "Technique save DC"
-  return {
-    save_dc_ability: ability,
-    label,
-    dc_formula: "8_plus_prof_plus_ability_mod",
+  if (match) {
+    const ability = parseAbilityWord(match[2])
+    if (!ability) return null
+    const kind = match[1].toLowerCase()
+    const label =
+      kind === "psionic" ? "Psionic ability" : kind === "maneuver" ? "Maneuver save DC" : "Technique save DC"
+    return {
+      save_dc_ability: ability,
+      label,
+      dc_formula: "8_plus_prof_plus_ability_mod",
+    }
   }
+
+  const prose = haystack.match(MANEUVER_PROSE_SAVE_DC)
+  if (prose) {
+    const ability = parseAbilityWord(prose[1])
+    if (!ability) return null
+    return {
+      save_dc_ability: ability,
+      label: "Maneuver save DC",
+      dc_formula: "8_plus_prof_plus_ability_mod",
+    }
+  }
+
+  return null
 }

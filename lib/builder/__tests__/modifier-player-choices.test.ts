@@ -3,10 +3,17 @@ import { proficientSkillsInBuilder } from "@/lib/builder/choices"
 import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 import {
   collectClassFeatureModifierPlayerChoiceSlots,
+  collectModifierPlayerChoiceSlots,
+  isSpellRelatedModifierSlot,
   optionsForExpertiseSlot,
   optionsForProficiencyGrantSlot,
+  spellModifierPlayerChoiceSlots,
 } from "@/lib/builder/modifier-player-choices"
-import type { DndClass, Feature } from "@/lib/types"
+import { buildDefaultModifierCatalog } from "@/lib/compendium/modifier-catalog"
+import { enrichCustomFeatRow } from "@/lib/compendium/enrich-custom-feats"
+import { enrichSrdFeatRow } from "@/lib/compendium/enrich-srd-feats"
+import { grantedFeatChoicePickKey } from "@/lib/builder/feat-choices"
+import type { DndClass, Feat, Feature } from "@/lib/types"
 
 describe("expertise modifier player choices", () => {
   it("collects proficient skills from background, class, and modifier grants", () => {
@@ -183,5 +190,59 @@ describe("proficiency grant modifier player choices", () => {
     })
 
     expect(options.map((option) => option.name).sort()).toEqual(["Lute", "Stealth"])
+  })
+})
+
+describe("feat spell grant player choices", () => {
+  const catalog = buildDefaultModifierCatalog()
+
+  function enrichedFeat(name: string): Feat {
+    const row =
+      name === "Magic Initiate"
+        ? enrichSrdFeatRow({ name, source: "SRD", description: "Cantrips and a level-1 spell" })
+        : enrichCustomFeatRow({ name, source: "PHB", description: name })
+    return {
+      id: `feat-${name.toLowerCase().replace(/\s+/g, "-")}`,
+      name,
+      description: row.description ?? "",
+      linkedModifiers: row.linked_modifiers ?? row.linkedModifiers ?? [],
+      modifierRefs: row.modifier_refs ?? row.modifierRefs ?? [],
+    } as unknown as Feat
+  }
+
+  it("collects Magic Initiate spell list, cantrip, and level-1 spell slots", () => {
+    const feat = enrichedFeat("Magic Initiate")
+    const sourceKey = grantedFeatChoicePickKey(feat.id)
+    const slots = collectModifierPlayerChoiceSlots({
+      featEntries: [{ featId: feat.id, choicePickKey: sourceKey }],
+      feats: [feat],
+      featChoicePicks: {},
+      catalog,
+    })
+    const spellSlots = spellModifierPlayerChoiceSlots(slots)
+    expect(spellSlots.some((slot) => slot.kind === "spell_list_class")).toBe(true)
+    expect(spellSlots.filter((slot) => slot.kind === "spell").map((slot) => slot.label)).toEqual([
+      "Choose 2 cantrips",
+      "Choose 1 level-1 spell",
+    ])
+    expect(slots.some((slot) => slot.kind === "spellcasting_ability")).toBe(true)
+  })
+
+  it("collects Fey Touched and Shadow Touched level-1 spell pick slots", () => {
+    for (const name of ["Fey Touched", "Shadow Touched"] as const) {
+      const feat = enrichedFeat(name)
+      const sourceKey = grantedFeatChoicePickKey(feat.id)
+      const slots = collectModifierPlayerChoiceSlots({
+        featEntries: [{ featId: feat.id, choicePickKey: sourceKey }],
+        feats: [feat],
+        featChoicePicks: {},
+        catalog,
+      })
+      const spellSlots = spellModifierPlayerChoiceSlots(
+        slots.filter((slot) => slot.sourceKey === sourceKey),
+      )
+      expect(spellSlots.some((slot) => slot.kind === "spell" && slot.spellLevel === 1)).toBe(true)
+      expect(spellSlots.every(isSpellRelatedModifierSlot)).toBe(true)
+    }
   })
 })

@@ -12,6 +12,15 @@ describe("weapon property reference", () => {
     expect(describeWeaponProperty("Reach")).toMatch(/5 feet/)
     expect(describeWeaponRange("Melee reach")).toMatch(/5 feet/)
   })
+
+  it("describes Firearm, Recoil, and parenthetical Reload / Ammunition tags", () => {
+    expect(describeWeaponProperty("Firearm")).toMatch(/ability modifier/)
+    expect(describeWeaponProperty("Recoil")).toMatch(/normal range/)
+    expect(describeWeaponProperty("Reload (6)")).toMatch(/reload/i)
+    expect(describeWeaponProperty("Ammunition (Range 30/120; Bullet)")).toMatch(/ammunition/i)
+    expect(describeWeaponProperty("Mounted")).toMatch(/Bonus Action/)
+    expect(describeWeaponProperty("Destructible")).toMatch(/destroyed/)
+  })
 })
 
 describe("buildWeaponSheetContext", () => {
@@ -165,7 +174,12 @@ describe("buildWeaponSheetContext", () => {
       ["Martial weapons"],
     )
 
-    expect(rangedContext.appliedModifiers.some((entry) => entry.name === "Archery")).toBe(true)
+    expect(rangedContext.appliedModifiers).toContainEqual(
+      expect.objectContaining({
+        name: "Archery",
+        sourceLabel: "Archery",
+      }),
+    )
   })
 
   it("resolves a class-resource damage rider to the current die size (Superiority Dice)", () => {
@@ -265,5 +279,63 @@ describe("buildWeaponSheetContext", () => {
     expect(maceContext.appliedModifiers.some((entry) => entry.name === "Elemental Attunement")).toBe(
       false,
     )
+  })
+
+  it("surfaces Crusher on-hit notes on Unarmed Strike and other bludgeoning weapons", () => {
+    const unarmed = {
+      id: "unarmed-strike",
+      name: "Unarmed Strike",
+      category: "Weapon",
+      subcategory: "Simple Melee Weapons",
+      damage: "1",
+      damage_type: "Bludgeoning",
+      properties: [],
+    } as unknown as Equipment
+
+    const dagger = {
+      id: "dagger",
+      name: "Dagger",
+      category: "Weapon",
+      subcategory: "Simple Melee Weapons",
+      damage: "1d4",
+      damage_type: "Piercing",
+      properties: ["Finesse"],
+    } as unknown as Equipment
+
+    const inputs = {
+      ...baseInputs,
+      modifierCatalog: [
+        {
+          id: "cat_char_on_hit_trigger",
+          name: "On-hit trigger",
+          group: "Attack & damage",
+          characteristics: [
+            {
+              id: "mod_crusher_push",
+              type: "on_hit_trigger" as const,
+              label: "Push 5 ft. on bludgeoning hit (once/turn)",
+              appliesTo: "bludgeoning",
+            },
+          ],
+        },
+      ],
+      feats: [
+        {
+          id: "crusher",
+          name: "Crusher",
+          modifierRefs: ["cat_char_on_hit_trigger"],
+        } as never,
+      ],
+      selectedFeatIds: ["crusher"],
+    } as CharacterBuildInputs
+
+    const unarmedContext = buildWeaponSheetContext(unarmed, inputs, ["Simple weapons"])
+    expect(unarmedContext.appliedModifiers.some((entry) => entry.name === "On hit")).toBe(true)
+
+    const maceContext = buildWeaponSheetContext(mace, inputs, ["Simple weapons"])
+    expect(maceContext.appliedModifiers.some((entry) => entry.name === "On hit")).toBe(true)
+
+    const daggerContext = buildWeaponSheetContext(dagger, inputs, ["Simple weapons"])
+    expect(daggerContext.appliedModifiers.some((entry) => entry.name === "On hit")).toBe(false)
   })
 })

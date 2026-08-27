@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { computeDerivedCharacter } from "@/lib/character/compute-derived"
 import { baseInputs, fighterClass } from "@/lib/character/__tests__/fixtures"
-import { getWeaponAttackAbility, hasWeaponProperty } from "@/lib/compendium/combat-stats"
+import {
+  calculateWeaponAttack,
+  getWeaponAttackAbility,
+  hasWeaponProperty,
+  weaponOmitsAbilityModifierFromDamage,
+} from "@/lib/compendium/combat-stats"
 import { cleanProperties } from "@/lib/import/normalize-equipment"
 import equipmentSeed from "@/lib/srd/seed-data/equipment.json"
 import type { Equipment } from "@/lib/types"
@@ -122,5 +127,54 @@ describe("Finesse damage on the sheet", () => {
     expect(derived.equippedWeaponAttack?.damageDisplay).toMatch(/\+ 4/)
     expect(derived.equippedOffHandWeaponAttack?.damageDisplay).not.toMatch(/\+ 4/)
     expect(derived.equippedOffHandWeaponAttack?.damageAbilityMod).toBe(4)
+  })
+})
+
+describe("Firearm weapon damage", () => {
+  const revolver = {
+    id: "revolver",
+    name: "Revolver",
+    category: "Weapon",
+    subcategory: "Martial Ranged Weapons",
+    properties: {
+      damage: "2d6 Piercing",
+      mastery: "Slow",
+      properties: [
+        "Ammunition (Range 30/120; Bullet)",
+        "Firearm",
+        "Recoil",
+        "Reload (6)",
+      ],
+    },
+  } as unknown as Equipment
+
+  it("omits the ability modifier from Firearm damage but keeps it on the attack roll", () => {
+    expect(weaponOmitsAbilityModifierFromDamage(revolver)).toBe(true)
+    const result = calculateWeaponAttack(revolver, dexMods, 2, true)
+    expect(result?.damageDisplay).toBe("2d6 Piercing")
+    expect(result?.attackBonus).toBe(6)
+  })
+
+  it("shows Firearm damage without the Dexterity bonus on the sheet", () => {
+    const derived = computeDerivedCharacter(
+      baseInputs({
+        baseAbilityScores: {
+          strength: 12,
+          dexterity: 18,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 10,
+        },
+        classLevels: [{ classId: fighterClass.id, level: 1 }],
+        classes: [fighterClass],
+        primaryClassId: fighterClass.id,
+        extraWeaponProficiencies: ["Martial weapons"],
+        equipment: [revolver],
+        equippedWeaponId: revolver.id,
+      }),
+    )
+    expect(derived.equippedWeaponAttack?.damageDisplay).toBe("2d6 Piercing")
+    expect(derived.equippedWeaponAttack?.attackBonus).toBe(6)
   })
 })

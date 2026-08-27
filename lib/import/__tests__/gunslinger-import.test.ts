@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { knackAbilitiesForClass } from "@/lib/builder/knack-choices"
+import { ownedEquipmentQuantity } from "@/lib/character/equipment-quantities"
+import { resolvePackageEquipment } from "@/lib/builder/equipment-utils"
+import { collectUnmatchedStartingEquipmentNames } from "@/lib/import/collect-unmatched-starting-equipment"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import {
   GUNSLINGER_BASE_MANEUVERS,
@@ -7,7 +10,9 @@ import {
 } from "@/lib/import/enrichment-presets/packs/gunslinger"
 import { usesConfigForProgressionColumn } from "@/lib/import/parse-class-progression-table"
 import type { ImportContent } from "@/lib/import/content-schema"
-import type { CustomAbility, Feature } from "@/lib/types"
+import type { CustomAbility, Equipment, Feature } from "@/lib/types"
+import gunslingerSeed from "@/lib/seed-packs/mage-hand-press/magehandpress-gunslinger-class.json"
+import equipmentSeed from "@/lib/srd/seed-data/equipment.json"
 
 describe("Gunslinger enrichment", () => {
   it("grants base Risk maneuvers and strips early initiative recharge", () => {
@@ -86,6 +91,10 @@ describe("Gunslinger enrichment", () => {
       type: "grant_custom_ability",
       abilityNames: [...GUNSLINGER_BASE_MANEUVERS],
     })
+    expect(enriched.classes?.[0]?.special_ability).toMatchObject({
+      save_dc_ability: "dexterity",
+      label: "Maneuver save DC",
+    })
 
     expect(
       (enriched.class_resources?.[0]?.uses as { rechargeOnInitiative?: boolean | number })
@@ -161,6 +170,11 @@ describe("Gunslinger enrichment", () => {
               description: "Medium and Heavy armor. Strength for ranged.",
             },
             {
+              level: 3,
+              name: "Walking Turret",
+              description: "Mounted Arsenal while holding a Ranged weapon whose mastery you can use.",
+            },
+            {
               level: 6,
               name: "Lightning Disarm [Maneuver]",
               description: "Expend one Risk Die as a Bonus Action.",
@@ -202,12 +216,22 @@ describe("Gunslinger enrichment", () => {
     const heavy = enriched.subclasses?.[0]?.features?.[0] as Feature
     const chars = (heavy.linkedModifiers ?? []).flatMap((m) => m.characteristics ?? [])
     expect(chars.some((c) => c.type === "armor_proficiencies")).toBe(true)
-    expect(chars.some((c) => c.type === "weapon_ability_override")).toBe(true)
+    const armor = chars.find((c) => c.type === "armor_proficiencies") as { values?: string[] }
+    expect(armor.values).toEqual(expect.arrayContaining(["Medium Armor", "Heavy Armor"]))
+    const override = chars.find((c) => c.type === "weapon_ability_override") as {
+      ability?: string
+      appliesTo?: string
+      scope?: string
+    }
+    expect(override).toMatchObject({ ability: "strength", appliesTo: "both", scope: "ranged" })
 
-    const lightning = enriched.subclasses?.[0]?.features?.[1] as Feature
+    const turret = enriched.subclasses?.[0]?.features?.[1] as Feature
+    expect(turret.description).toMatch(/Move While Mounted/)
+
+    const lightning = enriched.subclasses?.[0]?.features?.[2] as Feature
     expect(lightning.sheetDisplay?.combatActions).toBe(true)
 
-    const flash = enriched.subclasses?.[0]?.features?.[2] as Feature
+    const flash = enriched.subclasses?.[0]?.features?.[3] as Feature
     expect(flash.limitedUses?.restoreByResource).toMatchObject({
       resourceKey: "risk_dice",
       resourceAmount: 2,
@@ -303,5 +327,66 @@ describe("Gunslinger enrichment", () => {
     expect(
       next.import_proposals?.custom_abilities?.some((a) => a.name === "Skin of Your Teeth"),
     ).toBe(true)
+  })
+
+  it("ships Revolver as a catalog equipment row so starting gear is not flagged", () => {
+    const content = gunslingerSeed as ImportContent
+    const revolver = content.equipment?.find((item) => item.name === "Revolver")
+    expect(revolver).toMatchObject({
+      category: "Weapon",
+      subcategory: "Martial Ranged Weapons",
+      weight: 3,
+      cost: { amount: 125, unit: "GP" },
+    })
+    const props = revolver?.properties as {
+      damage?: string
+      mastery?: string
+      properties?: string[]
+    }
+    expect(props.damage).toBe("2d6 Piercing")
+    expect(props.mastery).toBe("Slow")
+    expect(props.properties).toEqual(
+      expect.arrayContaining([
+        "Ammunition (Range 30/120; Bullet)",
+        "Firearm",
+        "Recoil",
+        "Reload (6)",
+      ]),
+    )
+    const packageA = content.classes?.[0]?.starting_equipment_groups?.[0]?.options.find(
+      (option) => option.label === "A",
+    )
+    expect(packageA?.items.map((item) => item.name)).toEqual(
+      expect.arrayContaining(["Revolver", "Bullets, Firearm"]),
+    )
+    expect(collectUnmatchedStartingEquipmentNames(content).map((row) => row.name)).not.toContain(
+      "Revolver",
+    )
+  })
+
+  it("resolves Revolver and firearm bullets as separate starting-gear items", () => {
+    const content = gunslingerSeed as ImportContent
+    const catalog: Equipment[] = [
+      ...(equipmentSeed as unknown as Equipment[]).map((row, index) => ({
+        ...row,
+        id: `srd-${index}`,
+      })),
+      ...(content.equipment ?? []).map((row, index) => ({
+        ...(row as unknown as Equipment),
+        id: `mhp-${index}`,
+      })),
+    ]
+    const packageA = content.classes?.[0]?.starting_equipment_groups?.[0]?.options.find(
+      (option) => option.label === "A",
+    )
+    const resolved = resolvePackageEquipment(packageA?.items ?? [], catalog)
+    const names = resolved.ids.map((id) => catalog.find((item) => item.id === id)?.name)
+    expect(names).toEqual(
+      expect.arrayContaining(["Revolver", "Bullets, Firearm", "Dagger", "Leather Armor"]),
+    )
+    const revolverId = catalog.find((item) => item.name === "Revolver")!.id
+    const bulletsId = catalog.find((item) => item.name === "Bullets, Firearm")!.id
+    expect(ownedEquipmentQuantity(resolved.ids, resolved.quantities, revolverId)).toBe(1)
+    expect(ownedEquipmentQuantity(resolved.ids, resolved.quantities, bulletsId)).toBe(50)
   })
 })

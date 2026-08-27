@@ -30,6 +30,7 @@ const WEAPON_ICON_BY_NAME: Record<string, string> = {
   Musket: "musket",
   Pike: "pikeman",
   Pistol: "revolver",
+  Revolver: "revolver",
   Quarterstaff: "bo",
   Rapier: "pointy-sword",
   Scimitar: "dervish-swords",
@@ -65,5 +66,6 @@ export function weaponIconSlug(weaponName: string): string {
   if (lower.includes("spear") || lower.includes("pike")) return "spears"
   if (lower.includes("mace") || lower.includes("club")) return "flanged-mace"
   if (lower.includes("dagger") || lower.includes("knife")) return "plain-dagger"
+  if (lower.includes("revolver") || lower.includes("pistol")) return "revolver"
   return FALLBACK_ICON
 }

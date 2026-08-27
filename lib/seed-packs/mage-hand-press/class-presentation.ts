@@ -60,7 +60,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     card_image_slug: "dancer",
   },
   Gunslinger: {
-    icon: "gunshot",
+    icon: "pistol-gun",
     card_blurb:
       "Wagers hit points on risk dice for devastating critical shots, backed by an arsenal of guns.",
     creator_url:

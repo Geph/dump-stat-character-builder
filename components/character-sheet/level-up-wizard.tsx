@@ -68,10 +68,18 @@ import {
 import { mergeAlchemistDiscoveryPicks } from "@/lib/compendium/alchemist-feature-wiring"
 import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
-import { enrichSrdFeatRow } from "@/lib/compendium/enrich-srd-feats"
+import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { asCompendiumRows } from "@/lib/data/types"
-import type { Character, CustomAbility, DndClass, Feat, Spell, Subclass } from "@/lib/types"
+import type {
+  Character,
+  CustomAbility,
+  DndClass,
+  Equipment,
+  Feat,
+  Spell,
+  Subclass,
+} from "@/lib/types"
 import { ABILITY_SCORE_KEYS, type AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { LevelUpSubclassPicker } from "@/components/character-sheet/level-up-subclass-picker"
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
@@ -94,6 +102,7 @@ type Loaded = {
   subclasses: Subclass[]
   feats: Feat[]
   spells: Spell[]
+  equipment: Equipment[]
   customAbilities: CustomAbility[]
   modifierCatalog: ModifierCatalogEntry[]
 }
@@ -148,6 +157,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         { data: subclasses },
         { data: feats },
         { data: spells },
+        { data: equipment },
         { data: customAbilities },
         modifierCatalog,
       ] = await Promise.all([
@@ -156,6 +166,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         db.from("subclasses").select("*"),
         db.from("feats").select("*"),
         db.from("spells").select("*"),
+        db.from("equipment").select("*"),
         db.from("custom_abilities").select("*"),
         loadModifierCatalog(db),
       ])
@@ -174,8 +185,12 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         enrichedClasses,
         asCompendiumRows(subclasses) as unknown as Subclass[],
       )
-      const enrichedFeats = (asCompendiumRows(feats) as unknown as Feat[]).map(
-        (feat) => enrichSrdFeatRow(feat as unknown as Record<string, unknown>) as unknown as Feat,
+      const enrichedFeats = enrichFeatsList(
+        asCompendiumRows(feats) as unknown as Array<{
+          name: string
+          source?: string | null
+        }>,
+        modifierCatalog,
       )
       setLoaded({
         character: char,
@@ -183,6 +198,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         subclasses: asCompendiumRows(subclasses) as unknown as Subclass[],
         feats: enrichedFeats,
         spells: asCompendiumRows(spells) as unknown as Spell[],
+        equipment: asCompendiumRows(equipment) as unknown as Equipment[],
         customAbilities: asCompendiumRows(customAbilities) as unknown as CustomAbility[],
         modifierCatalog,
       })
@@ -302,6 +318,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       classIds: [plan.classId],
       classLevel: plan.toLevel,
       classWeaponProficiencies: selectedEntry.class?.weapon_proficiencies ?? null,
+      equipmentCatalog: loaded.equipment,
       knownSpellNames,
       subclassName: selectedEntry.subclass?.name ?? null,
     }
@@ -316,6 +333,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       classIds: [plan.classId],
       classLevel: plan.toLevel,
       classWeaponProficiencies: selectedEntry.class?.weapon_proficiencies ?? null,
+      equipmentCatalog: loaded.equipment,
       knownSpellNames,
       subclassName: selectedEntry.subclass?.name ?? null,
     })

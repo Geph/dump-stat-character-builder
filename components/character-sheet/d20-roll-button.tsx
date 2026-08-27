@@ -11,7 +11,8 @@ import {
   rollModeBadgeLabel,
   type ManualRollOverride,
 } from "@/lib/character/resolve-roll-mode"
-import { rollD20WithMode, type D20RollMode } from "@/lib/dice/d20-roll"
+import { D20NaturalsDisplay } from "@/components/character-sheet/d20-naturals-display"
+import { formatD20RollSummary, rollD20WithMode, type D20RollMode } from "@/lib/dice/d20-roll"
 
 type D20RollButtonProps = {
   modifier: number
@@ -56,6 +57,22 @@ export function rollD20(modifier: number): { natural: number; total: number } {
   return { natural: rolled.natural, total: rolled.total }
 }
 
+function D20RollFace({
+  result,
+  filled,
+}: {
+  result: { natural: number; total: number; naturals: number[] }
+  filled: boolean
+}) {
+  return (
+    <span className={`inline-flex items-center gap-0.5 font-medium ${filled ? "text-white" : ""}`}>
+      <D20NaturalsDisplay chosen={result.natural} filled={filled} naturals={result.naturals} />
+      <span className={filled ? "text-white/70" : "text-muted-foreground"}>=</span>
+      <span className={`font-black ${filled ? "text-white" : "text-primary"}`}>{result.total}</span>
+    </span>
+  )
+}
+
 function cycleManualOverride(current: ManualRollOverride): ManualRollOverride {
   if (current === "normal") return "advantage"
   if (current === "advantage") return "disadvantage"
@@ -89,6 +106,7 @@ export function D20RollButton({
     natural: number
     total: number
     mode: D20RollMode
+    naturals: number[]
   } | null>(null)
   const [manualOverride, setManualOverride] = useState<ManualRollOverride>("normal")
   const history = useSheetRollHistory()
@@ -176,26 +194,31 @@ export function D20RollButton({
   const handleRoll = () => {
     if (disabled) return
     if (effectiveMode === "auto_fail") {
-      setResult({ natural: 1, total: 1 + effectiveModifier, mode: "auto_fail" })
+      setResult({ natural: 1, total: 1 + effectiveModifier, mode: "auto_fail", naturals: [1] })
       history?.logRoll({
         kind: "d20",
         label: title ?? `d20 ${modLabel}`,
         summary: `Auto-fail (${title ?? "save"})`,
         natural: 1,
+        naturals: [1],
       })
       onRoll?.()
       return
     }
 
     const rolled = rollD20WithMode(effectiveMode, effectiveModifier)
-    setResult({ natural: rolled.natural, total: rolled.total, mode: rolled.mode })
-    const modeSuffix =
-      rolled.mode === "advantage" ? " (adv)" : rolled.mode === "disadvantage" ? " (dis)" : ""
+    setResult({
+      natural: rolled.natural,
+      total: rolled.total,
+      mode: rolled.mode,
+      naturals: rolled.naturals,
+    })
     history?.logRoll({
       kind: "d20",
       label: title ?? `d20 ${modLabel}`,
-      summary: `${rolled.natural}${effectiveModifier >= 0 ? ` + ${effectiveModifier}` : ` − ${Math.abs(effectiveModifier)}`} = ${rolled.total}${modeSuffix}${d20CriticalSuffix(rolled.natural)}`,
+      summary: formatD20RollSummary(rolled, effectiveModifier),
       natural: rolled.natural,
+      naturals: rolled.naturals,
     })
     onRoll?.()
   }
@@ -244,16 +267,7 @@ export function D20RollButton({
             {effectiveMode === "auto_fail" ? (
               <span className={`font-medium ${filled ? "text-white" : "text-destructive"}`}>Fail</span>
             ) : result != null ? (
-              <span className={`font-medium ${filled ? "text-white" : ""}`}>
-                {result.natural}
-                <span className={filled ? "text-white/70" : "text-muted-foreground"}>=</span>
-                <span className={`font-black ${filled ? "text-white" : "text-primary"}`}>{result.total}</span>
-                {isNat20OrNat1(result.natural) ? (
-                  <span className={filled ? "text-white" : "text-primary"} aria-label="Natural 20 or natural 1">
-                    !!
-                  </span>
-                ) : null}
-              </span>
+              <D20RollFace filled={filled} result={result} />
             ) : (
               <span className={filled ? "text-white" : "text-foreground"}>{modLabel}</span>
             )}
@@ -265,16 +279,7 @@ export function D20RollButton({
           {effectiveMode === "auto_fail" ? (
             <span className={`font-medium ${filled ? "text-white" : "text-destructive"}`}>Fail</span>
           ) : result != null ? (
-            <span className={`font-medium ${filled ? "text-white" : ""}`}>
-              {result.natural}
-              <span className={filled ? "text-white/70" : "text-muted-foreground"}>=</span>
-              <span className={`font-black ${filled ? "text-white" : "text-primary"}`}>{result.total}</span>
-              {isNat20OrNat1(result.natural) ? (
-                <span className={filled ? "text-white" : "text-primary"} aria-label="Natural 20 or natural 1">
-                  !!
-                </span>
-              ) : null}
-            </span>
+            <D20RollFace filled={filled} result={result} />
           ) : null}
         </>
       )}

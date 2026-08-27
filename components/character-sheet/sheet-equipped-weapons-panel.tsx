@@ -20,6 +20,8 @@ import {
 import { buildWeaponSheetContext } from "@/lib/compendium/weapon-sheet-context"
 import { weaponDamageDiceOptions } from "@/lib/compendium/weapon-damage-roll"
 import { weaponModifierBadgeClass } from "@/lib/character/sheet-status-colors"
+import { canMountWeapon, isWeaponMounted } from "@/lib/character/mounted-weapon"
+import { Switch } from "@/components/ui/switch"
 import type { WeaponAttackDerived } from "@/lib/character/types"
 import type { Equipment } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -55,6 +57,9 @@ type SheetEquippedWeaponsPanelProps = {
   onAttackRoll?: () => void
   /** Weapon damage rolls signal that damage was dealt this turn (Rampage Die). */
   onDamageRoll?: () => void
+  hideHeading?: boolean
+  activeSheetToggleIds?: readonly string[]
+  onToggleMounted?: (weaponId: string) => void
 }
 
 function WeaponAttackCard({
@@ -73,6 +78,8 @@ function WeaponAttackCard({
   onExtraMasteryChange,
   onAttackRoll,
   onDamageRoll,
+  activeSheetToggleIds,
+  onToggleMounted,
 }: EquippedWeaponCard & {
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
@@ -80,13 +87,19 @@ function WeaponAttackCard({
   onExtraMasteryChange?: (equipmentId: string, names: string[]) => void
   onAttackRoll?: () => void
   onDamageRoll?: () => void
+  activeSheetToggleIds?: readonly string[]
+  onToggleMounted?: (weaponId: string) => void
 }) {
   const range = getWeaponRangeText(weapon)
   const mastery = getWeaponMastery(weapon)
   const properties = getWeaponPropertyTags(weapon)
   const baseDamage = getWeaponDamageText(weapon)
   const damageExpression = attack.damageDisplay || baseDamage
-  const diceOptions = weaponDamageDiceOptions(weapon)
+  const canMount = buildInputs
+    ? canMountWeapon(weapon, buildInputs, weaponProficiencies)
+    : false
+  const mounted = canMount && isWeaponMounted(activeSheetToggleIds, weapon.id)
+  const diceOptions = weaponDamageDiceOptions(weapon, { stepDice: mounted })
   const sheetContext = buildInputs
     ? buildWeaponSheetContext(weapon, buildInputs, weaponProficiencies)
     : null
@@ -118,6 +131,11 @@ function WeaponAttackCard({
             {hand === "off" ? (
               <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
                 Off-hand
+              </span>
+            ) : null}
+            {mounted ? (
+              <span className="rounded-full border border-primary bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary">
+                Mounted
               </span>
             ) : null}
           </div>
@@ -201,6 +219,7 @@ function WeaponAttackCard({
                   {modifier.name}
                   <ConditionInfoTip
                     description={modifier.description}
+                    source={modifier.sourceLabel}
                     ariaLabel={`${modifier.name} modifier`}
                   />
                 </span>
@@ -234,6 +253,18 @@ function WeaponAttackCard({
                 </select>
               ))}
             </div>
+          ) : null}
+          {canMount && onToggleMounted ? (
+            <label className="flex items-center justify-between gap-2 pt-0.5 text-[11px]">
+              <span className="min-w-0 leading-snug text-muted-foreground">
+                Mount (Bonus Action)
+              </span>
+              <Switch
+                checked={mounted}
+                onCheckedChange={() => onToggleMounted(weapon.id)}
+                aria-label={`Mount ${weapon.name}`}
+              />
+            </label>
           ) : null}
           {note ? (
             <p className="text-[10px] leading-snug text-amber-800 dark:text-amber-200">{note}</p>
@@ -279,14 +310,19 @@ export function SheetEquippedWeaponsPanel({
   onExtraMasteryChange,
   onAttackRoll,
   onDamageRoll,
+  hideHeading = false,
+  activeSheetToggleIds,
+  onToggleMounted,
 }: SheetEquippedWeaponsPanelProps) {
   if (!weapons.length) return null
 
   return (
-    <div className="mb-3">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-        Weapon Attacks
-      </p>
+    <div>
+      {hideHeading ? null : (
+        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+          Weapon Attacks
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-2">
         {weapons.map((entry) => (
           <WeaponAttackCard
@@ -298,6 +334,8 @@ export function SheetEquippedWeaponsPanel({
             onExtraMasteryChange={onExtraMasteryChange}
             onAttackRoll={onAttackRoll}
             onDamageRoll={onDamageRoll}
+            activeSheetToggleIds={activeSheetToggleIds}
+            onToggleMounted={onToggleMounted}
           />
         ))}
       </div>

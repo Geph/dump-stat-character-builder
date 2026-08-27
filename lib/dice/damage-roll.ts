@@ -1,8 +1,10 @@
-/** Parse and roll weapon damage expressions like "1d8+2" or "2d6 - 1 Slashing". */
+/** Parse and roll weapon damage expressions like "1d8+2", "1 + 3 Bludgeoning", or "2d6 - 1 Slashing". */
 
 export type ParsedDamageRoll = {
   dice: { count: number; sides: number }[]
   modifier: number
+  /** Constant damage with no die (default Unarmed Strike of 1). */
+  flat: number
 }
 
 export function parseDamageRoll(expression: string): ParsedDamageRoll | null {
@@ -15,9 +17,24 @@ export function parseDamageRoll(expression: string): ParsedDamageRoll | null {
   while ((match = diceRe.exec(withoutType))) {
     dice.push({ count: parseInt(match[1], 10), sides: parseInt(match[2], 10) })
   }
-  if (dice.length === 0) return null
 
   let modifier = 0
+  if (dice.length === 0) {
+    const tokens = [...withoutType.matchAll(/([+-])?\s*(\d+)/g)]
+    if (tokens.length === 0) return null
+    let flat = 0
+    for (let i = 0; i < tokens.length; i++) {
+      const sign = tokens[i][1]
+      const n = parseInt(tokens[i][2], 10)
+      if (i === 0 && !sign) {
+        flat = n
+      } else {
+        modifier += (sign === "-" ? -1 : 1) * n
+      }
+    }
+    return { dice: [], modifier, flat }
+  }
+
   const afterDice = withoutType.replace(/\d+d\d+/gi, " ")
   const modMatches = [...afterDice.matchAll(/([+-])\s*(\d+)/g)]
   for (const m of modMatches) {
@@ -25,7 +42,7 @@ export function parseDamageRoll(expression: string): ParsedDamageRoll | null {
     modifier += sign * parseInt(m[2], 10)
   }
 
-  return { dice, modifier }
+  return { dice, modifier, flat: 0 }
 }
 
 export type DamageRollMode = "normal" | "advantage" | "disadvantage"
@@ -36,6 +53,7 @@ export function rollDamage(parsed: ParsedDamageRoll): {
   modifier: number
 } {
   const rolls: number[] = []
+  if (parsed.flat) rolls.push(parsed.flat)
   for (const { count, sides } of parsed.dice) {
     for (let i = 0; i < count; i++) {
       rolls.push(1 + Math.floor(Math.random() * sides))

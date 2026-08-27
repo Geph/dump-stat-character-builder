@@ -118,12 +118,25 @@ export function inferAbilityOwnerClassName(item: Record<string, unknown>): strin
   return null
 }
 
+/** Name-specific defaults for shared multi-class library rows (no single owner class). */
+export const ABILITY_ICON_BY_NAME: Record<string, string> = {
+  "Dodge Roll": "dodge",
+  "Eagle Eye": "eagle-head",
+  Skirmish: "sprint",
+}
+
 /**
- * Assigned icon wins. Otherwise owning-class icon (when resolvable).
+ * Assigned icon wins unless it is the missing Gunslinger stamp (`gunshot`)
+ * and a curated name default exists. Otherwise owning-class icon.
  * Unowned disciplines fall back to psychic-waves; owned ones use the class icon.
  */
 export function defaultAbilityIconForItem(item: Record<string, unknown>): string | null {
-  const assigned = trimString(item.icon)
+  const rawAssigned = trimString(item.icon)
+  // `gunshot` was stamped on Gunslinger rows, but the SVG is not shipped.
+  const assigned = rawAssigned === "gunshot" ? "" : rawAssigned
+  const name = trimString(item.name)
+  const named = name ? ABILITY_ICON_BY_NAME[name] : undefined
+  if (named && !assigned) return named
   if (assigned) return assigned
 
   const className = inferAbilityOwnerClassName(item)
@@ -133,7 +146,6 @@ export function defaultAbilityIconForItem(item: Record<string, unknown>): string
   }
 
   const role = trimString(item.ability_role).toLowerCase()
-  const name = trimString(item.name)
   if (role === "discipline" || /\bdiscipline\b/i.test(name)) {
     return "psychic-waves"
   }
@@ -143,10 +155,9 @@ export function defaultAbilityIconForItem(item: Record<string, unknown>): string
 
 /** Stamp a resolved default icon onto an ability row when none is assigned. */
 export function applyDefaultAbilityIcon<T extends Record<string, unknown>>(row: T): T {
-  const assigned = trimString(row.icon)
-  if (assigned) return { ...row, icon: assigned }
   const icon = defaultAbilityIconForItem(row)
   if (!icon) return row
+  if (trimString(row.icon) === icon) return row
   return { ...row, icon }
 }
 

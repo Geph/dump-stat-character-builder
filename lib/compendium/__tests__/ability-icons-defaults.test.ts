@@ -122,6 +122,44 @@ describe("ability icon defaults", () => {
     ).toBe("psychic-waves")
   })
 
+  it("uses curated icons for shared Gunslinger / Captain maneuvers", () => {
+    expect(
+      defaultAbilityIconForItem({
+        name: "Dodge Roll",
+        ability_role: "knack",
+        eligible_classes: ["Gunslinger", "Captain", "Vagabond"],
+      }),
+    ).toBe("dodge")
+    expect(
+      defaultAbilityIconForItem({
+        name: "Eagle Eye",
+        icon: "gunshot",
+        eligible_classes: ["Gunslinger", "Captain", "Vagabond"],
+      }),
+    ).toBe("eagle-head")
+    expect(
+      getCompendiumItemIcon("abilities", {
+        name: "Skirmish",
+        ability_role: "knack",
+        eligible_classes: ["Gunslinger", "Captain", "Vagabond"],
+      }),
+    ).toBe("sprint")
+    expect(
+      getCompendiumItemIcon("abilities", {
+        name: "Dodge Roll",
+        icon: "gunshot",
+        ability_role: "knack",
+        eligible_classes: ["Gunslinger", "Captain", "Vagabond"],
+      }),
+    ).toBe("dodge")
+    expect(
+      getCompendiumItemIcon("classes", {
+        name: "Gunslinger",
+        icon: "gunshot",
+      }),
+    ).toBe("pistol-gun")
+  })
+
   it("does not guess a class icon for shared multi-class libraries", () => {
     expect(
       inferAbilityOwnerClassName({

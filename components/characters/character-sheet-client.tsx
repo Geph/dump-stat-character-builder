@@ -69,6 +69,7 @@ import type {
   Subclass,
 } from "@/lib/types"
 import { resolveEquippedItems } from "@/lib/compendium/equipment-magic-modifiers"
+import { weaponOmitsAbilityModifierFromDamage } from "@/lib/compendium/combat-stats"
 import {
   addOwnedEquipmentQuantity,
   canDualWieldSameWeapon,
@@ -257,6 +258,12 @@ import {
   buildCharacterSheetToggleDefinitions,
   collectReferencedSheetToggleIds,
 } from "@/lib/character/collect-referenced-sheet-toggles"
+import {
+  isMountedWeaponToggleId,
+  mountedWeaponToggleDefinitions,
+  mountedWeaponToggleId,
+} from "@/lib/character/mounted-weapon"
+import { displayAbilityRoleLabel } from "@/lib/compendium/ability-role-label"
 import {
   currentInfluencePoints,
   characterHasInfluencePointsMechanic,
@@ -1603,9 +1610,24 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [pdfTemplateTarget],
   )
 
+  const hasMindRiderAbility = useMemo(() => {
+    if (!classDetails.some((entry) => /\bpsion\b/i.test(entry.class?.name ?? ""))) return false
+    if (!customAbilities.some((ability) => /^mind rider$/i.test(ability.name ?? ""))) return false
+    const selectedAbilityNames = collectSelectedCustomAbilityNames({
+      featureChoicePicks,
+      grantedCustomAbilityNames: derived?.grantedCustomAbilityNames,
+    })
+    return selectedAbilityNames.some((name) => /^mind rider$/i.test(name))
+  }, [
+    classDetails,
+    customAbilities,
+    featureChoicePicks,
+    derived?.grantedCustomAbilityNames,
+  ])
+
   const referencedSheetToggleIds = useMemo(
-    () =>
-      collectReferencedSheetToggleIds({
+    () => {
+      const ids = collectReferencedSheetToggleIds({
         features: sheetClassFeatures,
         feats: characterFeats,
         originFeat,
@@ -1613,7 +1635,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         customAbilities,
         magicItemPowers,
         catalog: modifierCatalog,
-      }),
+      })
+      if (!hasMindRiderAbility) ids.delete("mind_rider_active")
+      return ids
+    },
     [
       sheetClassFeatures,
       characterFeats,
@@ -1622,6 +1647,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       customAbilities,
       magicItemPowers,
       modifierCatalog,
+      hasMindRiderAbility,
     ],
   )
 
@@ -1640,10 +1666,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     // Always available for exclusive-group activation from Weapon Morph Use menu.
     dynamic.push(...WEAPON_MORPH_TOGGLES)
     const mindRiderToggle = getSheetToggleDefinition("mind_rider_active")
-    if (
-      mindRiderToggle &&
-      customAbilities.some((ability) => /^mind rider$/i.test(ability.name ?? ""))
-    ) {
+    if (mindRiderToggle && hasMindRiderAbility) {
       dynamic.push(mindRiderToggle)
     }
     dynamic.push(...magicItemToggleDefinitions(magicItemPowers, equipmentById))
@@ -1651,8 +1674,35 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       dynamic.push(...sheetToggleDefinitionsFromNewToggles(entry.class?.new_toggles))
       dynamic.push(...sheetToggleDefinitionsFromNewToggles(entry.subclass?.new_toggles))
     }
+    if (characterBuildInputs) {
+      const catalog = equipmentCatalog.length ? equipmentCatalog : equipment
+      const held = [equippedWeaponId, equippedOffHandWeaponId]
+        .map((id) => (id ? equipment.find((item) => item.id === id) : null))
+        .filter((item): item is NonNullable<typeof item> => Boolean(item))
+        .map((item) => resolveCharacterEquipment(item, catalog, equipmentBaseSelections))
+      dynamic.push(
+        ...mountedWeaponToggleDefinitions(
+          held,
+          characterBuildInputs,
+          derived?.weaponProficiencies ?? [],
+        ),
+      )
+    }
     return buildCharacterSheetToggleDefinitions(referencedSheetToggleIds, dynamic)
-  }, [classDetails, referencedSheetToggleIds, magicItemPowers, equipmentById, customAbilities])
+  }, [
+    classDetails,
+    referencedSheetToggleIds,
+    magicItemPowers,
+    equipmentById,
+    characterBuildInputs,
+    equippedWeaponId,
+    equippedOffHandWeaponId,
+    equipment,
+    equipmentCatalog,
+    equipmentBaseSelections,
+    hasMindRiderAbility,
+    derived?.weaponProficiencies,
+  ])
 
   const manualSheetToggles = useMemo(
     () =>
@@ -1660,7 +1710,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         (toggle) =>
           toggle.id !== "below_half_hp" &&
           toggle.id !== "quarry_marked" &&
-          !toggle.id.startsWith("weapon_morph_"),
+          !toggle.id.startsWith("weapon_morph_") &&
+          !isMountedWeaponToggleId(toggle.id),
       ),
     [sheetToggleDefinitions],
   )
@@ -2417,7 +2468,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         weapon: equippedWeapon,
         attack: derived.equippedWeaponAttack,
         hand: "main" as const,
-        defaultIncludeAbilityModifier: true,
+        defaultIncludeAbilityModifier: !weaponOmitsAbilityModifierFromDamage(equippedWeapon),
         abilityModifier: derived.equippedWeaponAttack.damageAbilityMod,
         quantity: ownedEquipmentQuantity(
           character?.equipment_ids ?? [],
@@ -2432,10 +2483,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         weapon: equippedOffHandWeapon,
         attack: derived.equippedOffHandWeaponAttack,
         hand: "off" as const,
-        defaultIncludeAbilityModifier: defaultOffHandIncludesAbilityMod(
-          abilityMod,
-          hasTwoWeaponFighting,
-        ),
+        defaultIncludeAbilityModifier:
+          !weaponOmitsAbilityModifierFromDamage(equippedOffHandWeapon) &&
+          defaultOffHandIncludesAbilityMod(abilityMod, hasTwoWeaponFighting),
         abilityModifier: abilityMod,
         quantity: ownedEquipmentQuantity(
           character?.equipment_ids ?? [],
@@ -3769,6 +3819,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         movementEffects.movementDisengage ? "Can Disengage without spending an action" : null,
         movementEffects.movementHide ? "Can Hide as part of another action" : null,
         movementEffects.spiderClimb ? "Can climb difficult surfaces (including ceilings) without a check" : null,
+        activeSheetToggleIds.some((id) => isMountedWeaponToggleId(id))
+          ? "Mounted weapon: every foot of movement costs 1 extra foot"
+          : null,
       ].filter((note): note is string => Boolean(note))
     : []
   const hasSenseNotes =
@@ -5093,6 +5146,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   <SheetActionsPanel
                     actions={utilityActions}
                     singleColumn={false}
+                    layoutScope="utility"
                     usedByActionId={usedActionUsesById}
                     onUsedChange={setUsedActionUsesById}
                     playerNoteValues={featureChoicePicks}
@@ -5330,81 +5384,77 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       disabled={incapacitated}
                       onUse={(kind) => markActionEconomy(kind)}
                     />
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 min-w-0">
-                      {(() => {
-                        const combatActionPanelProps = {
-                          actions: combatActions,
-                          usedByActionId: usedActionUsesById,
-                          onUsedChange: setUsedActionUsesById,
-                          playerNoteValues: featureChoicePicks,
-                          onPlayerNoteChange: (key: string, value: string) =>
-                            void persistFeatureChoicePicks(key, value.trim() ? [value] : []),
-                          onEquipmentChoiceChange: (key: string, value: string) =>
-                            void persistLinkedEquipmentChoice(key, value),
-                          resolveContext: usesResolveContext,
-                          resourceEntries,
-                          usedResourcesById,
-                          onResourceUsedChange: setUsedResourcesById,
-                          incapacitated,
-                          psiLimit,
-                          hitDiceRemaining: hitDiceRemainingTotal,
-                          onSpendHitDice: spendHitDiceForAction,
-                          onActivateSheetToggle: activateSheetToggle,
-                          onSpawnIllusionToken: spawnIllusionToken,
-                          onGrantMutationDie: grantMutationDieFromAction,
-                          onMarkEconomy: markActionEconomy,
-                          characterId: character.id,
-                          onApplySelfHeal: applySelfHeal,
-                          onApplySelfInspiration: applySelfInspiration,
-                          onApplySelfConditions: applySelfConditions,
-                          onAddDurationReminder: addDurationReminderFromAction,
-                          onApplyCompanionState: patchCompanionState,
-                          perfectedEnhancementBonus: perfectedEnhancementBonusValue,
-                          empoweredPsionicsBonus: empoweredPsionicsBonusValue,
-                          onMarkDamageDealt: markRampageDamageDealtThisTurn,
-                          onBankBalanceOfPower: hasBalanceOfPowerMechanic
-                            ? bankIntoBalanceOfPower
-                            : undefined,
-                          allyCandidates,
-                          healContext,
-                          singleColumn: true as const,
-                          onRestorePactSlots: handleRestorePactSlots,
-                          onRestoreSpellSlotsByCombinedLevel: handleRestoreSpellSlotsByCombinedLevel,
-                          onRestoreResourceFromSpellSlot: handleRestoreResourceFromSpellSlot,
-                          onSpendSpellSlot: handleSpendSpellSlot,
-                          primedBombUsedThisTurn,
-                          onPrimedBombUsed: () => setPrimedBombUsedThisTurn(true),
+                    <div id="sheet-combat-actions" className="min-w-0">
+                      <SheetActionsPanel
+                        actions={combatActions}
+                        usedByActionId={usedActionUsesById}
+                        onUsedChange={setUsedActionUsesById}
+                        playerNoteValues={featureChoicePicks}
+                        onPlayerNoteChange={(key: string, value: string) =>
+                          void persistFeatureChoicePicks(key, value.trim() ? [value] : [])
                         }
-                        return (
-                          <>
-                            <div className="space-y-3 min-w-0">
-                              <SheetEquippedWeaponsPanel
-                                weapons={equippedWeaponCards}
-                                buildInputs={characterBuildInputs}
-                                weaponProficiencies={derived?.weaponProficiencies ?? []}
-                                extraMasteryByWeaponId={extraMasteryByWeaponId}
-                                onExtraMasteryChange={persistExtraWeaponMasteries}
-                                onAttackRoll={() => markActionEconomy("action")}
-                                onDamageRoll={markRampageDamageDealtThisTurn}
-                              />
-                              <SheetActionsPanel
-                                {...combatActionPanelProps}
-                                sections="weapon-attacks"
-                              />
-                              <SheetActionsPanel
-                                {...combatActionPanelProps}
-                                sections="triggered"
-                              />
-                            </div>
-                            <div id="sheet-combat-actions">
-                              <SheetActionsPanel
-                                {...combatActionPanelProps}
-                                sections="economy"
-                              />
-                            </div>
-                          </>
-                        )
-                      })()}
+                        onEquipmentChoiceChange={(key: string, value: string) =>
+                          void persistLinkedEquipmentChoice(key, value)
+                        }
+                        resolveContext={usesResolveContext}
+                        resourceEntries={resourceEntries}
+                        usedResourcesById={usedResourcesById}
+                        onResourceUsedChange={setUsedResourcesById}
+                        incapacitated={incapacitated}
+                        psiLimit={psiLimit}
+                        hitDiceRemaining={hitDiceRemainingTotal}
+                        onSpendHitDice={spendHitDiceForAction}
+                        onActivateSheetToggle={activateSheetToggle}
+                        onSpawnIllusionToken={spawnIllusionToken}
+                        onGrantMutationDie={grantMutationDieFromAction}
+                        onMarkEconomy={markActionEconomy}
+                        characterId={character.id}
+                        onApplySelfHeal={applySelfHeal}
+                        onApplySelfInspiration={applySelfInspiration}
+                        onApplySelfConditions={applySelfConditions}
+                        onAddDurationReminder={addDurationReminderFromAction}
+                        onApplyCompanionState={patchCompanionState}
+                        perfectedEnhancementBonus={perfectedEnhancementBonusValue}
+                        empoweredPsionicsBonus={empoweredPsionicsBonusValue}
+                        onMarkDamageDealt={markRampageDamageDealtThisTurn}
+                        onBankBalanceOfPower={
+                          hasBalanceOfPowerMechanic ? bankIntoBalanceOfPower : undefined
+                        }
+                        allyCandidates={allyCandidates}
+                        healContext={healContext}
+                        singleColumn
+                        groupLayout="responsive-grid"
+                        layoutScope="combat"
+                        prependGroup={
+                          equippedWeaponCards.length
+                            ? {
+                                id: "weapons",
+                                node: (
+                                  <SheetEquippedWeaponsPanel
+                                    weapons={equippedWeaponCards}
+                                    buildInputs={characterBuildInputs}
+                                    weaponProficiencies={derived?.weaponProficiencies ?? []}
+                                    extraMasteryByWeaponId={extraMasteryByWeaponId}
+                                    onExtraMasteryChange={persistExtraWeaponMasteries}
+                                    onAttackRoll={() => markActionEconomy("action")}
+                                    onDamageRoll={markRampageDamageDealtThisTurn}
+                                    hideHeading
+                                    activeSheetToggleIds={activeSheetToggleIds}
+                                    onToggleMounted={(weaponId) =>
+                                      toggleSheetToggle(mountedWeaponToggleId(weaponId))
+                                    }
+                                  />
+                                ),
+                              }
+                            : null
+                        }
+                        onRestorePactSlots={handleRestorePactSlots}
+                        onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
+                        onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
+                        onSpendSpellSlot={handleSpendSpellSlot}
+                        primedBombUsedThisTurn={primedBombUsedThisTurn}
+                        onPrimedBombUsed={() => setPrimedBombUsedThisTurn(true)}
+                      />
                     </div>
                     {!equippedWeaponCards.length && !combatActions.length ? (
                       <p className="text-xs text-muted-foreground italic">
@@ -5540,6 +5590,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           </div>
                         </div>
                       )}
+                      {(derived?.specialSaveDcs ?? []).map((entry) => (
+                        <div
+                          key={`special-dc-${entry.classId}-${entry.label}`}
+                          className="flex justify-between items-center gap-2 px-2 py-1.5 rounded text-xs font-medium bg-secondary/10"
+                        >
+                          <span className="min-w-0">
+                            {entry.label}
+                            {entry.abilityLabel ? ` (${entry.abilityLabel})` : ""}
+                          </span>
+                          <span className="font-bold tabular-nums shrink-0">{entry.dc}</span>
+                        </div>
+                      ))}
                       {hasSpellcasting && spellSaveDcEntries.length > 0 ? (
                         <div className="space-y-1">
                           {spellSaveDcEntries.map((entry) => {
@@ -5996,7 +6058,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       const uses = resolveUsesConfig(ability.characteristics, ability.uses)
                       return (
                         <div key={ability.id} className="p-2 bg-muted rounded-lg text-xs">
-                          <p className="font-bold">{ability.name}</p>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <p className="font-bold">{ability.name}</p>
+                            {displayAbilityRoleLabel(ability) ? (
+                              <span className="rounded-full bg-background px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+                                {displayAbilityRoleLabel(ability)}
+                              </span>
+                            ) : null}
+                          </div>
                           {ability.description ? (
                             <ExpandableDescription
                               text={ability.description}

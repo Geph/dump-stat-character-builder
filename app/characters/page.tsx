@@ -10,7 +10,8 @@ import { Plus, User, Trash2, Pencil, Download, Upload, Users, ArrowUp } from "lu
 import { LevelUpWizard } from "@/components/character-sheet/level-up-wizard"
 import Link from "next/link"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
-import type { Character, DndClass, Species, Background } from "@/lib/types"
+import type { Character, DndClass, Species, Background, Subclass } from "@/lib/types"
+import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import {
   characterRowToExportItem,
   downloadCharacterExport,
@@ -44,6 +45,8 @@ import { rankSearchResults, searchItems } from "@/lib/search/ranked-search"
 
 interface CharacterWithRelations extends Character {
   classes?: DndClass
+  class_list?: CharacterClassDetail[]
+  subclasses?: Subclass
   species?: Species
   backgrounds?: Background
 }
@@ -570,6 +573,17 @@ export default function CharactersPage() {
                     <p className="text-sm text-primary font-medium">
                       {character.classes?.name || "Adventurer"}
                     </p>
+                    {(character.subclasses?.name ||
+                      character.class_list?.find(
+                        (entry) => entry.row.class_id === character.class_id,
+                      )?.subclass?.name) && (
+                      <p className="text-xs font-medium text-secondary">
+                        {character.subclasses?.name ||
+                          character.class_list?.find(
+                            (entry) => entry.row.class_id === character.class_id,
+                          )?.subclass?.name}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {character.species?.name || "Unknown Species"}
                     </p>

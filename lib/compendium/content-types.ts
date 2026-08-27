@@ -82,8 +82,10 @@ export function getCompendiumItemIcon(
   tab: CompendiumContentType,
   item: Record<string, unknown>,
 ): string {
-  const icon = item.icon
-  if (typeof icon === "string" && icon.trim()) return icon.trim()
+  const icon = typeof item.icon === "string" ? item.icon.trim() : ""
+  // `gunshot` was stamped on Gunslinger content, but the SVG is not shipped.
+  // Treat it as unset so name / class defaults can fill in.
+  if (icon && icon !== "gunshot") return icon
   if (tab === "classes") {
     const classIcon = defaultClassIconForName(String(item.name ?? ""))
     if (classIcon) return classIcon
@@ -113,7 +115,7 @@ export function getCompendiumItemIcon(
     if (creatureIcon) return creatureIcon
   }
   if (tab === "abilities") {
-    const abilityIcon = defaultAbilityIconForItem(item)
+    const abilityIcon = defaultAbilityIconForItem({ ...item, icon: icon || undefined })
     if (abilityIcon) return abilityIcon
   }
   if (

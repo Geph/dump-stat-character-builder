@@ -34,4 +34,15 @@ describe("detectGoverningAbilityFromText", () => {
       )?.label,
     ).toBe("Psionic ability")
   })
+
+  it("detects Gunslinger Maneuver save DC prose", () => {
+    expect(
+      detectNonSpellSpecialAbilityFromText(
+        "If a maneuver requires a saving throw, the DC equals 8 plus your Dexterity modifier and Proficiency Bonus.",
+      ),
+    ).toMatchObject({
+      save_dc_ability: "dexterity",
+      label: "Maneuver save DC",
+    })
+  })
 })

@@ -27,6 +27,12 @@ export const WEAPON_MASTERY_DESCRIPTIONS: Record<string, string> = {
     "If you hit a creature with this weapon and deal damage to the creature, you have Advantage on your next attack roll against that creature before the end of your next turn.",
 }
 
+/** Non-SRD mastery rules (Mage Hand Press Mounted, imported catalogs, …). */
+export const HOMEBREW_WEAPON_MASTERY_DESCRIPTIONS: Record<string, string> = {
+  Mounted:
+    "You can take a Bonus Action to mount this weapon in a fixed position until the end of your turn. A damage value in parentheses appears with this property. While mounted, the weapon deals that damage when used to make a ranged attack, and the weapon can't be moved.",
+}
+
 export const STANDARD_WEAPON_MASTERY_NAMES = Object.keys(WEAPON_MASTERY_DESCRIPTIONS)
 
 function stripHtml(text: string): string {
@@ -119,9 +125,10 @@ export function describeWeaponMastery(
     }
   }
 
-  const exact = WEAPON_MASTERY_DESCRIPTIONS[trimmed]
+  const lookups = { ...WEAPON_MASTERY_DESCRIPTIONS, ...HOMEBREW_WEAPON_MASTERY_DESCRIPTIONS }
+  const exact = lookups[trimmed]
   if (exact) return exact
-  const match = Object.entries(WEAPON_MASTERY_DESCRIPTIONS).find(
+  const match = Object.entries(lookups).find(
     ([key]) => key.toLowerCase() === trimmed.toLowerCase(),
   )
   return match?.[1] ?? null

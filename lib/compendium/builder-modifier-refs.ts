@@ -231,7 +231,7 @@ function classCharacteristicsWithPlayerPicks(params: {
     const cls = classes.find((candidate) => candidate.id === entry.classId)
     if (!cls) continue
 
-    const processFeatures = (features: Feature[]) => {
+    const processFeatures = (features: Feature[], ownerName: string) => {
       for (const rawFeature of features) {
         if (rawFeature.level > entry.level) continue
         const instances: LinkedModifierInstance[] = []
@@ -239,11 +239,17 @@ function classCharacteristicsWithPlayerPicks(params: {
         const filtered = filterSpellsKnownByClassLevel(instances, entry.level)
         const key = featureChoiceKey(entry.classId, rawFeature.name, rawFeature.level)
         const chars = characteristicsFromLinkedModifiers(catalog, filtered, rawFeature.modifierRefs)
-        mods.push(...applyModifierPlayerPicks(chars, key, modifierPlayerPicks))
+        mods.push(
+          ...tagModifierSource(applyModifierPlayerPicks(chars, key, modifierPlayerPicks), {
+            sourceType: "class",
+            source: rawFeature.name,
+            label: `${rawFeature.name} (${ownerName})`,
+          }),
+        )
       }
     }
 
-    processFeatures(cls.features ?? [])
+    processFeatures(cls.features ?? [], cls.name)
 
     const subclassId = subclassByClassId[entry.classId]
     if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
@@ -252,7 +258,7 @@ function classCharacteristicsWithPlayerPicks(params: {
         const subclassFeatures = /captain/i.test(cls.name)
           ? sanitizeCaptainSubclassFeatures(subclass.features) ?? subclass.features ?? []
           : subclass.features ?? []
-        processFeatures(subclassFeatures)
+        processFeatures(subclassFeatures, subclass.name)
       }
     }
   }
@@ -522,11 +528,7 @@ export function collectBuilderModifierRefIds(params: {
 
   return [
     ...speciesResolved,
-    ...tagModifierSource(normalizeCharacteristics(classResolved, null), {
-      sourceType: "class",
-      source: "Class features",
-      label: "Class features",
-    }),
+    ...normalizeCharacteristics(classResolved, null),
     ...tagModifierSource(normalizeCharacteristics(backgroundResolved, null), {
       sourceType: "background",
       source: background?.name ?? "Background",

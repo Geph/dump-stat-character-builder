@@ -51,6 +51,11 @@ export function hasWeaponProperty(equipment: Equipment, property: string): boole
   return propertiesToStringArray(equipment.properties).some((tag) => tag.toLowerCase().includes(needle))
 }
 
+/** Firearm: do not add the ability modifier to damage unless a feature says otherwise. */
+export function weaponOmitsAbilityModifierFromDamage(equipment: Equipment): boolean {
+  return hasWeaponProperty(equipment, "firearm")
+}
+
 export function isThrownWeapon(equipment: Equipment): boolean {
   return hasWeaponProperty(equipment, "thrown")
 }
@@ -294,7 +299,7 @@ export function calculateWeaponAttack(
     forRoll: "damage",
   })
   const attackBonus = abilityMod + (isProficient ? proficiencyBonus : 0)
-  const damageMod = damageAbility.mod
+  const damageMod = weaponOmitsAbilityModifierFromDamage(weapon) ? 0 : damageAbility.mod
   const modSuffix =
     damageMod === 0 ? "" : damageMod > 0 ? ` + ${damageMod}` : ` - ${Math.abs(damageMod)}`
   const damageDisplay = `${dice}${modSuffix}${damageType ? ` ${damageType}` : ""}`.trim()

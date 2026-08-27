@@ -100,6 +100,29 @@ describe("weapon mastery options scoped to class proficiencies", () => {
     expect(fighter).toContain("Longbow")
     expect(fighter).toContain("Greataxe")
   })
+
+  it("includes imported proficient weapons in a class mastery picker", () => {
+    const revolver = {
+      id: "revolver",
+      name: "Revolver",
+      category: "Weapon",
+      subcategory: "Martial Ranged",
+      properties: {
+        damage: "2d6 Piercing",
+        properties: ["Ammunition (Range 30/120; Bullet)", "Reload (6)"],
+        mastery: "Vex",
+      },
+    } as unknown as Equipment
+
+    const gunslinger = weaponMasteryOptionsForClass(
+      "Gunslinger",
+      [revolver],
+      null,
+      ["Simple weapons", "Martial Ranged weapons"],
+    ).map((option) => option.name)
+
+    expect(gunslinger).toContain("Revolver")
+  })
 })
 
 describe("SRD Rogue weapon proficiency qualifier", () => {

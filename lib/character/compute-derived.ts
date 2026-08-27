@@ -63,12 +63,21 @@ import {
 import {
   buildUnarmedStrikeEquipment,
   characterHasFreeHand,
+  characterIsEmptyHanded,
   extraUnarmedStrikeAbilityOverrides,
 } from "@/lib/character/unarmed-strike"
 import {
   buildWeaponDamageExpression,
   parseWeaponDamageDice,
+  stepWeaponDamageDice,
+  swapDamageDice,
 } from "@/lib/compendium/weapon-damage-roll"
+import {
+  anyEquippedWeaponIsMounted,
+  canMountWeapon,
+  isWeaponMounted,
+} from "@/lib/character/mounted-weapon"
+import { collectSpecialSaveDcs } from "@/lib/character/special-save-dc"
 import {
   characterHasTwoWeaponFighting,
   defaultOffHandIncludesAbilityMod,
@@ -136,6 +145,7 @@ function buildWeaponAttackDerived(
     featureDamageBonus: number
     includeAbilityModifier?: boolean
     characterLevel?: number
+    stepDamageDice?: boolean
   },
 ): WeaponAttackDerived | null {
   const unarmed = isUnarmedStrikeWeapon(weapon)
@@ -175,10 +185,13 @@ function buildWeaponAttackDerived(
     weapon,
     params.characterLevel ?? 1,
   )
-  const damageDice =
+  let damageDice =
     parsed != null && overrideSides != null
       ? replaceDamageDiceSides(parsed, overrideSides)
       : parsed
+  if (damageDice && params.stepDamageDice) {
+    damageDice = stepWeaponDamageDice(damageDice) ?? damageDice
+  }
   const damageDisplay =
     damageDice != null && params.includeAbilityModifier != null
       ? buildWeaponDamageExpression({
@@ -189,9 +202,11 @@ function buildWeaponAttackDerived(
           flatDamageBonus: damageBonus,
           overrides,
         })
-      : damageBonus > 0
-        ? `${base.damageDisplay} + ${damageBonus}`
-        : base.damageDisplay
+      : damageDice != null && params.stepDamageDice
+        ? swapDamageDice(base.damageDisplay, damageDice)
+        : damageBonus > 0
+          ? `${base.damageDisplay} + ${damageBonus}`
+          : base.damageDisplay
 
   const attackAbility = getWeaponAttackAbility(weapon, params.abilityMods, {
     overrides,
@@ -826,7 +841,15 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     wearingArmor,
   })
 
+  const heldWeapons = [equippedWeapon, equippedOffHandWeapon].filter(
+    (weapon): weapon is Equipment => Boolean(weapon),
+  )
+  const mountedMovement = anyEquippedWeaponIsMounted(inputs, heldWeapons, weaponProficiencies)
+
   let speed = resolveWalkSpeed(inputs, aggregatedCharacteristics.speed)
+  if (mountedMovement) {
+    speed = Math.floor(speed * 0.5)
+  }
   const walkBeforeExhaustion = speed
   if (exhaustionFx.speedMultiplier < 1) {
     speed = Math.floor(speed * exhaustionFx.speedMultiplier)
@@ -882,6 +905,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     currentHp: inputs.currentHp,
   }
   const resolvedFeatures = inputs.resolvedFeatures ?? []
+  const specialSaveDcs = collectSpecialSaveDcs(inputs, abilityMods, proficiencyBonus)
   const spellcasting = buildSpellcastingEntries({
     classLevels: inputs.classLevels,
     classes: inputs.classes,
@@ -912,20 +936,35 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     characterLevel: totalLevel,
   }
 
+  const mainMounted =
+    Boolean(equippedWeapon) &&
+    isWeaponMounted(inputs.activeSheetToggles, equippedWeapon!.id) &&
+    canMountWeapon(equippedWeapon!, inputs, weaponProficiencies)
+
   const equippedWeaponAttack =
     equippedWeapon && primaryClass
-      ? buildWeaponAttackDerived(equippedWeapon, weaponAttackContext)
+      ? buildWeaponAttackDerived(equippedWeapon, {
+          ...weaponAttackContext,
+          stepDamageDice: mainMounted,
+        })
       : equippedWeapon
         ? buildWeaponAttackDerived(equippedWeapon, {
             ...weaponAttackContext,
             weaponProficiencies: [],
+            stepDamageDice: mainMounted,
           })
         : null
+
+  const offHandMounted =
+    Boolean(equippedOffHandWeapon) &&
+    isWeaponMounted(inputs.activeSheetToggles, equippedOffHandWeapon!.id) &&
+    canMountWeapon(equippedOffHandWeapon!, inputs, weaponProficiencies)
 
   const equippedOffHandWeaponAttack =
     equippedOffHandWeapon && primaryClass
       ? buildWeaponAttackDerived(equippedOffHandWeapon, {
           ...weaponAttackContext,
+          stepDamageDice: offHandMounted,
           includeAbilityModifier: defaultOffHandIncludesAbilityMod(
             getWeaponAttackAbility(equippedOffHandWeapon, abilityMods, {
               overrides: aggregatedCharacteristics.weaponAbilityOverrides,
@@ -938,6 +977,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
         ? buildWeaponAttackDerived(equippedOffHandWeapon, {
             ...weaponAttackContext,
             weaponProficiencies: [],
+            stepDamageDice: offHandMounted,
             includeAbilityModifier: defaultOffHandIncludesAbilityMod(
               getWeaponAttackAbility(equippedOffHandWeapon, abilityMods, {
                 overrides: aggregatedCharacteristics.weaponAbilityOverrides,
@@ -948,14 +988,17 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
           })
         : null
 
-  const unarmedStrikeWeapon = characterHasFreeHand({
+  const unarmedHands = {
     mainWeapon: equippedWeapon,
     offHandWeapon: equippedOffHandWeapon,
     shield: equippedShield,
-  })
+  }
+  const unarmedStrikeWeapon = characterHasFreeHand(unarmedHands)
     ? buildUnarmedStrikeEquipment({
         die: aggregatedCharacteristics.unarmedStrikeDie,
         dieByLevel: aggregatedCharacteristics.unarmedStrikeDieByLevel,
+        emptyHandedDie: aggregatedCharacteristics.unarmedStrikeEmptyHandedDie,
+        emptyHanded: characterIsEmptyHanded(unarmedHands),
         damageType: aggregatedCharacteristics.unarmedStrikeDamageType,
         ability: aggregatedCharacteristics.unarmedStrikeAbility,
         characterLevel: totalLevel,
@@ -1027,6 +1070,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
       totalLevel,
     ),
     spellcasting,
+    specialSaveDcs,
     forcedSaveRemaps,
     telepathy,
     restReplacement: aggregatedCharacteristics.restReplacement,

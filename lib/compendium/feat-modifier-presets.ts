@@ -272,9 +272,14 @@ export function damageMod(
   ])
 }
 
-export function unarmedDie(key: string, die: "1d4" | "1d6" | "1d8", label: string): LinkedModifierInstance {
+export function unarmedDie(
+  key: string,
+  die: "1d4" | "1d6" | "1d8",
+  label: string,
+  extras?: { emptyHandedDie?: import("@/lib/compendium/characteristic-modifiers").UnarmedStrikeDie },
+): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.unarmedStrikeDamage, [
-    { id: modId(key), type: "unarmed_strike_damage", die, label },
+    { id: modId(key), type: "unarmed_strike_damage", die, label, ...extras },
   ])
 }
 

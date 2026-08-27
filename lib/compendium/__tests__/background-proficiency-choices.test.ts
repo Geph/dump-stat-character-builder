@@ -203,4 +203,70 @@ describe("unmatched starting equipment", () => {
     })
     expect(missing.map((row) => row.name)).toEqual([])
   })
+
+  it("flags class starting weapons that have no catalog or batch equipment row", () => {
+    const missing = collectUnmatchedStartingEquipmentNames({
+      classes: [
+        {
+          name: "Gunslinger",
+          description: null,
+          hit_die: 8,
+          primary_ability: ["Dexterity"],
+          features: [],
+          starting_equipment_groups: [
+            {
+              description: "Choose A or B:",
+              options: [
+                {
+                  label: "A",
+                  items: [
+                    { name: "Revolver", quantity: 1 },
+                    { name: "Bullets, Firearm", quantity: 50 },
+                    { name: "Dagger", quantity: 2 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+    expect(missing.map((row) => row.name)).toContain("Revolver")
+    expect(missing.map((row) => row.name)).not.toContain("Bullets, Firearm")
+    expect(missing.map((row) => row.name)).not.toContain("Dagger")
+  })
+
+  it("does not flag a class weapon when the same JSON includes an equipment row", () => {
+    const missing = collectUnmatchedStartingEquipmentNames({
+      classes: [
+        {
+          name: "Gunslinger",
+          description: null,
+          hit_die: 8,
+          primary_ability: ["Dexterity"],
+          features: [],
+          starting_equipment_groups: [
+            {
+              description: "Choose A or B:",
+              options: [
+                {
+                  label: "A",
+                  items: [{ name: "Revolver", quantity: 1 }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      equipment: [
+        {
+          name: "Revolver",
+          category: "Weapon",
+          subcategory: "Martial Ranged Weapons",
+          description: null,
+        },
+      ],
+    })
+    expect(missing.map((row) => row.name)).not.toContain("Revolver")
+  })
 })

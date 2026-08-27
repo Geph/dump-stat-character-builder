@@ -8,6 +8,8 @@ export type SheetRollEntry = {
   summary: string
   /** d20 natural roll when applicable (for nat 1/20 styling). */
   natural?: number
+  /** Every d20 face from the roll (two when advantage or disadvantage). */
+  naturals?: number[]
 }
 
 const STORAGE_PREFIX = "dump-stat-roll-history-"

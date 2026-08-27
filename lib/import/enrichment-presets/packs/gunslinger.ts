@@ -73,6 +73,21 @@ export function sanitizeGunslingerImportContent(content: ImportContent): ImportC
   const hasGunslinger = (content.classes ?? []).some((cls) => /gunslinger/i.test(cls.name ?? ""))
   if (!hasGunslinger) return content
 
+  content = {
+    ...content,
+    classes: (content.classes ?? []).map((cls) => {
+      if (!/gunslinger/i.test(cls.name ?? "")) return cls
+      return {
+        ...cls,
+        special_ability: cls.special_ability ?? {
+          save_dc_ability: "dexterity",
+          label: "Maneuver save DC",
+          dc_formula: "8_plus_prof_plus_ability_mod",
+        },
+      }
+    }),
+  }
+
   const proposals = content.import_proposals?.custom_abilities
   if (!proposals?.length && !content.import_proposals) return content
 
@@ -264,7 +279,7 @@ export const GUNSLINGER_PRESETS: EnrichmentPreset[] = [
             {
               id: modId("heavy_gunner_armor"),
               type: "armor_proficiencies",
-              armor: ["Medium Armor", "Heavy Armor"],
+              values: ["Medium Armor", "Heavy Armor"],
               label: "Heavy Gunner: Medium and Heavy armor",
             },
           ],
@@ -281,14 +296,27 @@ export const GUNSLINGER_PRESETS: EnrichmentPreset[] = [
             {
               id: modId("heavy_gunner_str_ranged"),
               type: "weapon_ability_override",
-              alternateAbility: "strength",
-              weaponAbilityAppliesTo: "both",
-              weaponAbilityScope: "ranged",
+              ability: "strength",
+              appliesTo: "both",
+              scope: "ranged",
               label: "Heavy Gunner: Strength for ranged attack and damage",
             },
           ],
         },
         replaceCharacteristicTypes: ["weapon_ability_override"],
+      },
+    ],
+  },
+  {
+    id: "gunslinger.subclass.walking_turret",
+    pack: "gunslinger",
+    target: "subclass_feature",
+    match: { subclassClassName: /gunslinger/i, name: /^walking turret$/i },
+    operations: [
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "appendDescription",
+        text: "Move While Mounted. You can move a weapon with the Mounted mastery property that is in a fixed position. While moving with such a weapon, every foot of movement costs 1 extra foot.",
       },
     ],
   },

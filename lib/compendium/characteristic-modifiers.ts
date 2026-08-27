@@ -667,6 +667,8 @@ export interface UnarmedStrikeDamageCharacteristic extends CharacteristicModifie
   die?: UnarmedStrikeDie
   /** Martial Arts-style die progression by character level. */
   dieByLevel?: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
+  /** Higher die while not wielding a weapon or shield (Unarmed Fighting 1d8). */
+  emptyHandedDie?: UnarmedStrikeDie | null
   /** Damage type for natural weapons (default Bludgeoning). */
   damageType?: string | null
   /** Ability modifier added to damage (default strength). */
@@ -1498,7 +1500,7 @@ export function createCharacteristicModifier(
     case "damage_roll_modifiers":
       return { id, type, entries: [{ bonus: 2, target: "one_handed_melee" }] }
     case "unarmed_strike_damage":
-      return { id, type, die: "1d6", dieByLevel: [], damageType: null, ability: null }
+      return { id, type, die: "1d6", dieByLevel: [], emptyHandedDie: null, damageType: null, ability: null }
     case "weapon_damage_die_override":
       return {
         id,
@@ -1721,6 +1723,20 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       }
     }
     return { ...legacy, entries: legacy.entries ?? [] }
+  }
+
+  if (value.type === "weapon_ability_override") {
+    const raw = value as WeaponAbilityOverrideCharacteristic & {
+      alternateAbility?: AbilityScoreKey
+      weaponAbilityAppliesTo?: WeaponAbilityAppliesTo
+      weaponAbilityScope?: WeaponAbilityScope
+    }
+    return {
+      ...raw,
+      ability: raw.ability ?? raw.alternateAbility ?? "strength",
+      appliesTo: raw.appliesTo ?? raw.weaponAbilityAppliesTo ?? "both",
+      scope: raw.scope ?? raw.weaponAbilityScope ?? "all",
+    }
   }
 
   if (value.type === "weapon_proficiencies") {
@@ -1958,8 +1974,9 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     value.type === "armor_proficiencies" ||
     value.type === "saving_throws"
   ) {
-    const raw = value as ListCharacteristic
-    return { ...raw, values: coerceStringArray(raw.values), choiceCount: raw.choiceCount ?? null }
+    const raw = value as ListCharacteristic & { armor?: string[] }
+    const values = coerceStringArray(raw.values?.length ? raw.values : raw.armor)
+    return { ...raw, values, choiceCount: raw.choiceCount ?? null }
   }
 
   if (value.type === "damage_resistance" || value.type === "damage_immunity") {
@@ -1979,6 +1996,7 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       ...raw,
       die: raw.die ?? "1d6",
       dieByLevel: normalizeBonusByLevel(raw.dieByLevel),
+      emptyHandedDie: raw.emptyHandedDie ?? null,
       damageType: raw.damageType ?? null,
       ability: raw.ability ?? null,
     }
@@ -2234,6 +2252,7 @@ export type AggregatedCharacteristics = {
   weaponReachModifiers: WeaponReachModifierCharacteristic[]
   unarmedStrikeDie: UnarmedStrikeDie | null
   unarmedStrikeDieByLevel: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
+  unarmedStrikeEmptyHandedDie: UnarmedStrikeDie | null
   unarmedStrikeDamageType: string | null
   unarmedStrikeAbility: AbilityScoreKey | null
   weaponDamageDieOverrides: WeaponDamageDieOverrideCharacteristic[]
@@ -2344,6 +2363,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   damageRollModifiers: [],
   weaponReachModifiers: [],
   unarmedStrikeDie: null,
+  unarmedStrikeEmptyHandedDie: null,
   unarmedStrikeDieByLevel: [],
   unarmedStrikeDamageType: null,
   unarmedStrikeAbility: null,
@@ -2425,7 +2445,7 @@ function pushGrantedEquipment(
   }
 }
 
-function pickHigherUnarmedDie(
+export function pickHigherUnarmedDie(
   current: UnarmedStrikeDie | null,
   next: UnarmedStrikeDie,
 ): UnarmedStrikeDie {
@@ -2719,6 +2739,12 @@ export function aggregateCharacteristics(
         }
         if (mod.die) {
           result.unarmedStrikeDie = pickHigherUnarmedDie(result.unarmedStrikeDie, mod.die)
+        }
+        if (mod.emptyHandedDie) {
+          result.unarmedStrikeEmptyHandedDie = pickHigherUnarmedDie(
+            result.unarmedStrikeEmptyHandedDie,
+            mod.emptyHandedDie,
+          )
         }
         if (mod.damageType) {
           result.unarmedStrikeDamageType = mod.damageType

@@ -3749,6 +3749,27 @@ function UnarmedStrikeDamageEditor({
           </select>
         </div>
       )}
+
+      <label className="text-sm text-muted-foreground">
+        Empty-handed die
+        <select
+          value={mod.emptyHandedDie ?? ""}
+          onChange={(e) =>
+            onChange({
+              ...mod,
+              emptyHandedDie: (e.target.value || null) as typeof mod.emptyHandedDie,
+            })
+          }
+          className="mt-1 block px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        >
+          <option value="">Same as fixed / scaled die</option>
+          {UNARMED_STRIKE_DICE.filter((die) => die !== "1").map((die) => (
+            <option key={die} value={die}>
+              {die} (no weapon or shield)
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   )
 }

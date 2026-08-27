@@ -107,6 +107,16 @@ export type DerivedForcedSaveRemap = {
   label?: string
 }
 
+export type DerivedSpecialSaveDc = {
+  classId: string
+  className: string
+  label: string
+  ability: AbilityScoreKey
+  abilityLabel: string
+  abilityMod: number
+  dc: number
+}
+
 export type DerivedTelepathy = {
   rangeFeet: number
   label?: string
@@ -167,6 +177,8 @@ export type DerivedCharacter = {
   tools: ToolBonus[]
   saves: SaveBonus[]
   spellcasting: DerivedSpellcastingEntry[]
+  /** Non-spell class save DCs (Maneuver, Technique, Psionic, …). */
+  specialSaveDcs: DerivedSpecialSaveDc[]
   forcedSaveRemaps: DerivedForcedSaveRemap[]
   telepathy: DerivedTelepathy | null
   restReplacement: {

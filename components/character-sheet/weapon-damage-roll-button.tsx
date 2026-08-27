@@ -13,7 +13,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { WeaponDamageDiceOption } from "@/lib/compendium/weapon-damage-roll"
+import {
+  swapDamageDice,
+  type WeaponDamageDiceOption,
+} from "@/lib/compendium/weapon-damage-roll"
 import type { DamageRollMode, ParsedDamageRoll } from "@/lib/dice/damage-roll"
 import {
   formatDamageRollResult,
@@ -44,13 +47,6 @@ function abilityModInExpression(
 ): number {
   if (includeAbilityModifier) return abilityModifier
   return abilityModifier < 0 ? abilityModifier : 0
-}
-
-function swapDamageDice(expression: string, dice: string): string {
-  const withoutType = expression.replace(/\s+[a-z][a-z\s]*$/i, "").trim()
-  const modPart = withoutType.replace(/^[\dd+\s]+/i, "").trim()
-  const typePart = expression.match(/\s+([a-z][a-z\s]*)$/i)?.[1] ?? ""
-  return `${dice}${modPart ? ` ${modPart}` : ""}${typePart ? ` ${typePart}` : ""}`.trim()
 }
 
 function resolveRollParsed(

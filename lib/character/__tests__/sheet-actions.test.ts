@@ -1050,6 +1050,58 @@ describe("triggered activations", () => {
     expect(font?.spendsEconomy).toBe(false)
   })
 
+  it("files Grazing Shot and Maverick Spirit as passives, not actions", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([], 2)],
+      species: null,
+      customAbilities: [
+        {
+          id: "grazing-shot",
+          name: "Grazing Shot",
+          description:
+            "<p>When you miss with a ranged attack roll using a weapon, you can expend one Risk Die (no action required) to deal damage to that creature equal to the number rolled on the die.</p>",
+          prerequisites: null,
+          characteristics: null,
+          attached_to_type: "class",
+          attached_to_id: "class-1",
+          uses: { type: "class_resource", classResourceKey: "risk_dice", classResourceAmount: 1 },
+          show_in_builder: true,
+          ability_role: "knack",
+          casting_time: "1 action",
+          icon: null,
+          source: "Mage Hand Press",
+          creator_url: null,
+          created_at: "",
+          updated_at: "",
+        },
+        {
+          id: "maverick-spirit",
+          name: "Maverick Spirit",
+          description:
+            "<p>When you fail an Intelligence, Wisdom, or Charisma ability check or saving throw, you can expend one Risk Die to add it to the roll, potentially turning the failure into a success.</p>",
+          prerequisites: null,
+          characteristics: null,
+          attached_to_type: "class",
+          attached_to_id: "class-1",
+          uses: { type: "class_resource", classResourceKey: "risk_dice", classResourceAmount: 1 },
+          show_in_builder: true,
+          ability_role: "knack",
+          icon: null,
+          source: "Mage Hand Press",
+          creator_url: null,
+          created_at: "",
+          updated_at: "",
+        },
+      ],
+    })
+    const grazing = actions.find((action) => action.name === "Grazing Shot")
+    expect(grazing?.trigger).toBe("When you miss")
+    expect(grazing?.spendsEconomy).toBe(false)
+    const maverick = actions.find((action) => action.name === "Maverick Spirit")
+    expect(maverick?.trigger).toBe("When you fail a roll")
+    expect(maverick?.spendsEconomy).toBe(false)
+  })
+
   it("cards a drop-to-0 escape hatch that has uses but no action cost", () => {
     const actions = collectSheetActions({
       classDetails: [

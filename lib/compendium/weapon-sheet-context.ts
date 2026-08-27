@@ -7,6 +7,7 @@ import {
   type BonusDamageRidersCharacteristic,
   type CharacteristicModifier,
   type DamageRollModifiersCharacteristic,
+  type OnHitTriggerCharacteristic,
   type RollModifierEntry,
   type WeaponReachModifierCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
@@ -35,6 +36,7 @@ export type WeaponSheetAppliedModifier = {
   name: string
   description: string
   sourceType?: StatContributionSourceType
+  sourceLabel?: string
 }
 
 export type WeaponSheetExtraMastery = {
@@ -53,6 +55,23 @@ export type WeaponSheetContext = {
 
 function normalizeToken(value: string): string {
   return value.trim().toLowerCase()
+}
+
+function weaponMatchesAppliesTo(
+  weapon: Equipment,
+  properties: string[],
+  appliesTo: string | null | undefined,
+): boolean {
+  if (!appliesTo || appliesTo === "all") return true
+  const needle = appliesTo.toLowerCase()
+  if (needle === "unarmed" || needle.includes("unarmed")) {
+    return isUnarmedStrikeWeapon(weapon)
+  }
+  const damageType = weapon.damage_type?.trim().toLowerCase() ?? ""
+  if (damageType && (needle === damageType || needle.includes(damageType))) return true
+  return weaponMatchesModifierTarget(weapon.subcategory ?? "", properties, appliesTo, {
+    unarmed: isUnarmedStrikeWeapon(weapon),
+  })
 }
 
 function weaponMatchesModifierTarget(
@@ -135,6 +154,17 @@ function describeRiderOption(rider: BonusDamageRiderEntry): string {
   return costs.length ? `${rider.name} (${costs.join(" + ")})` : rider.name
 }
 
+function appliedModifierSource(mod: CharacteristicModifier): Pick<
+  WeaponSheetAppliedModifier,
+  "sourceType" | "sourceLabel"
+> {
+  const source = readModifierSource(mod)
+  return {
+    sourceType: source?.sourceType,
+    sourceLabel: source?.label || source?.source,
+  }
+}
+
 function collectAppliedModifiers(
   weapon: Equipment,
   mods: CharacteristicModifier[],
@@ -163,7 +193,7 @@ function collectAppliedModifiers(
         applied.push({
           name: mod.label ?? "Attack modifier",
           description: extra.join(". "),
-          sourceType: readModifierSource(mod)?.sourceType,
+          ...appliedModifierSource(mod),
         })
         break
       }
@@ -178,7 +208,7 @@ function collectAppliedModifiers(
         applied.push({
           name: mod.label ?? "Damage modifier",
           description,
-          sourceType: readModifierSource(mod)?.sourceType,
+          ...appliedModifierSource(mod),
         })
         break
       }
@@ -199,9 +229,23 @@ function collectAppliedModifiers(
         applied.push({
           name: mod.label ?? "Reach modifier",
           description: `+${reachMod.reachBonusFeet} ft. reach`,
-          sourceType: readModifierSource(mod)?.sourceType,
+          ...appliedModifierSource(mod),
         })
       }
+    }
+
+    if (mod.type === "on_hit_trigger") {
+      const trigger = mod as OnHitTriggerCharacteristic
+      if (!weaponMatchesAppliesTo(weapon, properties, trigger.appliesTo)) continue
+      const bits: string[] = []
+      if (trigger.triggerOn === "crit") bits.push("On a critical hit")
+      else bits.push("On a hit")
+      if (trigger.oncePerTurn) bits.push("once per turn")
+      applied.push({
+        name: trigger.triggerOn === "crit" ? "Critical hit" : "On hit",
+        description: trigger.label?.trim() || bits.join(" · "),
+        ...appliedModifierSource(mod),
+      })
     }
 
     if (mod.type === "bonus_damage_riders") {
@@ -221,13 +265,13 @@ function collectAppliedModifiers(
           description:
             formatRollBonusSummary(riderMod.automaticBonus, { classResourceDieSides }) ||
             "Bonus damage on hit",
-          sourceType: readModifierSource(mod)?.sourceType,
+          ...appliedModifierSource(mod),
         })
       } else if (riderMod.riders?.length) {
         applied.push({
           name: mod.label ?? "On-hit options",
           description: `Pick on the Combat tab: ${riderMod.riders.map(describeRiderOption).join(", ")}`,
-          sourceType: readModifierSource(mod)?.sourceType,
+          ...appliedModifierSource(mod),
         })
       }
     }

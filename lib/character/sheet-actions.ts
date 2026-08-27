@@ -492,18 +492,20 @@ function kindsFromText(description: string | null | undefined): ActionEconomyKin
  * or Reaction (Font of Inspiration, Stroke of Luck, Hurl Through Hell). First match wins.
  */
 const TRIGGER_TEXT_PATTERNS: { re: RegExp; label: string }[] = [
-  { re: /\bno action required\b/i, label: "No action required" },
-  { re: /\bwithout (?:using|expending|spending) an action\b/i, label: "No action required" },
   { re: /\breduced to 0 hit points\b/i, label: "When reduced to 0 HP" },
   { re: /\b(?:when|whenever) you roll initiative\b/i, label: "When you roll Initiative" },
+  { re: /\b(?:when|whenever|if) you miss\b/i, label: "When you miss" },
   { re: /\b(?:when|whenever|if) you (?:hit|score a critical hit)\b/i, label: "On a hit" },
   { re: /\b(?:when|whenever|if) you deal sneak attack damage\b/i, label: "On a hit" },
-  { re: /\b(?:when|whenever|if) (?:you|the attack) (?:fail|miss)/i, label: "When you fail a roll" },
+  { re: /\b(?:when|whenever|if) you fail\b/i, label: "When you fail a roll" },
+  { re: /\b(?:when|whenever|if) the attack (?:fail|miss)/i, label: "When you fail a roll" },
   {
     re: /\b(?:when|whenever) you make an? (?:ability check|saving throw|attack roll|d20 test)\b/i,
     label: "When you make a D20 Test",
   },
   { re: /\b(?:when|whenever) you cast a spell\b/i, label: "When you cast a spell" },
+  { re: /\bno action required\b/i, label: "No action required" },
+  { re: /\bwithout (?:using|expending|spending) an action\b/i, label: "No action required" },
 ]
 
 /** Prose that declares an optional expenditure ("you can expend a spell slot"). */
@@ -1298,6 +1300,10 @@ function pushCustomAbilityActions(
       fallback.kinds,
       flexibleEconomyKindsFromText(`${ability.casting_time ?? ""} ${ability.description ?? ""}`),
     )
+    const trigger = resolveTriggeredActivationLabel({
+      ...item,
+      description: `${ability.description ?? ""} ${ability.execution ?? ""} ${ability.casting_time ?? ""}`,
+    })
 
     if (!kinds.length && ability.ability_role === "psionic_power") {
       kinds.push("action")
@@ -1322,6 +1328,7 @@ function pushCustomAbilityActions(
       name: ability.name,
       sourceLabel: customAbilitySourceLabel(ability),
       kinds,
+      trigger,
       category: classifyActionCategory(item, {
         preferCombat: preferCombatForAbility(ability, item),
       }),
@@ -1342,7 +1349,7 @@ function pushCustomAbilityActions(
       duration: ability.duration ?? null,
       concentration: ability.concentration,
       healEffects: healEffects.length ? healEffects : undefined,
-      spendsEconomy: fallback.spendsEconomy,
+      spendsEconomy: trigger ? false : fallback.spendsEconomy,
     })
   }
 
@@ -1390,6 +1397,7 @@ function pushCustomAbilityActions(
           : kindsFromText(item.description)
       const fallback = fallbackKindsForResourceSpend(inferredKinds, limitedUses, powerText)
       const kinds = [...fallback.kinds]
+      const trigger = resolveTriggeredActivationLabel(itemWithUses)
       if (!kinds.length && (isPowerGroup || hasSpecialAttack)) {
         kinds.push("action")
       }
@@ -1401,6 +1409,7 @@ function pushCustomAbilityActions(
         name: entryName,
         sourceLabel: ability.name,
         kinds,
+        trigger,
         category: classifyActionCategory(itemWithUses, { preferCombat: true }),
         limitedUses,
         classLevel: levelCap,
@@ -1417,7 +1426,7 @@ function pushCustomAbilityActions(
         specialAttack: resolveSpecialAttack(item, levelCap),
         specialAttacks: resolveSpecialAttacks(item, levelCap),
         castingTime: entry.summary?.match(/\b\d+\s+(?:bonus\s+)?action\b/i)?.[0] ?? null,
-        spendsEconomy: fallback.spendsEconomy,
+        spendsEconomy: trigger ? false : fallback.spendsEconomy,
       })
     }
   }

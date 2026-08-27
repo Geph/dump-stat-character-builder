@@ -6,9 +6,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 export function ConditionInfoTip({
   description,
+  source,
   ariaLabel = "More information",
 }: {
   description: string
+  source?: string
   ariaLabel?: string
 }) {
   return (
@@ -30,6 +32,11 @@ export function ConditionInfoTip({
           className="text-xs text-inherit [&_p]:mb-1 [&_p:last-child]:mb-0"
           fallback=""
         />
+        {source ? (
+          <p className="mt-1 border-t border-border/60 pt-1 text-[10px] text-muted-foreground">
+            <span className="font-semibold text-foreground">Source:</span> {source}
+          </p>
+        ) : null}
       </TooltipContent>
     </Tooltip>
   )

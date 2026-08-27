@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Dices, RotateCcw, Skull } from "lucide-react"
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 import { useSheetRollContext } from "@/components/character-sheet/sheet-roll-context"
+import { D20NaturalsDisplay } from "@/components/character-sheet/d20-naturals-display"
 import { isNat20OrNat1 } from "@/components/character-sheet/d20-roll-button"
 import { collectDeathSaveCritThreshold } from "@/lib/character/collect-feature-roll-modes"
 import {
@@ -90,7 +91,7 @@ export function DeathSaveTracker({
 }: DeathSaveTrackerProps) {
   const history = useSheetRollHistory()
   const rollCtx = useSheetRollContext()
-  const [lastRoll, setLastRoll] = useState<number | null>(null)
+  const [lastRoll, setLastRoll] = useState<{ natural: number; naturals: number[] } | null>(null)
   const [manualOverride, setManualOverride] = useState<ManualRollOverride>("normal")
 
   const critThreshold = collectDeathSaveCritThreshold(rollCtx.classFeatures, {
@@ -138,19 +139,26 @@ export function DeathSaveTracker({
   const handleRoll = () => {
     const rolled = rollD20WithMode(resolvedMode.mode === "auto_fail" ? "normal" : resolvedMode.mode, 0)
     const natural = rolled.natural
-    setLastRoll(natural)
+    setLastRoll({ natural, naturals: rolled.naturals })
     onDeathSavesChange(applyDeathSaveRoll(natural, deathSaves, critThreshold))
     const modeSuffix =
-      resolvedMode.mode === "advantage" ? " (adv)" : resolvedMode.mode === "disadvantage" ? " (dis)" : ""
+      rolled.mode === "advantage" ? " (adv)" : rolled.mode === "disadvantage" ? " (dis)" : ""
+    const outcome = deathSaveRollSummary(natural, critThreshold)
+    const dice =
+      rolled.naturals.length > 1
+        ? rolled.naturals.map((n) => (n === natural ? String(n) : `(${n})`)).join(" / ")
+        : String(natural)
     history?.logRoll({
       kind: "d20",
       label: "Death save",
-      summary: `${deathSaveRollSummary(natural, critThreshold)}${modeSuffix}`,
+      summary: `${dice}${outcome.slice(String(natural).length)}${modeSuffix}`,
       natural,
+      naturals: rolled.naturals,
     })
   }
 
-  const isCritByThreshold = lastRoll != null && lastRoll !== 1 && lastRoll >= critThreshold
+  const isCritByThreshold =
+    lastRoll != null && lastRoll.natural !== 1 && lastRoll.natural >= critThreshold
 
   const rollControls = (
     <div className="flex items-center gap-1 shrink-0">
@@ -179,14 +187,18 @@ export function DeathSaveTracker({
       >
         <Dices className="w-3 h-3 text-muted-foreground shrink-0" aria-hidden />
         {lastRoll != null ? (
-          <span className="font-medium">
-            {lastRoll}
-            {isNat20OrNat1(lastRoll) || isCritByThreshold ? (
-              <span className="text-primary" aria-label="Natural 20 or natural 1">
-                !!
-              </span>
-            ) : null}
-          </span>
+          lastRoll.naturals.length > 1 ? (
+            <D20NaturalsDisplay chosen={lastRoll.natural} naturals={lastRoll.naturals} />
+          ) : (
+            <span className="font-medium">
+              {lastRoll.natural}
+              {isNat20OrNat1(lastRoll.natural) || isCritByThreshold ? (
+                <span className="text-primary" aria-label="Natural 20 or natural 1">
+                  !!
+                </span>
+              ) : null}
+            </span>
+          )
         ) : null}
       </button>
       <button

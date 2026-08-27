@@ -91,7 +91,7 @@ const ABILITY_ROLE_LABELS: Record<string, string> = {
   psionic_power: "Psionic power",
   class_talent: "Class talent",
   talent_pool: "Talent pool (e.g. General Psionic Talents)",
-  knack: "Knack / trick",
+  knack: "Shared pool (Knack / Maneuver / Trick / Exploit)",
   upgrade: "Upgrade",
   bomb_formula: "Bomb formula",
   discovery: "Discovery",

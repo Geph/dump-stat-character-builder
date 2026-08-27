@@ -9,7 +9,10 @@ import type {
   UnarmedStrikeDie,
   WeaponAbilityOverrideCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
-import { resolveUnarmedStrikeDieAtLevel } from "@/lib/compendium/characteristic-modifiers"
+import {
+  pickHigherUnarmedDie,
+  resolveUnarmedStrikeDieAtLevel,
+} from "@/lib/compendium/characteristic-modifiers"
 import type { Equipment } from "@/lib/types"
 
 export { isUnarmedStrikeWeapon, UNARMED_STRIKE_EQUIPMENT_ID }
@@ -29,6 +32,15 @@ export function characterHasFreeHand(params: {
   if (off && shield) return false
   if (main && off) return false
   return true
+}
+
+/** True when not wielding a weapon or shield (Unarmed Fighting's 1d8). */
+export function characterIsEmptyHanded(params: {
+  mainWeapon?: Equipment | null
+  offHandWeapon?: Equipment | null
+  shield?: Equipment | null
+}): boolean {
+  return !params.mainWeapon && !params.offHandWeapon && !params.shield
 }
 
 export function extraUnarmedStrikeAbilityOverrides(
@@ -52,12 +64,18 @@ export function extraUnarmedStrikeAbilityOverrides(
 export function buildUnarmedStrikeEquipment(params: {
   die: UnarmedStrikeDie | null
   dieByLevel?: AggregatedCharacteristics["unarmedStrikeDieByLevel"]
+  emptyHandedDie?: UnarmedStrikeDie | null
+  emptyHanded?: boolean
   damageType: string | null
   ability: AbilityScoreKey | null
   characterLevel: number
 }): Equipment {
+  const baseDie =
+    resolveUnarmedStrikeDieAtLevel(params.die, params.dieByLevel, params.characterLevel)
   const resolvedDie =
-    resolveUnarmedStrikeDieAtLevel(params.die, params.dieByLevel, params.characterLevel) ?? "1"
+    (params.emptyHanded && params.emptyHandedDie
+      ? pickHigherUnarmedDie(baseDie, params.emptyHandedDie)
+      : baseDie) ?? "1"
   const damageType = params.damageType?.trim() || "Bludgeoning"
   return {
     id: UNARMED_STRIKE_EQUIPMENT_ID,

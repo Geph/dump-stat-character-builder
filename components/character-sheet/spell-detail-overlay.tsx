@@ -22,8 +22,7 @@ import type {
   ResolvedSpellCastCost,
 } from "@/lib/character/resolve-spell-cast-cost"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
-import { rollD20WithMode } from "@/lib/dice/d20-roll"
-import { d20CriticalSuffix } from "@/components/character-sheet/d20-roll-button"
+import { formatD20RollSummary, rollD20WithMode } from "@/lib/dice/d20-roll"
 import { useSheetRollContext } from "@/components/character-sheet/sheet-roll-context"
 import { resolveRollMode } from "@/lib/character/resolve-roll-mode"
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
@@ -146,15 +145,14 @@ export function SpellDetailOverlay({
       })
       const rolled = rollD20WithMode(resolved.mode, spellAttackMod)
       result.attackRoll = { natural: rolled.natural, total: rolled.total }
-      const modeSuffix =
-        rolled.mode === "advantage" ? " (adv)" : rolled.mode === "disadvantage" ? " (dis)" : ""
-      const attackSummary = `${result.attackRoll.natural}${spellAttackMod >= 0 ? ` + ${spellAttackMod}` : ` − ${Math.abs(spellAttackMod)}`} = ${result.attackRoll.total}${modeSuffix}${d20CriticalSuffix(result.attackRoll.natural)}`
+      const attackSummary = formatD20RollSummary(rolled, spellAttackMod)
       feedbackParts.push(`Attack: ${attackSummary}`)
       history?.logRoll({
         kind: "spell",
         label: `${spell.name} attack`,
         summary: attackSummary,
         natural: result.attackRoll.natural,
+        naturals: rolled.naturals,
       })
     }
     if (spell.concentration) {

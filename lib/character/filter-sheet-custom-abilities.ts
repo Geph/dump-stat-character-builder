@@ -8,6 +8,7 @@ import {
   isCatalogPackageAbility,
   isPickGatedCustomAbility,
 } from "@/lib/builder/picked-custom-abilities"
+import { isManeuverCustomAbility } from "@/lib/compendium/ability-role-label"
 import { resolvePsionicPowerDisciplineName } from "@/lib/import/nest-psionic-ability-library"
 import type { CustomAbility } from "@/lib/types"
 
@@ -214,9 +215,11 @@ export function filterFeatureTabCustomAbilities(
     [...(options?.sheetActionNames ?? [])].map((name) => name.trim().toLowerCase()).filter(Boolean),
   )
   return abilities.filter((ability) => {
+    if (abilityHasCompanionPayload(ability)) return false
+    // Maneuvers stay on Features even when they also appear as Combat actions.
+    if (isManeuverCustomAbility(ability)) return true
     if (actionIds.has(ability.id)) return false
     if (actionNames.has(ability.name.trim().toLowerCase())) return false
-    if (abilityHasCompanionPayload(ability)) return false
     return true
   })
 }

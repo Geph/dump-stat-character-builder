@@ -16,6 +16,7 @@ describe("weapon mastery", () => {
   it("describes standard mastery properties case-insensitively", () => {
     expect(describeWeaponMastery("Topple")).toMatch(/Prone/)
     expect(describeWeaponMastery("graze")).toMatch(/misses/)
+    expect(describeWeaponMastery("Mounted")).toMatch(/Bonus Action/)
   })
 
   it("returns null for unknown homebrew masteries without catalog", () => {
