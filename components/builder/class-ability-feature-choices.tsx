@@ -243,6 +243,7 @@ export function ClassAbilityFeatureChoices({
                 onChange={handleChange}
                 layout={cardViewMode === "cinematic" ? "visual" : "compact"}
                 masteryDescriptions={weaponMasteryDescriptions}
+                equipmentCatalog={equipment}
               />
             ) : (
               <MultiSelectChoices

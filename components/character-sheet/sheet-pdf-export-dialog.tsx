@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Download, FileText, Loader2, Trash2, Upload } from "lucide-react"
+import { Download, ExternalLink, FileText, Loader2, Trash2, Upload } from "lucide-react"
 
 import {
   Dialog,
@@ -42,6 +42,8 @@ export type SheetPdfExportDialogProps = {
   target: SheetTemplateTarget
   /** Compendium class names, used to tag imported templates by class. */
   knownClassNames: readonly string[]
+  /** Offer the publisher's downloadable sheets for Mage Hand Press classes. */
+  showMageHandPressSheetsLink?: boolean
   /** Plain-text PDF used when the user has not imported any templates. */
   onExportPlainPdf: () => void
 }
@@ -52,6 +54,7 @@ export function SheetPdfExportDialog({
   buildInput,
   target,
   knownClassNames,
+  showMageHandPressSheetsLink = false,
   onExportPlainPdf,
 }: SheetPdfExportDialogProps) {
   const [templates, setTemplates] = useState<SheetTemplateSummary[]>([])
@@ -176,6 +179,17 @@ export function SheetPdfExportDialog({
               <Upload className="h-4 w-4" />
               Add sheet PDFs
             </button>
+            {showMageHandPressSheetsLink ? (
+              <a
+                href="https://magehandpress.com/category/other/character-sheets/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Download Mage Hand Press sheets
+              </a>
+            ) : null}
             <input
               ref={fileInputRef}
               type="file"

@@ -48,7 +48,7 @@ function classNameBase(name: string): string {
   return name.replace(/\s*\(.*\)\s*$/, "").trim() || name
 }
 
-function isMageHandPressClass(name: string, source?: string | null): boolean {
+export function isMageHandPressClass(name: string, source?: string | null): boolean {
   if (source && /mage\s*hand\s*press/i.test(source)) return true
   if (/\(\s*mage\s*hand\s*press\s*\)/i.test(name)) return true
   return MHP_UNIQUE_CLASS_NAMES.has(classNameBase(name))

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { resolveFeatureChoiceOptions } from "@/lib/builder/aggregate-psionic-talents"
 import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import {
@@ -7,7 +8,7 @@ import {
   parseWeaponMasteryCountFromDescription,
   weaponMasteryOptionsForClass,
 } from "@/lib/compendium/weapon-mastery-choice"
-import type { Feature } from "@/lib/types"
+import type { Equipment, Feature } from "@/lib/types"
 
 describe("weapon mastery choices", () => {
   it("parses default mastery count from feature description", () => {
@@ -169,6 +170,29 @@ describe("weapon mastery choices", () => {
     )
     expect(isWeaponMasteryFeature(enriched)).toBe(true)
     expect(enriched.choices?.resourceKey).toBeUndefined()
+  })
+
+  it("adds compendium weapons to mastery choices without a legacy resource key", () => {
+    const feature = enrichWeaponMasteryFeature(
+      { level: 1, name: "Weapon Mastery", description: "two kinds of weapons" },
+      "Gunslinger",
+    )
+    const revolver = {
+      id: "revolver",
+      name: "Revolver",
+      category: "Weapon",
+      subcategory: "Martial Ranged",
+      properties: { damage: "1d8 Piercing", properties: ["Reload (6)"], mastery: "Vex" },
+    } as unknown as Equipment
+
+    const options = resolveFeatureChoiceOptions(feature, {
+      customAbilities: [],
+      featureChoicePicks: {},
+      classNames: ["Gunslinger"],
+      equipmentCatalog: [revolver],
+    })
+
+    expect(options.some((option) => option.name === "Revolver")).toBe(true)
   })
 
   it("falls back to weapon_mastery class resource for unmigrated choices", () => {

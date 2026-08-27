@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { FEAT_MODIFIER_PRESETS } from "@/lib/compendium/feat-modifier-presets"
 import { assignLevelUpSpellsToNewModifierSlots, buildLevelUpPlan, countReplacedPicks } from "@/lib/character/level-up-plan"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import type { DndClass, Feature } from "@/lib/types"
@@ -277,6 +278,41 @@ function investigatorAt(level: number): CharacterClassDetail {
   } as CharacterClassDetail
 }
 
+describe("buildLevelUpPlan — spell-grant choices", () => {
+  it("includes spell list, spell, and casting ability choices from a new feature", () => {
+    const entry = {
+      row: { class_id: "mage", level: 0, subclass_id: null, order: 0 },
+      class: {
+        id: "mage",
+        name: "Mage",
+        features: [
+          feature("Initiate Magic", 1, {
+            linkedModifiers: FEAT_MODIFIER_PRESETS["Magic Initiate"].linkedModifiers,
+          }),
+        ],
+      } as DndClass,
+      subclass: null,
+    } as CharacterClassDetail
+
+    const plan = buildLevelUpPlan({
+      entry,
+      subclasses: [],
+      currentTotalLevel: 0,
+      featureChoicePicks: {},
+    })
+    const kinds = plan?.steps
+      .filter((step) => step.kind === "modifier_choice")
+      .map((step) => step.slot.kind)
+
+    expect(kinds).toEqual([
+      "spell_list_class",
+      "spell",
+      "spell",
+      "spellcasting_ability",
+    ])
+  })
+})
+
 describe("buildLevelUpPlan — Investigator Expertise", () => {
   it("asks for two Expertise skill picks when the feature unlocks at level 2", () => {
     const plan = buildLevelUpPlan({
@@ -285,7 +321,9 @@ describe("buildLevelUpPlan — Investigator Expertise", () => {
       currentTotalLevel: 1,
       featureChoicePicks: {},
     })
-    const step = plan?.steps.find((entry) => entry.kind === "modifier_choice")
+    const step = plan?.steps.find(
+      (entry) => entry.kind === "modifier_choice" && entry.slot.grantsExpertise,
+    )
     expect(step).toMatchObject({
       kind: "modifier_choice",
       title: "Expertise",
@@ -303,7 +341,9 @@ describe("buildLevelUpPlan — Investigator Expertise", () => {
       currentTotalLevel: 1,
       featureChoicePicks: {},
     })
-    const slotKey = atTwo?.steps.find((entry) => entry.kind === "modifier_choice")?.id
+    const slotKey = atTwo?.steps.find(
+      (entry) => entry.kind === "modifier_choice" && entry.slot.grantsExpertise,
+    )?.id
     expect(slotKey).toBeTruthy()
 
     const plan = buildLevelUpPlan({
@@ -313,44 +353,39 @@ describe("buildLevelUpPlan — Investigator Expertise", () => {
       featureChoicePicks: {},
       modifierPlayerPicks: { [slotKey!]: ["Arcana", "Investigation"] },
     })
-    const step = plan?.steps.find((entry) => entry.kind === "modifier_choice")
+    const step = plan?.steps.find(
+      (entry) => entry.kind === "modifier_choice" && entry.slot.grantsExpertise,
+    )
     expect(step).toMatchObject({ kind: "modifier_choice", required: 4 })
   })
 })
 
 describe("buildLevelUpPlan — Investigator Ritualist grimoire", () => {
-  it("offers two grimoire spells when leveling from 1 to 2", () => {
+  it("offers grimoire grants through modifier spell pickers", () => {
     const plan = buildLevelUpPlan({
       entry: investigatorAt(1),
       subclasses: [],
       currentTotalLevel: 1,
       featureChoicePicks: {},
     })
-    const spells = plan?.steps.find((entry) => entry.kind === "spells")
-    expect(spells).toMatchObject({
-      kind: "spells",
-      title: "Add spells to your grimoire",
-      extraCantrips: 0,
-      extraPrepared: 2,
-      maxSpellLevel: 1,
-      preparedCaster: false,
-    })
+    const spells = plan?.steps.flatMap((entry) =>
+      entry.kind === "modifier_choice" && entry.slot.kind === "spell" ? [entry] : [],
+    )
+    expect(spells?.map((entry) => entry.required)).toEqual([4, 2])
+    expect(plan?.steps.some((entry) => entry.kind === "spells")).toBe(false)
   })
 
-  it("raises the Ritual Level cap when leveling into 3rd", () => {
+  it("uses the grant's spell-level cap when leveling into 3rd", () => {
     const plan = buildLevelUpPlan({
       entry: investigatorAt(2),
       subclasses: [],
       currentTotalLevel: 2,
       featureChoicePicks: {},
     })
-    const spells = plan?.steps.find((entry) => entry.kind === "spells")
-    expect(spells).toMatchObject({
-      kind: "spells",
-      extraPrepared: 2,
-      maxSpellLevel: 2,
-      preparedCaster: false,
-    })
+    const spells = plan?.steps.flatMap((entry) =>
+      entry.kind === "modifier_choice" && entry.slot.kind === "spell" ? [entry] : [],
+    )
+    expect(spells?.map((entry) => entry.slot.spellLevel)).toEqual([1, 1, 2])
   })
 })
 

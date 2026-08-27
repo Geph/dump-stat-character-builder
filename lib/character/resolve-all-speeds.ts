@@ -18,6 +18,8 @@ function speedLabel(type: string): string {
 export function resolveAllSpeeds(params: {
   walkSpeed: number
   aggregatedSpeed: Record<string, number>
+  aggregatedSpeedAdd?: Record<string, number>
+  aggregatedSpeedSet?: Record<string, number>
   speedEqualToWalk: string[]
   exhaustionMultiplier?: number
   exhaustionZero?: boolean
@@ -25,6 +27,8 @@ export function resolveAllSpeeds(params: {
   const {
     walkSpeed,
     aggregatedSpeed,
+    aggregatedSpeedAdd = {},
+    aggregatedSpeedSet = {},
     speedEqualToWalk,
     exhaustionMultiplier = 1,
     exhaustionZero = false,
@@ -45,9 +49,26 @@ export function resolveAllSpeeds(params: {
     if (!resolved.has(type)) resolved.set(type, applyExhaustion(walkSpeed))
   }
 
-  for (const [type, feet] of Object.entries(aggregatedSpeed)) {
-    if (type === "walk" || typeof feet !== "number") continue
-    resolved.set(type, applyExhaustion(feet))
+  const explicitTypes = new Set([
+    ...Object.keys(aggregatedSpeed),
+    ...Object.keys(aggregatedSpeedAdd),
+    ...Object.keys(aggregatedSpeedSet),
+  ])
+  for (const type of explicitTypes) {
+    if (type === "walk") continue
+    const add = aggregatedSpeedAdd[type] ?? 0
+    const set = aggregatedSpeedSet[type]
+    const legacy = aggregatedSpeed[type]
+    const base =
+      typeof set === "number"
+        ? set
+        : speedEqualToWalk.includes(type)
+          ? walkSpeed
+          : type in aggregatedSpeedAdd
+            ? walkSpeed
+            : legacy
+    if (typeof base !== "number") continue
+    resolved.set(type, applyExhaustion(base + add))
   }
 
   const order = ["walk", "fly", "swim", "climb", "burrow", "custom"]

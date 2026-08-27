@@ -9,6 +9,7 @@ import { paginateList } from "@/lib/builder/picker-pagination"
 import { filterSpellsBySchool, uniqueSpellSchools } from "@/lib/builder/spell-grant-filters"
 import { builderChoiceTargetId } from "@/lib/builder/proceed-blockers"
 import {
+  filterMagicInitiateAbilitySlotOptions,
   filterMagicInitiateSpellListSlotOptions,
   isMagicInitiateSourceLabel,
 } from "@/lib/builder/magic-initiate"
@@ -265,6 +266,7 @@ export function ModifierPlayerChoicePanel({
       return true
     })
     .map((slot) => filterMagicInitiateSpellListSlotOptions(slot, slots, picks))
+    .map((slot) => filterMagicInitiateAbilitySlotOptions(slot, slots, picks))
 
   useEffect(() => {
     for (const slot of relevant) {

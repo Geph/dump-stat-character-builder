@@ -65,7 +65,11 @@ function speciesBaseWalkSpeed(inputs: CharacterBuildInputs): number {
   const species = inputs.species
   if (typeof species?.speed === "number") return species.speed
   if (typeof species?.speed === "object" && species?.speed) {
-    return (species.speed as { walking?: number }).walking ?? 30
+    return (
+      (species.speed as { walking?: number; walk?: number }).walking ??
+      (species.speed as { walk?: number }).walk ??
+      30
+    )
   }
   return 30
 }

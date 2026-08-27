@@ -3,6 +3,7 @@ import {
   defaultClassComplexityForName,
   formatClassComplexityLabel,
   formatClassComplexityPhrase,
+  isMageHandPressClass,
   MHP_CLASS_COMPLEXITY_BY_NAME,
   resolveClassComplexity,
   SRD_CLASS_COMPLEXITY_BY_NAME,
@@ -41,6 +42,13 @@ describe("class complexity", () => {
       }),
     ).toBe("medium")
     expect(resolveClassComplexity({ name: "Warden (Kibbles Tasty)", complexity: null })).toBeNull()
+  })
+
+  it("identifies Mage Hand Press classes for publisher sheet links", () => {
+    expect(isMageHandPressClass("Gunslinger")).toBe(true)
+    expect(isMageHandPressClass("Warden", "Mage Hand Press")).toBe(true)
+    expect(isMageHandPressClass("Warden (Kibbles Tasty)")).toBe(false)
+    expect(isMageHandPressClass("Fighter", "SRD")).toBe(false)
   })
 
   it("prefers stored complexity over defaults", () => {

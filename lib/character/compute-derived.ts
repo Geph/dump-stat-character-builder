@@ -366,15 +366,21 @@ function buildTelepathyDerived(
   return { rangeFeet: telepathy.rangeFeet, label: telepathy.label }
 }
 
-function resolveWalkSpeed(inputs: CharacterBuildInputs, aggregatedSpeed: Record<string, number>) {
+function resolveWalkSpeed(
+  inputs: CharacterBuildInputs,
+  aggregatedSpeedAdd: Record<string, number>,
+  aggregatedSpeedSet: Record<string, number>,
+) {
   const species = inputs.species
   const baseWalkSpeed =
     typeof species?.speed === "number"
       ? species.speed
       : typeof species?.speed === "object" && species?.speed
-        ? (species.speed as { walking?: number }).walking ?? 30
+        ? (species.speed as { walking?: number; walk?: number }).walking ??
+          (species.speed as { walk?: number }).walk ??
+          30
         : 30
-  return aggregatedSpeed.walk ?? baseWalkSpeed
+  return (aggregatedSpeedSet.walk ?? baseWalkSpeed) + (aggregatedSpeedAdd.walk ?? 0)
 }
 
 function buildSkillBonuses(
@@ -846,7 +852,11 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
   )
   const mountedMovement = anyEquippedWeaponIsMounted(inputs, heldWeapons, weaponProficiencies)
 
-  let speed = resolveWalkSpeed(inputs, aggregatedCharacteristics.speed)
+  let speed = resolveWalkSpeed(
+    inputs,
+    aggregatedCharacteristics.speedAdd,
+    aggregatedCharacteristics.speedSet,
+  )
   if (mountedMovement) {
     speed = Math.floor(speed * 0.5)
   }
@@ -859,6 +869,8 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
   const speeds = resolveAllSpeeds({
     walkSpeed: walkBeforeExhaustion,
     aggregatedSpeed: aggregatedCharacteristics.speed,
+    aggregatedSpeedAdd: aggregatedCharacteristics.speedAdd,
+    aggregatedSpeedSet: aggregatedCharacteristics.speedSet,
     speedEqualToWalk: aggregatedCharacteristics.speedEqualToWalk,
     exhaustionMultiplier: exhaustionFx.speedMultiplier,
     exhaustionZero: exhaustionFx.speedZero,

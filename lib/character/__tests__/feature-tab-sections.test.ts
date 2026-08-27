@@ -93,6 +93,38 @@ describe("buildFeatureTabSections", () => {
     )
   })
 
+  it("shows a selected lineage's rules instead of the generic lineage prompt", () => {
+    const sections = buildFeatureTabSections({
+      classDetails: [],
+      species: {
+        name: "Elf",
+        traits: [
+          {
+            name: "Elven Lineage",
+            description: "Choose a lineage.",
+            isChoice: true,
+            choices: {
+              category: "Lineage",
+              count: 1,
+              options: [
+                { name: "Drow", description: "You know Dancing Lights and gain Drow magic." },
+                { name: "High Elf", description: "You know Prestidigitation and gain High Elf magic." },
+              ],
+            },
+          },
+        ],
+      },
+      feats: [],
+      featureChoicePicks: {},
+      speciesTraitPicks: { "Elven Lineage": ["Drow"] },
+    })
+
+    expect(sections.find((section) => section.id === "species")?.items[0]).toMatchObject({
+      chosenNames: ["Drow"],
+      description: "You know Dancing Lights and gain Drow magic.",
+    })
+  })
+
   it("attaches ASI allocations to Ability Score Improvement feats", () => {
     const sections = buildFeatureTabSections({
       classDetails: [],

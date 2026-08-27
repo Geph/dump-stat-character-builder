@@ -29,7 +29,6 @@ import {
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import {
-  assignLevelUpSpellsToNewModifierSlots,
   buildLevelUpPlan,
   countReplacedPicks,
   spellsEligibleForLevelUp,
@@ -238,6 +237,9 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
   const current = wizardSteps[stepIndex] ?? null
   const isReview = Boolean(plan) && stepIndex >= wizardSteps.length
   const visualSubclassScreen = visualBuilder && current?.kind === "subclass"
+  const levelUpModifierSlots = wizardSteps.flatMap((step) =>
+    step.kind === "modifier_choice" ? [step.slot] : [],
+  )
 
   const eligibleFeats = useMemo(() => {
     if (!loaded) return []
@@ -482,20 +484,12 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         [plan.classId]: [...existingSpells, ...cantripIds, ...spellIds],
       }
       const nextFeatIds = featPersist.featIds
-      const unlockedSpellIds = [...cantripIds, ...spellIds]
+      const modifierSpellIds = [...levelUpModifierSlots, ...pendingFeatModifierSlots]
+        .filter((slot) => slot.kind === "spell")
+        .flatMap((slot) => modifierPicks[slot.slotKey] ?? [])
+      const unlockedSpellIds = [...cantripIds, ...spellIds, ...modifierSpellIds]
       const nextSpellIds = [...new Set([...(loaded.character.spell_ids ?? []), ...unlockedSpellIds])]
       const nextAsi = featPersist.asiAllocations
-      const grimoireModifierPicks = assignLevelUpSpellsToNewModifierSlots({
-        fromLevel: plan.fromLevel,
-        toLevel: plan.toLevel,
-        classId: plan.classId,
-        cls: selectedEntry.class,
-        subclasses: loaded.subclasses,
-        subclassId: subclassId ?? selectedEntry.row.subclass_id,
-        featureChoicePicks: nextPicks,
-        modifierCatalog: loaded.modifierCatalog,
-        spellIds: unlockedSpellIds,
-      })
 
       const hpGain =
         hpMethod === "roll" && hpNatural != null
@@ -517,7 +511,6 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           modifier_player_picks: {
             ...(loaded.character.modifier_player_picks ?? {}),
             ...modifierPicks,
-            ...grimoireModifierPicks,
           },
           skill_proficiencies: mergeSkillProficiencyNames(
             loaded.character.skill_proficiencies,
@@ -690,23 +683,49 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
               ) : null}
 
               {current?.kind === "modifier_choice" ? (
-                <MultiSelectChoices
-                  title={withChosenOptionChrome(current.title, modifierPicks[current.id] ?? [])}
-                  hint={
-                    current.slot.grantsExpertise
-                      ? "Choose skills you are already proficient in. Your proficiency bonus is doubled for those checks."
-                      : undefined
-                  }
-                  options={modifierChoiceOptions}
-                  maxCount={current.required}
-                  selected={modifierPicks[current.id] ?? []}
-                  onChange={(selected) =>
-                    setModifierPicks((prev) => ({ ...prev, [current.id]: selected }))
-                  }
-                  showOptionInfo={
-                    current.slot.kind !== "skill" && current.slot.kind !== "skill_or_tool"
-                  }
-                />
+                current.slot.kind === "spell" ||
+                current.slot.kind === "spell_list_class" ||
+                current.slot.kind === "spellcasting_ability" ? (
+                  <ModifierPlayerChoicePanel
+                    sourceKey={current.slot.sourceKey}
+                    sourceLabel={current.slot.sourceLabel}
+                    slots={levelUpModifierSlots}
+                    picks={modifierPicks}
+                    spells={loaded?.spells ?? []}
+                    kinds={[current.slot.kind]}
+                    showSkillInfo={false}
+                    onChange={(slotKey, selected) => {
+                      const slot = levelUpModifierSlots.find((entry) => entry.slotKey === slotKey)
+                      if (!slot) return
+                      setModifierPicks((prev) =>
+                        setModifierPlayerPickValue(
+                          prev,
+                          slot,
+                          levelUpModifierSlots,
+                          selected,
+                        ),
+                      )
+                    }}
+                  />
+                ) : (
+                  <MultiSelectChoices
+                    title={withChosenOptionChrome(current.title, modifierPicks[current.id] ?? [])}
+                    hint={
+                      current.slot.grantsExpertise
+                        ? "Choose skills you are already proficient in. Your proficiency bonus is doubled for those checks."
+                        : undefined
+                    }
+                    options={modifierChoiceOptions}
+                    maxCount={current.required}
+                    selected={modifierPicks[current.id] ?? []}
+                    onChange={(selected) =>
+                      setModifierPicks((prev) => ({ ...prev, [current.id]: selected }))
+                    }
+                    showOptionInfo={
+                      current.slot.kind !== "skill" && current.slot.kind !== "skill_or_tool"
+                    }
+                  />
+                )
               ) : null}
 
               {current?.kind === "feat_or_asi" ? (

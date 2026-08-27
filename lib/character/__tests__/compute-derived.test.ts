@@ -116,6 +116,24 @@ const plusOneChainMail = {
 } as unknown as Equipment
 
 describe("computeDerivedCharacter", () => {
+  it("adds walk-speed modifiers to the species base speed", () => {
+    const derived = computeDerivedCharacter(
+      baseInputs({
+        species: {
+          id: "fast-species",
+          name: "Fast Species",
+          speed: { walk: 35 },
+          traits: [],
+          characteristics: [
+            { id: "speed-boost", type: "speed", speedType: "walk", mode: "add", value: 5 },
+          ],
+        } as never,
+      }),
+    )
+
+    expect(derived.speed).toBe(40)
+  })
+
   it("Barbarian 1 with shield uses Unarmored Defense + shield", () => {
     const derived = computeDerivedCharacter(barbarianShieldFixture())
 

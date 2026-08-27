@@ -2244,6 +2244,10 @@ export type AggregatedCharacteristics = {
   /** Ability modifiers added on top of the normal initiative roll (e.g. Dread Ambusher's WIS). */
   initiativeAdditionalAbilities: AbilityModifierKey[]
   vision: { type: string; rangeFeet: number }[]
+  /** Additive speed bonuses, kept separate so species base speeds are not replaced. */
+  speedAdd: Record<string, number>
+  /** Explicit speed values before additive bonuses. */
+  speedSet: Record<string, number>
   speed: Record<string, number>
   /** Climb/swim/fly speeds that mirror walking speed (Peak Athlete). */
   speedEqualToWalk: string[]
@@ -2357,6 +2361,8 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   initiativeAbilityBonus: 0,
   initiativeAdditionalAbilities: [],
   vision: [],
+  speedAdd: {},
+  speedSet: {},
   speed: {},
   speedEqualToWalk: [],
   attackRollModifiers: [],
@@ -2696,12 +2702,16 @@ export function aggregateCharacteristics(
             result.speedEqualToWalk.push(key)
           }
         } else {
-          const current = result.speed[key] ?? 0
-          const addValue =
+          const value =
             mod.valueByLevel?.length
               ? resolveFixedValueAtLevel(mod.valueByLevel, characterLevel, mod.value) ?? mod.value
               : mod.value
-          result.speed[key] = mod.mode === "set" ? addValue : current + addValue
+          if (mod.mode === "set") {
+            result.speedSet[key] = value
+          } else {
+            result.speedAdd[key] = (result.speedAdd[key] ?? 0) + value
+          }
+          result.speed[key] = (result.speedSet[key] ?? 0) + (result.speedAdd[key] ?? 0)
         }
         break
       }

@@ -1,4 +1,8 @@
-import { chosenOptionNames } from "@/lib/character/chosen-option-label"
+import {
+  chosenOptionNames,
+  resolveChoicePickLabel,
+} from "@/lib/character/chosen-option-label"
+import { resolveSpeciesTraitPicks } from "@/lib/builder/species-trait-picks"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import {
   formatAsiAllocationSummary,
@@ -150,15 +154,37 @@ function dedupeFeaturesByName(features: Feature[]): { feature: Feature; levels: 
   return order.map((name) => byName.get(name)!)
 }
 
+/** Show the rules for selected variants instead of the generic choice prompt. */
+export function selectedChoiceDescription(
+  item: {
+    description?: string | null
+    choices?: { options?: { name: string; description?: string | null }[] | null } | null
+  },
+  chosenNames: string[],
+): string | null | undefined {
+  if (!chosenNames.length || !item.choices?.options?.length) return item.description
+  const chosen = new Set(chosenNames.map((name) => name.trim().toLowerCase()).filter(Boolean))
+  const descriptions = item.choices.options
+    .filter((option) => chosen.has(option.name.trim().toLowerCase()))
+    .map((option) => option.description?.trim())
+    .filter((description): description is string => Boolean(description))
+  return descriptions.length ? descriptions.join("\n\n") : item.description
+}
+
 export function buildFeatureTabSections(params: {
   classDetails: CharacterClassDetail[]
   species?: { name: string; traits?: Trait[] | null } | null
-  backgroundFeature?: { name: string; description?: string | null } | null
+  backgroundFeature?: {
+    name: string
+    description?: string | null
+    choices?: { options?: { name: string; description?: string | null }[] | null } | null
+  } | null
   originFeat?: Feat | null
   originFeatFallbackName?: string | null
   originFeatFallbackDescription?: string | null
   feats: Feat[]
   featureChoicePicks: Record<string, string[]>
+  speciesTraitPicks?: Record<string, string[]>
   asiAllocations?: AsiAllocationsByFeatId | null
   /** All selected feat ids (including ASI slots) for combined milestone ASI. */
   featIds?: string[]
@@ -178,18 +204,21 @@ export function buildFeatureTabSections(params: {
     sections.push({
       id: sectionId,
       title: `${entry.class?.name ?? "Class"} Features${params.classDetails.length > 1 ? ` (Level ${entry.row.level})` : ""}`,
-      items: dedupeFeaturesByName(classFeatures).map(({ feature, levels }) => ({
-        id: `${sectionId}:${feature.name}`,
-        name: feature.name,
-        level: feature.level,
-        levels: levels.length > 1 ? levels : undefined,
-        description: feature.description,
-        chosenNames: chosenOptionNames(feature, entry.row.class_id, picks, {
+      items: dedupeFeaturesByName(classFeatures).map(({ feature, levels }) => {
+        const chosenNames = chosenOptionNames(feature, entry.row.class_id, picks, {
           labelByPickId: choiceLabelByPickId,
-        }),
-        classId: entry.row.class_id,
-        feature,
-      })),
+        })
+        return {
+          id: `${sectionId}:${feature.name}`,
+          name: feature.name,
+          level: feature.level,
+          levels: levels.length > 1 ? levels : undefined,
+          description: selectedChoiceDescription(feature, chosenNames),
+          chosenNames,
+          classId: entry.row.class_id,
+          feature,
+        }
+      }),
     })
   }
 
@@ -202,17 +231,20 @@ export function buildFeatureTabSections(params: {
     sections.push({
       id: sectionId,
       title: `${entry.subclass.name} Features`,
-      items: subclassFeatures.map((feature) => ({
-        id: `${sectionId}:${feature.name}:${feature.level}`,
-        name: feature.name,
-        level: feature.level,
-        description: feature.description,
-        chosenNames: chosenOptionNames(feature, entry.row.class_id, picks, {
+      items: subclassFeatures.map((feature) => {
+        const chosenNames = chosenOptionNames(feature, entry.row.class_id, picks, {
           labelByPickId: choiceLabelByPickId,
-        }),
-        classId: entry.row.class_id,
-        feature,
-      })),
+        })
+        return {
+          id: `${sectionId}:${feature.name}:${feature.level}`,
+          name: feature.name,
+          level: feature.level,
+          description: selectedChoiceDescription(feature, chosenNames),
+          chosenNames,
+          classId: entry.row.class_id,
+          feature,
+        }
+      }),
     })
   }
 
@@ -221,18 +253,35 @@ export function buildFeatureTabSections(params: {
     sections.push({
       id: sectionId,
       title: `${params.species.name} Traits`,
-      items: params.species.traits.map((trait) => ({
-        id: `${sectionId}:${trait.name}`,
-        name: trait.name,
-        description: trait.description,
-        chosenNames: chosenOptionNames(trait, null, picks, { labelByPickId: choiceLabelByPickId }),
-      })),
+      items: params.species.traits.map((trait, index) => {
+        const speciesPicks = resolveSpeciesTraitPicks(
+          params.speciesTraitPicks ?? {},
+          trait,
+          index,
+        )
+        const chosenNames = (
+          speciesPicks.length
+            ? speciesPicks.map((pick) => resolveChoicePickLabel(pick, choiceLabelByPickId))
+            : chosenOptionNames(trait, null, picks, {
+                labelByPickId: choiceLabelByPickId,
+              })
+        ).filter(Boolean)
+        return {
+          id: `${sectionId}:${trait.name}`,
+          name: trait.name,
+          description: selectedChoiceDescription(trait, chosenNames),
+          chosenNames,
+        }
+      }),
     })
   }
 
   if (backgroundFeatureShowsOnFeaturesTab(params.backgroundFeature)) {
     const sectionId = "background"
     const backgroundFeature = params.backgroundFeature!
+    const chosenNames = chosenOptionNames(backgroundFeature, null, picks, {
+      labelByPickId: choiceLabelByPickId,
+    })
     sections.push({
       id: sectionId,
       title: "Background Feature",
@@ -240,10 +289,8 @@ export function buildFeatureTabSections(params: {
         {
           id: `${sectionId}:feature`,
           name: backgroundFeature.name,
-          description: backgroundFeature.description,
-          chosenNames: chosenOptionNames(backgroundFeature, null, picks, {
-            labelByPickId: choiceLabelByPickId,
-          }),
+          description: selectedChoiceDescription(backgroundFeature, chosenNames),
+          chosenNames,
         },
       ],
     })
@@ -251,16 +298,16 @@ export function buildFeatureTabSections(params: {
 
   const featItems: FeatureTabItem[] = []
   if (params.originFeat || params.originFeatFallbackName) {
+    const chosenNames = params.originFeat
+      ? chosenOptionNames(params.originFeat, null, picks, { labelByPickId: choiceLabelByPickId })
+      : []
     featItems.push({
       id: "feat:origin",
       name: params.originFeat?.name ?? params.originFeatFallbackName ?? "Origin Feat",
-      description:
-        params.originFeat?.description ??
-        params.originFeatFallbackDescription ??
-        "Granted by your background at 1st level.",
-      chosenNames: params.originFeat
-        ? chosenOptionNames(params.originFeat, null, picks, { labelByPickId: choiceLabelByPickId })
-        : [],
+      description: params.originFeat
+        ? selectedChoiceDescription(params.originFeat, chosenNames)
+        : params.originFeatFallbackDescription ?? "Granted by your background at 1st level.",
+      chosenNames,
       collapsedLines: 4,
     })
   }
@@ -274,7 +321,7 @@ export function buildFeatureTabSections(params: {
     featItems.push({
       id: `feat:${feat.id}`,
       name: feat.name,
-      description: feat.description,
+      description: selectedChoiceDescription(feat, choiceNames),
       chosenNames: asiSummary ? [...choiceNames, asiSummary] : choiceNames,
       collapsedLines: 4,
     })

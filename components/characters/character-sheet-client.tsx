@@ -365,6 +365,8 @@ import type { SheetActionEntry } from "@/lib/character/sheet-actions"
 import { SiteFooter } from "@/components/site-footer"
 import { WILD_SHAPE_DIRECTIONS, WILD_SHAPE_GAME_STATISTICS } from "@/lib/character/srd-beast-forms"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
+import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
+import { isMageHandPressClass } from "@/lib/compendium/class-complexity"
 
 const SpellDetailOverlay = dynamic(
   () =>
@@ -1609,6 +1611,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     () => [...new Set([...DEFAULT_TEMPLATE_CLASS_NAMES, ...pdfTemplateTarget.classNames])],
     [pdfTemplateTarget],
   )
+  const hasMageHandPressClass = classDetails.some((entry) =>
+    isMageHandPressClass(entry.class?.name ?? "", entry.class?.source),
+  )
 
   const hasMindRiderAbility = useMemo(() => {
     if (!classDetails.some((entry) => /\bpsion\b/i.test(entry.class?.name ?? ""))) return false
@@ -2580,6 +2585,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     return labels
   }, [characterFeats, originFeat])
 
+  const speciesTraitPicks = useMemo(
+    () => normalizeBuilderPicks(character?.builder_picks).species_trait_picks ?? {},
+    [character?.builder_picks],
+  )
+
   const featureTabSections = useMemo(
     () =>
       buildFeatureTabSections({
@@ -2591,6 +2601,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         originFeatFallbackDescription: originFeat?.description ?? "Granted by your background at 1st level.",
         feats: characterFeatsForDisplay,
         featureChoicePicks,
+        speciesTraitPicks,
         asiAllocations: normalizeAsiAllocationsMap(character?.asi_allocations),
         featIds: character?.feat_ids ?? characterFeats.map((feat) => feat.id),
         choiceLabelByPickId,
@@ -2607,6 +2618,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       characterFeats,
       featureChoicePicks,
       choiceLabelByPickId,
+      speciesTraitPicks,
     ],
   )
 
@@ -4103,6 +4115,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           buildInput={buildPdfExportInput}
           target={pdfTemplateTarget}
           knownClassNames={pdfTemplateClassNames}
+          showMageHandPressSheetsLink={hasMageHandPressClass}
           onExportPlainPdf={exportPlainSummaryPdf}
         />
 

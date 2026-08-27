@@ -25,6 +25,9 @@ const LEVEL_UP_MODIFIER_CHOICE_KINDS: ReadonlySet<ModifierPlayerChoiceKind> = ne
   "tool",
   "language",
   "skill_or_tool",
+  "spell_list_class",
+  "spell",
+  "spellcasting_ability",
   "damage_type",
   "equipment",
 ])
@@ -322,23 +325,20 @@ export function buildLevelUpPlan(params: {
     fromLevel,
     toLevel,
   )
-  const extraCantrips =
-    Math.max(0, (after?.cantrips ?? 0) - (before?.cantrips ?? 0)) + knownUnlock.cantrips
-  const extraPrepared =
-    Math.max(0, (after?.prepared ?? 0) - (before?.prepared ?? 0)) + knownUnlock.leveled
-  const maxSpellLevel = Math.max(after?.max_spell_level ?? 1, knownUnlock.maxSpellLevel || 0, 1)
+  // Modifier-granted spells have dedicated steps above so their class/school/list and
+  // casting-ability dependencies remain intact. This generic step is only class progression.
+  const extraCantrips = Math.max(0, (after?.cantrips ?? 0) - (before?.cantrips ?? 0))
+  const extraPrepared = Math.max(0, (after?.prepared ?? 0) - (before?.prepared ?? 0))
+  const maxSpellLevel = Math.max(after?.max_spell_level ?? 1, 1)
   if (extraCantrips > 0 || extraPrepared > 0) {
     const preparedCaster =
       Boolean(cls.spellcasting) &&
       cls.spellcasting?.prepared !== false &&
       !cls.spellcasting?.pact_magic
-    const grimoireUnlock = knownUnlock.leveled > 0 && !cls.spellcasting?.progression?.length
     steps.push({
       kind: "spells",
       id: `spells:${classId}:${toLevel}`,
-      title: grimoireUnlock
-        ? "Add spells to your grimoire"
-        : extraPrepared > 0 && preparedCaster
+      title: extraPrepared > 0 && preparedCaster
           ? "Prepare additional spells"
           : "Learn additional spells",
       classId,

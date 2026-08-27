@@ -4548,6 +4548,7 @@ export default function BuilderPageClient() {
                               classIds: [entry.classId],
                               classLevel: entry.level,
                               equipmentCatalog: equipment,
+                              classWeaponProficiencies: cls.weapon_proficiencies,
                               knownSpellNames,
                               subclassName: subclassForClass?.name ?? null,
                               grantedCustomAbilityNames:
@@ -4624,6 +4625,7 @@ export default function BuilderPageClient() {
                                     onChange={handleFeatureChoiceChange}
                                     layout={cardViewMode === "cinematic" ? "visual" : "compact"}
                                     masteryDescriptions={weaponMasteryDescriptions}
+                                    equipmentCatalog={equipment}
                                   />
                                 ) : (
                                   <MultiSelectChoices

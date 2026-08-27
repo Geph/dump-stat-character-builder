@@ -294,7 +294,10 @@ export function resolveFeatureChoiceOptions(
       customAbilities: params.customAbilities,
     })
 
-  if (choices.resourceKey === "weapon_mastery" && params.classNames[0]) {
+  if (
+    (choices.resourceKey === "weapon_mastery" || isWeaponMasteryFeature(feature)) &&
+    params.classNames[0]
+  ) {
     const masteryCatalogEntries = weaponMasteryCatalogEntriesFromAbilities(params.customAbilities)
     const merged = weaponMasteryOptionsForClass(
       params.classNames[0],
@@ -302,14 +305,17 @@ export function resolveFeatureChoiceOptions(
       masteryCatalogEntries,
       params.classWeaponProficiencies,
     )
-    if (merged.length) return merged
-  }
-  if (isWeaponMasteryFeature(feature) && choices.options?.length) {
-    return filterWeaponMasteryOptionsByProficiency(
-      choices.options,
-      params.classWeaponProficiencies,
-      params.equipmentCatalog ?? [],
-    )
+    const byName = new Map<string, FeatureChoice["options"][number]>()
+    for (const option of [...(choices.options ?? []), ...merged]) {
+      byName.set(normalizeName(option.name), option)
+    }
+    if (byName.size) {
+      return filterWeaponMasteryOptionsByProficiency(
+        [...byName.values()].sort((a, b) => a.name.localeCompare(b.name)),
+        params.classWeaponProficiencies,
+        params.equipmentCatalog ?? [],
+      )
+    }
   }
   if (choices.optionsSource === "known_discipline_talents") {
     const aggregated = filterOptions(

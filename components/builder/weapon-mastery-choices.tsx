@@ -25,6 +25,8 @@ type WeaponMasteryChoicesProps = {
   layout?: "visual" | "compact"
   /** Catalog-backed mastery property rules (falls back to SRD defaults when omitted). */
   masteryDescriptions?: Record<string, string>
+  /** Live compendium weapons used by visual category/property filters. */
+  equipmentCatalog?: Equipment[]
 }
 
 type WeaponFilter =
@@ -59,14 +61,21 @@ function masteryNameFromDescription(description?: string): string | null {
   return trimmed || null
 }
 
-function seedWeaponByName(name: string): Equipment | undefined {
+function weaponByName(name: string, equipmentCatalog: Equipment[]): Equipment | undefined {
   const needle = name.trim().toLowerCase()
-  return SEED_WEAPONS.find((weapon) => weapon.name.trim().toLowerCase() === needle)
+  return (
+    equipmentCatalog.find((weapon) => weapon.name.trim().toLowerCase() === needle) ??
+    SEED_WEAPONS.find((weapon) => weapon.name.trim().toLowerCase() === needle)
+  )
 }
 
-function matchesWeaponFilter(name: string, filter: WeaponFilter): boolean {
+function matchesWeaponFilter(
+  name: string,
+  filter: WeaponFilter,
+  equipmentCatalog: Equipment[],
+): boolean {
   if (filter === "all") return true
-  const weapon = seedWeaponByName(name)
+  const weapon = weaponByName(name, equipmentCatalog)
   if (PROPERTY_FILTERS.has(filter)) {
     return weapon ? hasWeaponProperty(weapon, filter) : false
   }
@@ -108,6 +117,7 @@ export function WeaponMasteryChoices({
   unavailableOptions = [],
   layout = "compact",
   masteryDescriptions,
+  equipmentCatalog = [],
 }: WeaponMasteryChoicesProps) {
   const [showInfo, setShowInfo] = useState(false)
   const [portalReady, setPortalReady] = useState(false)
@@ -143,10 +153,10 @@ export function WeaponMasteryChoices({
 
   const filteredOptions = useMemo(() => {
     return options.filter((option) => {
-      if (selectedSet.has(option.name)) return true
-      return matchesWeaponFilter(option.name, weaponFilter)
+      if (selected.includes(option.name)) return true
+      return matchesWeaponFilter(option.name, weaponFilter, equipmentCatalog)
     })
-  }, [options, weaponFilter, selected])
+  }, [options, weaponFilter, selected, equipmentCatalog])
 
   const masteriesPresent = Array.from(
     new Set(
