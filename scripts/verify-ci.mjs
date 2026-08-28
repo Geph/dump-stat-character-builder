@@ -22,7 +22,10 @@ const gitDir =
 const cachePath = gitDir ? join(gitDir, "dump-stat-verify-ci-cache") : null
 const useCache = process.argv.includes("--pre-push") && !process.env.PREPUSH_FULL
 
+const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm"
+
 const checks = [
+  ["Frozen lockfile install", pnpmBin, ["install", "--frozen-lockfile"]],
   ["MySQL dependency audit", process.execPath, ["scripts/check-no-supabase.mjs"]],
   ["ESLint", process.execPath, ["node_modules/eslint/bin/eslint.js", "."]],
   ["TypeScript", process.execPath, ["node_modules/typescript/bin/tsc", "--noEmit"]],
@@ -64,6 +67,7 @@ function verificationKey() {
   for (const path of [
     "package.json",
     "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
     ".github/workflows/ci.yml",
     "scripts/verify-ci.mjs",
   ]) {

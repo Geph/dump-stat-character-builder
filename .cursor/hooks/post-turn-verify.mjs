@@ -2,6 +2,7 @@
 /**
  * Cursor `stop` hook — Node port so Windows (no working bash) still typechecks.
  * Mirrors `.cursor/hooks/post-turn-verify.sh` for the fast CI gate (eslint + tsc).
+ * Also runs `pnpm install --frozen-lockfile` when lockfile / workspace / package.json change.
  *
  * Force: CURSOR_HOOK_FORCE=1
  * Also run next build: CURSOR_HOOK_RUN_BUILD=1
@@ -53,7 +54,11 @@ function listRelevantChanges() {
       names
         .map((n) => n.trim())
         .filter(Boolean)
-        .filter((n) => /\.(ts|tsx|js|jsx|mjs|cjs|json)$/.test(n))
+        .filter(
+          (n) =>
+            /\.(ts|tsx|js|jsx|mjs|cjs|json)$/.test(n) ||
+            /(?:^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$/.test(n),
+        )
         .filter((n) => !/(^|\/)(node_modules|\.next)\//.test(n)),
     ),
   ]
@@ -153,6 +158,19 @@ if (!shouldRun(loopCount)) {
   log("skipped (no relevant source changes since last pass)")
   emit({})
   process.exit(0)
+}
+
+const changed = listRelevantChanges()
+const lockfileTouched = changed.some((n) =>
+  /(?:^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$/.test(n),
+)
+if (lockfileTouched || process.env.CURSOR_HOOK_FORCE === "1") {
+  runCheck(
+    "pnpm install --frozen-lockfile",
+    process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+    ["install", "--frozen-lockfile"],
+    true,
+  )
 }
 
 runPnpmOrBin("eslint .", "eslint", ["."], ["run", "lint"])

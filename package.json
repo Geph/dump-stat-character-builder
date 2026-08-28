@@ -2,6 +2,7 @@
   "name": "dump-stat-character-builder",
   "version": "0.25",
   "private": true,
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/build-hosted.mjs",
