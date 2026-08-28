@@ -1,9 +1,29 @@
 import type { ActionEconomyKind } from "@/lib/character/sheet-actions"
+import type { Feature } from "@/lib/types"
 
 export type ActionEconomySpent = Record<ActionEconomyKind, boolean>
 
 export function emptyActionEconomySpent(): ActionEconomySpent {
   return { action: false, bonus: false, reaction: false }
+}
+
+/**
+ * Maximum weapon attacks in one normal Attack action. `extraAttackCount` is stored as additional
+ * attacks beyond the first; conditional attacks with their own labels (Horde Breaker, etc.) are
+ * intentionally excluded from the base action.
+ */
+export function attacksPerAttackAction(features: Feature[]): number {
+  let additional = 0
+  for (const feature of features) {
+    for (const instance of feature.linkedModifiers ?? []) {
+      for (const effect of instance.activation?.effects ?? []) {
+        if (effect.kind !== "extra_attack") continue
+        if (effect.label?.trim()) continue
+        additional = Math.max(additional, Math.max(0, effect.extraAttackCount ?? 1))
+      }
+    }
+  }
+  return 1 + additional
 }
 
 /** Infer which turn resource a spell cast spends from casting time / Quickened. */

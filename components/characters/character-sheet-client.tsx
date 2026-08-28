@@ -94,7 +94,7 @@ import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 import { SheetRollProvider } from "@/components/character-sheet/sheet-roll-context"
 import { MagicItemPowersPanel } from "@/components/character-sheet/magic-item-powers-panel"
 import { planEquipmentGrants } from "@/lib/character/granted-equipment"
-import { SpellSlotTracker, consumeSpellSlot } from "@/components/character-sheet/spell-slot-tracker"
+import { SpellSlotTracker } from "@/components/character-sheet/spell-slot-tracker"
 import {
   getMulticlassSpellSlotTables,
   resolveEffectiveClassSpellcasting,
@@ -180,17 +180,23 @@ import { collectSheetActions } from "@/lib/character/sheet-actions"
 import type { ActionEconomyKind } from "@/lib/character/sheet-actions"
 import {
   actionEconomyKindFromCastingTime,
+  attacksPerAttackAction,
   characterCanRollHitDiceOutsideShortRest,
   emptyActionEconomySpent,
   type ActionEconomySpent,
 } from "@/lib/character/action-economy"
-import { SHEET_STATUS_ROW, SHEET_BANNER_BADGE, SHEET_BANNER_BUTTON, SHEET_BANNER_CHIP, SHEET_ABILITIES_PANEL, SHEET_COMBAT_PANEL, SHEET_EQUIPMENT_PANEL, SHEET_FEATURES_PANEL, SHEET_DETAILS_PANEL, SHEET_MAIN_CLASS, SHEET_TAB_CONTENT_CLASS, abilityScoreTileClass, abilityScoreModifierFrameClass, abilityScorePillClass } from "@/lib/character/sheet-status-colors"
+import { SHEET_STATUS_ROW, SHEET_BANNER_BADGE, SHEET_BANNER_BUTTON, SHEET_BANNER_CHIP, SHEET_ABILITIES_PANEL, SHEET_COMBAT_PANEL, SHEET_EQUIPMENT_PANEL, SHEET_FEATURES_PANEL, SHEET_DETAILS_PANEL, SHEET_MAIN_CLASS, SHEET_TAB_CONTENT_CLASS, abilityScoreTileClass, abilityScoreModifierFrameClass, abilityScorePillClass, weaponModifierBadgeClass } from "@/lib/character/sheet-status-colors"
 import { useAppTheme } from "@/components/providers/app-theme-provider"
 import { compendiumEditHref } from "@/lib/compendium/edit-href"
 import { resolvePsiLimit } from "@/lib/character/resolve-psi-limit"
 import { collectAlternateAbilityChecks } from "@/lib/character/alternate-ability-checks"
 import { collectSubclassAlwaysPreparedSpells } from "@/lib/character/subclass-granted-spells"
-import { collectFreeCastSpellKeys, isFreeCastSpell } from "@/lib/character/free-cast-spells"
+import {
+  collectFreeCastSpellKeys,
+  grantedSpellProfileFor,
+  isFreeCastSpell,
+  resetGrantedSpellFreeCasts,
+} from "@/lib/character/free-cast-spells"
 import { featureChoiceKey } from "@/lib/builder/choices"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
@@ -219,6 +225,7 @@ import {
 } from "@/lib/srd/exhaustion-effects"
 import { BLOODIED_DESCRIPTION, isBloodied } from "@/lib/character/bloodied"
 import { buildIncomingAttackNotes } from "@/lib/character/incoming-attack-notes"
+import { collectSaveFeatureBadges } from "@/lib/character/save-feature-badges"
 import {
   buildSheetPlayStateFromSheet,
   loadSheetSessionState,
@@ -712,6 +719,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [usedActionUsesById, setUsedActionUsesById] = useState<Record<string, number>>({})
   const [primedBombUsedThisTurn, setPrimedBombUsedThisTurn] = useState(false)
   const [actionEconomySpent, setActionEconomySpent] = useState<ActionEconomySpent>(emptyActionEconomySpent)
+  const [attackRollsUsed, setAttackRollsUsed] = useState(0)
   const [usedHitDiceByClassId, setUsedHitDiceByClassId] = useState<Record<string, number>>({})
   const [shortRestHitDiceOpen, setShortRestHitDiceOpen] = useState(false)
   const [restOverlay, setRestOverlay] = useState<{
@@ -1597,6 +1605,30 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     }
     return features
   }, [classDetails])
+  const sheetSaveFeatures = useMemo(() => {
+    const features: Feature[] = [...sheetClassFeatures]
+    for (const trait of character?.species?.traits ?? []) {
+      features.push({
+        name: trait.name,
+        description: trait.description ?? null,
+        level: trait.level ?? 1,
+        linkedModifiers: trait.linkedModifiers ?? undefined,
+      } as Feature)
+    }
+    for (const feat of [...characterFeats, ...(originFeat ? [originFeat] : [])]) {
+      features.push({
+        name: feat.name,
+        description: feat.description ?? null,
+        level: 1,
+        linkedModifiers: feat.linkedModifiers ?? undefined,
+      } as Feature)
+    }
+    return features
+  }, [sheetClassFeatures, character?.species?.traits, characterFeats, originFeat])
+  const attacksPerAction = useMemo(
+    () => attacksPerAttackAction(sheetClassFeatures),
+    [sheetClassFeatures],
+  )
 
   const equipmentById = useMemo(
     () => new Map(equipment.map((item) => [item.id, item])),
@@ -1805,15 +1837,30 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const markActionEconomy = useCallback((kind: ActionEconomyKind) => {
     setActionEconomySpent((prev) => (prev[kind] ? prev : { ...prev, [kind]: true }))
-  }, [])
+    if (kind === "action") setAttackRollsUsed(attacksPerAction)
+  }, [attacksPerAction])
 
   const toggleActionEconomy = useCallback((kind: ActionEconomyKind) => {
-    setActionEconomySpent((prev) => ({ ...prev, [kind]: !prev[kind] }))
-  }, [])
+    setActionEconomySpent((prev) => {
+      const nextSpent = !prev[kind]
+      if (kind === "action") setAttackRollsUsed(nextSpent ? attacksPerAction : 0)
+      return { ...prev, [kind]: nextSpent }
+    })
+  }, [attacksPerAction])
 
   const resetActionEconomy = useCallback(() => {
     setActionEconomySpent(emptyActionEconomySpent())
+    setAttackRollsUsed(0)
   }, [])
+
+  const recordWeaponAttack = useCallback(() => {
+    const next = Math.min(attacksPerAction, attackRollsUsed + 1)
+    setAttackRollsUsed(next)
+    setActionEconomySpent((spent) => ({
+      ...spent,
+      action: next >= attacksPerAction,
+    }))
+  }, [attackRollsUsed, attacksPerAction])
 
   const renderManualToggleButton = useCallback(
     (toggle: SheetToggleDefinition) => {
@@ -2411,6 +2458,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         species: character?.species ?? null,
         backgroundFeature: character?.backgrounds?.feature ?? null,
         customAbilities: sheetCustomAbilities,
+        feats: [...characterFeats, ...(originFeat ? [originFeat] : [])],
         featureChoicePicks,
       }),
     [
@@ -2418,6 +2466,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       character?.species,
       character?.backgrounds?.feature,
       sheetCustomAbilities,
+      characterFeats,
+      originFeat,
       featureChoicePicks,
     ],
   )
@@ -2951,6 +3001,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const handleTurnStart = useCallback(() => {
     setPrimedBombUsedThisTurn(false)
     setActionEconomySpent(emptyActionEconomySpent())
+    setAttackRollsUsed(0)
     // Full Awakening lasts until the start of your next turn.
     setActiveSheetToggleIds((prev) =>
       prev.includes("full_awakening_active")
@@ -3030,7 +3081,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       })
       setUsedSpellSlotsByKey(result.usedSpellSlotsByKey)
       setUsedResourcesById(result.usedResourcesById)
-      setUsedActionUsesById(result.usedActionUsesById)
+      const freeCastReset = resetGrantedSpellFreeCasts(
+        result.usedActionUsesById,
+        derived?.grantedSpellCasts ?? [],
+        rest,
+      )
+      setUsedActionUsesById(freeCastReset.usedById)
       setPrimedBombUsedThisTurn(false)
       if (result.rechargeCapsByResourceId) {
         setRechargeCapsByResourceId(result.rechargeCapsByResourceId)
@@ -3041,6 +3097,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       if (result.activeConditions) setActiveConditions(result.activeConditions)
 
       const summary = [...result.summary]
+      for (const profile of freeCastReset.restored) {
+        summary.push(`Restored ${profile.sourceLabel} free cast`)
+      }
       // Resting ends the fight — the Rampage Die falls back to its d4 baseline.
       if (resourceDieSidesByKey.rampage_die != null) {
         setResourceDieSidesByKey((prev) => ({ ...prev, rampage_die: 4 }))
@@ -3082,6 +3141,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       usesResolveContext,
       rechargeCapsByResourceId,
       resourceRefreshEffects,
+    derived?.grantedSpellCasts,
       classDetails,
       usedHitDiceByClassId,
       resourceDieSidesByKey.rampage_die,
@@ -3845,13 +3905,40 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     movementEffectNotes.length > 0 ||
     extraTurns.length > 0
 
-  const freeCastSpellKeys = collectFreeCastSpellKeys(
+  const slotlessCastSpellKeys = collectFreeCastSpellKeys(
     classDetails.flatMap((entry) =>
       [...(entry.class?.features ?? []), ...(entry.subclass?.features ?? [])].filter(
         (feature) => (feature.level ?? 1) <= entry.row.level,
       ),
     ),
   )
+  const grantedSpellCastProfiles = derived?.grantedSpellCasts ?? []
+  const selectedGrantedSpellProfile = selectedSpell
+    ? grantedSpellProfileFor(grantedSpellCastProfiles, selectedSpell)
+    : null
+  const selectedSpellAttackMod = selectedGrantedSpellProfile?.castingAbility
+    ? proficiencyBonus + abilityMods[selectedGrantedSpellProfile.castingAbility]
+    : spellAttackMod
+  const selectedSpellFreeCast = selectedGrantedSpellProfile?.freeCastCount
+    ? {
+        trackingKey: selectedGrantedSpellProfile.trackingKey,
+        sourceLabel: selectedGrantedSpellProfile.sourceLabel,
+        max: selectedGrantedSpellProfile.freeCastCount,
+        remaining: Math.max(
+          0,
+          selectedGrantedSpellProfile.freeCastCount -
+            (usedActionUsesById[selectedGrantedSpellProfile.trackingKey] ?? 0),
+        ),
+      }
+    : null
+  const selectedSpellSlotLevel =
+    selectedSpell && selectedSpell.level > 0 && primarySpellSlotTable
+      ? spendLowestAvailableSpellSlot(
+          usedSpellSlotsByKey[spellSlotTableKey(primarySpellSlotTable)] ?? [],
+          primarySpellSlotTable.slotsByLevel,
+          selectedSpell.level,
+        )?.spentLevel ?? null
+      : null
 
   const alwaysPreparedSpellIds = (() => {
     const ids = new Set<string>()
@@ -3950,6 +4037,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       equippedShield: limitationEquipment.shield,
       currentHp,
     },
+  })
+  const saveFeatureBadges = collectSaveFeatureBadges(sheetSaveFeatures, {
+    activeConditions,
+    activeSheetToggles: activeSheetToggleSet,
+    equippedArmor: limitationEquipment.armor,
+    equippedShield: limitationEquipment.shield,
+    currentHp,
   })
   const influencePointCount = hasInfluencePointsMechanic
     ? currentInfluencePoints(tickAccumulatedResources(accumulatedResources))
@@ -5449,7 +5543,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                     weaponProficiencies={derived?.weaponProficiencies ?? []}
                                     extraMasteryByWeaponId={extraMasteryByWeaponId}
                                     onExtraMasteryChange={persistExtraWeaponMasteries}
-                                    onAttackRoll={() => markActionEconomy("action")}
+                                    onAttackRoll={(kind) =>
+                                      kind === "bonus"
+                                        ? markActionEconomy("bonus")
+                                        : recordWeaponAttack()
+                                    }
+                                    attackPips={{
+                                      used: attackRollsUsed,
+                                      total: attacksPerAction,
+                                    }}
                                     onDamageRoll={markRampageDamageDealtThisTurn}
                                     hideHeading
                                     activeSheetToggleIds={activeSheetToggleIds}
@@ -5546,6 +5648,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           const mod =
                             derivedSave?.bonus ??
                             abilityMods[abilityKey] + (isProficient ? proficiencyBonus : 0)
+                          const saveBadges = saveFeatureBadges[abilityKey] ?? []
                           return (
                             <div
                               key={ability}
@@ -5553,12 +5656,31 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                 isProficient ? SHEET_STATUS_ROW.saveProficient : SHEET_STATUS_ROW.muted
                               }`}
                             >
-                              <span className="min-w-0 font-semibold tabular-nums tracking-wide">
-                                {ABILITY_LABELS[ability.toLowerCase()]}
-                                {derivedSave?.governingAbility
-                                  ? ` (${ABILITY_LABELS[derivedSave.governingAbility]})`
-                                  : ""}
-                              </span>
+                              <div className="min-w-0 flex flex-col gap-1">
+                                <span className="font-semibold tabular-nums tracking-wide">
+                                  {ABILITY_LABELS[ability.toLowerCase()]}
+                                  {derivedSave?.governingAbility
+                                    ? ` (${ABILITY_LABELS[derivedSave.governingAbility]})`
+                                    : ""}
+                                </span>
+                                {saveBadges.length ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {saveBadges.map((badge) => (
+                                      <span
+                                        key={badge.id}
+                                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${weaponModifierBadgeClass("feature")}`}
+                                      >
+                                        {badge.label}
+                                        <ConditionInfoTip
+                                          description={badge.description}
+                                          source={badge.sourceLabel}
+                                          ariaLabel={`${badge.label} save feature`}
+                                        />
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <span className="font-bold tabular-nums">{formatMod(mod)}</span>
                                 <D20RollButton
@@ -6346,7 +6468,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           <SpellDetailOverlay
             key="spell-detail"
             spell={selectedSpell}
-            spellAttackMod={spellAttackMod}
+            spellAttackMod={selectedSpellAttackMod}
             activeConcentration={getActiveConcentration(activeConditions)}
             onClose={() => setSelectedSpell(null)}
             psiLimit={psiLimit}
@@ -6404,34 +6526,34 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   }))
                 }
               }
+              if (result.freeCastUsedKey) {
+                setUsedActionUsesById((prev) => ({
+                  ...prev,
+                  [result.freeCastUsedKey!]: (prev[result.freeCastUsedKey!] ?? 0) + 1,
+                }))
+              }
               if (result.slotUsed && primarySpellSlotTable) {
                 const key = spellSlotTableKey(primarySpellSlotTable)
                 const used = usedSpellSlotsByKey[key] ?? primarySpellSlotTable.slotsByLevel.map(() => 0)
-                const next = consumeSpellSlot(
+                const spent = spendLowestAvailableSpellSlot(
                   used,
                   primarySpellSlotTable.slotsByLevel,
                   selectedSpell.level,
                 )
-                if (next) {
-                  setUsedSpellSlotsByKey((prev) => ({ ...prev, [key]: next }))
+                if (spent) {
+                  setUsedSpellSlotsByKey((prev) => ({ ...prev, [key]: spent.nextUsed }))
                 }
               }
             }}
+            slotLevel={selectedSpellSlotLevel}
             canUseSlot={
               selectedSpell.level === 0 ||
               spellCastCost?.mode === "point_pool" ||
               spellCastCost?.mode === "resource" ||
-              (primarySpellSlotTable != null &&
-                (() => {
-                  const key = spellSlotTableKey(primarySpellSlotTable)
-                  const used = usedSpellSlotsByKey[key] ?? []
-                  return (
-                    (used[selectedSpell.level - 1] ?? 0) <
-                    (primarySpellSlotTable.slotsByLevel[selectedSpell.level - 1] ?? 0)
-                  )
-                })())
+              selectedSpellSlotLevel != null
             }
-            freeCast={isFreeCastSpell(freeCastSpellKeys, selectedSpell.name)}
+            freeCast={selectedSpellFreeCast}
+            slotlessCast={isFreeCastSpell(slotlessCastSpellKeys, selectedSpell.name)}
           />
         ) : null}
         {portraitZoomOpen && character.portrait_url ? (

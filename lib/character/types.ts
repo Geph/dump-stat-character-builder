@@ -177,6 +177,8 @@ export type DerivedCharacter = {
   tools: ToolBonus[]
   saves: SaveBonus[]
   spellcasting: DerivedSpellcastingEntry[]
+  /** Per-source rules for spells granted by feats, species, backgrounds, and features. */
+  grantedSpellCasts: import("@/lib/character/free-cast-spells").GrantedSpellCastProfile[]
   /** Non-spell class save DCs (Maneuver, Technique, Psionic, …). */
   specialSaveDcs: DerivedSpecialSaveDc[]
   forcedSaveRemaps: DerivedForcedSaveRemap[]

@@ -12,6 +12,10 @@ import {
   filterMagicInitiateAbilitySlotOptions,
   filterMagicInitiateSpellListSlotOptions,
   isMagicInitiateSourceLabel,
+  normalizeMagicInitiateSpellList,
+  takenMagicInitiateSpellLists,
+  unavailableMagicInitiateAbilityNames,
+  unavailableMagicInitiateSpellListNames,
 } from "@/lib/builder/magic-initiate"
 import {
   modifierPlayerChoiceSlotsForSource,
@@ -274,11 +278,14 @@ export function ModifierPlayerChoicePanel({
       if (!isMagicInitiateSourceLabel(slot.sourceLabel)) continue
       const selected = picks[slot.slotKey] ?? []
       if (!selected.length) continue
-      const allowed = new Set((slot.options ?? []).map((option) => option.name))
-      const next = selected.filter((name) => allowed.has(name))
+      const taken = takenMagicInitiateSpellLists(slots, picks, slot.slotKey)
+      const next = selected.filter((name) => {
+        const list = normalizeMagicInitiateSpellList(name)
+        return list ? !taken.has(list.toLowerCase()) : true
+      })
       if (next.length !== selected.length) onChange(slot.slotKey, next)
     }
-  }, [relevant, picks, onChange])
+  }, [relevant, picks, onChange, slots])
 
   if (relevant.length === 0) return null
 
@@ -301,10 +308,21 @@ export function ModifierPlayerChoicePanel({
           )
         }
 
+        const miSpellListUnavailable =
+          slot.kind === "spell_list_class" && isMagicInitiateSourceLabel(slot.sourceLabel)
+            ? unavailableMagicInitiateSpellListNames(slots, picks, slot.slotKey)
+            : []
+        const miAbilityUnavailable =
+          slot.kind === "spellcasting_ability" && isMagicInitiateSourceLabel(slot.sourceLabel)
+            ? unavailableMagicInitiateAbilityNames(slots, picks, slot.slotKey)
+            : []
+
         if (
           slot.kind === "spell_list_class" &&
           isMagicInitiateSourceLabel(slot.sourceLabel) &&
-          (slot.options?.length ?? 0) === 0
+          (slot.options?.length ?? 0) > 0 &&
+          miSpellListUnavailable.length >= (slot.options?.length ?? 0) &&
+          !(picks[slot.slotKey]?.length)
         ) {
           return (
             <p
@@ -405,7 +423,10 @@ export function ModifierPlayerChoicePanel({
                   ? unavailableOptions
                   : isLanguageKind
                     ? knownLanguages
-                    : []
+                    : [
+                        ...miSpellListUnavailable,
+                        ...miAbilityUnavailable,
+                      ]
             }
             allowCustom={slot.allowCustom ?? false}
             customPlaceholder={

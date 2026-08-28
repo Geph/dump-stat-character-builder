@@ -14,6 +14,8 @@ import { featureShowsOnSheetTab } from "@/lib/compendium/feature-sheet-display"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import {
   buildLevelUpStandardizedNotes,
+  collectFeatureScalingImprovements,
+  type LevelUpFeatureImprovement,
   type LevelUpStandardizedNote,
 } from "@/lib/character/level-up-improvements"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
@@ -100,6 +102,8 @@ export type LevelUpPlan = {
   newTotalLevel: number
   hitDie: number
   newFeatures: LevelUpNewFeature[]
+  /** Already-unlocked features whose level-gated modifiers improve at `toLevel`. */
+  featureImprovements: LevelUpFeatureImprovement[]
   standardizedNotes: LevelUpStandardizedNote[]
   steps: LevelUpChoiceStep[]
 }
@@ -196,6 +200,21 @@ export function buildLevelUpPlan(params: {
       description: feature.description ?? "",
       source: "subclass" as const,
     })),
+  ]
+
+  const featureImprovements: LevelUpFeatureImprovement[] = [
+    ...collectFeatureScalingImprovements(
+      cls.features as Feature[] | undefined,
+      fromLevel,
+      toLevel,
+      "class",
+    ),
+    ...collectFeatureScalingImprovements(
+      params.entry.subclass?.features as Feature[] | undefined,
+      fromLevel,
+      toLevel,
+      "subclass",
+    ),
   ]
 
   const steps: LevelUpChoiceStep[] = []
@@ -358,6 +377,7 @@ export function buildLevelUpPlan(params: {
     newTotalLevel,
     hitDie: cls.hit_die ?? 8,
     newFeatures,
+    featureImprovements,
     standardizedNotes: buildLevelUpStandardizedNotes({
       fromTotalLevel: params.currentTotalLevel,
       toTotalLevel: newTotalLevel,

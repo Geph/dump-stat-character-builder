@@ -547,6 +547,17 @@ export function grantTempHpFx(
   })
 }
 
+export function healSelfFx(
+  key: string,
+  effect: Omit<FeatureEffect, "id" | "kind"> & { kind?: "heal_self" },
+  activation: Partial<FeatureActivation> = { action: true },
+): LinkedModifierInstance {
+  return fxInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.healSelf, {
+    ...activation,
+    effects: [{ ...effect, id: modId(key), kind: "heal_self" }],
+  })
+}
+
 export function bonusActionAttackFx(key: string): LinkedModifierInstance {
   return fxInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.bonusActionAttack, {
     bonusAction: true,
@@ -731,10 +742,11 @@ export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
       spellsKnown("magic_initiate_spells", {
         choiceGrants: [
           { level: 0, count: 2 },
-          { level: 1, count: 1 },
+          { level: 1, count: 1, alwaysPrepared: true, freeCastPerLongRest: 1 },
         ],
         spellListClassOptions: ["Cleric", "Druid", "Wizard"],
         playerPicksSpellList: true,
+        alwaysPrepared: true,
         label: "Magic Initiate spells",
       }),
       spellAbility("magic_initiate_ability", "Spellcasting ability: INT, WIS, or CHA (chosen with feat)", [

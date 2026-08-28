@@ -3,6 +3,7 @@ import { collectAsiPoolsFromFeat } from "@/lib/character/feat-asi-pools"
 import {
   averageHpGain,
   buildLevelUpStandardizedNotes,
+  collectFeatureScalingImprovements,
   proficiencyBonusAtLevel,
   rolledHpGain,
 } from "@/lib/character/level-up-improvements"
@@ -32,6 +33,51 @@ describe("level-up improvements", () => {
     expect(averageHpGain(10, 2)).toBe(8)
     expect(rolledHpGain(10, 2, 1)).toBe(3)
     expect(rolledHpGain(10, -2, 1)).toBe(1)
+  })
+
+  it("explains Critical Shot crit-range improvements at levels 9 and 17", () => {
+    const criticalShot = {
+      name: "Critical Shot",
+      level: 2,
+      description: "",
+      linkedModifiers: [
+        {
+          instanceId: "crit",
+          catalogRefId: "cat_char_attack_roll_modifiers",
+          characteristics: [
+            {
+              id: "mod_crit",
+              type: "attack_roll_modifiers",
+              entries: [
+                {
+                  bonus: 0,
+                  target: "ranged",
+                  criticalHitMinimum: 19,
+                  criticalHitMinimumByLevel: [
+                    { level: 9, mode: "fixed", fixed: 18 },
+                    { level: 17, mode: "fixed", fixed: 17 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as Feature
+
+    expect(collectFeatureScalingImprovements([criticalShot], 8, 9, "class")).toEqual([
+      expect.objectContaining({
+        name: "Critical Shot",
+        detail: "Critical hits with ranged weapons improve from 19–20 to 18–20.",
+      }),
+    ])
+    expect(collectFeatureScalingImprovements([criticalShot], 16, 17, "class")).toEqual([
+      expect.objectContaining({
+        name: "Critical Shot",
+        detail: "Critical hits with ranged weapons improve from 18–20 to 17–20.",
+      }),
+    ])
+    expect(collectFeatureScalingImprovements([criticalShot], 7, 8, "class")).toEqual([])
   })
 })
 
@@ -114,5 +160,59 @@ describe("buildLevelUpPlan standardized notes and hit die", () => {
     expect(plan?.toLevel).toBe(5)
     expect(plan?.standardizedNotes.some((note) => note.id === "proficiency_bonus")).toBe(true)
     expect(plan?.newFeatures.some((feature) => feature.name === "Extra Attack")).toBe(true)
+    expect(plan?.featureImprovements).toEqual([])
+  })
+
+  it("surfaces Critical Shot improvement on Gunslinger 8 → 9", () => {
+    const entry = {
+      row: { class_id: "gunslinger", level: 8, subclass_id: null, order: 0 },
+      class: {
+        id: "gunslinger",
+        name: "Gunslinger",
+        hit_die: 8,
+        features: [
+          feature("Critical Shot", 2, {
+            linkedModifiers: [
+              {
+                instanceId: "crit",
+                catalogRefId: "cat_char_attack_roll_modifiers",
+                characteristics: [
+                  {
+                    id: "mod_crit",
+                    type: "attack_roll_modifiers",
+                    entries: [
+                      {
+                        bonus: 0,
+                        target: "ranged",
+                        criticalHitMinimum: 19,
+                        criticalHitMinimumByLevel: [
+                          { level: 9, mode: "fixed", fixed: 18 },
+                          { level: 17, mode: "fixed", fixed: 17 },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        ],
+      } as DndClass,
+      subclass: null,
+    } as CharacterClassDetail
+    const plan = buildLevelUpPlan({
+      entry,
+      subclasses: [],
+      currentTotalLevel: 8,
+      featureChoicePicks: {},
+    })
+    expect(plan?.newFeatures).toEqual([])
+    expect(plan?.featureImprovements).toEqual([
+      expect.objectContaining({
+        name: "Critical Shot",
+        detail: "Critical hits with ranged weapons improve from 19–20 to 18–20.",
+      }),
+    ])
+    expect(plan?.standardizedNotes.some((note) => note.id === "proficiency_bonus")).toBe(true)
   })
 })

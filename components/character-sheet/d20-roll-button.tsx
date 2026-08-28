@@ -29,6 +29,8 @@ type D20RollButtonProps = {
   modeToggleSurface?: "default" | "onFill"
   /** Optional caption shown inside filled panel buttons (e.g. TO HIT). */
   caption?: string
+  /** Optional shared progress through a multi-attack Attack action. */
+  attackPips?: { used: number; total: number }
   className?: string
   breakdown?: { label: string; value: number }[]
   onRoll?: () => void
@@ -91,6 +93,7 @@ export function D20RollButton({
   tone = "default",
   modeToggleSurface = "default",
   caption,
+  attackPips,
   className,
   breakdown,
   onRoll,
@@ -272,6 +275,21 @@ export function D20RollButton({
               <span className={filled ? "text-white" : "text-foreground"}>{modLabel}</span>
             )}
           </span>
+          {attackPips && attackPips.total > 1 ? (
+            <span
+              className="inline-flex gap-1 pt-0.5"
+              aria-label={`${Math.min(attackPips.used, attackPips.total)} of ${attackPips.total} attacks used`}
+            >
+              {Array.from({ length: attackPips.total }).map((_, index) => (
+                <span
+                  key={index}
+                  className={`h-1.5 w-1.5 rounded-full border border-white/70 ${
+                    index < attackPips.used ? "bg-white" : "bg-transparent"
+                  }`}
+                />
+              ))}
+            </span>
+          ) : null}
         </span>
       ) : (
         <>

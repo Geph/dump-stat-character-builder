@@ -84,6 +84,44 @@ describe("collectSheetActions", () => {
     expect(healing?.kinds).toEqual(["bonus"])
   })
 
+  it("includes feat combat actions such as Battle Medic from Healer", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([])],
+      species: null,
+      feats: [
+        {
+          id: "feat-healer",
+          name: "Healer",
+          description: "Battle Medic as a Utilize action.",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_healer_battle_medic",
+              catalogRefId: "cat_fx_heal_self",
+              activation: {
+                action: true,
+                effects: [
+                  {
+                    id: "mod_healer_battle_medic",
+                    kind: "heal_self",
+                    healTarget: "choose_ally",
+                    healMode: "proficiency",
+                    label: "Battle Medic",
+                  },
+                ],
+              },
+            },
+          ],
+        } as unknown as import("@/lib/types").Feat,
+      ],
+    })
+    const battleMedic = actions.find((a) => a.name === "Battle Medic")
+    expect(battleMedic).toMatchObject({
+      kinds: ["action"],
+      category: "combat",
+      sourceLabel: "Feat",
+    })
+  })
+
   it("derives a reaction from a trigger characteristic with useReaction", () => {
     const actions = collectSheetActions({
       classDetails: [

@@ -62,7 +62,12 @@ describe("PHB feats wiring (Origin / General / Fighting Style)", () => {
     ).toBe(true)
 
     const healer = enrich("Healer")
-    expect(chars(healer).length).toBeGreaterThan(0)
+    expect(chars(healer).some((c) => c.type === "spell_healing_modifier")).toBe(true)
+    expect(
+      ((healer.linked_modifiers as { catalogRefId?: string; activation?: { action?: boolean } }[]) ?? []).some(
+        (m) => m.catalogRefId === "cat_fx_heal_self" && m.activation?.action === true,
+      ),
+    ).toBe(true)
 
     const asi = enrich(
       "Ability Score Improvement",

@@ -24,6 +24,7 @@ import {
   forceSaveFx,
   grantTempHpFx,
   healingDicePool,
+  healSelfFx,
   hitPerLevel,
   imposeDisadvantageFx,
   modifyCreatureFx,
@@ -107,12 +108,15 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   Healer: {
     linkedModifiers: [
-      healingDicePool("healer_battle_medic", {
-        dieType: "d8",
-        activation: "action",
-        dicePerUseSource: "proficiency",
-        label: "Battle Medic: expend Healer's Kit use; target spends Hit Die + your PB",
-      }),
+      healSelfFx(
+        "healer_battle_medic",
+        {
+          healTarget: "choose_ally",
+          healMode: "proficiency",
+          label: "Battle Medic — expend one Healer's Kit use; target spends a Hit Die and regains the roll + your PB",
+        },
+        { action: true },
+      ),
       spellHealing("healer_rerolls", {
         label: "Healing Rerolls: reroll 1s on healing dice from spells or Battle Medic",
       }),

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { collectFreeCastSpellKeys, isFreeCastSpell } from "@/lib/character/free-cast-spells"
+import {
+  collectFreeCastSpellKeys,
+  collectGrantedSpellCastProfiles,
+  grantedSpellProfileFor,
+  isFreeCastSpell,
+  resetGrantedSpellFreeCasts,
+} from "@/lib/character/free-cast-spells"
+import { tagModifierSource } from "@/lib/character/tag-modifier-source"
+import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import {
   detectFeatureModifiers,
   mergeDetectionsIntoFeature,
@@ -63,5 +71,100 @@ describe("collectFreeCastSpellKeys", () => {
   it("returns no keys for features without cast_spell wiring", () => {
     expect(collectFreeCastSpellKeys([]).size).toBe(0)
     expect(collectFreeCastSpellKeys([null, undefined]).size).toBe(0)
+  })
+})
+
+describe("limited granted-spell casts", () => {
+  const modifiers = tagModifierSource(
+    [
+      {
+        id: "mod_magic_initiate_spells",
+        type: "spells_known",
+        spells: [
+          {
+            spellId: "spell-guiding-bolt",
+            prepared: true,
+            alwaysPrepared: true,
+            freeCastPerLongRest: 1,
+          },
+        ],
+        castingAbility: "wisdom",
+      },
+    ] as CharacteristicModifier[],
+    {
+      sourceType: "feat",
+      source: "Magic Initiate",
+      sourceId: "feat-magic-initiate",
+      label: "Magic Initiate",
+    },
+  )
+
+  it("keeps the chosen ability and one free Long Rest cast with the granted spell", () => {
+    const profiles = collectGrantedSpellCastProfiles(modifiers)
+    const profile = grantedSpellProfileFor(profiles, {
+      id: "spell-guiding-bolt",
+      name: "Guiding Bolt",
+    })
+
+    expect(profile).toMatchObject({
+      sourceLabel: "Magic Initiate",
+      castingAbility: "wisdom",
+      freeCastCount: 1,
+    })
+  })
+
+  it("restores the free cast only on a Long Rest", () => {
+    const [profile] = collectGrantedSpellCastProfiles(modifiers)
+    const used = { [profile.trackingKey]: 1 }
+
+    expect(resetGrantedSpellFreeCasts(used, [profile], "short_rest").usedById).toEqual(used)
+    expect(resetGrantedSpellFreeCasts(used, [profile], "long_rest")).toEqual({
+      usedById: {},
+      restored: [profile],
+    })
+  })
+
+  it("associates legacy sibling Uses wiring with only the selected leveled spell", () => {
+    const legacy = tagModifierSource(
+      [
+        {
+          id: "mod_magic_initiate_spells",
+          type: "spells_known",
+          spells: [
+            { spellId: "spell-light", prepared: true },
+            { spellId: "spell-guiding-bolt", prepared: true },
+          ],
+          castingAbility: "charisma",
+        },
+        {
+          id: "mod_magic_initiate_cast",
+          type: "uses",
+          uses: {
+            type: "fixed",
+            fixedAmount: 1,
+            recharges: [{ rest: "long_rest" }],
+          },
+          label: "Cast chosen level-1 spell once without a slot",
+        },
+      ] as CharacteristicModifier[],
+      {
+        sourceType: "feat",
+        source: "Magic Initiate",
+        sourceId: "feat-magic-initiate",
+        label: "Magic Initiate",
+      },
+    )
+    const profiles = collectGrantedSpellCastProfiles(legacy)
+
+    expect(
+      grantedSpellProfileFor(profiles, { id: "spell-light", name: "Light", level: 0 }),
+    ).toBeNull()
+    expect(
+      grantedSpellProfileFor(profiles, {
+        id: "spell-guiding-bolt",
+        name: "Guiding Bolt",
+        level: 1,
+      }),
+    ).toMatchObject({ castingAbility: "charisma", freeCastCount: 1 })
   })
 })

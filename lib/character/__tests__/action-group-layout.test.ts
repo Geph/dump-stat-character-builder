@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   DEFAULT_COMBAT_ACTION_GROUP_ORDER,
+  defaultActionGroupColumn,
   moveActionGroup,
   orderActionGroups,
 } from "@/lib/character/action-group-layout"
@@ -21,6 +22,14 @@ describe("action group layout", () => {
       "bonus",
       "reaction",
     ])
+  })
+
+  it("assigns the default row pairs to independent columns", () => {
+    expect(defaultActionGroupColumn("weapons")).toBe(0)
+    expect(defaultActionGroupColumn("action")).toBe(1)
+    expect(defaultActionGroupColumn("triggered")).toBe(0)
+    expect(defaultActionGroupColumn("bonus")).toBe(1)
+    expect(defaultActionGroupColumn("reaction")).toBe(0)
   })
 
   it("honors a saved order and keeps new groups at the end", () => {

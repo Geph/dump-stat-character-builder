@@ -63,10 +63,14 @@ import { formatDamageRollResult, rollDamageWithMode } from "@/lib/dice/damage-ro
 import { resolveRollMode } from "@/lib/character/resolve-roll-mode"
 import {
   DEFAULT_COMBAT_ACTION_GROUP_ORDER,
+  defaultActionGroupColumn,
+  loadActionGroupColumns,
   loadActionGroupOrder,
   moveActionGroup,
   orderActionGroups,
+  saveActionGroupColumns,
   saveActionGroupOrder,
+  type ActionGroupColumnMap,
   type ActionGroupId,
 } from "@/lib/character/action-group-layout"
 
@@ -264,6 +268,34 @@ type ActionUsage = {
   setUsed: (next: number) => void
   resourceName?: string
   resourceId?: string
+}
+
+/** Compact cost for the action card title row (replaces publisher/source labels). */
+function formatSheetActionCostMeta(
+  entry: SheetActionEntry,
+  usage: ActionUsage | null,
+): string | null {
+  const hitDice = entry.spendHitDice ?? 0
+  if (hitDice > 0) {
+    return `${hitDice} Hit Die${hitDice === 1 ? "" : "ce"}`
+  }
+  if (!entry.classResourceKey) return null
+
+  const resourceName =
+    usage?.resourceName?.trim() || entry.classResourceKey.replace(/_/g, " ")
+  const amount = Math.max(1, entry.limitedUses?.classResourceAmount ?? 1)
+  const mode = entry.limitedUses?.classResourceCostMode
+
+  if (mode === "up_to_proficiency_bonus") {
+    const mult = amount > 1 ? `${amount} × ` : ""
+    return `up to ${mult}PB ${resourceName}`
+  }
+  if (mode === "up_to_ability_modifier") {
+    const ability = entry.limitedUses?.classResourceCostAbility ?? "ability"
+    const mult = amount > 1 ? `${amount} × ` : ""
+    return `up to ${mult}${ability} mod ${resourceName}`
+  }
+  return `${amount} ${resourceName}`
 }
 
 function dieSides(dieType: string): number {
@@ -2031,20 +2063,37 @@ export function SheetActionsPanel({
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [openEconomyKind, setOpenEconomyKind] = useState<ActionEconomyKind | null>(null)
   const [groupOrder, setGroupOrder] = useState<string[]>([])
+  const [groupColumns, setGroupColumns] = useState<ActionGroupColumnMap>({})
+  const [desktopGroupDragEnabled, setDesktopGroupDragEnabled] = useState(false)
   const dragGroupIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!characterId) {
       setGroupOrder([])
+      setGroupColumns({})
       return
     }
     setGroupOrder(loadActionGroupOrder(characterId, layoutScope))
+    setGroupColumns(loadActionGroupColumns(characterId, layoutScope))
   }, [characterId, layoutScope])
 
   useEffect(() => {
     if (!characterId || !groupOrder.length) return
     saveActionGroupOrder(characterId, layoutScope, groupOrder)
   }, [characterId, layoutScope, groupOrder])
+
+  useEffect(() => {
+    if (!characterId || !Object.keys(groupColumns).length) return
+    saveActionGroupColumns(characterId, layoutScope, groupColumns)
+  }, [characterId, layoutScope, groupColumns])
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1280px)")
+    const update = () => setDesktopGroupDragEnabled(media.matches)
+    update()
+    media.addEventListener("change", update)
+    return () => media.removeEventListener("change", update)
+  }, [])
 
   const resourceById = useMemo(
     () => new Map(resourceEntries.map((entry) => [entry.id, entry])),
@@ -2268,22 +2317,14 @@ export function SheetActionsPanel({
       )
       .filter((label): label is string => Boolean(label))
     const summary = isSpecialAttack ? null : actionSummaryLine(entry)
-    const sourceLine = [
+    const costMeta = formatSheetActionCostMeta(entry, usage)
+    const titleMeta = [
       entry.trigger,
-      entry.sourceLabel,
+      costMeta,
       isSpecialAttack ? specialAttackProfileLabel(primaryAttack!) : null,
     ]
       .filter(Boolean)
       .join(" · ")
-    const resourceCostLabel = usage && usesClassResource
-      ? `Costs ${
-          entry.limitedUses?.classResourceCostMode === "up_to_proficiency_bonus"
-            ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}PB`
-            : entry.limitedUses?.classResourceCostMode === "up_to_ability_modifier"
-              ? `up to ${(entry.limitedUses.classResourceAmount ?? 1) > 1 ? `${entry.limitedUses.classResourceAmount} × ` : ""}${entry.limitedUses.classResourceCostAbility ?? "ability"} mod`
-              : entry.limitedUses?.classResourceAmount ?? 1
-        }${usage.resourceName ? ` ${usage.resourceName}` : ""}`
-      : null
 
     return (
       <div
@@ -2354,8 +2395,8 @@ export function SheetActionsPanel({
                 </span>
               ) : null}
               <p className="text-xs font-semibold text-foreground">{entry.name}</p>
-              {sourceLine ? (
-                <p className="text-[10px] text-muted-foreground">{sourceLine}</p>
+              {titleMeta ? (
+                <p className="text-[10px] text-muted-foreground">{titleMeta}</p>
               ) : null}
             </div>
 
@@ -2401,9 +2442,7 @@ export function SheetActionsPanel({
               </p>
             ) : null}
 
-            {resourceCostLabel ? (
-              <p className="text-[10px] tabular-nums text-muted-foreground">{resourceCostLabel}</p>
-            ) : usage ? (
+            {usage ? (
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] tabular-nums text-muted-foreground">
                   {usage.max - usage.used} / {usage.max}
@@ -2517,11 +2556,22 @@ export function SheetActionsPanel({
   )
   const visibleGroupIds = visibleGroups.map((group) => group.id)
 
-  const dropOnGroup = (targetId: string) => {
+  const columnForGroup = (id: string): 0 | 1 =>
+    groupColumns[id] ?? defaultActionGroupColumn(id)
+  const groupsByColumn = [
+    visibleGroups.filter((group) => columnForGroup(group.id) === 0),
+    visibleGroups.filter((group) => columnForGroup(group.id) === 1),
+  ] as const
+  const canDragGroups = groupLayout === "responsive-grid" && desktopGroupDragEnabled
+
+  const dropGroup = (column: 0 | 1, targetId?: string) => {
     const fromId = dragGroupIdRef.current
     dragGroupIdRef.current = null
-    if (!fromId || fromId === targetId) return
-    setGroupOrder(moveActionGroup(visibleGroupIds, groupOrder, fromId, targetId))
+    if (!fromId) return
+    setGroupColumns((previous) => ({ ...previous, [fromId]: column }))
+    if (targetId && fromId !== targetId) {
+      setGroupOrder(moveActionGroup(visibleGroupIds, groupOrder, fromId, targetId))
+    }
   }
 
   return (
@@ -2531,33 +2581,10 @@ export function SheetActionsPanel({
           Incapacitated — you cannot take actions, bonus actions, or reactions.
         </p>
       ) : null}
-      <div
-        className={
-          groupLayout === "responsive-grid"
-            ? "grid grid-cols-1 xl:grid-cols-2 gap-3 min-w-0"
-            : "space-y-3"
-        }
-      >
+      <div className={groupLayout === "responsive-grid" ? "space-y-3 xl:hidden" : "space-y-3"}>
         {visibleGroups.map((group) => (
-          <div
-            key={group.id}
-            className="min-w-0"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault()
-              dropOnGroup(group.id)
-            }}
-          >
-            <div
-              className="mb-1.5 flex cursor-grab items-center gap-1 active:cursor-grabbing"
-              draggable
-                onDragStart={(event) => {
-                  dragGroupIdRef.current = group.id
-                  event.dataTransfer.effectAllowed = "move"
-                  event.dataTransfer.setData("text/plain", group.id)
-                }}
-            >
-              <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <div key={group.id} className="min-w-0">
+            <div className="mb-1.5 flex items-center gap-1">
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                 {group.label}
               </p>
@@ -2566,6 +2593,66 @@ export function SheetActionsPanel({
           </div>
         ))}
       </div>
+      {groupLayout === "responsive-grid" ? (
+        <div className="hidden min-w-0 grid-cols-2 items-start gap-3 xl:grid">
+          {groupsByColumn.map((groups, columnIndex) => {
+            const column = columnIndex as 0 | 1
+            return (
+              <div
+                key={column}
+                className="min-h-16 min-w-0 space-y-3 rounded-lg transition-colors"
+                onDragOver={(event) => {
+                  if (canDragGroups) event.preventDefault()
+                }}
+                onDrop={(event) => {
+                  if (!canDragGroups) return
+                  event.preventDefault()
+                  dropGroup(column)
+                }}
+              >
+                {groups.map((group) => (
+                  <div
+                    key={group.id}
+                    className="min-w-0"
+                    onDragOver={(event) => {
+                      if (canDragGroups) event.preventDefault()
+                    }}
+                    onDrop={(event) => {
+                      if (!canDragGroups) return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      dropGroup(column, group.id)
+                    }}
+                  >
+                    <div
+                      className={cn(
+                        "mb-1.5 flex items-center gap-1",
+                        canDragGroups && "cursor-grab active:cursor-grabbing",
+                      )}
+                      draggable={canDragGroups}
+                      onDragStart={(event) => {
+                        if (!canDragGroups) {
+                          event.preventDefault()
+                          return
+                        }
+                        dragGroupIdRef.current = group.id
+                        event.dataTransfer.effectAllowed = "move"
+                        event.dataTransfer.setData("text/plain", group.id)
+                      }}
+                    >
+                      <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        {group.label}
+                      </p>
+                    </div>
+                    {group.body}
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
 
       <AnimatePresence>
         {openAction ? (

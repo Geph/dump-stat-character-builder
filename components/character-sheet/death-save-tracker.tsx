@@ -221,10 +221,13 @@ export function DeathSaveTracker({
         className={`relative flex flex-col justify-center gap-1.5 px-2 py-1.5 min-h-[2.75rem] h-full ${SHEET_DEATH_SAVE_BOX}`}
       >
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase shrink-0">Death Saves</p>
+          <div className="flex shrink-0 items-center gap-1">
+            <Skull className="h-3.5 w-3.5 text-muted-foreground/60" aria-hidden />
+            <p className="text-[10px] font-bold text-muted-foreground uppercase">Death Saves</p>
+          </div>
           {rollControls}
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pr-6">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <DeathSaveDots
             label="Succ"
             count={deathSaves.successes}
@@ -240,10 +243,6 @@ export function DeathSaveTracker({
             compact
           />
         </div>
-        <Skull
-          className="pointer-events-none absolute bottom-1.5 right-1.5 h-5 w-5 text-muted-foreground/30"
-          aria-hidden
-        />
       </div>
     )
   }

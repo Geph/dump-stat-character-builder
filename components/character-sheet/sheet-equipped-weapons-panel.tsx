@@ -53,8 +53,9 @@ type SheetEquippedWeaponsPanelProps = {
   weaponProficiencies: string[]
   extraMasteryByWeaponId?: Record<string, ExtraWeaponMasteryControl>
   onExtraMasteryChange?: (equipmentId: string, names: string[]) => void
-  /** Weapon attack rolls spend the Attack action. */
-  onAttackRoll?: () => void
+  /** Weapon attack rolls spend the Attack or off-hand Bonus Action. */
+  onAttackRoll?: (kind: "action" | "bonus") => void
+  attackPips?: { used: number; total: number }
   /** Weapon damage rolls signal that damage was dealt this turn (Rampage Die). */
   onDamageRoll?: () => void
   hideHeading?: boolean
@@ -77,6 +78,7 @@ function WeaponAttackCard({
   extraMastery,
   onExtraMasteryChange,
   onAttackRoll,
+  attackPips,
   onDamageRoll,
   activeSheetToggleIds,
   onToggleMounted,
@@ -85,7 +87,8 @@ function WeaponAttackCard({
   weaponProficiencies: string[]
   extraMastery?: ExtraWeaponMasteryControl
   onExtraMasteryChange?: (equipmentId: string, names: string[]) => void
-  onAttackRoll?: () => void
+  onAttackRoll?: (kind: "action" | "bonus") => void
+  attackPips?: { used: number; total: number }
   onDamageRoll?: () => void
   activeSheetToggleIds?: readonly string[]
   onToggleMounted?: (weaponId: string) => void
@@ -93,6 +96,10 @@ function WeaponAttackCard({
   const range = getWeaponRangeText(weapon)
   const mastery = getWeaponMastery(weapon)
   const properties = getWeaponPropertyTags(weapon)
+  const isBasicMeleeRange =
+    (weapon.subcategory ?? "").toLowerCase().includes("melee") &&
+    !properties.some((property) => /^reach(?:\s|\(|$)/i.test(property)) &&
+    (range === "Melee reach" || /^5\s*ft\.?$/i.test(range ?? ""))
   const baseDamage = getWeaponDamageText(weapon)
   const damageExpression = attack.damageDisplay || baseDamage
   const canMount = buildInputs
@@ -108,15 +115,16 @@ function WeaponAttackCard({
     (mastery ? describeWeaponMastery(mastery) : null) ??
     (mastery ? "Homebrew mastery — see item details." : null)
   const masteryActive = sheetContext?.masteryActive ?? false
+  const appliedModifiers = sheetContext?.appliedModifiers ?? []
   const handleAttackRoll = () => {
     if (ammoHpCost && ammoHpCost > 0 && onSpendAmmoHp) onSpendAmmoHp()
-    onAttackRoll?.()
+    onAttackRoll?.(hand === "off" ? "bonus" : "action")
   }
 
   return (
-    <div className="rounded border border-primary/40 bg-primary/5 px-2.5 py-2 min-w-0">
-      <div className="flex items-stretch justify-between gap-2">
-        <div className="min-w-0 flex-1 space-y-1">
+    <div className="min-w-0 rounded border border-primary/40 bg-primary/5 px-2.5 py-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 basis-[7rem] space-y-1">
           <div className="flex flex-wrap items-center gap-x-1.5">
             {weapon.icon?.trim() ? (
               <GameIcon name={weapon.icon.trim()} className="h-5 w-5 shrink-0 text-primary" />
@@ -149,10 +157,12 @@ function WeaponAttackCard({
                 <span className="inline-flex items-center gap-0.5">
                   {damageExpression ? <span className="text-muted-foreground mx-1">·</span> : null}
                   {range}
-                  <ConditionInfoTip
-                    description={describeWeaponRange(range) ?? range}
-                    ariaLabel="Range rules"
-                  />
+                  {isBasicMeleeRange ? null : (
+                    <ConditionInfoTip
+                      description={describeWeaponRange(range) ?? range}
+                      ariaLabel="Range rules"
+                    />
+                  )}
                 </span>
               ) : null}
             </p>
@@ -160,9 +170,9 @@ function WeaponAttackCard({
 
           {mastery ||
           properties.length > 0 ||
-          sheetContext?.appliedModifiers.length ||
+          appliedModifiers.length > 0 ||
           sheetContext?.extraMasteries.length ? (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-col items-start gap-1">
               {mastery ? (
                 <span
                   className={cn(
@@ -191,39 +201,40 @@ function WeaponAttackCard({
                   />
                 </span>
               ))}
-              {properties.map((property) => {
-                const description = describeWeaponProperty(property)
-                return (
-                  <span
-                    key={property}
-                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-medium text-foreground"
-                  >
-                    {property}
-                    {description ? (
-                      <ConditionInfoTip
-                        description={description}
-                        ariaLabel={`${property} property`}
-                      />
-                    ) : null}
-                  </span>
-                )
-              })}
-              {(sheetContext?.appliedModifiers ?? []).map((modifier) => (
+              {properties.map((property) => (
                 <span
-                  key={`${modifier.name}-${modifier.description}`}
+                  key={property}
                   className={cn(
                     "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] font-medium",
-                    weaponModifierBadgeClass(modifier.sourceType),
+                    weaponModifierBadgeClass(undefined),
                   )}
                 >
-                  {modifier.name}
+                  {property}
                   <ConditionInfoTip
-                    description={modifier.description}
-                    source={modifier.sourceLabel}
-                    ariaLabel={`${modifier.name} modifier`}
+                    description={describeWeaponProperty(property) ?? property}
+                    ariaLabel={`${property} property`}
                   />
                 </span>
               ))}
+              {appliedModifiers.length > 0 ? (
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] font-medium",
+                    weaponModifierBadgeClass("feature"),
+                  )}
+                >
+                  Attack modifiers ({appliedModifiers.length})
+                  <ConditionInfoTip
+                    description=""
+                    details={appliedModifiers.map((modifier) => ({
+                      label: modifier.name,
+                      description: modifier.description,
+                      source: modifier.sourceLabel,
+                    }))}
+                    ariaLabel={`${weapon.name} attack modifiers`}
+                  />
+                </span>
+              ) : null}
             </div>
           ) : null}
 
@@ -255,15 +266,15 @@ function WeaponAttackCard({
             </div>
           ) : null}
           {canMount && onToggleMounted ? (
-            <label className="flex items-center justify-between gap-2 pt-0.5 text-[11px]">
-              <span className="min-w-0 leading-snug text-muted-foreground">
-                Mount (Bonus Action)
-              </span>
+            <label className="flex items-center gap-2 pt-0.5 text-[11px]">
               <Switch
                 checked={mounted}
                 onCheckedChange={() => onToggleMounted(weapon.id)}
                 aria-label={`Mount ${weapon.name}`}
               />
+              <span className="min-w-0 leading-snug text-muted-foreground">
+                Mount (Bonus Action)
+              </span>
             </label>
           ) : null}
           {note ? (
@@ -271,30 +282,36 @@ function WeaponAttackCard({
           ) : null}
         </div>
 
-        <div className="flex w-[8.4375rem] shrink-0 flex-col gap-1 self-start">
-          <D20RollButton
-            modifier={attack.attackBonus}
-            title={`${weapon.name} attack`}
-            breakdown={attack.attackBreakdown}
-            rollContext={{ kind: "attack" }}
-            onRoll={handleAttackRoll}
-            layout="panel"
-            tone={hand === "off" ? "bonus" : "action"}
-            caption="To Hit"
-          />
-          {damageExpression ? (
-            <WeaponDamageRollButton
-              expression={damageExpression}
-              label={`${weapon.name} damage`}
-              diceOptions={diceOptions}
-              showNoModToggle={hand === "off"}
-              defaultIncludeAbilityModifier={defaultIncludeAbilityModifier}
-              abilityModifier={abilityModifier}
+        {/* Side-by-side when the row has room for both (~17rem); wrap to a stack when it doesn't. */}
+        <div className="flex w-max max-w-full flex-row flex-wrap justify-end gap-1">
+          <div className="w-[8.4375rem] max-w-full">
+            <D20RollButton
+              modifier={attack.attackBonus}
+              title={`${weapon.name} attack`}
+              breakdown={attack.attackBreakdown}
+              rollContext={{ kind: "attack" }}
+              onRoll={handleAttackRoll}
               layout="panel"
-              tone="damage"
-              caption="Dmg"
-              onRoll={onDamageRoll}
+              tone={hand === "off" ? "bonus" : "action"}
+              caption="To Hit"
+              attackPips={hand === "main" ? attackPips : undefined}
             />
+          </div>
+          {damageExpression ? (
+            <div className="w-[8.4375rem] max-w-full">
+              <WeaponDamageRollButton
+                expression={damageExpression}
+                label={`${weapon.name} damage`}
+                diceOptions={diceOptions}
+                showNoModToggle={hand === "off"}
+                defaultIncludeAbilityModifier={defaultIncludeAbilityModifier}
+                abilityModifier={abilityModifier}
+                layout="panel"
+                tone="damage"
+                caption="Dmg"
+                onRoll={onDamageRoll}
+              />
+            </div>
           ) : null}
         </div>
       </div>
@@ -309,6 +326,7 @@ export function SheetEquippedWeaponsPanel({
   extraMasteryByWeaponId,
   onExtraMasteryChange,
   onAttackRoll,
+  attackPips,
   onDamageRoll,
   hideHeading = false,
   activeSheetToggleIds,
@@ -333,6 +351,7 @@ export function SheetEquippedWeaponsPanel({
             extraMastery={extraMasteryByWeaponId?.[entry.weapon.id]}
             onExtraMasteryChange={onExtraMasteryChange}
             onAttackRoll={onAttackRoll}
+            attackPips={attackPips}
             onDamageRoll={onDamageRoll}
             activeSheetToggleIds={activeSheetToggleIds}
             onToggleMounted={onToggleMounted}

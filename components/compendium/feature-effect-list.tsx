@@ -171,7 +171,7 @@ export function FeatureEffectList({
       defaults.standardActionStudy = true
     }
     if (kind === "extra_attack") {
-      defaults.extraAttackCount = 2
+      defaults.extraAttackCount = 1
     }
     if (kind === "weapon_attack") {
       defaults.attackProfile = "melee"
@@ -614,18 +614,18 @@ function EffectRow({
       {fields.includes("extraAttackCount") && (
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">
-            Attacks when taking the Attack action
+            Additional attacks when taking the Attack action
           </label>
           <select
-            value={effect.extraAttackCount ?? 2}
+            value={effect.extraAttackCount ?? 1}
             onChange={(e) =>
               onChange({ extraAttackCount: parseInt(e.target.value, 10) })
             }
             className="w-full max-w-xs px-3 py-2 bg-card border border-border rounded-lg text-sm"
           >
-            <option value={2}>2 attacks (Extra Attack)</option>
-            <option value={3}>3 attacks (Two Extra Attacks)</option>
-            <option value={4}>4 attacks (Three Extra Attacks)</option>
+            <option value={1}>1 additional (2 attacks total)</option>
+            <option value={2}>2 additional (3 attacks total)</option>
+            <option value={3}>3 additional (4 attacks total)</option>
           </select>
         </div>
       )}

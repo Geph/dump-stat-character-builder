@@ -5,6 +5,7 @@ import {
   magicInitiateAbilityForSpellList,
   pruneConflictingMagicInitiateSpellListPicks,
   takenMagicInitiateSpellLists,
+  unavailableMagicInitiateSpellListNames,
 } from "@/lib/builder/magic-initiate"
 import type { ModifierPlayerChoiceSlot } from "@/lib/builder/modifier-player-choices"
 
@@ -32,14 +33,15 @@ describe("magic-initiate spell list exclusivity", () => {
     expect(magicInitiateAbilityForSpellList("Druid")).toBe("wisdom")
   })
 
-  it("blocks reusing a spell list already taken by another Magic Initiate", () => {
+  it("marks a spell list already taken by another Magic Initiate as unavailable", () => {
     const granted = listSlot("granted:mi")
     const second = listSlot("feat:mi2")
     const slots = [granted, second]
     const picks = { [granted.slotKey]: ["Wizard"] }
 
     const filtered = filterMagicInitiateSpellListSlotOptions(second, slots, picks)
-    expect(filtered.options?.map((o) => o.name)).toEqual(["Cleric", "Druid"])
+    expect(filtered.options?.map((o) => o.name)).toEqual(["Cleric", "Druid", "Wizard"])
+    expect(unavailableMagicInitiateSpellListNames(slots, picks, second.slotKey)).toEqual(["Wizard"])
     expect(takenMagicInitiateSpellLists(slots, picks).has("wizard")).toBe(true)
     expect(canTakeAnotherMagicInitiate({ slots, picks })).toBe(true)
   })
@@ -50,8 +52,10 @@ describe("magic-initiate spell list exclusivity", () => {
     const slots = [first, second]
     const picks = { [first.slotKey]: ["Cleric"] }
 
-    const filtered = filterMagicInitiateSpellListSlotOptions(second, slots, picks)
-    expect(filtered.options?.map((o) => o.name)).toEqual(["Druid", "Wizard"])
+    expect(unavailableMagicInitiateSpellListNames(slots, picks, second.slotKey)).toEqual(["Cleric"])
+    expect(
+      filterMagicInitiateSpellListSlotOptions(second, slots, picks).options?.map((o) => o.name),
+    ).toEqual(["Cleric", "Druid", "Wizard"])
   })
 
   it("reports no remaining Magic Initiate takes when all spell lists are used", () => {

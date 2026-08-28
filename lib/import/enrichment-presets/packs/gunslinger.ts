@@ -15,6 +15,8 @@ export const GUNSLINGER_BASE_MANEUVERS = [
 
 const SKIN_OF_YOUR_TEETH_DESCRIPTION =
   "<p>When a creature you can see hits you with an attack roll, you can take a Reaction and expend one Risk Die to dodge out of harm's way. Roll the die and add the number rolled to your AC against this attack, potentially causing it to miss.</p>"
+const DODGE_ROLL_DESCRIPTION =
+  "<p>You can expend one Risk Die as a Bonus Action to move up to 15 feet and reload any Ranged weapon you are holding. This movement doesn’t provoke Opportunity Attacks and is unaffected by Difficult Terrain.</p>"
 
 function grantBaseManeuvers() {
   return {
@@ -123,6 +125,9 @@ export function sanitizeGunslingerImportContent(content: ImportContent): ImportC
     }
     return {
       ...ability,
+      description: /^dodge roll$/i.test(ability.name ?? "")
+        ? DODGE_ROLL_DESCRIPTION
+        : ability.description,
       ability_role: "knack" as const,
       source_type: ability.source_type === "compendium" ? "class" : ability.source_type,
       source_name: ability.source_type === "compendium" || !ability.source_name ? "Gunslinger" : ability.source_name,

@@ -115,44 +115,55 @@ export function takenMagicInitiateAbilities(
   return taken
 }
 
-/** Filter spell-list options so each Magic Initiate take uses a distinct class list. */
-export function filterMagicInitiateSpellListSlotOptions(
-  slot: ModifierPlayerChoiceSlot,
+/**
+ * Spell-list names already claimed by other Magic Initiate takes (for graying out picker options).
+ * `currentSlotKey` is excluded so the active pick keeps its own selection enabled.
+ */
+export function unavailableMagicInitiateSpellListNames(
   slots: readonly ModifierPlayerChoiceSlot[],
   picks: Record<string, string[]>,
-): ModifierPlayerChoiceSlot {
-  if (slot.kind !== "spell_list_class") return slot
-  if (!isMagicInitiateSourceLabel(slot.sourceLabel)) return slot
-  const taken = takenMagicInitiateSpellLists(slots, picks, slot.slotKey)
-  return {
-    ...slot,
-    options: (slot.options ?? []).filter((option) => {
-      const list = normalizeMagicInitiateSpellList(option.name)
-      if (!list) return true
-      return !taken.has(list.toLowerCase())
-    }),
-  }
+  currentSlotKey?: string | null,
+): string[] {
+  const taken = takenMagicInitiateSpellLists(slots, picks, currentSlotKey)
+  return MAGIC_INITIATE_SPELL_LISTS.filter((list) => taken.has(list.toLowerCase()))
 }
 
-/** Filter ability options so each Magic Initiate take uses a distinct ability. */
-export function filterMagicInitiateAbilitySlotOptions(
-  slot: ModifierPlayerChoiceSlot,
+/**
+ * Ability option names already claimed by other Magic Initiate takes (for graying out pickers).
+ */
+export function unavailableMagicInitiateAbilityNames(
   slots: readonly ModifierPlayerChoiceSlot[],
   picks: Record<string, string[]>,
+  currentSlotKey?: string | null,
+): string[] {
+  const taken = takenMagicInitiateAbilities(slots, picks, currentSlotKey)
+  return MAGIC_INITIATE_ABILITY_OPTIONS.filter((ability) => taken.has(ability)).map(
+    (ability) => ability.charAt(0).toUpperCase() + ability.slice(1),
+  )
+}
+
+/**
+ * Keep spell-list options intact. Taken lists are grayed out via unavailableOptions in the UI.
+ * @deprecated Filtering was replaced by unavailableMagicInitiateSpellListNames; this is a no-op.
+ */
+export function filterMagicInitiateSpellListSlotOptions(
+  slot: ModifierPlayerChoiceSlot,
+  _slots: readonly ModifierPlayerChoiceSlot[],
+  _picks: Record<string, string[]>,
 ): ModifierPlayerChoiceSlot {
-  if (slot.kind !== "spellcasting_ability") return slot
-  if (!isMagicInitiateSourceLabel(slot.sourceLabel)) return slot
-  const taken = takenMagicInitiateAbilities(slots, picks, slot.slotKey)
-  const current = normalizeSpellcastingAbilityPick(picks[slot.slotKey]?.[0])
-  return {
-    ...slot,
-    options: (slot.options ?? []).filter((option) => {
-      const ability = normalizeSpellcastingAbilityPick(option.name)
-      if (!ability) return true
-      if (current && ability === current) return true
-      return !taken.has(ability)
-    }),
-  }
+  return slot
+}
+
+/**
+ * Keep ability options intact. Taken abilities are grayed out via unavailableOptions in the UI.
+ * @deprecated Filtering was replaced by unavailableMagicInitiateAbilityNames; this is a no-op.
+ */
+export function filterMagicInitiateAbilitySlotOptions(
+  slot: ModifierPlayerChoiceSlot,
+  _slots: readonly ModifierPlayerChoiceSlot[],
+  _picks: Record<string, string[]>,
+): ModifierPlayerChoiceSlot {
+  return slot
 }
 
 /**

@@ -277,7 +277,15 @@ function collectAppliedModifiers(
     }
   }
 
-  return applied
+  const seen = new Set<string>()
+  return applied.filter((row) => {
+    // Same effect + source can appear twice when a feature was imported with both AI and
+    // detector attack_roll_modifiers (Critical Shot). Collapse those display duplicates.
+    const key = `${normalizeToken(row.description)}|${normalizeToken(row.sourceLabel ?? "")}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 function collectWeaponMasteryPicks(inputs: CharacterBuildInputs): string[] {

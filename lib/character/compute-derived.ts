@@ -113,6 +113,7 @@ import {
 import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import { resolveSkillAbility } from "@/lib/character/skill-ability-overrides"
+import { collectGrantedSpellCastProfiles } from "@/lib/character/free-cast-spells"
 
 const SKILL_ROWS: { name: string; ability: AbilityScoreKey }[] = [
   { name: "Acrobatics", ability: "dexterity" },
@@ -1082,6 +1083,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
       totalLevel,
     ),
     spellcasting,
+    grantedSpellCasts: collectGrantedSpellCastProfiles(builderCharacteristicMods),
     specialSaveDcs,
     forcedSaveRemaps,
     telepathy,
@@ -1233,6 +1235,26 @@ export function buildInputsFromSavedCharacter(params: {
           extraSkillProficiencies: character.skill_proficiencies ?? [],
         })
       : null
+  const savedFeatureChoicePicks =
+    pruned?.featureChoicePicks ?? character.feature_choice_picks ?? {}
+  const selectedFeatIds = [
+    ...new Set([
+      ...(character.feat_ids ?? []),
+      ...catalogFeatPickIdsFromPicks(savedFeatureChoicePicks),
+    ]),
+  ]
+  const featSelectionEntries = Object.entries(savedFeatureChoicePicks).flatMap(
+    ([slotKey, pickedIds]) =>
+      (pickedIds ?? [])
+        .filter((featId) => selectedFeatIds.includes(featId))
+        .map((featId) => ({ featId, choicePickKey: `feat:${slotKey}` })),
+  )
+  const featsWithSavedSlots = new Set(featSelectionEntries.map((entry) => entry.featId))
+  for (const featId of selectedFeatIds) {
+    if (!featsWithSavedSlots.has(featId)) {
+      featSelectionEntries.push({ featId, choicePickKey: `feat:${featId}` })
+    }
+  }
 
   return {
     baseAbilityScores: {
@@ -1254,18 +1276,13 @@ export function buildInputsFromSavedCharacter(params: {
     classAddOrder: pruned?.classAddOrder ?? character.class_add_order ?? rowsToClassAddOrder(classRows),
     classSkillPicks: pruned?.classSkillPicks ?? classSkillPicks,
     classToolPicks: pruned?.classToolPicks ?? builderPicks.class_tool_picks ?? {},
-    featureChoicePicks: pruned?.featureChoicePicks ?? character.feature_choice_picks ?? {},
+    featureChoicePicks: savedFeatureChoicePicks,
     speciesTraitPicks: builderPicks.species_trait_picks ?? {},
     featChoicePicks: character.feat_choice_picks ?? {},
     modifierPlayerPicks: character.modifier_player_picks ?? {},
-    selectedFeatIds: [
-      ...new Set([
-        ...(character.feat_ids ?? []),
-        ...catalogFeatPickIdsFromPicks(pruned?.featureChoicePicks ?? character.feature_choice_picks),
-      ]),
-    ],
+    selectedFeatIds,
     grantedFeatIds: [],
-    featSelectionEntries: [],
+    featSelectionEntries,
     extraSkillProficiencies: pruned?.extraSkillProficiencies ?? character.skill_proficiencies ?? [],
     extraToolProficiencies: character.tool_proficiencies ?? [],
     extraWeaponProficiencies: character.weapon_proficiencies ?? [],

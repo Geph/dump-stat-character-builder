@@ -40,7 +40,7 @@ import {
   inferGrantInspirationEffect,
   shouldCollectTargetableEffect,
 } from "@/lib/character/effect-target-policy"
-import type { CustomAbility, Feature, FeatureActivation, FeatureEffect, Species, UsesConfig } from "@/lib/types"
+import type { CustomAbility, Feat, Feature, FeatureActivation, FeatureEffect, Species, UsesConfig } from "@/lib/types"
 
 export type ActionEconomyKind = "action" | "bonus" | "reaction"
 
@@ -1016,6 +1016,11 @@ function suppressParentForMovementExpansions(
   return true
 }
 
+function resolveSheetActionName(feature: ActivatableItem): string {
+  if (/^healer$/i.test(feature.name.trim())) return "Battle Medic"
+  return feature.name
+}
+
 function pushActivatableItemActions(
   actions: SheetActionEntry[],
   feature: ActivatableItem,
@@ -1064,7 +1069,7 @@ function pushActivatableItemActions(
         const specialAttacks = resolveSpecialAttacks(feature, levelCap)
         actions.push({
           id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
-          name: feature.name,
+          name: resolveSheetActionName(feature),
           sourceLabel,
           kinds,
           trigger,
@@ -1753,6 +1758,7 @@ export function collectSheetActions(params: {
   species: Species | null
   backgroundFeature?: ActivatableItem | null
   customAbilities?: CustomAbility[]
+  feats?: Feat[]
   featureChoicePicks?: Record<string, string[]>
 }): SheetActionEntry[] {
   const actions: SheetActionEntry[] = []
@@ -1810,6 +1816,30 @@ export function collectSheetActions(params: {
       "background",
       null,
     )
+  }
+
+  if (params.feats?.length) {
+    const seenFeatKeys = new Set<string>()
+    for (const feat of params.feats) {
+      const key = `${feat.name}:${feat.id}`.toLowerCase()
+      if (seenFeatKeys.has(key)) continue
+      seenFeatKeys.add(key)
+      pushFeatureActions(
+        actions,
+        [
+          {
+            name: feat.name,
+            description: feat.description ?? null,
+            level: 1,
+            linkedModifiers: feat.linkedModifiers ?? undefined,
+          },
+        ],
+        Math.max(totalLevel, 1),
+        "Feat",
+        `feat-${feat.id}`,
+        null,
+      )
+    }
   }
 
   if (params.customAbilities?.length) {

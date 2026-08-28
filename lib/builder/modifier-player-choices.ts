@@ -801,7 +801,10 @@ export function applyModifierPlayerPicks(
           if (!spellId) continue
           pickedSpells.push({
             spellId,
-            prepared: grant.level > 0 ? true : undefined,
+            prepared:
+              grant.alwaysPrepared ?? spellMod.alwaysPrepared ?? (grant.level > 0 ? true : undefined),
+            alwaysPrepared: grant.alwaysPrepared ?? spellMod.alwaysPrepared,
+            freeCastPerLongRest: grant.freeCastPerLongRest,
           })
         }
       }

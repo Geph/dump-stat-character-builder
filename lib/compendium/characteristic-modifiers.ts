@@ -859,12 +859,16 @@ export interface SpellsKnownChoiceGrant {
   crossClassAnyList?: boolean
   /** Spells from this grant are always prepared (domain/oath spells). */
   alwaysPrepared?: boolean
+  /** Number of slot-free casts restored on a Long Rest for each spell chosen by this grant. */
+  freeCastPerLongRest?: number
 }
 
 export interface SpellsKnownEntry {
   spellId: string
   prepared?: boolean
   alwaysPrepared?: boolean
+  /** Number of slot-free casts restored on a Long Rest. */
+  freeCastPerLongRest?: number
   /** Class level when this always-prepared spell unlocks (subclass spell tables). */
   unlocksAtClassLevel?: number
   /** May only be cast as a Ritual (e.g. Animal Speaker / Nature Speaker). */

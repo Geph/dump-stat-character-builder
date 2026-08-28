@@ -338,4 +338,78 @@ describe("buildWeaponSheetContext", () => {
     const daggerContext = buildWeaponSheetContext(dagger, inputs, ["Simple weapons"])
     expect(daggerContext.appliedModifiers.some((entry) => entry.name === "On hit")).toBe(false)
   })
+
+  it("dedupes duplicate Critical Shot attack modifiers from the same source", () => {
+    const revolver = {
+      ...mace,
+      id: "revolver",
+      name: "Revolver",
+      subcategory: "Martial Ranged Weapons",
+    } as unknown as Equipment
+
+    const critMod = {
+      id: "mod_crit",
+      type: "attack_roll_modifiers" as const,
+      entries: [
+        {
+          bonus: 0,
+          target: "ranged",
+          criticalHitMinimum: 19,
+          criticalHitMinimumByLevel: [
+            { level: 9, mode: "fixed" as const, fixed: 18 },
+            { level: 17, mode: "fixed" as const, fixed: 17 },
+          ],
+        },
+      ],
+    }
+
+    const context = buildWeaponSheetContext(
+      revolver,
+      {
+        ...baseInputs,
+        classLevels: [{ classId: "gunslinger", level: 8 }],
+        classes: [
+          {
+            id: "gunslinger",
+            name: "Gunslinger",
+            hit_die: 8,
+            features: [
+              {
+                level: 2,
+                name: "Critical Shot",
+                description: "Crit on 19–20.",
+                linkedModifiers: [
+                  {
+                    instanceId: "ai",
+                    catalogRefId: "cat_char_attack_roll_modifiers",
+                    characteristics: [{ ...critMod, id: "mod_ai" }],
+                  },
+                  {
+                    instanceId: "detector",
+                    catalogRefId: "cat_char_attack_roll_modifiers",
+                    characteristics: [
+                      {
+                        ...critMod,
+                        id: "mod_detector",
+                        label: "Ranged weapon critical hit range",
+                        entries: [{ bonus: 0, target: "ranged", criticalHitMinimum: 19 }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        featureChoicePicks: {},
+      } as CharacterBuildInputs,
+      ["Martial weapons"],
+    )
+
+    const critLines = context.appliedModifiers.filter((entry) =>
+      /critical hit on 19/i.test(entry.description),
+    )
+    expect(critLines).toHaveLength(1)
+    expect(critLines[0]?.sourceLabel).toMatch(/Critical Shot/)
+  })
 })

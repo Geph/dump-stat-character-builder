@@ -41,10 +41,20 @@ type SpellDetailOverlayProps = {
     psiPointsSpent?: number
     hitDiceSpent?: number
     arcanumUsed?: boolean
+    freeCastUsedKey?: string
+    slotLevelUsed?: number
   }) => void
   canUseSlot: boolean
-  /** A feature grants this spell without expending a slot (Eye for Quality, Third Eye, …). */
-  freeCast?: boolean
+  slotLevel?: number | null
+  /** A limited slot-free use granted by a feat, species, background, or feature. */
+  freeCast?: {
+    trackingKey: string
+    sourceLabel: string
+    remaining: number
+    max: number
+  } | null
+  /** An unrestricted feature cast that never expends a slot. */
+  slotlessCast?: boolean
   psiLimit?: number | null
   castCost?: ResolvedSpellCastCost | null
   metamagicOptions?: MetamagicCastOption[]
@@ -61,7 +71,9 @@ export function SpellDetailOverlay({
   onClose,
   onCast,
   canUseSlot,
-  freeCast = false,
+  slotLevel = null,
+  freeCast = null,
+  slotlessCast = false,
   psiLimit,
   castCost = null,
   metamagicOptions = [],
@@ -73,6 +85,9 @@ export function SpellDetailOverlay({
   const [concentrationWarningOpen, setConcentrationWarningOpen] = useState(false)
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
   const [showEmpoweredReroll, setShowEmpoweredReroll] = useState(false)
+  const [castMode, setCastMode] = useState<"free" | "slot">(
+    freeCast && freeCast.remaining > 0 ? "free" : "slot",
+  )
   const history = useSheetRollHistory()
   const rollCtx = useSheetRollContext()
   const psionicAugments = resolveSpellPsionicAugments(spell)
@@ -93,6 +108,10 @@ export function SpellDetailOverlay({
     (row) => row.effectHint === "empowered_reroll",
   )
   const hasQuickened = selectedMetamagicOptions.some((row) => row.effectHint === "quicken")
+  const freeCastTrackingKey = freeCast?.trackingKey
+  const freeCastRemaining = freeCast?.remaining ?? 0
+  const freeCastAvailable = freeCastRemaining > 0
+  const usingFreeCast = slotlessCast || (castMode === "free" && freeCastAvailable)
   const canCastSpell = isCantrip
     ? spendsResourcePoints
       ? (castCost?.canCast ?? true)
@@ -101,7 +120,7 @@ export function SpellDetailOverlay({
         : true
     : spendsResourcePoints
       ? (castCost?.canCast ?? false)
-      : (canUseSlot || freeCast) && metamagicReady
+      : (canUseSlot || usingFreeCast) && metamagicReady
 
   useEffect(() => {
     setConcentrationWarningOpen(false)
@@ -109,6 +128,10 @@ export function SpellDetailOverlay({
     setAugmentSelections([])
     setShowEmpoweredReroll(false)
   }, [spell.id])
+
+  useEffect(() => {
+    setCastMode(freeCastTrackingKey && freeCastRemaining > 0 ? "free" : "slot")
+  }, [freeCastTrackingKey, freeCastRemaining])
 
   const augmentSummary =
     psionicAugments && augmentSelections.length
@@ -124,6 +147,8 @@ export function SpellDetailOverlay({
       psiPointsSpent?: number
       hitDiceSpent?: number
       arcanumUsed?: boolean
+      freeCastUsedKey?: string
+      slotLevelUsed?: number
     } = {}
 
     const feedbackParts: string[] = []
@@ -169,15 +194,20 @@ export function SpellDetailOverlay({
       } else if (castCost?.metamagicCost) {
         result.psiPointsSpent = castCost.metamagicCost
         feedbackParts.push(`Spent ${castCost.metamagicCost} ${resourceLabel} on Metamagic`)
-        if (!isCantrip && !freeCast) {
+        if (!isCantrip && !usingFreeCast) {
           result.slotUsed = true
-          feedbackParts.push(`Used 1 level ${spell.level} slot`)
+          result.slotLevelUsed = slotLevel ?? spell.level
+          feedbackParts.push(`Used 1 level ${result.slotLevelUsed} slot`)
         }
-      } else if (freeCast) {
-        feedbackParts.push("No spell slot spent")
+      } else if (usingFreeCast) {
+        if (!slotlessCast && freeCast) result.freeCastUsedKey = freeCast.trackingKey
+        feedbackParts.push(
+          slotlessCast ? "No spell slot spent" : `Used free cast from ${freeCast?.sourceLabel}`,
+        )
       } else if (!isCantrip) {
         result.slotUsed = true
-        feedbackParts.push(`Used 1 level ${spell.level} slot`)
+        result.slotLevelUsed = slotLevel ?? spell.level
+        feedbackParts.push(`Used 1 level ${result.slotLevelUsed} slot`)
       }
     } else if (isCantrip && castCost?.metamagicCost) {
       result.psiPointsSpent = castCost.metamagicCost
@@ -321,9 +351,39 @@ export function SpellDetailOverlay({
           {showEmpoweredReroll ? (
             <EmpoweredSpellReroll maxRerolls={Math.max(1, empoweredRerollCap)} />
           ) : null}
-          {freeCast && !isCantrip && (
+          {!isCantrip && freeCast && (freeCastAvailable || canUseSlot) ? (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setCastMode("free")}
+                disabled={!freeCastAvailable}
+                className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-40 ${
+                  castMode === "free"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground"
+                }`}
+              >
+                Free cast ({freeCast.remaining}/{freeCast.max})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCastMode("slot")}
+                disabled={!canUseSlot}
+                className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-40 ${
+                  castMode === "slot"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground"
+                }`}
+              >
+                {slotLevel ? `Level ${slotLevel} slot` : "Spell slot"}
+              </button>
+            </div>
+          ) : null}
+          {(slotlessCast || freeCastAvailable) && !isCantrip && (
             <p className="text-xs text-center font-semibold text-accent bg-accent/10 rounded-lg px-3 py-2">
-              A feature grants this spell without a spell slot — casting it spends none.
+              {slotlessCast
+                ? "A feature grants this spell without a spell slot."
+                : `${freeCast?.sourceLabel} grants one slot-free cast; it recharges on a Long Rest.`}
             </p>
           )}
           {castFeedback && (
@@ -373,7 +433,9 @@ export function SpellDetailOverlay({
                       ? hasMetamagic && selectedMetamagicIds.length > 0 && canUseSlot
                         ? `Not enough ${resourceLabel} for Metamagic`
                         : `Not enough ${resourceLabel}`
-                      : `No ${spell.level} slots remaining`}
+                      : freeCast && !freeCastAvailable
+                        ? `Free cast used; no level ${spell.level} or higher slots remaining`
+                        : `No level ${spell.level} or higher slots remaining`}
             </p>
           )}
           {isCantrip && hasMetamagic && selectedMetamagicIds.length > 0 && !metamagicReady && (
@@ -414,7 +476,11 @@ export function SpellDetailOverlay({
                     : !isCantrip && castCost?.metamagicCost
                       ? `Uses 1 spell slot + ${castCost.metamagicCost} ${resourceLabel} Metamagic`
                       : !isCantrip
-                        ? "Uses one spell slot"
+                        ? usingFreeCast
+                          ? slotlessCast
+                            ? "Does not use a spell slot"
+                            : `Uses ${freeCast?.sourceLabel} free cast`
+                          : `Uses one level ${slotLevel ?? spell.level} spell slot`
                         : castCost?.metamagicCost
                           ? `Cantrip · ${castCost.metamagicCost} ${resourceLabel} Metamagic`
                           : "Cantrips do not use slots"}

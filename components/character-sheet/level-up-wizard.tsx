@@ -636,7 +636,27 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                     ))}
                   </ul>
                 </div>
-              ) : !visualSubclassScreen ? (
+              ) : null}
+
+              {!visualSubclassScreen && plan.featureImprovements.length > 0 ? (
+                <div className="rounded-xl border border-border bg-muted/30 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Feature improvements
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {plan.featureImprovements.map((feature) => (
+                      <li key={`${feature.source}-improve-${feature.name}`}>
+                        <p className="text-sm font-semibold text-foreground">{feature.name}</p>
+                        <p className="text-xs text-muted-foreground">{feature.detail}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {!visualSubclassScreen &&
+              plan.newFeatures.length === 0 &&
+              plan.featureImprovements.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No named features unlock at this level — resources and proficiency still scale.
                 </p>
