@@ -5,3 +5,13 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+
+# Force patched transitive versions for known advisories (pnpm audit).
+overrides:
+  undici: ">=7.29.0"
+  js-yaml: ">=4.3.0"
+  "brace-expansion@1": "1.1.18"
+  "brace-expansion@>=3": "5.0.9"
+  "nanoid@3": ">=3.3.18"
+  esbuild: ">=0.28.1"
+  postcss: ">=8.5.12"
