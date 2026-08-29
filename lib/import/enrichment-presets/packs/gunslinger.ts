@@ -227,6 +227,39 @@ export const GUNSLINGER_PRESETS: EnrichmentPreset[] = [
     ],
   },
   {
+    id: "gunslinger.class.overkill",
+    pack: "gunslinger",
+    target: "class_feature",
+    match: { className: /gunslinger/i, name: /^overkill$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "overkill_ranged_damage",
+          catalogRefId: characteristicCatalogRefId("damage_roll_modifiers"),
+          characteristics: [
+            {
+              id: modId("overkill_ranged_damage"),
+              type: "damage_roll_modifiers",
+              label: "Overkill",
+              entries: [
+                {
+                  bonus: 0,
+                  target: "ranged",
+                  grantAbilityModifierWhenMissing: true,
+                  bonusDiceWhenModifierIncluded: "1d8",
+                  bonusDiceUsesWeaponDamageType: true,
+                },
+              ],
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["damage_roll_modifiers"],
+      },
+    ],
+  },
+  {
     id: "gunslinger.class.headshot",
     pack: "gunslinger",
     target: "class_feature",

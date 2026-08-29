@@ -69,17 +69,20 @@ import type {
   Subclass,
 } from "@/lib/types"
 import { resolveEquippedItems } from "@/lib/compendium/equipment-magic-modifiers"
-import { weaponOmitsAbilityModifierFromDamage } from "@/lib/compendium/combat-stats"
+import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
+import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
+import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
+import {
+  resolveSpeciesLinkedSpells,
+  resolveSpellIdAgainstCatalog,
+} from "@/lib/import/resolve-linked-modifier-spells"
 import {
   addOwnedEquipmentQuantity,
   canDualWieldSameWeapon,
   ownedEquipmentQuantity,
   setOwnedEquipmentQuantity,
 } from "@/lib/character/equipment-quantities"
-import {
-  characterHasTwoWeaponFighting,
-  defaultOffHandIncludesAbilityMod,
-} from "@/lib/compendium/two-weapon-fighting"
+import { characterHasTwoWeaponFighting } from "@/lib/compendium/two-weapon-fighting"
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 import { partitionToolProficiencies } from "@/lib/compendium/partition-tool-proficiencies"
 import {
@@ -110,7 +113,10 @@ import {
   deriveArmorClassForLoadout,
 } from "@/lib/character/compute-derived"
 import { filterDisplaySpeedEntries } from "@/lib/character/resolve-all-speeds"
-import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import {
+  refreshClassDetailWiring,
+  type CharacterClassDetail,
+} from "@/lib/character/character-classes"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 import { ResourceUsesTracker, type ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import { collectFeatureUsesResources } from "@/lib/character/collect-feature-uses-resources"
@@ -138,10 +144,15 @@ import {
 } from "@/lib/character/collect-turn-start-triggers"
 import { getPointPoolSpellcasting } from "@/lib/character/point-pool-spellcasting"
 import {
+  applyHitPointRefund,
+  applyHitPointSpend,
+} from "@/lib/character/hit-point-spend"
+import {
   metamagicOptionsForCharacter,
   manipulateMagicCatalogPickIds,
   mortalMetamagicOptionsFromFeatures,
   resolveSpellCastCost,
+  resolveSpellLimitCap,
 } from "@/lib/character/resolve-spell-cast-cost"
 import {
   collectResourceCastSpellIds,
@@ -315,7 +326,7 @@ import {
   applyFeatureResourceRefresh,
   collectResourceRefreshEffects,
 } from "@/lib/character/collect-resource-refresh-effects"
-import { buildHitDicePool, recoverHitDiceOnLongRest, spendHitDiceFromPool, totalHitDiceRemaining } from "@/lib/character/hit-dice"
+import { buildHitDicePool, recoverHitDiceOnLongRest, recoverHitDiceUpTo, spendHitDiceFromPool, totalHitDiceRemaining } from "@/lib/character/hit-dice"
 import type { Feature, RestType } from "@/lib/types"
 import { weaponTargetFromEquipment } from "@/lib/builder/weapon-property-prerequisite"
 import { aggregateWeaponMasteryOptionsForWeapon } from "@/lib/builder/upgrade-choices"
@@ -444,9 +455,9 @@ function pickInitialPlayState(
 }
 
 function buildClassDetailList(character: CharacterWithRelations): CharacterClassDetail[] {
-  if (character.class_list?.length) return character.class_list
+  if (character.class_list?.length) return refreshClassDetailWiring(character.class_list)
   if (!character.classes || !character.class_id) return []
-  return [
+  return refreshClassDetailWiring([
     {
       row: {
         class_id: character.class_id,
@@ -457,7 +468,7 @@ function buildClassDetailList(character: CharacterWithRelations): CharacterClass
       class: character.classes,
       subclass: character.subclasses ?? null,
     },
-  ]
+  ])
 }
 
 function normalizeResourceName(value: string): string {
@@ -712,6 +723,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [usedResourcesById, setUsedResourcesById] = useState<Record<string, number>>({})
   const [rechargeCapsByResourceId, setRechargeCapsByResourceId] = useState<Record<string, number>>({})
   const [selectedMetamagicIds, setSelectedMetamagicIds] = useState<string[]>([])
+  const [createdSpellSlotLevel, setCreatedSpellSlotLevel] = useState<number | null>(null)
   const [hasInspiration, setHasInspiration] = useState(false)
   const [deathSaves, setDeathSaves] = useState({ successes: 0, failures: 0 })
   const [attunedItemIds, setAttunedItemIds] = useState<string[]>([])
@@ -891,7 +903,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         if (featIds.length) {
           const { data: featData } = await db.from("feats").select("*").in("id", featIds)
           if (featData) {
-            const rows = asCompendiumRows<Feat & Record<string, unknown>>(featData) as Feat[]
+            const rows = enrichFeatsList(
+              asCompendiumRows<Feat & Record<string, unknown>>(featData),
+              catalog,
+            )
             const byId = new Map(rows.map((feat) => [feat.id, feat]))
             const orderedOwned = (row.feat_ids ?? [])
               .map((id) => byId.get(id))
@@ -908,15 +923,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         const effectiveOriginGrant = getEffectiveBackgroundFeatGranted(bg, featurePicks)
         if (effectiveOriginGrant) {
           const { data: featCatalog } = await db.from("feats").select("*")
-          const resolved = findBackgroundGrantedFeat(
-            effectiveOriginGrant,
-            asCompendiumRows<Feat & Record<string, unknown>>(featCatalog ?? []) as Feat[],
+          const originRows = enrichFeatsList(
+            asCompendiumRows<Feat & Record<string, unknown>>(featCatalog ?? []),
+            catalog,
           )
+          const resolved = findBackgroundGrantedFeat(effectiveOriginGrant, originRows)
           if (resolved) {
-            const full =
-              (featCatalog as unknown as Feat[] | null)?.find((feat) => feat.id === resolved.id) ??
-              resolved
-            setOriginFeat(full as Feat)
+            setOriginFeat(originRows.find((feat) => feat.id === resolved.id) ?? resolved)
           }
         }
       }
@@ -1030,10 +1043,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const characterBuildInputs = useMemo(() => {
     if (!character) return null
     const classList = character.class_list ?? []
-    const classesFromList = classList.map((entry) => entry.class).filter(Boolean) as unknown as DndClass[]
+    const classesFromList = enrichClassesList(
+      classList
+        .map((entry) => entry.class)
+        .filter((cls): cls is NonNullable<typeof cls> => Boolean(cls)),
+    ) as unknown as DndClass[]
     const subclassesFromList = classList
       .map((entry) => entry.subclass)
       .filter(Boolean) as unknown as Subclass[]
+    const spellRows = spellCatalog.length ? spellCatalog : spells
+    const [enrichedSpecies] = character.species
+      ? enrichSpeciesList([character.species])
+      : []
+    const species = resolveSpeciesLinkedSpells(enrichedSpecies, spellRows) ?? null
     const inputs = buildInputsFromSavedCharacter({
       character,
       classes: classesFromList.length ? classesFromList : character.classes ? [character.classes] : [],
@@ -1042,7 +1064,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         : character.subclasses
           ? [character.subclasses]
           : [],
-      species: character.species,
+      species,
       background: character.backgrounds,
       feats: characterFeats,
       equipment,
@@ -1108,6 +1130,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     equipment,
     equipmentCatalog,
     modifierCatalog,
+    spellCatalog,
+    spells,
     featureChoicePicks,
     customAbilities,
     equippedArmorId,
@@ -2415,7 +2439,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     }
 
     return resolveSpellCastCost({
-      spellLevel: selectedSpell.level,
+      spellLevel:
+        selectedSpell.level > 0
+          ? Math.max(selectedSpell.level, createdSpellSlotLevel ?? selectedSpell.level)
+          : selectedSpell.level,
       spellcasting: castingClass?.spellcasting,
       classRow: castingClass ?? { class_resources: null },
       classLevel: castingLevel,
@@ -2445,11 +2472,27 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     usesResolveContext,
     psiLimit,
     usedHitDiceByClassId,
+    createdSpellSlotLevel,
+  ])
+
+  const martyrMaxCreatedSlotLevel = useMemo(() => {
+    if (!selectedSpell || selectedSpell.level <= 0) return null
+    const castingClass = primarySpellcaster?.class ?? classDetails[0]?.class ?? null
+    if (!castingClass?.spellcasting?.hit_point_cost_by_level) return null
+    const castingLevel = primarySpellcaster?.row.level ?? classDetails[0]?.row.level ?? character?.level ?? 1
+    return resolveSpellLimitCap(castingClass, "max_spell_level", castingLevel, usesResolveContext)
+  }, [
+    selectedSpell,
+    primarySpellcaster,
+    classDetails,
+    character?.level,
+    usesResolveContext,
   ])
 
   useEffect(() => {
     setSelectedMetamagicIds([])
-  }, [selectedSpell?.id])
+    setCreatedSpellSlotLevel(selectedSpell && selectedSpell.level > 0 ? selectedSpell.level : null)
+  }, [selectedSpell?.id, selectedSpell?.level])
 
   const sheetActions = useMemo(
     () =>
@@ -2523,7 +2566,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         weapon: equippedWeapon,
         attack: derived.equippedWeaponAttack,
         hand: "main" as const,
-        defaultIncludeAbilityModifier: !weaponOmitsAbilityModifierFromDamage(equippedWeapon),
+        defaultIncludeAbilityModifier:
+          derived.equippedWeaponAttack.includesAbilityModifierOnDamage,
         abilityModifier: derived.equippedWeaponAttack.damageAbilityMod,
         quantity: ownedEquipmentQuantity(
           character?.equipment_ids ?? [],
@@ -2539,8 +2583,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         attack: derived.equippedOffHandWeaponAttack,
         hand: "off" as const,
         defaultIncludeAbilityModifier:
-          !weaponOmitsAbilityModifierFromDamage(equippedOffHandWeapon) &&
-          defaultOffHandIncludesAbilityMod(abilityMod, hasTwoWeaponFighting),
+          derived.equippedOffHandWeaponAttack.includesAbilityModifierOnDamage,
         abilityModifier: abilityMod,
         quantity: ownedEquipmentQuantity(
           character?.equipment_ids ?? [],
@@ -3177,6 +3220,21 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       })
     },
     [spellSlotTables, resourceEntries, usesResolveContext],
+  )
+
+  const handleRestoreHitDice = useCallback(
+    (amount: number, preferClassId?: string | null) => {
+      const pool = buildHitDicePool(classDetails, usedHitDiceByClassId)
+      const { nextUsedByClassId, recovered } = recoverHitDiceUpTo(
+        usedHitDiceByClassId,
+        pool,
+        amount,
+        preferClassId,
+      )
+      if (recovered > 0) setUsedHitDiceByClassId(nextUsedByClassId)
+      return recovered
+    },
+    [classDetails, usedHitDiceByClassId],
   )
 
   const handleRestoreSpellSlotsByCombinedLevel = useCallback(
@@ -3825,6 +3883,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     setUsedHitDiceByClassId(result.nextUsedByClassId)
     return true
   }
+  const spendHitPointsForAction = (amount: number) => {
+    setCurrentHp((hp) => applyHitPointSpend(hp, amount))
+  }
+  const refundHitPointsForAction = (amount: number) => {
+    setCurrentHp((hp) => applyHitPointRefund(hp, amount, maxHp))
+  }
   const savingThrowProficiencies = derived?.savingThrowProficiencies ?? character.classes?.saving_throws ?? []
 
   const classLabel = shareClassLabel
@@ -3953,6 +4017,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       }
     }
     for (const id of resourceCastSpellIds) ids.add(id)
+    for (const profile of grantedSpellCastProfiles) {
+      const rawId = profile.spellId ?? profile.spellName
+      if (!rawId) continue
+      const resolved = resolveSpellIdAgainstCatalog(rawId, catalog)
+      if (catalog.some((spell) => spell.id === resolved)) ids.add(resolved)
+    }
     return ids
   })()
 
@@ -5271,12 +5341,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     psiLimit={psiLimit}
                     hitDiceRemaining={hitDiceRemainingTotal}
                     onSpendHitDice={spendHitDiceForAction}
+                    onSpendHitPoints={spendHitPointsForAction}
+                    onRefundHitPoints={refundHitPointsForAction}
                     onActivateSheetToggle={activateSheetToggle}
                     onSpawnIllusionToken={spawnIllusionToken}
                     onGrantMutationDie={grantMutationDieFromAction}
                     onMarkEconomy={markActionEconomy}
                     characterId={character.id}
                     onApplySelfHeal={applySelfHeal}
+                    onSetCurrentHp={setCurrentHp}
                     onApplySelfInspiration={applySelfInspiration}
                     onApplySelfConditions={applySelfConditions}
                     onAddDurationReminder={addDurationReminderFromAction}
@@ -5291,6 +5364,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     healContext={healContext}
                     onRestorePactSlots={handleRestorePactSlots}
                     onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
+                    onRestoreHitDice={handleRestoreHitDice}
                     onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
                     onSpendSpellSlot={handleSpendSpellSlot}
                     primedBombUsedThisTurn={primedBombUsedThisTurn}
@@ -5511,12 +5585,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         psiLimit={psiLimit}
                         hitDiceRemaining={hitDiceRemainingTotal}
                         onSpendHitDice={spendHitDiceForAction}
+                        onSpendHitPoints={spendHitPointsForAction}
+                        onRefundHitPoints={refundHitPointsForAction}
                         onActivateSheetToggle={activateSheetToggle}
                         onSpawnIllusionToken={spawnIllusionToken}
                         onGrantMutationDie={grantMutationDieFromAction}
                         onMarkEconomy={markActionEconomy}
                         characterId={character.id}
                         onApplySelfHeal={applySelfHeal}
+                        onSetCurrentHp={setCurrentHp}
                         onApplySelfInspiration={applySelfInspiration}
                         onApplySelfConditions={applySelfConditions}
                         onAddDurationReminder={addDurationReminderFromAction}
@@ -5565,6 +5642,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         }
                         onRestorePactSlots={handleRestorePactSlots}
                         onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
+                        onRestoreHitDice={handleRestoreHitDice}
                         onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
                         onSpendSpellSlot={handleSpendSpellSlot}
                         primedBombUsedThisTurn={primedBombUsedThisTurn}
@@ -6492,6 +6570,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               if ((result.hitDiceSpent ?? 0) > 0) {
                 spendHitDiceForAction(result.hitDiceSpent!)
               }
+              if ((result.hitPointsSpent ?? 0) > 0) {
+                spendHitPointsForAction(result.hitPointsSpent!)
+              }
               if (result.psiPointsSpent) {
                 const spendKey =
                   spellCastCost?.resourceKey ??
@@ -6545,6 +6626,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 }
               }
             }}
+            createdSlotLevel={createdSpellSlotLevel}
+            maxCreatedSlotLevel={martyrMaxCreatedSlotLevel}
+            onCreatedSlotLevelChange={setCreatedSpellSlotLevel}
             slotLevel={selectedSpellSlotLevel}
             canUseSlot={
               selectedSpell.level === 0 ||

@@ -124,6 +124,43 @@ describe("Gunslinger enrichment", () => {
     })
   })
 
+  it("wires Overkill to add ability modifier or extra 1d8 on ranged damage", () => {
+    const enriched = applyImportEnrichmentPresets({
+      classes: [
+        {
+          name: "Gunslinger",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Dexterity"],
+          features: [
+            {
+              level: 11,
+              name: "Overkill",
+              description:
+                "When you deal damage with a Ranged weapon that doesn't add your ability modifier to the roll, you add your ability modifier nonetheless.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+
+    const overkill = enriched.classes?.[0]?.features?.find((f) => f.name === "Overkill") as Feature
+    const damage = (overkill.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "damage_roll_modifiers")
+    expect(damage).toMatchObject({
+      type: "damage_roll_modifiers",
+      entries: [
+        {
+          target: "ranged",
+          grantAbilityModifierWhenMissing: true,
+          bonusDiceWhenModifierIncluded: "1d8",
+          bonusDiceUsesWeaponDamageType: true,
+        },
+      ],
+    })
+  })
+
   it("strips rechargeOnInitiative when Dire Gambit is absent", () => {
     const enriched = applyImportEnrichmentPresets({
       classes: [

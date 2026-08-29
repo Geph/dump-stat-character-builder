@@ -138,7 +138,11 @@ function describeAttackEntry(entry: RollModifierEntry): string {
     parts.push("Adds ability modifier to damage when it would not apply")
   }
   if (entry.bonusDiceWhenModifierIncluded) {
-    parts.push(`Extra damage: ${entry.bonusDiceWhenModifierIncluded}`)
+    parts.push(
+      `Extra ${entry.bonusDiceWhenModifierIncluded}${
+        entry.bonusDiceUsesWeaponDamageType ? " of the weapon's type" : ""
+      } when ability modifier already applies`,
+    )
   }
   return parts.join(". ")
 }

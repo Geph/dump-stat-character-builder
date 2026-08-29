@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   buildHitDicePool,
   recoverHitDiceOnLongRest,
+  recoverHitDiceUpTo,
   rollHitDiceHeal,
   spendHitDiceFromPool,
 } from "@/lib/character/hit-dice"
@@ -57,6 +58,30 @@ describe("hit-dice", () => {
     )
 
     expect(recoverHitDiceOnLongRest({ fighter: 4 }, pool)).toEqual({ fighter: 1 })
+  })
+
+  it("regains up to N expended hit dice, preferring the named class pool", () => {
+    const pool = buildHitDicePool(
+      [
+        {
+          row: { class_id: "martyr", level: 12, order: 0 },
+          class: { id: "martyr", name: "Martyr", hit_die: 8 } as never,
+        },
+      ],
+      { martyr: 5 },
+    )
+    expect(recoverHitDiceUpTo({ martyr: 5 }, pool, 3, "martyr")).toEqual({
+      nextUsedByClassId: { martyr: 2 },
+      recovered: 3,
+    })
+    expect(recoverHitDiceUpTo({ martyr: 1 }, pool, 3, "martyr")).toEqual({
+      nextUsedByClassId: {},
+      recovered: 1,
+    })
+    expect(recoverHitDiceUpTo({}, pool, 3, "martyr")).toEqual({
+      nextUsedByClassId: {},
+      recovered: 0,
+    })
   })
 
   it("spends hit dice for feature fuel from the preferred class pool", () => {

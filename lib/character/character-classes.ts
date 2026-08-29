@@ -1,4 +1,10 @@
-import type { Character } from "@/lib/types"
+import { withMartyrHitPointSpellcasting } from "@/lib/character/hit-point-spend"
+import { applyFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
+import {
+  enrichClassFeaturesWithPresets,
+  enrichSubclassFeaturesWithPresets,
+} from "@/lib/import/enrichment-presets/apply"
+import type { Character, Feature } from "@/lib/types"
 
 /** One class level row persisted on a character (builder + sheet). */
 export type CharacterClassRow = {
@@ -87,6 +93,41 @@ export type CharacterClassDetail = {
   subclass?: import("@/lib/types").Subclass | null
 }
 
+/** Re-apply class-feature presets so sheet cards pick up wiring added after import. */
+export function enrichAttachedClassFeatures(
+  cls: import("@/lib/types").DndClass,
+): import("@/lib/types").DndClass {
+  const withHpCasting = withMartyrHitPointSpellcasting(cls)
+  return {
+    ...withHpCasting,
+    features: enrichClassFeaturesWithPresets(
+      (withHpCasting.features ?? []) as Feature[],
+      withHpCasting.name,
+      withHpCasting.spellcasting,
+    ).map(applyFeatureSheetDisplay),
+  }
+}
+
+export function refreshClassDetailWiring(
+  details: CharacterClassDetail[],
+): CharacterClassDetail[] {
+  return details.map((entry) => {
+    const cls = entry.class ? enrichAttachedClassFeatures(entry.class) : undefined
+    const subclass =
+      entry.subclass && cls
+        ? {
+            ...entry.subclass,
+            features: enrichSubclassFeaturesWithPresets(
+              (entry.subclass.features ?? []) as Feature[],
+              cls.name,
+              entry.subclass.name,
+            ).map(applyFeatureSheetDisplay),
+          }
+        : entry.subclass
+    return { ...entry, class: cls, subclass }
+  })
+}
+
 export function attachClassDetails(
   rows: CharacterClassRow[],
   classes: import("@/lib/types").DndClass[],
@@ -94,11 +135,23 @@ export function attachClassDetails(
 ): CharacterClassDetail[] {
   return [...rows]
     .sort((a, b) => a.order - b.order)
-    .map((row) => ({
-      row,
-      class: classes.find((cls) => cls.id === row.class_id),
-      subclass: row.subclass_id
+    .map((row) => {
+      const rawClass = classes.find((entry) => entry.id === row.class_id)
+      const cls = rawClass ? enrichAttachedClassFeatures(rawClass) : undefined
+      const rawSubclass = row.subclass_id
         ? subclasses.find((sub) => sub.id === row.subclass_id) ?? null
-        : null,
-    }))
+        : null
+      const subclass =
+        rawSubclass && cls
+          ? {
+              ...rawSubclass,
+              features: enrichSubclassFeaturesWithPresets(
+                (rawSubclass.features ?? []) as Feature[],
+                cls.name,
+                rawSubclass.name,
+              ).map(applyFeatureSheetDisplay),
+            }
+          : rawSubclass
+      return { row, class: cls, subclass }
+    })
 }

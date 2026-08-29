@@ -88,6 +88,8 @@ export type EnrichmentOperation =
       op: "attachNamedPreset"
       preset: NamedModifierPreset
       skipIfCharacteristicTypes?: string[]
+      /** Skip when a linked modifier already has one of these FeatureEffect kinds. */
+      skipIfEffectKinds?: string[]
       /** Drop existing linkedModifiers that include these characteristic types before attaching. */
       replaceCharacteristicTypes?: string[]
       /** When true, do not call syncModifierRefs (legacy psion Climactic Moment). */

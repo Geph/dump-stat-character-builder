@@ -1,0 +1,12 @@
+---
+description: Prefer catalog modifiers over class-name special cases
+globs: lib/character/**/*.ts,lib/compendium/**/*.ts,lib/builder/**/*.ts,components/character-sheet/**/*.tsx,components/builder/**/*.tsx,components/compendium/**/*.tsx
+alwaysApply: false
+---
+
+# Common modifiers first
+
+- Author with an existing `CharacteristicModifier` or `FeatureEffect` kind when one fits. Add a new catalog type only when the idea is reusable and user-editable.
+- Wire through `linkedModifiers` / enrichment presets / detect rules. Users must be able to change the same effect on the Compendium row.
+- Do not add `if (name === "…")` class or feature branches in `lib/character/` or React when a modifier can express it.
+- Pick CharacteristicModifier vs FeatureEffect using `docs/modifier-vs-feature-effect.md`.

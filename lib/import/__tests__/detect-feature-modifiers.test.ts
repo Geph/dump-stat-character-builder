@@ -123,6 +123,36 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "short-rest hit point dice restore",
+      text:
+        "When you finish a Short Rest, you can choose to regain up to 3 expended Hit Point Dice. Once you use this feature, you can't do so again until you finish a Long Rest. The number of expended Hit Point Dice you regain increases when you reach levels 13 (6 Hit Point Dice) and 17 (10 Hit Point Dice).",
+      ruleId: "restore.hit_dice.short_rest",
+      assert: (detections) => {
+        const instance = detections.find((entry) => entry.ruleId === "restore.hit_dice.short_rest")
+          ?.instance
+        const restore = instance?.characteristics?.find((char) => char.type === "hit_dice_restore")
+        expect(restore?.type).toBe("hit_dice_restore")
+        if (restore?.type === "hit_dice_restore") {
+          expect(restore.amount).toBe(3)
+          expect(restore.restoreOn).toBe("short_rest")
+          expect(restore.amountByLevel?.map((row) => [row.level, row.fixed])).toEqual([
+            [1, 3],
+            [13, 6],
+            [17, 10],
+          ])
+        }
+        const uses = instance?.characteristics?.find((char) => char.type === "uses")
+        expect(uses?.type).toBe("uses")
+        if (uses?.type === "uses") {
+          expect(uses.uses).toMatchObject({
+            type: "fixed",
+            fixedAmount: 1,
+            recharges: [{ rest: "long_rest" }],
+          })
+        }
+      },
+    },
+    {
       label: "fixed uses per long rest",
       text: "You can use this feature 3 times, regaining all expended uses when you finish a long rest.",
       ruleId: "uses.fixed_rest",
@@ -641,6 +671,18 @@ describe("detectFeatureModifiers", () => {
         }
       },
     },
+    {
+      label: "named species cantrip without the word cantrip",
+      text: "Level 1: Speed increases to 35 ft.; know Druidcraft.",
+      ruleId: "spell.know_named",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "spell.know_named")?.instance.characteristics?.[0],
+          "spells_known",
+        )
+        expect(char?.spells?.[0]?.spellId).toContain("Druidcraft")
+      },
+    },
   ]
 
   it.each(positiveCases)("detects $label ($ruleId)", ({ text, ruleId, assert }) => {
@@ -658,6 +700,25 @@ describe("detectFeatureModifiers", () => {
 
   it.each(negativeCases)("does not invent modifiers from: %s", (text) => {
     expect(detectFeatureModifiers(text, baseCtx)).toEqual([])
+  })
+
+  it("wires species lineage Level|Spell tables with Long Rest free casts", () => {
+    const detections = detectFeatureModifiers(
+      "<p>Level 1: Speed increases to 35 ft.; know Druidcraft.</p><table><tbody><tr><td>Level</td><td>Spell</td></tr><tr><td>3</td><td>Longstrider</td></tr><tr><td>5</td><td>Pass without Trace</td></tr></tbody></table>",
+      {
+        contentKind: "species_trait",
+        sourceName: "Elf",
+        featureName: "Elven Lineage:Wood Elf",
+      },
+    )
+    expect(detections.some((entry) => entry.ruleId === "spell.know_named")).toBe(true)
+    const table = detections.find((entry) => entry.ruleId === "spell.level_unlock_table")
+    const char = modOf(table?.instance.characteristics?.[0], "spells_known")
+    expect(char?.spells?.map((entry) => entry.spellId).join(" ")).toMatch(/Longstrider/)
+    expect(char?.spells?.map((entry) => entry.spellId).join(" ")).toMatch(/Pass without Trace/)
+    expect(char?.spells?.every((entry) => (entry.unlocksAtClassLevel ?? 0) > 1 ? entry.freeCastPerLongRest === 1 : true)).toBe(
+      true,
+    )
   })
 
   it("scopes the Precognitive Dreams temp-HP rule to that exact feature name", () => {
@@ -1103,6 +1164,45 @@ describe("detectFeatureModifiers by feature name", () => {
     expect(
       (asi?.instance.characteristics?.[0] as { mode?: string }).mode,
     ).toBe("asi_pool")
+  })
+
+  it("wires a single named half-feat score as fixed ability_scores", () => {
+    const cook =
+      "Your Wisdom ability score increases by 1, to a maximum of 20. When you make a Cooking crafting check, you can take 10."
+    const detections = detectFeatureModifiers(cook, {
+      contentKind: "feat",
+      sourceName: "Homebrew Cook",
+      featureName: "Homebrew Cook",
+    })
+    const asi = detections.find((entry) => entry.ruleId === "grant.asi_fixed_one")
+    expect(asi?.instance.catalogRefId).toBe("cat_char_ability_scores")
+    expect(asi?.instance.characteristics?.[0]).toMatchObject({
+      type: "ability_scores",
+      mode: "fixed",
+      bonuses: { wisdom: 1 },
+    })
+  })
+
+  it("does not treat a choice pool or class-feature STR bump as a fixed half-feat ASI", () => {
+    const pool =
+      "Your Intelligence or Wisdom ability score increases by 1, to a maximum of 20."
+    expect(
+      detectFeatureModifiers(pool, {
+        contentKind: "feat",
+        sourceName: "Expert Alchemist",
+        featureName: "Expert Alchemist",
+      }).some((entry) => entry.ruleId === "grant.asi_fixed_one"),
+    ).toBe(false)
+
+    const warsmith =
+      "While wearing your armor, your Strength ability score increases by 2, and your maximum Strength ability score becomes 22."
+    expect(
+      detectFeatureModifiers(warsmith, {
+        contentKind: "class_feature",
+        sourceName: "Inventor",
+        featureName: "Warsmith's Armor",
+      }).some((entry) => entry.ruleId === "grant.asi_fixed_one"),
+    ).toBe(false)
   })
 
   it("wires PHB 2024 ASI feat body (or increase, without 'you can') as asi_pool", () => {

@@ -6,7 +6,12 @@ import { ToolGroupedChoices } from "@/components/builder/tool-grouped-choices"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { useFeatSpellGrantPickerPageSize } from "@/hooks/use-picker-page-size"
 import { paginateList } from "@/lib/builder/picker-pagination"
-import { filterSpellsBySchool, uniqueSpellSchools } from "@/lib/builder/spell-grant-filters"
+import {
+  filterSpellsBySchool,
+  filterSpellsByUsage,
+  SPELL_USAGE_CATEGORIES,
+  uniqueSpellSchools,
+} from "@/lib/builder/spell-grant-filters"
 import { builderChoiceTargetId } from "@/lib/builder/proceed-blockers"
 import {
   filterMagicInitiateAbilitySlotOptions,
@@ -84,6 +89,7 @@ function SpellGrantPicker({
   const selectedIds = picks[slot.slotKey] ?? []
   const [filter, setFilter] = useState("")
   const [schoolFilter, setSchoolFilter] = useState("all")
+  const [usageFilter, setUsageFilter] = useState("all")
   const [page, setPage] = useState(0)
   const pageSize = useFeatSpellGrantPickerPageSize()
 
@@ -91,7 +97,7 @@ function SpellGrantPicker({
 
   useEffect(() => {
     setPage(0)
-  }, [filter, schoolFilter, listClass, slot.slotKey, pageSize])
+  }, [filter, schoolFilter, usageFilter, listClass, slot.slotKey, pageSize])
 
   useEffect(() => {
     if (schoolFilter !== "all" && !schoolOptions.includes(schoolFilter)) {
@@ -107,7 +113,10 @@ function SpellGrantPicker({
     )
   }
 
-  const schoolScoped = filterSpellsBySchool(availableSpells, schoolFilter)
+  const schoolScoped = filterSpellsByUsage(
+    filterSpellsBySchool(availableSpells, schoolFilter),
+    usageFilter,
+  )
   const filtered = searchItems(schoolScoped, filter, {
     name: (spell) => spell.name,
     aliases: (spell) => spellAliasLookupKeys(spell.name),
@@ -197,6 +206,25 @@ function SpellGrantPicker({
             </select>
           </div>
         ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          <label className={filterLabelClass} htmlFor={`spell-use-${slot.slotKey}`}>
+            Use
+          </label>
+          <select
+            id={`spell-use-${slot.slotKey}`}
+            value={usageFilter}
+            onChange={(event) => setUsageFilter(event.target.value)}
+            className={cn(filterSelectClass, "max-w-[13rem]")}
+            aria-label={`Filter ${slot.label} spells by how they are used`}
+          >
+            <option value="all">All uses</option>
+            {SPELL_USAGE_CATEGORIES.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       {filtered.length === 0 ? (
         <p className="text-xs text-muted-foreground">No spells match this filter.</p>

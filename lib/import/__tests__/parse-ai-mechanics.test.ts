@@ -343,6 +343,36 @@ describe("aiMechanicsToDetections", () => {
     expect(effect?.healFixed).toBe(5)
   })
 
+  it("builds hit_dice_restore from AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "hit_dice_restore",
+          hitDiceRestoreAmount: 3,
+          hitDiceRestoreByLevel: [
+            { level: 13, amount: 6 },
+            { level: 17, amount: 10 },
+          ],
+          restoreOnRest: "short_rest",
+          sourcePhrase: "regain up to 3 expended Hit Point Dice",
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Divine Respite" },
+    )
+    expect(detections[0]?.ruleId).toBe("ai.hit_dice_restore")
+    const char = detections[0]?.instance.characteristics?.[0]
+    expect(char?.type).toBe("hit_dice_restore")
+    if (char?.type === "hit_dice_restore") {
+      expect(char.amount).toBe(3)
+      expect(char.restoreOn).toBe("short_rest")
+      expect(char.amountByLevel?.map((row) => [row.level, row.fixed])).toEqual([
+        [1, 3],
+        [13, 6],
+        [17, 10],
+      ])
+    }
+  })
+
   it("wires amountDice and amountScaling variants of temporary_hit_points", () => {
     const dice = aiMechanicsToDetections(
       [{ kind: "temporary_hit_points", amountDice: "2d6" }],
@@ -729,6 +759,7 @@ describe("aiMechanicsToDetections", () => {
     expect(char?.type).toBe("spells_known")
     if (char?.type === "spells_known") {
       expect(char.spells[0]?.unlocksAtClassLevel).toBe(5)
+      expect(char.spells[0]?.freeCastPerLongRest).toBe(1)
     }
   })
 

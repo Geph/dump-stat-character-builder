@@ -131,6 +131,8 @@ export type WeaponAttackDerived = {
   attackAbilityMod: number
   /** Ability modifier used for damage rolls (after weapon ability overrides). */
   damageAbilityMod: number
+  /** True when Overkill or similar has applied the ability modifier to this damage. */
+  includesAbilityModifierOnDamage: boolean
 }
 
 /** A single labeled contribution to a derived statistic (e.g. Armor Class). */

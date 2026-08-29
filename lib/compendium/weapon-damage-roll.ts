@@ -95,6 +95,9 @@ export function buildWeaponDamageExpression(params: {
   dice: string
   includeAbilityModifier: boolean
   flatDamageBonus?: number
+  grantAbilityModifierWhenMissing?: boolean
+  bonusDiceWhenModifierIncluded?: string | null
+  bonusDiceUsesWeaponDamageType?: boolean
   overrides?: import("@/lib/compendium/characteristic-modifiers").WeaponAbilityOverrideCharacteristic[] | null
 }): string {
   const {
@@ -103,22 +106,65 @@ export function buildWeaponDamageExpression(params: {
     dice,
     includeAbilityModifier,
     flatDamageBonus = 0,
+    grantAbilityModifierWhenMissing = false,
+    bonusDiceWhenModifierIncluded = null,
+    bonusDiceUsesWeaponDamageType = false,
     overrides,
   } = params
   const { mod: abilityMod } = getWeaponAttackAbility(weapon, abilityMods, {
     overrides,
     forRoll: "damage",
   })
-  const appliedMod = weaponOmitsAbilityModifierFromDamage(weapon)
-    ? 0
-    : includeAbilityModifier
-      ? abilityMod
-      : abilityMod < 0
-        ? abilityMod
-        : 0
+  const appliedMod = shouldApplyAbilityModifierToWeaponDamage({
+    weapon,
+    includeAbilityModifier,
+    grantAbilityModifierWhenMissing,
+    abilityMod,
+  })
+    ? abilityMod
+    : 0
   const totalMod = appliedMod + flatDamageBonus
   const modSuffix =
     totalMod === 0 ? "" : totalMod > 0 ? ` + ${totalMod}` : ` - ${Math.abs(totalMod)}`
-  const damageType = weapon.damage_type?.trim()
-  return `${dice}${modSuffix}${damageType ? ` ${damageType}` : ""}`.trim()
+  const damageType =
+    weapon.damage_type?.trim() ||
+    getWeaponDamageText(weapon)?.replace(/^[\d+d\s/()-]+/i, "").trim() ||
+    ""
+  const withMod = `${dice}${modSuffix}${damageType ? ` ${damageType}` : ""}`.trim()
+  const normallyIncludesAbility =
+    !weaponOmitsAbilityModifierFromDamage(weapon) && includeAbilityModifier !== false
+  if (normallyIncludesAbility && bonusDiceWhenModifierIncluded) {
+    const extraType = bonusDiceUsesWeaponDamageType ? damageType : null
+    return appendBonusDamageDice(withMod, bonusDiceWhenModifierIncluded, extraType)
+  }
+  return withMod
+}
+
+export function shouldApplyAbilityModifierToWeaponDamage(params: {
+  weapon: Equipment
+  includeAbilityModifier?: boolean
+  grantAbilityModifierWhenMissing: boolean
+  abilityMod: number
+}): boolean {
+  const { weapon, includeAbilityModifier, grantAbilityModifierWhenMissing, abilityMod } = params
+  if (grantAbilityModifierWhenMissing) return true
+  if (weaponOmitsAbilityModifierFromDamage(weapon)) return false
+  if (includeAbilityModifier === false) return abilityMod < 0
+  return true
+}
+
+/** Append extra dice before the damage type when the type matches (`2d6 + 4 + 1d8 Piercing`). */
+export function appendBonusDamageDice(
+  display: string,
+  dice: string,
+  extraType?: string | null,
+): string {
+  const typePart = display.match(/\s+([A-Za-z][A-Za-z\s]*)$/)?.[1] ?? ""
+  const withoutType = typePart ? display.slice(0, display.length - typePart.length).trim() : display
+  const extra = extraType?.trim()
+  if (extra && typePart && extra.toLowerCase() === typePart.toLowerCase()) {
+    return `${withoutType} + ${dice} ${typePart}`.trim()
+  }
+  if (extra) return `${display} + ${dice} ${extra}`.trim()
+  return `${withoutType} + ${dice}${typePart ? ` ${typePart}` : ""}`.trim()
 }

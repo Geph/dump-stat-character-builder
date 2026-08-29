@@ -5,10 +5,10 @@ import {
   flexibleEconomyKindsFromText,
   selectableEconomyKinds,
 } from "@/lib/character/sheet-actions"
-import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import { attachClassDetails, type CharacterClassDetail } from "@/lib/character/character-classes"
 import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
 import classes from "@/lib/srd/seed-data/classes.json"
-import type { Feature, Species } from "@/lib/types"
+import type { DndClass, Feature, Species } from "@/lib/types"
 
 function classDetail(
   features: Feature[],
@@ -25,6 +25,103 @@ function classDetail(
 }
 
 describe("collectSheetActions", () => {
+  it("shows Sacrifice Foe as a notice on Sacrificial Strike and Skill", () => {
+    const [detail] = attachClassDetails(
+      [{ class_id: "cls_martyr", level: 7, order: 0 }],
+      [
+        {
+          id: "cls_martyr",
+          name: "Martyr",
+          features: [
+            {
+              name: "Sacrificial Strike",
+              level: 1,
+              description: "Bonus Action: take 5 Radiant and deal +10 Radiant.",
+              activation: { bonusAction: true },
+              sheetDisplay: { combatActions: true },
+            },
+            {
+              name: "Sacrificial Skill",
+              level: 1,
+              description: "When you fail a D20 Test, take 10 Radiant for +5.",
+              sheetDisplay: { combatActions: true },
+            },
+            {
+              name: "Sacrifice Foe",
+              level: 7,
+              description:
+                "When you make an attack or damage roll that is improved by your Sacrifice feature, and the attack reduces an enemy to 0 Hit Points, you don't take Radiant damage from using the feature.",
+            },
+          ],
+        } as DndClass,
+      ],
+      [],
+    )
+    const actions = collectSheetActions({
+      classDetails: [detail],
+      species: null,
+    })
+    expect(actions.map((action) => action.name)).not.toContain("Sacrifice Foe")
+    for (const name of ["Sacrificial Strike", "Sacrificial Skill"]) {
+      const action = actions.find((entry) => entry.name === name)
+      expect(action?.relatedTalentAlerts?.map((alert) => alert.name)).toContain("Sacrifice Foe")
+      expect(action?.relatedTalentAlerts?.[0]?.summary).toMatch(/0 Hit Points/i)
+    }
+  })
+
+  it("exposes Divine Respite as a utility restore-hit-dice action", () => {
+    const [detail] = attachClassDetails(
+      [{ class_id: "cls_martyr", level: 12, order: 0 }],
+      [
+        {
+          id: "cls_martyr",
+          name: "Martyr",
+          features: [
+            {
+              name: "Divine Respite",
+              level: 9,
+              description:
+                "When you finish a Short Rest, you can choose to regain up to 3 expended Hit Point Dice. Once you use this feature, you can't do so again until you finish a Long Rest.",
+            },
+          ],
+        } as DndClass,
+      ],
+      [],
+    )
+    const actions = collectSheetActions({
+      classDetails: [detail],
+      species: null,
+    })
+    const respite = actions.find((action) => action.name === "Divine Respite")
+    expect(respite?.category).toBe("utility")
+    expect(respite?.spendsEconomy).toBe(false)
+    expect(respite?.restoreHitDiceOnUse).toEqual({ amount: 3 })
+
+    const [at13] = attachClassDetails(
+      [{ class_id: "cls_martyr", level: 13, order: 0 }],
+      [
+        {
+          id: "cls_martyr",
+          name: "Martyr",
+          features: [
+            {
+              name: "Divine Respite",
+              level: 9,
+              description:
+                "When you finish a Short Rest, you can choose to regain up to 3 expended Hit Point Dice.",
+            },
+          ],
+        } as DndClass,
+      ],
+      [],
+    )
+    const scaled = collectSheetActions({
+      classDetails: [at13],
+      species: null,
+    }).find((action) => action.name === "Divine Respite")
+    expect(scaled?.restoreHitDiceOnUse).toEqual({ amount: 6 })
+  })
+
   it("includes features with a top-level activation", () => {
     const actions = collectSheetActions({
       classDetails: [
@@ -1163,6 +1260,61 @@ describe("triggered activations", () => {
     )
   })
 
+  it("files onDropToZeroHp as a Passive and offers an immediately-used sibling heal", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 10,
+              name: "Undying",
+              description:
+                "When you are reduced to 0 Hit Points but not killed outright, you can drop to 1 Hit Point instead and you can immediately use your Miraculous Healing (no action required).",
+              activation: { onDropToZeroHp: true, alsoActivateFeatureNames: ["Miraculous Healing"] },
+              limitedUses: { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+            } as unknown as Feature,
+            {
+              level: 2,
+              name: "Miraculous Healing",
+              description: "As a Bonus Action, roll Hit Point Dice to heal.",
+              activation: { bonusAction: true, spendHitDice: 1 },
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_mh",
+                  catalogRefId: "cat_fx_heal_self",
+                  activation: {
+                    bonusAction: true,
+                    spendHitDice: 1,
+                    effects: [
+                      {
+                        id: "mod_mh",
+                        kind: "heal_self",
+                        healMode: "hit_dice",
+                        healDiceCount: 1,
+                        healAbility: "CON",
+                      },
+                    ],
+                  },
+                },
+              ],
+            } as unknown as Feature,
+          ],
+          12,
+        ),
+      ],
+      species: null,
+    })
+    const undying = actions.find((action) => action.name === "Undying")
+    expect(undying?.trigger).toBe("When reduced to 0 HP")
+    expect(undying?.kinds).not.toContain("reaction")
+    expect(undying?.dropToOneHpOnUse).toBe(true)
+    expect(undying?.alsoActivate?.map((row) => row.name)).toEqual(["Miraculous Healing"])
+    expect(undying?.alsoActivate?.[0]?.healEffects?.[0]).toMatchObject({
+      kind: "heal_self",
+      healMode: "hit_dice",
+    })
+  })
+
   it("leaves features with a real action cost out of the triggered bucket", () => {
     const actions = collectSheetActions({
       classDetails: [
@@ -1415,5 +1567,74 @@ describe("combat / utility tab classification", () => {
       "action",
       "bonus",
     ])
+  })
+
+  it("cards Martyr Sacrificial Strike as a bonus action and Skill as a passive", () => {
+    const [detail] = attachClassDetails(
+      [{ class_id: "cls_martyr", level: 3, order: 0 }],
+      [
+        {
+          id: "cls_martyr",
+          name: "Martyr",
+          features: [
+            {
+              name: "Sacrifice",
+              level: 1,
+              description:
+                "Sacrificial Strike. When you deal damage with a Melee weapon, take a Bonus Action to deal extra 10 Radiant. Sacrificial Skill. Once per turn when you fail a D20 Test, take 10 Radiant to gain +5.",
+            },
+          ],
+        } as DndClass,
+      ],
+      [],
+    )
+    const actions = collectSheetActions({
+      classDetails: [detail],
+      species: null,
+    })
+    const strike = actions.find((action) => action.name === "Sacrificial Strike")
+    expect(strike?.kinds).toEqual(["bonus"])
+    expect(strike?.trigger ?? null).toBeNull()
+    const skill = actions.find((action) => action.name === "Sacrificial Skill")
+    expect(skill?.trigger).toBe("When you fail a roll")
+    expect(skill?.spendsEconomy).toBe(false)
+    expect(strike?.spendHitPoints).toBe(5)
+    expect(skill?.spendHitPoints).toBe(10)
+    expect(skill?.refundHitPointsOnStillFailed).toBe(true)
+    expect(actions.some((action) => action.name === "Sacrifice")).toBe(false)
+  })
+
+  it("offers Improved Sacrificial Strike as a selectable rider on Sacrificial Strike", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 1,
+              name: "Sacrificial Strike",
+              description: "Bonus Action: take 5 Radiant and deal +10 Radiant.",
+              activation: { bonusAction: true, spendHitPoints: 5 },
+              sheetDisplay: { combatActions: true },
+            } as unknown as Feature,
+            {
+              level: 11,
+              name: "Improved Sacrificial Strike",
+              description:
+                "Your Sacrificial Strike improves. When you use this feature, you can choose to take 10 Radiant damage, and the target takes an extra 20 Radiant damage.",
+            } as unknown as Feature,
+          ],
+          11,
+        ),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Improved Sacrificial Strike")).toBeUndefined()
+    const strike = actions.find((action) => action.name === "Sacrificial Strike")
+    const improved = strike?.relatedTalentAlerts?.find(
+      (alert) => alert.name === "Improved Sacrificial Strike",
+    )
+    expect(improved?.selectable).toBe(true)
+    expect(improved?.spendHitPoints).toBe(10)
+    expect(improved?.summary).toMatch(/10/)
   })
 })

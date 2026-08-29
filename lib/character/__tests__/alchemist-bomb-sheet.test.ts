@@ -104,5 +104,11 @@ describe("isShortRestActivityText", () => {
         "As a Bonus Action, you gain Tremorsense for 10 minutes.",
       ),
     ).toBe(false)
+    expect(
+      isShortRestActivityText(
+        "Divine Respite",
+        "When you finish a Short Rest, you can choose to regain up to 3 expended Hit Point Dice.",
+      ),
+    ).toBe(true)
   })
 })

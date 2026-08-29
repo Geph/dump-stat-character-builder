@@ -169,6 +169,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   craftable_items: "Equipment & items",
   held_items_cap: "Equipment & items",
   rest_replacement: "Resources & uses",
+  hit_dice_restore: "Resources & uses",
   creature_size: "Movement & senses",
   magical_sleep_immunity: "Damage mitigation",
   movement_effects: "Movement & senses",

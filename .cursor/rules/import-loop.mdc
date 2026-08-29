@@ -1,0 +1,16 @@
+---
+description: Close Drive JSON and BYO prompt gaps when fixing import or wiring lapses
+globs: lib/import/**/*.ts,lib/import/enrichment-presets/**/*.ts
+alwaysApply: false
+---
+
+# Close the import loop
+
+When a fix exists because extract JSON, BYO text, detect rules, or enrichment missed a mechanic:
+
+- Update Drive import JSON if a fixture exists (`docs/homebrew-import-review.md`, `HOMEBREW_IMPORT_JSON_DIR`). Do not copy copyrighted source text into the repo.
+- Update BYO / AI hints in `modifier-wiring-registry.ts`. Touch `byo-import-kit.ts`, `parse-ai-mechanics.ts`, and `detect-feature-modifier-rules.ts` when the kind or phrase is new.
+- Update the class enrichment preset when that pack attaches the mechanic.
+- Add or extend `byo-prompt-guidance` and/or the class Drive import test.
+
+If the same mistake appears in more than one extract, fix the sanitizer or prompt, not only one JSON row.

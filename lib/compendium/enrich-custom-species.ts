@@ -11,6 +11,7 @@ import {
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { mergeOptionPresetModifiers } from "@/lib/compendium/merge-species-option-presets"
 import {
   defaultSpeciesCardImageUrl,
   SPECIES_CARD_IMAGES_BY_NAME,
@@ -336,7 +337,7 @@ function creatureSize(
 
 function spellsKnownFixed(
   instanceKey: string,
-  entries: { name: string; unlocksAtLevel?: number }[],
+  entries: { name: string; unlocksAtLevel?: number; freeCastPerLongRest?: number }[],
   label?: string,
 ) {
   return charInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.spellsKnown, [
@@ -348,6 +349,11 @@ function spellsKnownFixed(
         alwaysPrepared: true,
         prepared: true,
         unlocksAtClassLevel: entry.unlocksAtLevel,
+        ...(entry.freeCastPerLongRest != null
+          ? { freeCastPerLongRest: entry.freeCastPerLongRest }
+          : entry.unlocksAtLevel != null && entry.unlocksAtLevel > 1
+            ? { freeCastPerLongRest: 1 }
+            : {}),
       })),
       alwaysPrepared: true,
       label,
@@ -1639,14 +1645,21 @@ function applyPresetToTrait(
             trait.name ?? "",
             option.name ?? "",
           )
+          if (!optionPreset?.linkedModifiers?.length) return option
+          const replaceWithExact =
+            preferExactPresets && exactOptionPreset === optionPreset
+          const merged =
+            optionHasModifierConfig(option) && !replaceWithExact
+              ? mergeOptionPresetModifiers(option.linkedModifiers, optionPreset.linkedModifiers)
+              : optionPreset.linkedModifiers
           if (
-            !optionPreset?.linkedModifiers?.length ||
-            (optionHasModifierConfig(option) &&
-              !(preferExactPresets && exactOptionPreset === optionPreset))
+            optionHasModifierConfig(option) &&
+            !replaceWithExact &&
+            merged === option.linkedModifiers
           ) {
             return option
           }
-          const synced = syncModifierRefs({ linkedModifiers: optionPreset.linkedModifiers })
+          const synced = syncModifierRefs({ linkedModifiers: merged })
           return {
             ...option,
             linkedModifiers: synced.linkedModifiers,

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest"
 import {
   IMPORT_SPELL_NAME_PREFIX,
+  formatSpellGrantDisplayName,
   resolveFeatureLinkedSpells,
   resolveLinkedModifierSpells,
+  resolveSpellIdAgainstCatalog,
 } from "@/lib/import/resolve-linked-modifier-spells"
 import { enrichAbilityImportRow } from "@/lib/import/enrich-ability-import"
 import type { Feature } from "@/lib/types"
@@ -166,5 +168,29 @@ describe("resolveLinkedModifierSpells", () => {
         "spell-haste",
       ])
     }
+  })
+})
+
+describe("formatSpellGrantDisplayName", () => {
+  it("resolves import slugs, placeholders, and catalog ids", () => {
+    const catalog = [
+      { id: "srd-hold", name: "Hold Person", source: "SRD" },
+      { id: "91a77aa3-a4c7-4bea-9da0-5bcb01f95496", name: "Crippling Agony", source: "MHP" },
+    ]
+    expect(formatSpellGrantDisplayName("import:hold person", catalog)).toBe("Hold Person")
+    expect(formatSpellGrantDisplayName(`${IMPORT_SPELL_NAME_PREFIX}Hold Person`, catalog)).toBe(
+      "Hold Person",
+    )
+    expect(
+      formatSpellGrantDisplayName("91a77aa3-a4c7-4bea-9da0-5bcb01f95496", catalog),
+    ).toBe("Crippling Agony")
+    expect(formatSpellGrantDisplayName("import:magic weapon")).toBe("Magic Weapon")
+    expect(formatSpellGrantDisplayName("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).toBe("")
+    expect(resolveSpellIdAgainstCatalog("import:hold person", catalog)).toBe("srd-hold")
+    expect(
+      formatSpellGrantDisplayName("import:divine wrath", [
+        { id: "import:divine wrath", name: "import:divine wrath", source: "import" },
+      ]),
+    ).toBe("Divine Wrath")
   })
 })

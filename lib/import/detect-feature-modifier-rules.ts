@@ -6,7 +6,7 @@ import {
 } from "@/lib/compendium/modifier-catalog-refs"
 import type { FeatPickCategory } from "@/lib/compendium/class-feature-metadata"
 import { charInstance, fxInstance, modId, usesInstance } from "@/lib/compendium/modifier-instance-builders"
-import { asiPool } from "@/lib/compendium/feat-modifier-presets"
+import { asiFixed, asiPool } from "@/lib/compendium/feat-modifier-presets"
 import {
   buildEvasionModifier,
   buildGrantFeatModifier,
@@ -21,6 +21,7 @@ import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import type { RollBonusConfig } from "@/lib/compendium/roll-bonus-config"
 import type { DetectFeatureContext } from "@/lib/import/detect-feature-modifiers"
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
+import { parseSubclassSpellTable } from "@/lib/import/subclass-spell-table"
 import { PSIONIC_TALENT_WIRING_RULES } from "@/lib/import/psionic-talent-wiring"
 import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
 import type { UsesConfig, FeatureEffect } from "@/lib/types"
@@ -56,6 +57,10 @@ export const CLASSIC_ASI_PHRASE =
 
 export const FEAT_ASI_2024_PHRASE =
   /gain the Ability Score Improvement feat or another feat of your choice for which you qualify/i
+
+/** Half-feat / homebrew: one named score, not a choice pool. */
+export const SINGLE_ABILITY_ASI_PHRASE =
+  /(?:increase\s+your|your)\s+(strength|dexterity|constitution|intelligence|wisdom|charisma)\s+(?:ability\s+)?score\s+(?:increases\s+by|by)\s+(\d+)/i
 
 const ABILITY_WORD_TO_KEY: Record<string, AbilityScoreKey> = {
   strength: "strength",
@@ -414,6 +419,26 @@ function parseConditions(fragment: string): string[] {
     const re = new RegExp(`\\b${condition.toLowerCase()}\\b`, "i")
     return re.test(lower)
   })
+}
+
+function parseHitDiceRestoreByLevel(text: string, baseAmount: number): BonusByLevelEntry[] {
+  const rows: BonusByLevelEntry[] = []
+  const parenRe = /(?:levels?\s+)?(\d+)\s*\(\s*(\d+)\s+hit(?:\s+point)?\s+dice\s*\)/gi
+  let match: RegExpExecArray | null
+  while ((match = parenRe.exec(text))) {
+    const level = parseInt(match[1], 10)
+    const amount = parseInt(match[2], 10)
+    if (!Number.isFinite(level) || !Number.isFinite(amount)) continue
+    rows.push({ level, mode: "fixed", fixed: amount })
+  }
+  if (!rows.some((row) => row.fixed === baseAmount)) {
+    rows.unshift({ level: 1, mode: "fixed", fixed: baseAmount })
+  }
+  const byLevel = new Map<number, BonusByLevelEntry>()
+  for (const row of rows.sort((a, b) => a.level - b.level)) {
+    byLevel.set(row.level, row)
+  }
+  return [...byLevel.values()]
 }
 
 function parseRechargeRest(fragment: string): UsesConfig["recharges"] {
@@ -1980,6 +2005,38 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "restore.hit_dice.short_rest",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\bwhen you finish a short rest\b[\s\S]{0,240}\bregain\b[\s\S]{0,80}\b(?:up to\s+)?(\d+)\s+expended\s+hit(?:\s+point)?\s+dice\b/i,
+    build: (match, ctx, text) => {
+      if (/\bincreases to \d+\b/i.test(text) && !/\bregain up to\b/i.test(text)) return null
+      const amount = parseInt(match[1], 10)
+      if (!Number.isFinite(amount) || amount < 1) return null
+      const restoreChar = {
+        id: modId(instanceKey(ctx, "hit_dice_restore")),
+        type: "hit_dice_restore" as const,
+        amount,
+        amountByLevel: parseHitDiceRestoreByLevel(text, amount),
+        restoreOn: "short_rest" as const,
+        label: ctx.featureName ?? "Restore Hit Point Dice",
+      }
+      if (!/\bonce you use this feature\b[\s\S]{0,120}\buntil you finish a long rest\b/i.test(text)) {
+        return charInstance(newInstanceId(), characteristicCatalogRefId("hit_dice_restore"), [restoreChar])
+      }
+      return charInstance(newInstanceId(), characteristicCatalogRefId("hit_dice_restore"), [
+        restoreChar,
+        {
+          id: modId(instanceKey(ctx, "hit_dice_restore_uses")),
+          type: "uses",
+          uses: { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+          label: ctx.featureName ?? "Limited uses",
+        },
+      ])
+    },
+  },
+  {
     id: "uses.fixed_rest",
     confidence: "high",
     test:
@@ -2462,10 +2519,10 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "spell.know_cantrip",
     confidence: "high",
-    test: /\b(?:you\s+know|learn|you\s+learn)\s+the\s+([A-Za-z' ]+?)\s+cantrip\b/i,
+    test: /\b(?:you\s+know|knows?|learn|you\s+learn)\s+(?:the\s+)?([A-Za-z' ]+?)\s+cantrip\b/i,
     build: (match, ctx) => {
       const spellName = match[1].trim()
-      if (!spellName) return null
+      if (!spellName || !looksLikeNamedSpell(spellName)) return null
       return charInstance(newInstanceId(), characteristicCatalogRefId("spells_known"), [
         {
           id: modId(instanceKey(ctx, `cantrip_${spellName}`)),
@@ -2473,6 +2530,54 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           spells: [{ spellId: spellNamePlaceholder(spellName), alwaysPrepared: true }],
           alwaysPrepared: true,
           label: `${spellName} cantrip`,
+        },
+      ])
+    },
+  },
+  {
+    // Species lineage prose: "know Druidcraft" / "Knows Shocking Grasp" without the word cantrip.
+    id: "spell.know_named",
+    confidence: "high",
+    test: /\b(?:you\s+know|knows|know)\s+(?:the\s+)?([A-Z][A-Za-z']+(?:\s+[A-Z][a-z']+){0,4})\b/,
+    build: (match, ctx, text) => {
+      if (/\bcantrip\b/i.test(match[0])) return null
+      const spellName = match[1].trim()
+      if (!spellName || !looksLikeNamedSpell(spellName)) return null
+      if (/\b(d20|Common|Sylvan|Infernal|language|languages)\b/i.test(spellName)) return null
+      // "After you know the d20 result" and similar non-spell "know" clauses.
+      if (/\bknow\s+the\s+d20\b/i.test(text) && /d20/i.test(spellName)) return null
+      return spellsKnownInstance(ctx, `know_named_${spellName}`, [spellName], spellName)
+    },
+  },
+  {
+    // Elf / Tiefling lineage option tables: Level | Spell (3 Faerie Fire, 5 Darkness).
+    id: "spell.level_unlock_table",
+    confidence: "high",
+    scope: "full",
+    test: /<table[\s\S]*?<\/table>|\bLevel\b[\s\S]{0,80}\bSpell\b/i,
+    build: (_match, ctx, text) => {
+      if (ctx.contentKind !== "species_trait") return null
+      const parsed = parseSubclassSpellTable(text)
+      if (!parsed?.rows.length || parsed.ambiguousMultiTable) return null
+      const spells = parsed.rows.flatMap((row) =>
+        row.spellNames
+          .filter((name) => looksLikeNamedSpell(name))
+          .map((name) => ({
+            spellId: spellNamePlaceholder(name),
+            alwaysPrepared: true as const,
+            prepared: true as const,
+            unlocksAtClassLevel: row.unlocksAtClassLevel,
+            ...(row.unlocksAtClassLevel > 1 ? { freeCastPerLongRest: 1 } : {}),
+          })),
+      )
+      if (!spells.length) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("spells_known"), [
+        {
+          id: modId(instanceKey(ctx, "level_unlock_table")),
+          type: "spells_known",
+          spells,
+          alwaysPrepared: true,
+          label: parsed.allSpellNames.join(", "),
         },
       ])
     },
@@ -2950,6 +3055,22 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     test: CLASSIC_ASI_PHRASE,
     build: (_match, ctx) =>
       asiPool(`modinst_${instanceKey(ctx, "asi_classic")}`, 2, "Ability Score Improvement (+2 or +1/+1)"),
+  },
+  {
+    id: "grant.asi_fixed_one",
+    confidence: "high",
+    scope: "full",
+    test: SINGLE_ABILITY_ASI_PHRASE,
+    build: (match, ctx) => {
+      // Class features often raise a score while wearing constructed armor, on a
+      // companion, or as a player choice — only wire the unambiguous feat phrasing.
+      if (ctx.contentKind !== "feat") return null
+      const ability = ABILITY_WORD_TO_KEY[match[1]?.toLowerCase() ?? ""]
+      const amount = Number.parseInt(match[2] ?? "", 10)
+      if (!ability || !Number.isFinite(amount) || amount < 1 || amount > 4) return null
+      const display = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase()
+      return asiFixed(instanceKey(ctx, "asi_fixed"), { [ability]: amount }, `+${amount} ${display}`)
+    },
   },
   {
     id: "grant.asi_2024",

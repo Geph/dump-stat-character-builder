@@ -1,5 +1,6 @@
 import { enrichSpellRowWithBundledCardImage } from "@/lib/compendium/enrich-srd-spells"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
+import { resolveSpeciesLinkedSpells } from "@/lib/import/resolve-linked-modifier-spells"
 import { enrichBackgroundList } from "@/lib/compendium/normalize-backgrounds"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
@@ -257,7 +258,7 @@ async function fetchBuilderCompendium(db: DataClient): Promise<BuilderCompendium
     const features = sanitizeCaptainSubclassFeatures(subclass.features)
     return features ? { ...subclass, features } : subclass
   })
-  const species = filterEnabled(
+  const speciesRows = filterEnabled(
     enrichSpeciesList(
       asCompendiumRows<Parameters<typeof enrichSpeciesList>[0][number]>(speciesRes.data),
     ) as unknown as Species[],
@@ -290,6 +291,9 @@ async function fetchBuilderCompendium(db: DataClient): Promise<BuilderCompendium
       enrichSpellRowWithBundledCardImage(row as Record<string, unknown>),
     ),
   ) as unknown as Spell[]
+  const species = speciesRows.map(
+    (row) => resolveSpeciesLinkedSpells(row, spells) ?? row,
+  ) as unknown as Species[]
   const equipment = filterEnabled(asCompendiumRows(equipmentRes.data)) as unknown as Equipment[]
 
   return {

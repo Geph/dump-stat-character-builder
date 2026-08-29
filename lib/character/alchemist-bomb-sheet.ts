@@ -89,6 +89,12 @@ const PRIME_BOMB_RIDER_RE =
 /** "Spend/take 10 minutes" is a rest/downtime activity; "for 10 minutes" is only a duration. */
 const SPEND_MINUTES_RE = /\b(?:spend|take)\b(?:\s+\w+){0,6}\s+\d+\s+minutes?\b/i
 const DURING_REST_RE = /\bduring a (?:short|long) rest\b/i
+/**
+ * "When you finish a Short Rest, you can …" — a chosen rest activity (Divine Respite),
+ * not a recharge. Same "you can" gate as long-rest activities.
+ */
+const SHORT_REST_ACTIVITY_RE =
+  /\b(?:when|after|whenever) you (?:finish|complete) a short rest,? you can\b/i
 
 export function looksLikePrimeBombRiderText(
   ...parts: Array<string | null | undefined>
@@ -128,7 +134,11 @@ export function isShortRestActivityText(
 ): boolean {
   const haystack = parts.filter(Boolean).join(" ")
   if (/^potion brewing$/i.test((parts[0] ?? "").trim())) return true
-  return SPEND_MINUTES_RE.test(haystack) || DURING_REST_RE.test(haystack)
+  return (
+    SPEND_MINUTES_RE.test(haystack) ||
+    DURING_REST_RE.test(haystack) ||
+    SHORT_REST_ACTIVITY_RE.test(haystack)
+  )
 }
 
 /**

@@ -63,6 +63,7 @@ export const AI_MECHANIC_KINDS = [
   "failed_roll_trigger",
   "d20_test_reaction",
   "special_attack",
+  "hit_dice_restore",
 ] as const
 
 /**
@@ -739,6 +740,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: "fixed charge pool; use specialDescription for dawn or partial recharge wording",
   },
   {
+    ruleId: "restore.hit_dice.short_rest",
+    trigger: "description",
+    catalog: "cat_char_hit_dice_restore",
+    examples: [
+      "When you finish a Short Rest, you can choose to regain up to 3 expended Hit Point Dice. Once you use this feature, you can't do so again until you finish a Long Rest. The number of expended Hit Point Dice you regain increases when you reach levels 13 (6 Hit Point Dice) and 17 (10 Hit Point Dice).",
+    ],
+    mechanicsKind: "hit_dice_restore",
+    notes:
+      "hitDiceRestoreAmount + optional hitDiceRestoreByLevel [{ level, amount }]. Pair with a separate uses mechanic (usesFixed 1, usesRecharge long_rest). Do not emit leftover features that only say the amount increases.",
+  },
+  {
     ruleId: "uses.fixed_rest",
     trigger: "description",
     catalog: "cat_char_uses",
@@ -815,6 +827,25 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     examples: ["You know the Druidcraft cantrip"],
     mechanicsKind: "spells_known",
     notes: 'spellNames: ["Druidcraft"]',
+  },
+  {
+    ruleId: "spell.know_named",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: ["know Druidcraft", "Knows Shocking Grasp"],
+    mechanicsKind: "spells_known",
+    notes: 'spellNames: ["Druidcraft"] — species lineage prose that omits the word cantrip',
+  },
+  {
+    ruleId: "spell.level_unlock_table",
+    trigger: "description",
+    catalog: "cat_char_spells_known",
+    examples: [
+      "<table><tr><td>Level</td><td>Spell</td></tr><tr><td>3</td><td>Longstrider</td></tr><tr><td>5</td><td>Pass without Trace</td></tr></table>",
+    ],
+    mechanicsKind: "spells_known",
+    notes:
+      "Species lineage/legacy option tables only. One spells_known row per unlock level with unlocksAtClassLevel; leveled spells get freeCastPerLongRest 1.",
   },
   {
     ruleId: "spell.can_cast_named",
@@ -1033,6 +1064,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "increase one ability score of your choice by 2, or you can increase two ability scores of your choice by 1",
     ],
     notes: "mode: asi_pool, points: 2 — overrides grant.asi_by_name when description disagrees",
+  },
+  {
+    ruleId: "grant.asi_fixed_one",
+    trigger: "description",
+    catalog: "cat_char_ability_scores",
+    examples: [
+      "Your Wisdom ability score increases by 1, to a maximum of 20",
+      "Increase your Dexterity score by 1, to a maximum of 20",
+    ],
+    notes:
+      "mode: fixed — one named score only (Expert Cook / Actor). Choice pools (Strength or Dexterity) stay narrative or use a name preset. Feat descriptions only.",
   },
   {
     ruleId: "grant.asi_2024",
@@ -1440,10 +1482,11 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Spell Uses column → class_resources.spell_uses (long rest). Do not invent normal spell-slot progression for Hit Point Spellcasting.",
       "Max Spell Levels column → class_resources.max_spell_level (special cap), not a pool and not caster_progression full/half/third.",
       "Set spellcasting.ability to Wisdom when the Spellcasting feature says so, but omit caster_progression / slots — Hit Point Spellcasting is not normal slots.",
-      "Keep the Hit Point Spellcasting damage table in the Spellcasting feature description — Radiant self-cost is narrative/play-time.",
-      "Sacrifice / Sacrificial Strike self-damage riders stay narrative unless a clear passive sheet bonus exists.",
-      "Undying: once per Long Rest when dropping to 0 HP (enrichment wires limitedUses + onDropToZeroHp).",
-      "Miraculous Healing: Bonus Action that spends a Hit Point Die — keep that wording; HD spend is play-time.",
+      "Keep the Hit Point Spellcasting table (1st 5 / 2nd 10 / 3rd 20 / 4th 30 / 5th 45). The sheet spends current HP on cast (bypasses Temporary Hit Points). Optionally set spellcasting.hit_point_cost_by_level; enrichment injects the Martyr table on attach.",
+      "Sacrifice grants two named benefits with different action economies — emit Sacrificial Strike and Sacrificial Skill as separate features[] rows at the same level (do not keep them as one Sacrifice blob). Sacrificial Strike is a Bonus Action: after a melee/unarmed hit, extra 10 Radiant to the target (spendHitPoints 5). Sacrificial Skill is a Passive failed_roll_trigger on any failed D20 Test: bonusFixed 5, spendResourceKey hit_points amount 10, refundResourceOnStillFailed (no damage if the test still fails).",
+      "Improved Sacrificial Strike (\"Your Sacrificial Strike improves… you can choose to take 10… extra 20\"): power_rider on that feature, parentPowerNames [\"Sacrificial Strike\"], selectable true, spendHitPoints 10. Do not emit a second combat action. Keep the choose-to-take sentence. The later \"first time each turn without a Bonus Action\" upgrade is a separate notice, not this rider.",
+      "Undying: Passive once per Long Rest when dropping to 0 HP (onDropToZeroHp — not a Reaction). Keep \"immediately use your Miraculous Healing (no action required)\"; enrichment sets alsoActivateFeatureNames so the sheet offers a button to fire Miraculous Healing after Undying.",
+      "Miraculous Healing: Bonus Action heal_self with healMode hit_dice (class HD + CON per die) and spendHitDice. Dice scale 1/2/3/4 at Martyr 1/5/11/17.",
       "Burden of … Spells features: keep HTML spell tables in description.",
     ],
   },
@@ -1755,12 +1798,14 @@ function formatMechanicsCheatsheet(): string {
     "- turn_start_bonus_grant: grantResourceKey \"psi_points\"; grantAmount 2; expiresEndOfTurn true; usageRestriction \"…\" — ephemeral bonus units that do NOT refill the main pool; optional grantAmountByLevel [{ level, amount }]",
     "- resource_ability_menu: classResourceKey (or resourceKey) for the pool; waiveResourceCost true when options can be used free. Prefer structured menuOptions [{ name, description, resourceCost, hitDiceCost?, unlocksAtLevel? }] when choices have different costs; menuAbilityNames [\"Feat of Strength\", \"Heroic Fortitude\"] remains valid for same-cost/name-only menus.",
     "- extra_attack: extraAttackCount is the number of EXTRA attacks beyond the first (1 = attack twice; 2 = attack three times). Preserve special replacement rules such as casting a cantrip in place of one attack in narrative text.",
-    "- power_rider: parentPowerNames [\"Guardian Tactics\", \"Survive\", \"Interrupt\", \"Bombs\"] — sheet alert on those actions. When the rider only applies to one menu option, also set parentMenuOptionNames [\"Block\"] | [\"Challenge\"] | [\"Grasp\"]. For Alchemist Bomb modes set appliesToAttackVariants [\"attack\"] (regular formulas such as Painkiller Bomb) or [\"primed\"] (\"When you prime a Bomb…\", e.g. Timed Demolition) and selectable true when the rider is an optional add-on. Optional alertSummary for the badge text.",
+    "- power_rider: parentPowerNames [\"Guardian Tactics\", \"Survive\", \"Interrupt\", \"Bombs\", \"Sacrificial Strike\"] — sheet alert on those actions. When the rider only applies to one menu option, also set parentMenuOptionNames [\"Block\"] | [\"Challenge\"] | [\"Grasp\"]. For Alchemist Bomb modes set appliesToAttackVariants [\"attack\"] (regular formulas such as Painkiller Bomb) or [\"primed\"] (\"When you prime a Bomb…\", e.g. Timed Demolition) and selectable true when the rider is an optional add-on. Optional alertSummary for the badge text. For \"Your X improves. When you use this feature, you can choose to take N…\" upgrades, emit power_rider on the improvement feature (not a second action card): parentPowerNames [\"Sacrificial Strike\"], selectable true, spendHitPoints 10 when the choice replaces the parent HP cost.",
     "- grant_custom_ability: abilityNames [\"Alchemy of Poison\", \"Telepathy\", \"Laughing Gas Bomb\"] — unlock a named custom ability / formula / discovery / discipline already in the batch (or seeded). Prefer this over leaving subclass formula grants unwired.",
     "- failed_roll_trigger: rollKind attack|ability|skill|save; failedTriggerOn fail|success; targetScope self|allied_creature|target_creature; optional rangeFeet, useReaction, spendResourceKey/spendResourceAmount. For a flat bonus (Guided Strike +10) set bonusFixed 10 — nested as check_roll_modifier. Prefer this over inventing a one-off reaction when the feature adds to a missed/failed (or successful) roll.",
     "- d20_test_reaction: modifierMode add|subtract; rollKinds [\"ability\",\"skill\",\"attack\",\"save\"]; targetScope; optional rangeFeet and useReaction; dieSource fixed|ability_modifier with fixedDie \"1d4\" or dieAbility. Despite the schema name, set useReaction false when the source says \"whenever\" and does not spend a Reaction.",
     "- special_attack: attackProfile melee|ranged|emanation|force_save; damageDice \"2d6\" (or bonusDice); damageType/damageTypes; optional saveAbility + saveHalfDamage, areaShape cone|line|sphere|…, areaLengthFeet, rangeFeet, attackName, targetMode single|multi|area. Use for Breath Weapon / Bile Blast / Radiance-style activatable attacks that are not weapon Attack action riders. Alchemist Bombs are Dump Stat–preset (attack + explode variants); do not invent a separate attack_roll_modifiers mechanic for Intelligent Explosions INT damage — leave that for the Bomb Explode label / enrichment.",
-    "- Downtime / rest activities: if the text says you spend or take 10 minutes (or another minute cost) — not merely that an effect lasts for 10 minutes — emit a non-combat Abilities action (sheetDisplay abilitiesActions, not combatActions) and treat it as a Short Rest activity. Do not file those on the Combat tab.",
+    "- hit_dice_restore: regain expended Hit Point Dice when you finish a rest (Divine Respite). hitDiceRestoreAmount 3; optional hitDiceRestoreByLevel [{ level: 13, amount: 6 }, { level: 17, amount: 10 }]; restoreOnRest short_rest (default) or long_rest. Always pair with uses usesFixed 1 / usesRecharge long_rest when the feature is once per Long Rest. Put the scaling sentence on the SAME feature that grants the restore — do not emit leftover features that only say \"the number increases to N\". This is Hit Point Dice (the HD tracker), not current HP.",
+    "- Drop to 0 HP / drop to 1 HP instead (Relentless Endurance, Undying, Survive): this is a Passive trigger, not a Reaction, unless the text spends a Reaction. Keep the \"When you are reduced to 0 Hit Points\" sentence. If you can immediately use another named feature at no action cost, keep that sentence verbatim (\"immediately use your Miraculous Healing\") so the sheet can offer a button for it.",
+    "- Downtime / rest activities: if the text says you spend or take 10 minutes (or another minute cost) — not merely that an effect lasts for 10 minutes — emit a non-combat Abilities action (sheetDisplay abilitiesActions, not combatActions) and treat it as a Short Rest activity. Do not file those on the Combat tab. The same is true of \"When you finish a Short Rest, you can …\" choice features such as Divine Respite / Arcane Recovery — abilitiesActions, not combatActions.",
     "- Alchemist: emit a custom_abilities Bomb proposal (ability_role alchemist_bomb) plus bomb_formula upgrades; Potion Brewing should keep the Potions table in description (HTML table with \"Alchemist Level N\" section headers is fine) and is a non-combat Abilities action / short-rest activity (spend/take 10 minutes) — set sheetDisplay abilitiesActions, not combatActions. Potion Mixologist is a Bonus Action on the Combat tab (sheetDisplay combatActions). Do not tag damage_roll_modifiers for Prime Bomb without classResourceKey reagents — enrichment owns Prime Bomb linear scaling on the Bomb ability. Reagents / Potions unlock rows / Experimentalist are structural shells. Recipe / downtime features (Alchemical Resurrection) and reaction stubs (Toxic Recompense, Beguiling Perfume, Counter-Discharge) are enrichment-activated — keep activation prose in description; do not leave them as empty unwired shells.",
     "- temporary_hit_points: amount N (fixed) OR amountDice \"1d12\" OR amountScaling character_level|class_resource_die|ability_modifier|proficiency. For amountScaling \"character_level\" (\"three times your level\"), put the per-level multiplier in amount (amount: 3), NOT amountMultiplier — amountMultiplier is ONLY for doubling/tripling a class_resource_die roll (\"twice the number rolled on your Bardic Inspiration die\": amountScaling class_resource_die, classResourceKey bardic_inspiration, amountMultiplier 2). For ability_modifier scaling, pair with ability. For proficiency (\"temporary hit points equal to your proficiency bonus\"), use amountScaling proficiency (optional amount/amountMultiplier for N×PB). thpTrigger on_activation|turn_start|on_use|on_hit (field name is thpTrigger, not trigger); thpTarget self|chosen_creature_in_range|allies_in_range (field name is thpTarget, not target; rangeFeet when not self) — self and ally/chosen targets wire with healTarget self|choose_ally on on_activation/on_use; turn_start/on_hit stay unwired. targetCount { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } when creature count scales that way; expiresOnTriggerEnd true when THP ends with the gating state",
     "- uses: usesFixed 2, usesRecharge short_rest|long_rest|both|until_item_consumed|on_resource_reactivation; OR usesAbility WIS; OR usesProficiency true when uses equal Proficiency Bonus (Lucky). ALWAYS wire the base usesFixed/usesRecharge from \"Once you use this… until you finish a [rest]\" even when the next sentence adds an alternate early refresh — alternateRefresh is additive, never a reason to omit the base wire. until_item_consumed = resource locked until a crafted/summoned item from this ability is spent or destroyed. on_resource_reactivation + gatingResourceKey \"rage\" = once per (re)activation of that resource/state (Fanatical Focus). alternateRefresh: { spendResourceKey, spendAmount, actionCost } for resource spends OR { spendSpellSlotMinLevel: 3, actionCost } for \"expend a level 3+ spell slot\".",

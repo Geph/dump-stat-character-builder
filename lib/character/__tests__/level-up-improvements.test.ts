@@ -4,13 +4,18 @@ import {
   averageHpGain,
   buildLevelUpStandardizedNotes,
   collectFeatureScalingImprovements,
+  collectSpeciesScalingImprovements,
+  collectSpeciesTraitsGainedAtLevel,
   proficiencyBonusAtLevel,
   rolledHpGain,
 } from "@/lib/character/level-up-improvements"
 import { buildLevelUpPlan } from "@/lib/character/level-up-plan"
 import { asiPool } from "@/lib/compendium/feat-modifier-presets"
+import { enrichSrdSpeciesRow } from "@/lib/compendium/enrich-srd-species"
+import { SRD_SOURCE } from "@/lib/srd/source"
+import bundledSpecies from "@/lib/srd/seed-data/species.json"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
-import type { DndClass, Feat, Feature } from "@/lib/types"
+import type { DndClass, Feat, Feature, Species } from "@/lib/types"
 
 describe("level-up improvements", () => {
   it("computes proficiency bonus by total level", () => {
@@ -78,6 +83,236 @@ describe("level-up improvements", () => {
       }),
     ])
     expect(collectFeatureScalingImprovements([criticalShot], 7, 8, "class")).toEqual([])
+  })
+
+  it("shows catalog spell names instead of import slugs and UUIDs", () => {
+    const revolutionSpells = {
+      name: "Revolution Spells",
+      level: 3,
+      description: "",
+      linkedModifiers: [
+        {
+          instanceId: "table",
+          catalogRefId: "cat_char_spells_known",
+          characteristics: [
+            {
+              id: "mod_table",
+              type: "spells_known",
+              alwaysPrepared: true,
+              spells: [
+                { spellId: "import:hold person", alwaysPrepared: true, unlocksAtClassLevel: 5 },
+                { spellId: "import:magic weapon", alwaysPrepared: true, unlocksAtClassLevel: 5 },
+                {
+                  spellId: "91a77aa3-a4c7-4bea-9da0-5bcb01f95496",
+                  alwaysPrepared: true,
+                  unlocksAtClassLevel: 5,
+                },
+                {
+                  spellId: "d52b1f22-503e-416b-a310-d79d76d6c002",
+                  alwaysPrepared: true,
+                  unlocksAtClassLevel: 5,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          instanceId: "prose",
+          catalogRefId: "cat_char_spells_known",
+          characteristics: [
+            {
+              id: "mod_prose",
+              type: "spells_known",
+              alwaysPrepared: true,
+              spells: [
+                {
+                  spellId: "91a77aa3-a4c7-4bea-9da0-5bcb01f95496",
+                  alwaysPrepared: true,
+                  unlocksAtClassLevel: 5,
+                },
+                {
+                  spellId: "d52b1f22-503e-416b-a310-d79d76d6c002",
+                  alwaysPrepared: true,
+                  unlocksAtClassLevel: 5,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as Feature
+
+    expect(
+      collectFeatureScalingImprovements([revolutionSpells], 4, 5, "subclass", [
+        { id: "srd-hold", name: "Hold Person", source: "SRD" },
+        { id: "srd-magic", name: "Magic Weapon", source: "SRD" },
+        { id: "91a77aa3-a4c7-4bea-9da0-5bcb01f95496", name: "Crippling Agony", source: "MHP" },
+        { id: "d52b1f22-503e-416b-a310-d79d76d6c002", name: "Divine Wrath", source: "MHP" },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        name: "Revolution Spells",
+        detail:
+          "You gain Hold Person, Magic Weapon, Crippling Agony, and Divine Wrath (always prepared).",
+      }),
+    ])
+  })
+
+  it("title-cases import slugs and drops unresolved UUIDs at Revolution 9", () => {
+    const revolutionSpells = {
+      name: "Burden of Revolution Spells",
+      level: 3,
+      description: "",
+      linkedModifiers: [
+        {
+          instanceId: "table",
+          catalogRefId: "cat_char_spells_known",
+          characteristics: [
+            {
+              id: "mod_table",
+              type: "spells_known",
+              alwaysPrepared: true,
+              spells: [
+                { spellId: "import:divine wrath", alwaysPrepared: true, unlocksAtClassLevel: 9 },
+                {
+                  spellId: "import:protection from energy",
+                  alwaysPrepared: true,
+                  unlocksAtClassLevel: 9,
+                },
+                {
+                  spellId: "7821cd1d-98bc-420b-917c-78e227647f44",
+                  alwaysPrepared: true,
+                  unlocksAtClassLevel: 9,
+                },
+                {
+                  spellId: "551fb9d2-daed-4009-b6e5-0831aaab2dc8",
+                  alwaysPrepared: true,
+                  unlocksAtClassLevel: 9,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          instanceId: "prose",
+          catalogRefId: "cat_char_spells_known",
+          characteristics: [
+            {
+              id: "mod_prose",
+              type: "spells_known",
+              alwaysPrepared: true,
+              spells: [
+                {
+                  spellId: "7821cd1d-98bc-420b-917c-78e227647f44",
+                  alwaysPrepared: true,
+                  unlocksAtClassLevel: 9,
+                },
+                {
+                  spellId: "551fb9d2-daed-4009-b6e5-0831aaab2dc8",
+                  alwaysPrepared: true,
+                  unlocksAtClassLevel: 9,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as Feature
+
+    expect(collectFeatureScalingImprovements([revolutionSpells], 8, 9, "subclass")).toEqual([
+      expect.objectContaining({
+        name: "Burden of Revolution Spells",
+        detail: "You gain Divine Wrath and Protection From Energy (always prepared).",
+      }),
+    ])
+    expect(
+      collectFeatureScalingImprovements([revolutionSpells], 8, 9, "subclass", [
+        { id: "7821cd1d-98bc-420b-917c-78e227647f44", name: "Divine Wrath", source: "MHP" },
+        { id: "551fb9d2-daed-4009-b6e5-0831aaab2dc8", name: "Protection from Energy", source: "SRD" },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        detail: "You gain Divine Wrath and Protection from Energy (always prepared).",
+      }),
+    ])
+  })
+})
+
+function srdSpecies(name: string): Species {
+  const row = bundledSpecies.find((entry) => entry.name === name)
+  if (!row) throw new Error(`${name} missing from SRD seed`)
+  return enrichSrdSpeciesRow({
+    id: `species_${name.toLowerCase()}`,
+    name,
+    description: row.description ?? null,
+    speed: 30,
+    size: "Medium",
+    creature_type: "Humanoid",
+    source: SRD_SOURCE,
+    traits: row.traits,
+  }) as unknown as Species
+}
+
+describe("species level-up improvements", () => {
+  it("unlocks High Elf lineage spells at character levels 3 and 5", () => {
+    const elf = srdSpecies("Elf")
+    const picks = { "Elven Lineage": ["High Elf"] }
+
+    expect(collectSpeciesScalingImprovements(elf, picks, 2, 3)).toEqual([
+      expect.objectContaining({
+        name: "Elven Lineage",
+        detail: "You gain Detect Magic (always prepared).",
+        source: "species",
+      }),
+    ])
+    expect(collectSpeciesScalingImprovements(elf, picks, 4, 5)).toEqual([
+      expect.objectContaining({
+        name: "Elven Lineage",
+        detail: "You gain Misty Step (always prepared).",
+      }),
+    ])
+    expect(collectSpeciesScalingImprovements(elf, picks, 3, 4)).toEqual([])
+  })
+
+  it("scales Dragonborn Breath Weapon and unlocks Draconic Flight at 5", () => {
+    const dragonborn = srdSpecies("Dragonborn")
+    expect(collectSpeciesScalingImprovements(dragonborn, {}, 4, 5)).toEqual([
+      expect.objectContaining({
+        name: "Breath Weapon",
+        detail: "Breath Weapon damage increases from 1d10 to 2d10.",
+      }),
+    ])
+    expect(collectSpeciesTraitsGainedAtLevel(dragonborn, 4, 5)).toEqual([
+      expect.objectContaining({ name: "Draconic Flight", level: 5 }),
+    ])
+    expect(collectSpeciesTraitsGainedAtLevel(dragonborn, 2, 3)).toEqual([])
+  })
+
+  it("includes lineage spells and breath scaling on the level-up plan", () => {
+    const entry = {
+      row: { class_id: "fighter", level: 2, subclass_id: null, order: 0 },
+      class: {
+        id: "fighter",
+        name: "Fighter",
+        hit_die: 10,
+        features: [{ name: "Fighting Style", level: 1, description: "" } as Feature],
+      } as DndClass,
+      subclass: null,
+    } as CharacterClassDetail
+    const plan = buildLevelUpPlan({
+      entry,
+      subclasses: [],
+      currentTotalLevel: 2,
+      featureChoicePicks: {},
+      species: srdSpecies("Elf"),
+      speciesTraitPicks: { "Elven Lineage": ["High Elf"] },
+    })
+    expect(plan?.featureImprovements).toEqual([
+      expect.objectContaining({
+        name: "Elven Lineage",
+        detail: "You gain Detect Magic (always prepared).",
+      }),
+    ])
   })
 })
 

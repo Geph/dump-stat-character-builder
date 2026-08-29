@@ -297,7 +297,13 @@ const ImportMechanicAiSchema = z.object({
   alertSummary: z.string().nullable(),
   appliesToAttackVariants: z.array(z.enum(["attack", "primed", "explode"])).nullable(),
   selectable: z.boolean().nullable(),
+  spendHitPoints: z.number().nullable(),
   amount: z.number().nullable(),
+  hitDiceRestoreAmount: z.number().nullable(),
+  hitDiceRestoreByLevel: z
+    .array(z.object({ level: z.number(), amount: z.number() }))
+    .nullable(),
+  restoreOnRest: z.enum(["short_rest", "long_rest"]).nullable(),
   amountDice: z.string().nullable(),
   amountScaling: z
     .enum(["character_level", "class_resource_die", "ability_modifier", "proficiency"])
@@ -385,6 +391,7 @@ const SpellcastingAiSchema = z.object({
       replaces_spell_slots: z.boolean(),
     })
     .nullable(),
+  hit_point_cost_by_level: z.record(z.string(), z.number()).nullable().optional(),
 })
 
 const SkillChoicesAiSchema = z.object({
@@ -1124,6 +1131,7 @@ function normalizeSpellcasting(
     progression: spellcasting.progression,
     explicit_slot_progression: spellcasting.explicit_slot_progression,
     point_pool: pointPool,
+    hit_point_cost_by_level: spellcasting.hit_point_cost_by_level,
   }) as NonNullable<NonNullable<ImportContent["classes"]>[number]["spellcasting"]>
 }
 

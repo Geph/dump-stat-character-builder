@@ -289,6 +289,7 @@ Product names are used for identification only (README). The app does not collec
 
 ## Related docs
 
+- [Agent session invariants](../AGENTS.md) — what a new Cursor chat sees; copyright, common modifiers, import loop
 - [Homebrew class import review](./homebrew-import-review.md) — Drive extract → audit → enrich loop
 - [CharacteristicModifier vs FeatureEffect](./modifier-vs-feature-effect.md) — which effect system to author
 - [SRD seed](../lib/srd/README.md) — rebuild and attribution

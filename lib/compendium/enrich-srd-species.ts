@@ -7,6 +7,7 @@ import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { GRANT_FEAT_CATALOG_ID } from "@/lib/compendium/grant-feat-catalog"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { mergeOptionPresetModifiers } from "@/lib/compendium/merge-species-option-presets"
 import { applySrdFlavorDescription } from "@/lib/compendium/srd-flavor-descriptions"
 import { isSrdSource } from "@/lib/srd/source"
 import type { Feature, FeatureActivation, Trait, UsesConfig } from "@/lib/types"
@@ -381,7 +382,7 @@ function spellsKnownChoice(
 /** Fixed always-prepared lineage / trait spells (no player spell picks). */
 function spellsKnownFixed(
   instanceKey: string,
-  entries: { name: string; unlocksAtLevel?: number }[],
+  entries: { name: string; unlocksAtLevel?: number; freeCastPerLongRest?: number }[],
   label?: string,
 ) {
   return charInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.spellsKnown, [
@@ -393,6 +394,11 @@ function spellsKnownFixed(
         alwaysPrepared: true,
         prepared: true,
         unlocksAtClassLevel: entry.unlocksAtLevel,
+        ...(entry.freeCastPerLongRest != null
+          ? { freeCastPerLongRest: entry.freeCastPerLongRest }
+          : entry.unlocksAtLevel != null && entry.unlocksAtLevel > 1
+            ? { freeCastPerLongRest: 1 }
+            : {}),
       })),
       alwaysPrepared: true,
       label,
@@ -1005,10 +1011,18 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
             trait.name,
             option.name ?? "",
           )
-          if (!optionPreset?.linkedModifiers?.length || optionHasModifierConfig(option)) {
+          if (!optionPreset?.linkedModifiers?.length) return option
+          const merged = optionHasModifierConfig(option)
+            ? mergeOptionPresetModifiers(option.linkedModifiers, optionPreset.linkedModifiers)
+            : optionPreset.linkedModifiers
+          if (
+            optionHasModifierConfig(option) &&
+            merged.length === (option.linkedModifiers?.length ?? 0) &&
+            merged === option.linkedModifiers
+          ) {
             return option
           }
-          const synced = syncModifierRefs({ linkedModifiers: optionPreset.linkedModifiers })
+          const synced = syncModifierRefs({ linkedModifiers: merged })
           return {
             ...option,
             linkedModifiers: synced.linkedModifiers,

@@ -24,6 +24,7 @@ describe("special attack icon defaults", () => {
     expect(defaultSpecialAttackIcon({ attackName: "Armored Slam" })).toBe("mailed-fist")
     expect(defaultSpecialAttackIcon({ attackName: "Radiance of the Dawn" })).toBe("sun-radiations")
     expect(defaultSpecialAttackIcon({ attackName: "Breath Weapon" })).toBe("dragon-breath")
+    expect(defaultSpecialAttackIcon({ attackName: "Reprisal" })).toBe("crossed-swords")
   })
 
   it("keeps an authored icon", () => {

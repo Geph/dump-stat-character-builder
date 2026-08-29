@@ -123,8 +123,8 @@ function WeaponAttackCard({
 
   return (
     <div className="min-w-0 rounded border border-primary/40 bg-primary/5 px-2.5 py-2">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1 basis-[7rem] space-y-1">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+        <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-x-1.5">
             {weapon.icon?.trim() ? (
               <GameIcon name={weapon.icon.trim()} className="h-5 w-5 shrink-0 text-primary" />
@@ -172,11 +172,11 @@ function WeaponAttackCard({
           properties.length > 0 ||
           appliedModifiers.length > 0 ||
           sheetContext?.extraMasteries.length ? (
-            <div className="flex flex-col items-start gap-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-1">
               {mastery ? (
                 <span
                   className={cn(
-                    "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold border",
+                    "inline-flex max-w-full items-center gap-0.5 rounded-full px-2 py-0.5 text-left text-[10px] font-semibold border",
                     masteryActive
                       ? "border-primary bg-primary/15 text-primary"
                       : "border-border bg-muted/60 text-muted-foreground",
@@ -192,7 +192,7 @@ function WeaponAttackCard({
               {(sheetContext?.extraMasteries ?? []).map((entry) => (
                 <span
                   key={`extra-${entry.name}`}
-                  className="inline-flex items-center gap-0.5 rounded-full border border-primary bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary"
+                  className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-primary bg-primary/15 px-2 py-0.5 text-left text-[10px] font-semibold text-primary"
                 >
                   {entry.name}
                   <ConditionInfoTip
@@ -205,7 +205,7 @@ function WeaponAttackCard({
                 <span
                   key={property}
                   className={cn(
-                    "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] font-medium",
+                    "inline-flex max-w-full items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-left text-[10px] font-medium",
                     weaponModifierBadgeClass(undefined),
                   )}
                 >
@@ -219,7 +219,7 @@ function WeaponAttackCard({
               {appliedModifiers.length > 0 ? (
                 <span
                   className={cn(
-                    "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] font-medium",
+                    "inline-flex max-w-full items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-left text-[10px] font-medium",
                     weaponModifierBadgeClass("feature"),
                   )}
                 >
@@ -282,9 +282,9 @@ function WeaponAttackCard({
           ) : null}
         </div>
 
-        {/* Side-by-side when the row has room for both (~17rem); wrap to a stack when it doesn't. */}
-        <div className="flex w-max max-w-full flex-row flex-wrap justify-end gap-1">
-          <div className="w-[8.4375rem] max-w-full">
+        {/* Stay top-right; wrap To Hit / Dmg into a stack only if this column is too narrow. */}
+        <div className="flex w-max max-w-full min-w-0 flex-row flex-wrap justify-end justify-self-end gap-1">
+          <div className="w-[6.328125rem] max-w-full">
             <D20RollButton
               modifier={attack.attackBonus}
               title={`${weapon.name} attack`}
@@ -298,7 +298,7 @@ function WeaponAttackCard({
             />
           </div>
           {damageExpression ? (
-            <div className="w-[8.4375rem] max-w-full">
+            <div className="w-[6.328125rem] max-w-full">
               <WeaponDamageRollButton
                 expression={damageExpression}
                 label={`${weapon.name} damage`}

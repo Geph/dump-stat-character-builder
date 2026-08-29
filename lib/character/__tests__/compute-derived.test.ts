@@ -283,7 +283,8 @@ describe("computeDerivedCharacter", () => {
     expect(withMagic.equippedWeaponAttack?.attackBonus).toBe(
       (withoutMagic.equippedWeaponAttack?.attackBonus ?? 0) + 1,
     )
-    expect(withMagic.equippedWeaponAttack?.damageDisplay).toContain("+ 1")
+    expect(withoutMagic.equippedWeaponAttack?.damageDisplay).toMatch(/\+ 3/)
+    expect(withMagic.equippedWeaponAttack?.damageDisplay).toMatch(/\+ 4/)
   })
 
   it("applies +1 shield magic effects when wielded", () => {

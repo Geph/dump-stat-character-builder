@@ -39,6 +39,7 @@ import {
   computeInitiative,
   resolveAggregatedAcFormula,
   resolveWeaponDamageDieSidesOverride,
+  collectAbilityModifierDamageRules,
   type SheetToggleKey,
   sumAttackRollModifiers,
   sumDamageRollModifiers,
@@ -69,8 +70,8 @@ import {
 import {
   buildWeaponDamageExpression,
   parseWeaponDamageDice,
+  shouldApplyAbilityModifierToWeaponDamage,
   stepWeaponDamageDice,
-  swapDamageDice,
 } from "@/lib/compendium/weapon-damage-roll"
 import {
   anyEquippedWeaponIsMounted,
@@ -193,21 +194,6 @@ function buildWeaponAttackDerived(
   if (damageDice && params.stepDamageDice) {
     damageDice = stepWeaponDamageDice(damageDice) ?? damageDice
   }
-  const damageDisplay =
-    damageDice != null && params.includeAbilityModifier != null
-      ? buildWeaponDamageExpression({
-          weapon,
-          abilityMods: params.abilityMods,
-          dice: damageDice,
-          includeAbilityModifier: params.includeAbilityModifier,
-          flatDamageBonus: damageBonus,
-          overrides,
-        })
-      : damageDice != null && params.stepDamageDice
-        ? swapDamageDice(base.damageDisplay, damageDice)
-        : damageBonus > 0
-          ? `${base.damageDisplay} + ${damageBonus}`
-          : base.damageDisplay
 
   const attackAbility = getWeaponAttackAbility(weapon, params.abilityMods, {
     overrides,
@@ -217,6 +203,35 @@ function buildWeaponAttackDerived(
     overrides,
     forRoll: "damage",
   })
+  const abilityDamageRules = collectAbilityModifierDamageRules(params.aggregatedCharacteristics, {
+    subcategory: weapon.subcategory ?? "",
+    properties: weaponProps,
+    unarmed,
+  })
+  const includeAbilityModifier = params.includeAbilityModifier ?? true
+  const includesAbilityModifierOnDamage = shouldApplyAbilityModifierToWeaponDamage({
+    weapon,
+    includeAbilityModifier,
+    grantAbilityModifierWhenMissing: abilityDamageRules.grantAbilityModifierWhenMissing,
+    abilityMod: damageAbility.mod,
+  })
+
+  const damageDisplay =
+    damageDice != null
+      ? buildWeaponDamageExpression({
+          weapon,
+          abilityMods: params.abilityMods,
+          dice: damageDice,
+          includeAbilityModifier,
+          flatDamageBonus: damageBonus,
+          grantAbilityModifierWhenMissing: abilityDamageRules.grantAbilityModifierWhenMissing,
+          bonusDiceWhenModifierIncluded: abilityDamageRules.bonusDiceWhenModifierIncluded,
+          bonusDiceUsesWeaponDamageType: abilityDamageRules.bonusDiceUsesWeaponDamageType,
+          overrides,
+        })
+      : damageBonus > 0
+        ? `${base.damageDisplay} + ${damageBonus}`
+        : base.damageDisplay
 
   return {
     attackBonus,
@@ -224,6 +239,7 @@ function buildWeaponAttackDerived(
     attackBreakdown,
     attackAbilityMod: attackAbility.mod,
     damageAbilityMod: damageAbility.mod,
+    includesAbilityModifierOnDamage,
   }
 }
 

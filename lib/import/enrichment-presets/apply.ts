@@ -24,6 +24,10 @@ import { sanitizeAlchemistImportContent } from "@/lib/import/enrichment-presets/
 import { sanitizeCaptainImportContent } from "@/lib/import/enrichment-presets/packs/captain"
 import { sanitizeGunslingerImportContent } from "@/lib/import/enrichment-presets/packs/gunslinger"
 import { sanitizeInvestigatorImportContent, ensureInvestigatorRitualistFeature } from "@/lib/import/enrichment-presets/packs/investigator"
+import {
+  applyMartyrHitPointSpends,
+  expandMartyrSacrificeFeatures,
+} from "@/lib/import/enrichment-presets/packs/homebrew"
 import { sanitizeNecromancerImportContent } from "@/lib/import/enrichment-presets/packs/necromancer"
 import { sanitizeVagabondImportContent } from "@/lib/import/enrichment-presets/packs/vagabond"
 import { sanitizeWarmageImportContent } from "@/lib/import/enrichment-presets/packs/warmage"
@@ -72,6 +76,8 @@ const CLASS_ROW_PACKS = new Set([
   "martyr",
   "necromancer",
   "mhp_warden",
+  "alchemist",
+  "investigator",
 ])
 const CONTENT_PACKS = new Set([
   "alchemist",
@@ -108,7 +114,8 @@ function castingTimeFromActivation(
 ): string | null {
   if (!activation) return null
   if (activation.bonusAction) return "1 bonus action"
-  if (activation.reaction || activation.onDropToZeroHp) return "1 reaction"
+  if (activation.reaction) return "1 reaction"
+  if (activation.onDropToZeroHp) return "when reduced to 0 HP"
   if (activation.action) return "1 action"
   return null
 }
@@ -120,6 +127,16 @@ function hasCharacteristicType(
   if (!types?.length || !modifiers?.length) return false
   return modifiers.some((mod) =>
     mod.characteristics?.some((char) => types.includes(char.type)),
+  )
+}
+
+function hasEffectKind(
+  modifiers: LinkedModifierInstance[] | undefined,
+  kinds: string[] | undefined,
+): boolean {
+  if (!kinds?.length || !modifiers?.length) return false
+  return modifiers.some((mod) =>
+    (mod.activation?.effects ?? []).some((effect) => kinds.includes(effect.kind)),
   )
 }
 
@@ -225,6 +242,9 @@ function applyOperations(
       }
       case "attachNamedPreset": {
         if (hasCharacteristicType(next.linkedModifiers, operation.skipIfCharacteristicTypes)) {
+          break
+        }
+        if (hasEffectKind(next.linkedModifiers, operation.skipIfEffectKinds)) {
           break
         }
         let baseModifiers = next.linkedModifiers ?? []
@@ -430,7 +450,9 @@ export function enrichClassFeaturesWithPresets(
     spellcasting as import("@/lib/types").DndClass["spellcasting"],
   )
 
-  return features.map((feature) => {
+  const expanded = expandMartyrSacrificeFeatures(features, className)
+
+  return expanded.map((feature) => {
     let next = feature as FeatureLike
     for (const preset of presets) {
       next = applyPresetToFeature(next, preset, { className, hasPointPool })
@@ -439,7 +461,28 @@ export function enrichClassFeaturesWithPresets(
     if (/investigator/i.test(className)) {
       enriched = ensureInvestigatorRitualistFeature(enriched)
     }
+    enriched = applyMartyrHitPointSpends(enriched, className)
     return enriched
+  })
+}
+
+/** Apply subclass-scoped feature enrichment presets (MHP houses, hexes, banners, …). */
+export function enrichSubclassFeaturesWithPresets(
+  features: Feature[],
+  parentClassName: string,
+  subclassName: string,
+): Feature[] {
+  const presets = getEnrichmentPresets().filter((preset) => preset.target === "subclass_feature")
+  return features.map((feature) => {
+    let next = feature as FeatureLike
+    for (const preset of presets) {
+      next = applyPresetToFeature(next, preset, {
+        className: parentClassName,
+        subclassClassName: parentClassName,
+        sourceName: subclassName,
+      })
+    }
+    return next as Feature
   })
 }
 
@@ -505,7 +548,10 @@ export function applyImportEnrichmentPresets(
   if (next.classes?.length) {
     const enrichedClasses = next.classes.map((cls) => {
       const className = cls.name
-      const features = (cls.features ?? []).map((feature) => {
+      const features = expandMartyrSacrificeFeatures(
+        (cls.features ?? []) as Feature[],
+        className,
+      ).map((feature) => {
         let row = feature as unknown as FeatureLike
         for (const preset of presets.filter((p) => p.target === "class_feature")) {
           row = applyPresetToFeature(row, preset, { className })

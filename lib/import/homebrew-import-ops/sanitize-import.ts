@@ -25,7 +25,9 @@ import {
 } from "@/lib/import/enrichment-presets/packs/alternate-ranger"
 import { sanitizeAlternateRogueImportContent } from "@/lib/import/enrichment-presets/packs/alternate-rogue"
 import { sanitizeAlternateFighterImportContent } from "@/lib/import/enrichment-presets/packs/alternate-fighter"
+import { expandMartyrSacrificeFeatures } from "@/lib/import/enrichment-presets/packs/homebrew"
 import type { ImportContent } from "@/lib/import/content-schema"
+import type { Feature } from "@/lib/types"
 
 type JsonRecord = Record<string, unknown>
 
@@ -158,6 +160,17 @@ export function sanitizeHomebrewImportJson(content: unknown): Record<string, unk
       if (Array.isArray(next.classes)) next.classes = [{ ...cls }, ...next.classes.slice(1)]
     }
     fixLichdomImmunityKind(next)
+  }
+
+  if (/martyr/i.test(name)) {
+    const cls = asRecord(Array.isArray(next.classes) ? next.classes[0] : null)
+    if (cls && Array.isArray(cls.features)) {
+      cls.features = expandMartyrSacrificeFeatures(
+        cls.features as Feature[],
+        String(cls.name ?? "Martyr"),
+      )
+      if (Array.isArray(next.classes)) next.classes = [{ ...cls }, ...next.classes.slice(1)]
+    }
   }
 
   if (/martyr/i.test(name) && Array.isArray(next.class_resources)) {

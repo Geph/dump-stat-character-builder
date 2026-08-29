@@ -297,6 +297,7 @@ function speciesCharacteristicsWithPlayerPicks(
   speciesTraitPicks: Record<string, string[]>,
   modifierPlayerPicks: Record<string, string[]>,
   catalog: ModifierCatalogEntry[],
+  characterLevel: number,
 ): CharacteristicModifier[] {
   if (!species) return []
   const mods: CharacteristicModifier[] = []
@@ -304,7 +305,7 @@ function speciesCharacteristicsWithPlayerPicks(
   const speciesRow = species as unknown as unknown as Record<string, unknown>
   const speciesWide = characteristicsFromLinkedModifiers(
     catalog,
-    readLinkedModifiers(speciesRow, catalog),
+    filterSpellsKnownByClassLevel(readLinkedModifiers(speciesRow, catalog), characterLevel),
     readModifierRefs(speciesRow),
   )
   mods.push(
@@ -335,7 +336,11 @@ function speciesCharacteristicsWithPlayerPicks(
       }
     }
     const chars = instances.length
-      ? characteristicsFromLinkedModifiers(catalog, instances, trait.modifierRefs)
+      ? characteristicsFromLinkedModifiers(
+          catalog,
+          filterSpellsKnownByClassLevel(instances, characterLevel),
+          trait.modifierRefs,
+        )
       : []
     mods.push(
       ...tagModifierSource(applyModifierPlayerPicks(chars, sourceKey, modifierPlayerPicks), {
@@ -388,11 +393,13 @@ export function collectBuilderModifierRefIds(params: {
     customAbilities = [],
   } = params
 
+  const characterLevel = classLevels.reduce((sum, entry) => sum + entry.level, 0)
   const speciesResolved = speciesCharacteristicsWithPlayerPicks(
     species,
     speciesTraitPicks,
     modifierPlayerPicks,
     catalog,
+    characterLevel > 0 ? characterLevel : 20,
   )
 
   const classResolved = classCharacteristicsWithPlayerPicks({

@@ -29,6 +29,10 @@ import {
 } from "@/lib/character/sheet-status-colors"
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import { firstSentenceFromText } from "@/lib/builder/feature-choice-hint"
+import {
+  formatSpecialAttackDamageTypes,
+  specialAttackChoosesDamageType,
+} from "@/lib/compendium/special-attack-damage-type"
 import { cn } from "@/lib/utils"
 import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
@@ -47,7 +51,8 @@ import {
 } from "@/lib/character/special-attack-empower"
 import { defaultSheetPlayState } from "@/lib/character/sheet-play-state"
 import {
-  resolveFeatureEffectHealAmount,
+  resolveFeatureEffectHeal,
+  resolveHitDiceHealCount,
   type HealResolveContext,
 } from "@/lib/character/resolve-feature-effect-heal"
 import type { PartyAllyCandidate } from "@/lib/character/party-ally-candidates"
@@ -88,6 +93,10 @@ type SheetActionsPanelProps = {
   hitDiceRemaining?: number
   /** Spend Hit Dice when an action/menu option requires them. Returns false if unaffordable. */
   onSpendHitDice?: (amount: number, preferClassId?: string | null) => boolean
+  /** Spend current HP (bypasses Temporary Hit Points). */
+  onSpendHitPoints?: (amount: number) => void
+  /** Refund HP if a failed-roll trigger still fails after the bonus. */
+  onRefundHitPoints?: (amount: number) => void
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
   onActivateSheetToggle?: (toggleId: string) => void
   /** Spawn a Projected Self / Imaginary Ally play-state token. */
@@ -104,6 +113,8 @@ type SheetActionsPanelProps = {
   characterId?: string | null
   /** Apply heal / temp HP to the open sheet's local play state. */
   onApplySelfHeal?: (amount: number, kind: "heal" | "temp_hp") => void
+  /** Drop-to-0 features set current HP to this value (usually 1). */
+  onSetCurrentHp?: (next: number) => void
   onApplySelfInspiration?: () => void
   onApplySelfConditions?: (add: string[], remove: string[]) => void
   onAddDurationReminder?: (label: string) => void
@@ -125,6 +136,8 @@ type SheetActionsPanelProps = {
   onRestorePactSlots?: (mode: "half_round_up" | "all") => void
   /** Arcane Recovery restores expended slots by combined level. */
   onRestoreSpellSlotsByCombinedLevel?: (classLevel: number, maxSlotLevel: number) => void
+  /** Divine Respite and similar: regain expended Hit Point Dice. */
+  onRestoreHitDice?: (amount: number, classId?: string | null) => number
   /** Dark Arcana: spend a slot to refill a class resource. */
   onRestoreResourceFromSpellSlot?: (spec: {
     resourceKey: string
@@ -276,6 +289,13 @@ function formatSheetActionCostMeta(
   usage: ActionUsage | null,
 ): string | null {
   const hitDice = entry.spendHitDice ?? 0
+  const hitPoints = entry.spendHitPoints ?? 0
+  if (hitPoints > 0 && hitDice > 0) {
+    return `${hitPoints} HP · ${hitDice} Hit Die${hitDice === 1 ? "" : "ce"}`
+  }
+  if (hitPoints > 0) {
+    return `${hitPoints} HP`
+  }
   if (hitDice > 0) {
     return `${hitDice} Hit Die${hitDice === 1 ? "" : "ce"}`
   }
@@ -389,14 +409,12 @@ function specialAttackRangeLabel(attack: SpecialAttackCharacteristic): string | 
 function specialAttackDamageLabel(
   attack: SpecialAttackCharacteristic,
   ctx: ResolveUsesContext,
-  hitDieSides?: number | null,
 ): string | null {
   if (attack.useWeaponDamage) return "Weapon damage"
   if (!(attack.damageDiceCount > 0)) return null
-  const sides =
-    hitDieSides != null && hitDieSides > 0 ? hitDieSides : dieSides(attack.damageDieType)
+  const sides = dieSides(attack.damageDieType)
   const modifier = specialAttackDamageModifier(attack, ctx)
-  const type = attack.damageTypes[0]
+  const type = formatSpecialAttackDamageTypes(attack.damageTypes, attack.chooseDamageType)
   return `${attack.damageDiceCount}d${sides}${
     modifier ? ` ${formatSignedModifier(modifier)}` : ""
   }${type ? ` ${type}` : ""}`
@@ -408,6 +426,43 @@ function specialAttackProfileLabel(attack: SpecialAttackCharacteristic): string 
   if (attack.attackProfile === "force_save") return "Save"
   if (attack.attackProfile === "emanation") return "Emanation"
   return null
+}
+
+function healContextForAction(
+  base: HealResolveContext | null | undefined,
+  action: SheetActionEntry,
+): HealResolveContext | null {
+  if (!base) return null
+  return {
+    ...base,
+    classLevel: action.classLevel ?? base.classLevel ?? base.characterLevel,
+    hitDieSides: action.hitDieSides ?? base.hitDieSides ?? null,
+  }
+}
+
+function isRedundantDropToOneHeal(effect: FeatureEffect): boolean {
+  if (effect.kind !== "heal_self") return false
+  const mode = effect.healMode ?? (effect.healAmount != null ? "fixed" : null)
+  if (mode !== "fixed") return false
+  return (effect.healFixed ?? effect.healAmount) === 1
+}
+
+function alsoActivateHitDiceNeeded(
+  also: NonNullable<SheetActionEntry["alsoActivate"]>[number],
+): number {
+  if (also.spendHitDice != null && also.spendHitDice > 0) return also.spendHitDice
+  const effect = also.healEffects?.find((row) => row.healMode === "hit_dice")
+  if (!effect) return 0
+  return resolveHitDiceHealCount(effect, also.classLevel ?? 1)
+}
+
+function hitDiceHealLabel(entry: SheetActionEntry): string | null {
+  const effect = entry.healEffects?.find((row) => row.healMode === "hit_dice")
+  if (!effect) return null
+  const count = resolveHitDiceHealCount(effect, entry.classLevel ?? 1)
+  const sides = entry.hitDieSides != null && entry.hitDieSides > 0 ? entry.hitDieSides : 8
+  const ability = effect.healAbility ?? "CON"
+  return `${count}d${sides} + ${ability}`
 }
 
 function actionSummaryLine(entry: SheetActionEntry): string | null {
@@ -483,6 +538,7 @@ function ActionRollStep({
   radiusBonusFeet = 0,
   psiSpent,
   hitDiceSpent,
+  hitPointsSpent,
   augmentSummary,
   onClose,
 }: {
@@ -498,13 +554,21 @@ function ActionRollStep({
   radiusBonusFeet?: number
   psiSpent: number
   hitDiceSpent: number
+  hitPointsSpent: number
   augmentSummary: string | null
   onClose: () => void
 }) {
   const history = useSheetRollHistory()
   const rollCtx = useSheetRollContext()
   const [attackSummary, setAttackSummary] = useState<string | null>(null)
-  const [damageSummary, setDamageSummary] = useState<string | null>(null)
+  const [damageRollText, setDamageRollText] = useState<string | null>(null)
+  const choosesDamageType = specialAttackChoosesDamageType(specialAttack)
+  const [selectedDamageType, setSelectedDamageType] = useState(
+    specialAttack.damageTypes[0] ?? "",
+  )
+  const activeDamageType = choosesDamageType
+    ? selectedDamageType
+    : formatSpecialAttackDamageTypes(specialAttack.damageTypes, false)
 
   const isAttackRoll =
     specialAttack.attackProfile === "melee" || specialAttack.attackProfile === "ranged"
@@ -516,15 +580,12 @@ function ActionRollStep({
       ? specialAttack.areaLengthFeet + Math.max(0, radiusBonusFeet)
       : null
 
-  const sides =
-    action.hitDieSides != null && action.hitDieSides > 0
-      ? action.hitDieSides
-      : dieSides(specialAttack.damageDieType)
+  const sides = dieSides(specialAttack.damageDieType)
   const extraDice = bonusDice && bonusDice.count > 0 ? bonusDice : null
   const damageExpression = `${specialAttack.damageDiceCount}d${sides}${
     extraDice ? ` + ${extraDice.count}d${extraDice.sides}` : ""
   }${damageModifier ? ` ${damageModifier >= 0 ? "+" : ""}${damageModifier}` : ""}${
-    specialAttack.damageTypes[0] ? ` ${specialAttack.damageTypes[0]}` : ""
+    activeDamageType ? ` ${activeDamageType}` : ""
   }`
 
   const rollAttack = () => {
@@ -569,11 +630,9 @@ function ActionRollStep({
       },
       "normal",
     )
-    const damageType = specialAttack.damageTypes[0]
-    const summary = `${formatDamageRollResult(result.rolls, result.modifier, result.total)}${
-      damageType ? ` ${damageType}` : ""
-    }`
-    setDamageSummary(summary)
+    const rollText = formatDamageRollResult(result.rolls, result.modifier, result.total)
+    const summary = `${rollText}${activeDamageType ? ` ${activeDamageType}` : ""}`
+    setDamageRollText(rollText)
     history?.logRoll({
       kind: "damage",
       label: `${action.name} damage`,
@@ -597,6 +656,11 @@ function ActionRollStep({
         {hitDiceSpent > 0 ? (
           <p className="text-xs text-muted-foreground">
             Spent {hitDiceSpent} Hit Dice
+          </p>
+        ) : null}
+        {hitPointsSpent > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Took {hitPointsSpent} HP (bypasses Temp HP)
           </p>
         ) : null}
         {augmentSummary ? (
@@ -646,11 +710,32 @@ function ActionRollStep({
           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
             Damage ({damageExpression})
           </p>
+          {choosesDamageType ? (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Damage type">
+              {specialAttack.damageTypes.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setSelectedDamageType(type)}
+                  className={cn(
+                    "rounded-lg border-2 px-3 py-1.5 text-xs font-semibold",
+                    selectedDamageType === type
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground hover:border-primary/40",
+                  )}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {damageModifierNote ? (
             <p className="text-[11px] font-medium text-primary">{damageModifierNote}</p>
           ) : null}
           <p className="text-lg font-black tabular-nums text-foreground">
-            {damageSummary ?? "—"}
+            {damageRollText
+              ? `${damageRollText}${activeDamageType ? ` ${activeDamageType}` : ""}`
+              : "—"}
           </p>
           <button
             type="button"
@@ -683,6 +768,8 @@ function ActionDetailOverlay({
   onSpendPsi,
   hitDiceRemaining,
   onSpendHitDice,
+  onSpendHitPoints,
+  onRefundHitPoints,
   onActivateSheetToggle,
   onSpawnIllusionToken,
   onGrantMutationDie,
@@ -692,6 +779,7 @@ function ActionDetailOverlay({
   onClose,
   characterId,
   onApplySelfHeal,
+  onSetCurrentHp,
   onApplySelfInspiration,
   onApplySelfConditions,
   onAddDurationReminder,
@@ -709,6 +797,7 @@ function ActionDetailOverlay({
   onEquipmentChoiceChange,
   onRestorePactSlots,
   onRestoreSpellSlotsByCombinedLevel,
+  onRestoreHitDice,
   onRestoreResourceFromSpellSlot,
   onSpendSpellSlot,
   primedBombUsedThisTurn = false,
@@ -723,6 +812,8 @@ function ActionDetailOverlay({
   onSpendPsi: (points: number) => void
   hitDiceRemaining: number
   onSpendHitDice?: (amount: number, preferClassId?: string | null) => boolean
+  onSpendHitPoints?: (amount: number) => void
+  onRefundHitPoints?: (amount: number) => void
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
   onActivateSheetToggle?: (toggleId: string) => void
   onSpawnIllusionToken?: (kind: IllusionTokenKind) => void
@@ -737,6 +828,7 @@ function ActionDetailOverlay({
   onClose: () => void
   characterId?: string | null
   onApplySelfHeal?: (amount: number, kind: "heal" | "temp_hp") => void
+  onSetCurrentHp?: (next: number) => void
   onApplySelfInspiration?: () => void
   onApplySelfConditions?: (add: string[], remove: string[]) => void
   onAddDurationReminder?: (label: string) => void
@@ -755,6 +847,7 @@ function ActionDetailOverlay({
   onEquipmentChoiceChange?: (key: string, value: string) => void
   onRestorePactSlots?: (mode: "half_round_up" | "all") => void
   onRestoreSpellSlotsByCombinedLevel?: (classLevel: number, maxSlotLevel: number) => void
+  onRestoreHitDice?: (amount: number, classId?: string | null) => number
   onRestoreResourceFromSpellSlot?: (spec: {
     resourceKey: string
     classId?: string | null
@@ -768,6 +861,8 @@ function ActionDetailOverlay({
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
   const [step, setStep] = useState<"detail" | "roll" | "target">("detail")
   const [useFeedback, setUseFeedback] = useState<string | null>(null)
+  const [parentUsedThisOpen, setParentUsedThisOpen] = useState(false)
+  const [lastSpentHitPoints, setLastSpentHitPoints] = useState(0)
   const [resourceSpendAmount, setResourceSpendAmount] = useState(1)
   const [empowerSpend, setEmpowerSpend] = useState(0)
   const [overloadedChargeActive, setOverloadedChargeActive] = useState(false)
@@ -842,6 +937,15 @@ function ActionDetailOverlay({
     action.spendHitDice ??
     (menuOptions.length === 0 ? null : menuOptions[0]?.hitDiceCost ?? null)
   const hitDiceNeeded = hitDiceCost != null && hitDiceCost > 0 ? hitDiceCost : 0
+  const riderHitPoints = selectableRiders
+    .filter((alert) => selectedRiderNames.includes(alert.name) && (alert.spendHitPoints ?? 0) > 0)
+    .reduce((max, alert) => Math.max(max, alert.spendHitPoints ?? 0), 0)
+  const hitPointsNeeded =
+    riderHitPoints > 0
+      ? riderHitPoints
+      : action.spendHitPoints != null && action.spendHitPoints > 0
+        ? action.spendHitPoints
+        : 0
 
   const resourceCostMode = action.limitedUses?.classResourceCostMode ?? "fixed"
   const configuredResourceCost = Math.max(1, action.limitedUses?.classResourceAmount ?? 1)
@@ -923,6 +1027,8 @@ function ActionDetailOverlay({
     setAugmentSelections([])
     setStep("detail")
     setUseFeedback(null)
+    setParentUsedThisOpen(false)
+    setLastSpentHitPoints(0)
     setResourceSpendAmount(1)
     setEmpowerSpend(attackProfiles[0]?.attackVariant === "primed" ? 1 : 0)
     setOverloadedChargeActive(false)
@@ -948,6 +1054,10 @@ function ActionDetailOverlay({
         return
       }
     }
+    if (hitPointsNeeded > 0 && onSpendHitPoints) {
+      onSpendHitPoints(hitPointsNeeded)
+      setLastSpentHitPoints(hitPointsNeeded)
+    }
     let spentSlotMessage: string | null = null
     if (action.spendSpellSlotOnUse && onSpendSpellSlot) {
       spentSlotMessage = onSpendSpellSlot(action.spendSpellSlotOnUse.minSpellLevel)
@@ -963,6 +1073,7 @@ function ActionDetailOverlay({
     if (usage && !spendViaAugments) {
       usage.setUsed(usage.used + resourceSpend + (sharesEmpowerPool ? empowerResourceCost : 0))
     }
+    setParentUsedThisOpen(true)
     if (empowerPool && empowerResourceCost > 0 && !sharesEmpowerPool) {
       empowerPool.setUsed(empowerPool.used + empowerResourceCost)
     }
@@ -971,6 +1082,13 @@ function ActionDetailOverlay({
     }
 
     const parts: string[] = []
+    if (action.dropToOneHpOnUse && onSetCurrentHp) {
+      onSetCurrentHp(1)
+      parts.push("Dropped to 1 HP")
+    }
+    if (hitPointsNeeded > 0) {
+      parts.push(`Took ${hitPointsNeeded} HP`)
+    }
     if (action.restorePactSlotsOnUse && onRestorePactSlots) {
       onRestorePactSlots(action.restorePactSlotsOnUse)
       parts.push(
@@ -986,6 +1104,14 @@ function ActionDetailOverlay({
       )
       parts.push(
         `Recovered spell slots totaling half Wizard level (max ${action.restoreSpellSlotsOnUse.maxSlotLevel}th)`,
+      )
+    }
+    if (action.restoreHitDiceOnUse && onRestoreHitDice) {
+      const recovered = onRestoreHitDice(action.restoreHitDiceOnUse.amount, action.classId)
+      parts.push(
+        recovered > 0
+          ? `Regained ${recovered} Hit Point Dice (up to ${action.restoreHitDiceOnUse.amount})`
+          : "No expended Hit Point Dice to regain",
       )
     }
     if (action.restoreResourceFromSpellSlotOnUse && onRestoreResourceFromSpellSlot) {
@@ -1086,21 +1212,27 @@ function ActionDetailOverlay({
       parts.push(`Spent ${resourceSpend} ${usage.resourceName ?? "resource"}`)
     }
 
-    const targetable = collectTargetableEffects(action.healEffects)
+    const actionHealCtx = healContextForAction(healContext, action)
+    const targetable = collectTargetableEffects(
+      action.dropToOneHpOnUse
+        ? action.healEffects?.filter((effect) => !isRedundantDropToOneHeal(effect))
+        : action.healEffects,
+    )
     const needsAllyPick = targetable.some((entry) => entry.policy === "choose_ally")
-    if (needsAllyPick && healContext) {
+    if (needsAllyPick && actionHealCtx) {
       setPendingHealEffects(targetable.map((entry) => entry.effect))
       setUseFeedback(parts.join(" · ") || null)
       setStep("target")
       return
     }
 
-    if (targetable.length && healContext && characterId && onApplySelfHeal) {
+    if (targetable.length && actionHealCtx && characterId && onApplySelfHeal) {
       const healParts = [...parts]
       const isPsionicPower = action.abilityRole === "psionic_power"
       let banked = 0
       for (const { effect } of targetable) {
-        let amount = resolveFeatureEffectHealAmount(effect, healContext)
+        const resolved = resolveFeatureEffectHeal(effect, actionHealCtx)
+        let amount = resolved.amount
         if (amount <= 0) continue
         const kind = effect.kind === "grant_temp_hp" ? "temp_hp" : "heal"
         if (
@@ -1113,7 +1245,13 @@ function ActionDetailOverlay({
         }
         onApplySelfHeal(amount, kind)
         if (isPsionicPower) banked += amount
-        healParts.push(kind === "temp_hp" ? `+${amount} temp HP` : `Healed ${amount} HP`)
+        healParts.push(
+          kind === "temp_hp"
+            ? `+${amount} temp HP`
+            : resolved.summary
+              ? `Healed ${resolved.summary}`
+              : `Healed ${amount} HP`,
+        )
       }
       if (banked > 0 && onBankBalanceOfPower) onBankBalanceOfPower(banked)
       setUseFeedback(healParts.join(" · ") || "Used!")
@@ -1132,8 +1270,67 @@ function ActionDetailOverlay({
     setUseFeedback(parts.join(" · ") || "Used!")
   }
 
+  const handleAlsoActivate = (
+    also: NonNullable<SheetActionEntry["alsoActivate"]>[number],
+  ) => {
+    if (incapacitated) return
+    const hdNeeded = alsoActivateHitDiceNeeded(also)
+    if (hdNeeded > 0 && !onSpendHitDice) return
+    if (hdNeeded > hitDiceRemaining) {
+      setUseFeedback(`Not enough Hit Dice (need ${hdNeeded})`)
+      return
+    }
+
+    const parts: string[] = []
+    if (!parentUsedThisOpen) {
+      if (chargeExhausted) return
+      if (usage) usage.setUsed(usage.used + 1)
+      if (action.dropToOneHpOnUse && onSetCurrentHp) {
+        onSetCurrentHp(1)
+        parts.push("Dropped to 1 HP")
+      }
+      setParentUsedThisOpen(true)
+    }
+
+    if (hdNeeded > 0 && onSpendHitDice) {
+      const ok = onSpendHitDice(hdNeeded, also.classId ?? action.classId)
+      if (!ok) {
+        setUseFeedback("Not enough Hit Dice")
+        return
+      }
+      parts.push(`Spent ${hdNeeded} Hit Dice`)
+    }
+
+    const alsoCtx = healContext
+      ? {
+          ...healContext,
+          classLevel: also.classLevel ?? action.classLevel ?? healContext.classLevel,
+          hitDieSides: also.hitDieSides ?? action.hitDieSides ?? healContext.hitDieSides ?? null,
+        }
+      : null
+    if (also.healEffects?.length && alsoCtx && onApplySelfHeal) {
+      for (const effect of also.healEffects) {
+        const resolved = resolveFeatureEffectHeal(effect, alsoCtx)
+        if (resolved.amount <= 0) continue
+        const kind = effect.kind === "grant_temp_hp" ? "temp_hp" : "heal"
+        onApplySelfHeal(resolved.amount, kind)
+        parts.push(
+          kind === "temp_hp"
+            ? `+${resolved.amount} temp HP`
+            : resolved.summary
+              ? `${also.name}: ${resolved.summary}`
+              : `${also.name}: healed ${resolved.amount} HP`,
+        )
+      }
+    } else {
+      parts.push(`Used ${also.name}`)
+    }
+    setUseFeedback(parts.join(" · ") || `Used ${also.name}`)
+  }
+
   const handlePickTarget = async (target: PartyEffectTarget) => {
-    if (!healContext || !pendingHealEffects.length) return
+    const actionHealCtx = healContextForAction(healContext, action)
+    if (!actionHealCtx || !pendingHealEffects.length) return
     setApplyingHeal(true)
     try {
       const parts: string[] = useFeedback ? [useFeedback] : []
@@ -1187,7 +1384,7 @@ function ActionDetailOverlay({
           const result = applyAllyEffectLocally({
             effect: effectForApply,
             target,
-            healContext,
+            healContext: actionHealCtx,
             play,
             companion,
             maxHp: candidate?.maxHp ?? null,
@@ -1216,7 +1413,7 @@ function ActionDetailOverlay({
         const result = await applyPartyHealEffect({
           effect: effectForApply,
           target,
-          healContext,
+          healContext: actionHealCtx,
           selfCharacterId: characterId,
         })
         if (!result) continue
@@ -1403,6 +1600,7 @@ function ActionDetailOverlay({
             radiusBonusFeet={radiusBonusFeet}
             psiSpent={psiCost}
             hitDiceSpent={hitDiceNeeded}
+            hitPointsSpent={hitPointsNeeded}
             augmentSummary={augmentSummary}
             onClose={onClose}
           />
@@ -1927,6 +2125,21 @@ function ActionDetailOverlay({
                   {useFeedback}
                 </p>
               ) : null}
+              {lastSpentHitPoints > 0 &&
+              action.refundHitPointsOnStillFailed &&
+              onRefundHitPoints ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRefundHitPoints(lastSpentHitPoints)
+                    setLastSpentHitPoints(0)
+                    setUseFeedback("Refunded HP — the test still failed")
+                  }}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-muted"
+                >
+                  Still failed — refund {lastSpentHitPoints} HP
+                </button>
+              ) : null}
               {usage?.used && action.limitedUses?.restoreByResource && onRestoreUseByResource ? (
                 <button
                   type="button"
@@ -2006,8 +2219,28 @@ function ActionDetailOverlay({
                   ? ` (+${empowerResourceCost} ${empowerPool?.resourceName ?? "resource"})`
                   : ""}
                 {hitDiceNeeded > 0 ? ` (${hitDiceNeeded} HD)` : ""}
+                {hitPointsNeeded > 0 ? ` (${hitPointsNeeded} HP)` : ""}
                 {psiCost > 0 ? ` (${psiCost} psi)` : ""}
               </button>
+              {(action.alsoActivate ?? []).map((also) => {
+                const alsoHd = alsoActivateHitDiceNeeded(also)
+                const canAlso =
+                  !incapacitated &&
+                  (parentUsedThisOpen || !chargeExhausted) &&
+                  (alsoHd <= 0 || (Boolean(onSpendHitDice) && alsoHd <= hitDiceRemaining))
+                return (
+                  <button
+                    key={`also-${also.name}`}
+                    type="button"
+                    disabled={!canAlso}
+                    onClick={() => handleAlsoActivate(also)}
+                    className="w-full rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-sm font-bold text-foreground transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Also use {also.name}
+                    {alsoHd > 0 ? ` (${alsoHd} HD)` : ""}
+                  </button>
+                )
+              })}
             </div>
             ) : null}
           </>
@@ -2029,12 +2262,15 @@ export function SheetActionsPanel({
   psiLimit = null,
   hitDiceRemaining = 0,
   onSpendHitDice,
+  onSpendHitPoints,
+  onRefundHitPoints,
   onActivateSheetToggle,
   onSpawnIllusionToken,
   onGrantMutationDie,
   onMarkEconomy,
   characterId = null,
   onApplySelfHeal,
+  onSetCurrentHp,
   onApplySelfInspiration,
   onApplySelfConditions,
   onAddDurationReminder,
@@ -2051,6 +2287,7 @@ export function SheetActionsPanel({
   onEquipmentChoiceChange,
   onRestorePactSlots,
   onRestoreSpellSlotsByCombinedLevel,
+  onRestoreHitDice,
   onRestoreResourceFromSpellSlot,
   onSpendSpellSlot,
   primedBombUsedThisTurn = false,
@@ -2305,7 +2542,7 @@ export function SheetActionsPanel({
       ? (saveProfile.saveDCBase ?? 8) + proficiencyBonus + saveMod
       : 0
     const damageLabel = primaryAttack
-      ? specialAttackDamageLabel(primaryAttack, resolveContext, entry.hitDieSides)
+      ? specialAttackDamageLabel(primaryAttack, resolveContext)
       : null
     const rangeLabel = primaryAttack ? specialAttackRangeLabel(primaryAttack) : null
     const extraModeLabels = attackProfiles
@@ -2316,7 +2553,8 @@ export function SheetActionsPanel({
           : specialAttackProfileLabel(profile),
       )
       .filter((label): label is string => Boolean(label))
-    const summary = isSpecialAttack ? null : actionSummaryLine(entry)
+    const hdHealLabel = hitDiceHealLabel(entry)
+    const summary = isSpecialAttack || hdHealLabel ? null : actionSummaryLine(entry)
     const costMeta = formatSheetActionCostMeta(entry, usage)
     const titleMeta = [
       entry.trigger,
@@ -2434,6 +2672,10 @@ export function SheetActionsPanel({
                   </div>
                 ) : null}
               </>
+            ) : hdHealLabel ? (
+              <p className="text-[10px] text-foreground">
+                <span className="font-medium">{hdHealLabel}</span>
+              </p>
             ) : summary ? (
               <p className="text-[10px] leading-snug text-muted-foreground">{summary}</p>
             ) : entry.menuOptions?.length ? (
@@ -2666,6 +2908,8 @@ export function SheetActionsPanel({
             onSpendPsi={spendPsi}
             hitDiceRemaining={hitDiceRemaining}
             onSpendHitDice={onSpendHitDice}
+            onSpendHitPoints={onSpendHitPoints}
+            onRefundHitPoints={onRefundHitPoints}
             onActivateSheetToggle={onActivateSheetToggle}
             onSpawnIllusionToken={onSpawnIllusionToken}
             onGrantMutationDie={onGrantMutationDie}
@@ -2679,6 +2923,7 @@ export function SheetActionsPanel({
             initialEconomyKind={openEconomyKind}
             characterId={characterId}
             onApplySelfHeal={onApplySelfHeal}
+            onSetCurrentHp={onSetCurrentHp}
             onApplySelfInspiration={onApplySelfInspiration}
             onApplySelfConditions={onApplySelfConditions}
             onAddDurationReminder={onAddDurationReminder}
@@ -2698,6 +2943,7 @@ export function SheetActionsPanel({
             onEquipmentChoiceChange={onEquipmentChoiceChange}
             onRestorePactSlots={onRestorePactSlots}
             onRestoreSpellSlotsByCombinedLevel={onRestoreSpellSlotsByCombinedLevel}
+            onRestoreHitDice={onRestoreHitDice}
             onRestoreResourceFromSpellSlot={onRestoreResourceFromSpellSlot}
             onSpendSpellSlot={onSpendSpellSlot}
             primedBombUsedThisTurn={primedBombUsedThisTurn}

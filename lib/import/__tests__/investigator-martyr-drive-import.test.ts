@@ -76,7 +76,7 @@ describe.skipIf(!hasMartyr)("Martyr Drive import wiring", () => {
     expect(content.classes?.[0]?.spellcasting).toBeUndefined()
     const spellcasting = content.classes?.[0]?.features?.find((f) => f.name === "Spellcasting") as Feature | undefined
     expect(spellcasting?.description).toMatch(/Hit Point Spellcasting/i)
-    expect(spellcasting?.description).toMatch(/narrative/i)
+    expect(spellcasting?.description).toMatch(/current HP/i)
   })
 
   it("wires Undying, Miraculous Healing, and Reprisal activations", () => {
@@ -84,12 +84,98 @@ describe.skipIf(!hasMartyr)("Martyr Drive import wiring", () => {
     const undying = content.classes?.[0]?.features?.find((f) => f.name === "Undying") as Feature | undefined
     expect(undying?.limitedUses).toMatchObject({ type: "fixed", fixedAmount: 1 })
     expect(undying?.activation?.onDropToZeroHp).toBe(true)
+    expect(undying?.activation?.alsoActivateFeatureNames).toEqual(["Miraculous Healing"])
+    expect(undying?.activation?.reaction).toBeFalsy()
 
     const heal = content.classes?.[0]?.features?.find((f) => f.name === "Miraculous Healing") as Feature | undefined
     expect(heal?.activation?.bonusAction).toBe(true)
+    expect(heal?.activation?.spendHitDice).toBe(1)
+    const healFx = heal?.linkedModifiers
+      ?.flatMap((instance) => instance.activation?.effects ?? [])
+      .find((effect) => effect.kind === "heal_self")
+    expect(healFx).toMatchObject({ healMode: "hit_dice", healAbility: "CON" })
 
     const reprisal = content.classes?.[0]?.features?.find((f) => f.name === "Reprisal") as Feature | undefined
     expect(reprisal?.activation?.reaction).toBe(true)
+    const attack = reprisal?.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "special_attack") as
+      | { damageTypes?: string[]; chooseDamageType?: boolean; damageDieType?: string }
+      | undefined
+    expect(attack).toMatchObject({
+      type: "special_attack",
+      chooseDamageType: true,
+      damageDieType: "d6",
+    })
+    expect(attack?.damageTypes).toEqual(["Necrotic", "Radiant"])
+  })
+
+  it("splits Sacrifice into Sacrificial Strike and Sacrificial Skill", () => {
+    const content = enrich("magehandpress-martyr-class")
+    const features = (content.classes?.[0]?.features ?? []) as Feature[]
+    const names = features.map((feature) => feature.name)
+    expect(names).toContain("Sacrificial Strike")
+    expect(names).toContain("Sacrificial Skill")
+
+    const strike = features.find((feature) => feature.name === "Sacrificial Strike")
+    expect(strike?.activation?.bonusAction).toBe(true)
+    expect(
+      strike?.linkedModifiers
+        ?.flatMap((instance) => instance.activation?.effects ?? [])
+        .some((effect) => effect.kind === "extra_damage_on_hit"),
+    ).toBe(true)
+
+    const skill = features.find((feature) => feature.name === "Sacrificial Skill")
+    expect(
+      skill?.linkedModifiers
+        ?.flatMap((instance) => instance.characteristics ?? [])
+        .some((char) => char.type === "failed_roll_trigger"),
+    ).toBe(true)
+
+    const foe = features.find((feature) => feature.name === "Sacrifice Foe")
+    const rider = foe?.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "power_rider") as { parentPowerNames?: string[] } | undefined
+    expect(rider?.parentPowerNames).toEqual(["Sacrificial Strike", "Sacrificial Skill"])
+    expect(foe?.sheetDisplay).toMatchObject({ combatActions: false, featuresTab: true })
+  })
+
+  it("wires Improved Sacrificial Strike as a selectable Sacrificial Strike rider", () => {
+    const content = enrich("magehandpress-martyr-class")
+    const improved = content.classes?.[0]?.features?.find(
+      (f) => f.name === "Improved Sacrificial Strike",
+    ) as Feature | undefined
+    expect(improved?.sheetDisplay?.combatActions).toBe(false)
+    const rider = improved?.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "power_rider") as
+      | { parentPowerNames?: string[]; selectable?: boolean; spendHitPoints?: number }
+      | undefined
+    expect(rider).toMatchObject({
+      parentPowerNames: ["Sacrificial Strike"],
+      selectable: true,
+      spendHitPoints: 10,
+    })
+  })
+
+  it("wires Divine Respite as a short-rest Hit Point Dice restore", () => {
+    const content = enrich("magehandpress-martyr-class")
+    const features = (content.classes?.[0]?.features ?? []) as Feature[]
+    const respiteRows = features.filter((feature) => feature.name === "Divine Respite")
+    expect(respiteRows).toHaveLength(1)
+    expect(respiteRows[0]?.level).toBe(9)
+    const restore = respiteRows[0]?.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "hit_dice_restore") as
+      | { amount?: number; amountByLevel?: { level: number; fixed?: number | null }[] }
+      | undefined
+    expect(restore?.amount).toBe(3)
+    expect(restore?.amountByLevel?.some((row) => row.level === 13 && row.fixed === 6)).toBe(true)
+    expect(restore?.amountByLevel?.some((row) => row.level === 17 && row.fixed === 10)).toBe(true)
+    expect(respiteRows[0]?.sheetDisplay).toMatchObject({
+      abilitiesActions: true,
+      combatActions: false,
+    })
   })
 
   it("keeps Armor of Faith as a picker", () => {

@@ -548,9 +548,11 @@ export function collectSpeciesModifierPlayerChoiceSlots(
   species: Species | null | undefined,
   speciesTraitPicks: Record<string, string[]>,
   catalog: ModifierCatalogEntry[],
+  characterLevel?: number,
 ): ModifierPlayerChoiceSlot[] {
   if (!species) return []
   const slots: ModifierPlayerChoiceSlot[] = []
+  const context = characterLevel != null ? { classLevel: characterLevel } : undefined
 
   const speciesRow = species as unknown as unknown as Record<string, unknown>
   const speciesWide = characteristicsFromLinkedModifiers(
@@ -559,7 +561,12 @@ export function collectSpeciesModifierPlayerChoiceSlots(
     readModifierRefs(speciesRow),
   )
   slots.push(
-    ...slotsFromCharacteristics(speciesWide, speciesModsSourceKey(species.id), species.name),
+    ...slotsFromCharacteristics(
+      speciesWide,
+      speciesModsSourceKey(species.id),
+      species.name,
+      context,
+    ),
   )
 
   species.traits?.forEach((trait, index) => {
@@ -569,7 +576,7 @@ export function collectSpeciesModifierPlayerChoiceSlots(
       effectiveLinkedModifiers(trait.linkedModifiers, trait.modifierRefs, catalog),
       trait.modifierRefs,
     )
-    slots.push(...slotsFromCharacteristics(baseMods, sourceKey, trait.name))
+    slots.push(...slotsFromCharacteristics(baseMods, sourceKey, trait.name, context))
 
     if (trait.isChoice && trait.choices?.options?.length) {
       const picked = resolveSpeciesTraitPicks(speciesTraitPicks, trait, index)
@@ -581,7 +588,7 @@ export function collectSpeciesModifierPlayerChoiceSlots(
           effectiveLinkedModifiers(option.linkedModifiers, option.modifierRefs, catalog),
           option.modifierRefs,
         )
-        slots.push(...slotsFromCharacteristics(optionMods, sourceKey, trait.name))
+        slots.push(...slotsFromCharacteristics(optionMods, sourceKey, trait.name, context))
       }
     }
   })
@@ -681,8 +688,14 @@ export function collectModifierPlayerChoiceSlots(params: {
   }
 
   if (species) {
+    const characterLevel = classLevels.reduce((sum, entry) => sum + entry.level, 0)
     slots.push(
-      ...collectSpeciesModifierPlayerChoiceSlots(species, speciesTraitPicks, catalog),
+      ...collectSpeciesModifierPlayerChoiceSlots(
+        species,
+        speciesTraitPicks,
+        catalog,
+        characterLevel > 0 ? characterLevel : undefined,
+      ),
     )
   }
 

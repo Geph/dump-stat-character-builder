@@ -40,6 +40,7 @@ type SpellDetailOverlayProps = {
     psionicAugments?: PsionicAugmentSelection[]
     psiPointsSpent?: number
     hitDiceSpent?: number
+    hitPointsSpent?: number
     arcanumUsed?: boolean
     freeCastUsedKey?: string
     slotLevelUsed?: number
@@ -62,6 +63,10 @@ type SpellDetailOverlayProps = {
   onMetamagicChange?: (next: string[]) => void
   /** Charisma modifier (min 1) for Empowered Spell reroll cap. */
   empoweredRerollCap?: number
+  /** Created/upcast slot for Hit Point Spellcasting (Martyr). */
+  createdSlotLevel?: number | null
+  maxCreatedSlotLevel?: number | null
+  onCreatedSlotLevelChange?: (level: number) => void
 }
 
 export function SpellDetailOverlay({
@@ -80,6 +85,9 @@ export function SpellDetailOverlay({
   selectedMetamagicIds = [],
   onMetamagicChange,
   empoweredRerollCap = 1,
+  createdSlotLevel = null,
+  maxCreatedSlotLevel = null,
+  onCreatedSlotLevelChange,
 }: SpellDetailOverlayProps) {
   const [castFeedback, setCastFeedback] = useState<string | null>(null)
   const [concentrationWarningOpen, setConcentrationWarningOpen] = useState(false)
@@ -146,6 +154,7 @@ export function SpellDetailOverlay({
       psionicAugments?: PsionicAugmentSelection[]
       psiPointsSpent?: number
       hitDiceSpent?: number
+      hitPointsSpent?: number
       arcanumUsed?: boolean
       freeCastUsedKey?: string
       slotLevelUsed?: number
@@ -216,6 +225,10 @@ export function SpellDetailOverlay({
     if ((castCost?.hitDiceCost ?? 0) > 0) {
       result.hitDiceSpent = castCost!.hitDiceCost
       feedbackParts.push(`Spent ${castCost!.hitDiceCost} Hit Dice`)
+    }
+    if ((castCost?.hitPointsCost ?? 0) > 0) {
+      result.hitPointsSpent = castCost!.hitPointsCost
+      feedbackParts.push(`Took ${castCost!.hitPointsCost} HP (Radiant, bypasses Temp HP)`)
     }
     if (hasQuickened) {
       feedbackParts.push("Quickened: Bonus Action this cast")
@@ -447,6 +460,39 @@ export function SpellDetailOverlay({
                   : `Not enough ${resourceLabel} for Metamagic`}
             </p>
           )}
+          {!isCantrip && maxCreatedSlotLevel != null && maxCreatedSlotLevel > 0 && onCreatedSlotLevelChange ? (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                Create slot
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {Array.from(
+                  { length: Math.max(0, maxCreatedSlotLevel - spell.level + 1) },
+                  (_, index) => spell.level + index,
+                ).map((level) => {
+                  const selected = (createdSlotLevel ?? spell.level) === level
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => onCreatedSlotLevelChange(level)}
+                      className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                        selected
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      {level}
+                      {level === 1 ? "st" : level === 2 ? "nd" : level === 3 ? "rd" : "th"}
+                      {(castCost?.hitPointsCost ?? 0) > 0 && selected
+                        ? ` · ${castCost!.hitPointsCost} HP`
+                        : ""}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
           {!concentrationWarningOpen && (
             <>
               <button
@@ -472,7 +518,9 @@ export function SpellDetailOverlay({
                 {!isCantrip && isPointPool && castCost?.castKind === "arcanum"
                   ? "Uses one Innate Arcanum charge"
                   : !isCantrip && spendsResourcePoints && castCost
-                    ? `Costs ${castCost.totalCost} ${resourceLabel}`
+                    ? `Costs ${castCost.totalCost} ${resourceLabel}${
+                        (castCost.hitPointsCost ?? 0) > 0 ? ` + ${castCost.hitPointsCost} HP` : ""
+                      }`
                     : !isCantrip && castCost?.metamagicCost
                       ? `Uses 1 spell slot + ${castCost.metamagicCost} ${resourceLabel} Metamagic`
                       : !isCantrip

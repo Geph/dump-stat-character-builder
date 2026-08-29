@@ -1,0 +1,12 @@
+---
+description: Keep PHB text and unapproved art out of seed and GitHub
+globs: lib/srd/**,lib/seed-packs/**,public/images/**,scripts/**/*-card-sources/**
+alwaysApply: false
+---
+
+# Copyright and shipped art
+
+- `lib/srd/` is SRD 5.2.1 only. No PHB, Xanathar’s, or other product prose.
+- `lib/seed-packs/` ships only publisher-allowed examples (see that folder’s README). Do not add paid or disallowed pack text.
+- Commit optimized card art only from allowed origins (SRD, Kibbles, Mage Hand Press). Leave PHB/setting outputs and `local-available-card-art.json` untracked.
+- Name-keyed mechanical presets without book text are allowed.

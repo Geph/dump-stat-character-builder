@@ -1,3 +1,4 @@
+import { hitPointCostForSpellLevel } from "@/lib/character/hit-point-spend"
 import {
   getPointPoolSpellcasting,
   pointCostForSpellLevel,
@@ -48,6 +49,8 @@ export type ResolvedSpellCastCost = {
   metamagicCost: number
   /** Total Hit Dice required by selected Mortal Metamagic options. */
   hitDiceCost: number
+  /** Current HP spent to create this slot (Martyr Hit Point Spellcasting). */
+  hitPointsCost: number
   totalCost: number
   canCast: boolean
   blockReason?: SpellCastCostBlockReason
@@ -294,20 +297,26 @@ export function resolveSpellCastCost(params: {
 }): ResolvedSpellCastCost {
   const metamagicCost = params.selectedMetamagic.reduce((sum, row) => sum + row.cost, 0)
   const hitDiceCost = totalMetamagicHitDiceCost(params.selectedMetamagic)
+  const hitPointsCost = hitPointCostForSpellLevel(
+    params.spellcasting?.hit_point_cost_by_level,
+    params.spellLevel,
+  )
   const metamagicCap = params.ctx.proficiencyBonus ?? 2
   const availableHitDice = params.availableHitDice ?? Number.POSITIVE_INFINITY
 
-  const applyHitDiceGate = (result: ResolvedSpellCastCost): ResolvedSpellCastCost => {
-    if (!result.canCast) return { ...result, hitDiceCost }
+  const applyHitDiceGate = (
+    result: Omit<ResolvedSpellCastCost, "hitPointsCost">,
+  ): ResolvedSpellCastCost => {
+    const withHp = { ...result, hitDiceCost, hitPointsCost }
+    if (!withHp.canCast) return withHp
     if (hitDiceCost > 0 && hitDiceCost > availableHitDice) {
       return {
-        ...result,
-        hitDiceCost,
+        ...withHp,
         canCast: false,
         blockReason: "insufficient_hit_dice",
       }
     }
-    return { ...result, hitDiceCost }
+    return withHp
   }
 
   if (params.spellResourceCost && params.spellResourceCost.amount > 0) {

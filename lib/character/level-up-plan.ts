@@ -2,6 +2,7 @@ import { featureChoiceKey } from "@/lib/builder/choices"
 import { FEAT_MILESTONES } from "@/lib/builder/feat-selection"
 import {
   collectClassFeatureModifierPlayerChoiceSlots,
+  collectSpeciesModifierPlayerChoiceSlots,
   type ModifierPlayerChoiceKind,
   type ModifierPlayerChoiceSlot,
 } from "@/lib/builder/modifier-player-choices"
@@ -10,16 +11,20 @@ import {
   resolveSubclassUnlockLevel,
 } from "@/lib/builder/subclass-unlock"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
-import { featureShowsOnSheetTab } from "@/lib/compendium/feature-sheet-display"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import {
   buildLevelUpStandardizedNotes,
+  collectClassResourceScalingImprovements,
   collectFeatureScalingImprovements,
+  collectSpeciesScalingImprovements,
+  collectSpeciesTraitsGainedAtLevel,
   type LevelUpFeatureImprovement,
   type LevelUpStandardizedNote,
 } from "@/lib/character/level-up-improvements"
+import { grantFeatsFromFeature } from "@/lib/compendium/grant-feat-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
-import type { Feature, Spell, Subclass } from "@/lib/types"
+import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
+import type { Feature, Species, Spell, Subclass } from "@/lib/types"
 import { spellMatchesClassName } from "@/lib/compendium/investigator-spell-list"
 
 const LEVEL_UP_MODIFIER_CHOICE_KINDS: ReadonlySet<ModifierPlayerChoiceKind> = new Set([
@@ -38,7 +43,7 @@ export type LevelUpNewFeature = {
   name: string
   level: number
   description: string
-  source: "class" | "subclass"
+  source: "class" | "subclass" | "species"
 }
 
 export type LevelUpChoiceStep =
@@ -65,6 +70,8 @@ export type LevelUpChoiceStep =
       classId: string
       featureName: string
       level: number
+      /** When set, the picker is limited to these feat categories (Fighting Style, Metamagic). */
+      featCategories?: string[]
     }
   | {
       kind: "subclass"
@@ -117,13 +124,11 @@ function featuresGainedAtLevel(
   fromLevel: number,
   toLevel: number,
 ): Feature[] {
-  return (features ?? []).filter(
-    (feature) => feature.level > fromLevel && feature.level <= toLevel && featureShowsOnSheetTab(feature),
-  )
+  return (features ?? []).filter((feature) => feature.level > fromLevel && feature.level <= toLevel)
 }
 
 function featuresUnlockedByLevel(features: Feature[], toLevel: number): Feature[] {
-  return features.filter((feature) => feature.level <= toLevel && featureShowsOnSheetTab(feature))
+  return features.filter((feature) => feature.level <= toLevel)
 }
 
 function progressionAt(cls: CharacterClassDetail["class"], level: number) {
@@ -171,6 +176,9 @@ export function buildLevelUpPlan(params: {
   featureChoicePicks: Record<string, string[]>
   modifierPlayerPicks?: Record<string, string[]>
   modifierCatalog?: ModifierCatalogEntry[]
+  species?: Species | null
+  speciesTraitPicks?: Record<string, string[]>
+  spells?: Array<{ id?: string | null; name?: string | null; source?: string | null }>
 }): LevelUpPlan | null {
   const cls = params.entry.class
   if (!cls) return null
@@ -200,6 +208,16 @@ export function buildLevelUpPlan(params: {
       description: feature.description ?? "",
       source: "subclass" as const,
     })),
+    ...collectSpeciesTraitsGainedAtLevel(
+      params.species,
+      params.currentTotalLevel,
+      newTotalLevel,
+    ).map((trait) => ({
+      name: trait.name,
+      level: trait.level,
+      description: trait.description,
+      source: "species" as const,
+    })),
   ]
 
   const featureImprovements: LevelUpFeatureImprovement[] = [
@@ -208,12 +226,26 @@ export function buildLevelUpPlan(params: {
       fromLevel,
       toLevel,
       "class",
+      params.spells,
     ),
     ...collectFeatureScalingImprovements(
       params.entry.subclass?.features as Feature[] | undefined,
       fromLevel,
       toLevel,
       "subclass",
+      params.spells,
+    ),
+    ...collectClassResourceScalingImprovements(
+      resolveClassResourcesForClass(cls),
+      fromLevel,
+      toLevel,
+    ),
+    ...collectSpeciesScalingImprovements(
+      params.species,
+      params.speciesTraitPicks ?? {},
+      params.currentTotalLevel,
+      newTotalLevel,
+      params.spells,
     ),
   ]
 
@@ -243,6 +275,23 @@ export function buildLevelUpPlan(params: {
       classId,
       featureName: feature.name,
       level: feature.level,
+    })
+  }
+
+  const catalog = params.modifierCatalog ?? []
+  for (const feature of [...classFeatures, ...subclassFeatures]) {
+    if (isAsiFeature(feature.name)) continue
+    const grants = grantFeatsFromFeature(feature, catalog)
+    if (!grants.length) continue
+    const featCategories = [...new Set(grants.flatMap((grant) => grant.featCategories))]
+    steps.push({
+      kind: "feat_or_asi",
+      id: `feat:${classId}:${feature.level}:${feature.name}`,
+      title: grants[0]?.label ? `Choose ${grants[0].label}` : `Choose a feat (${feature.name})`,
+      classId,
+      featureName: feature.name,
+      level: feature.level,
+      featCategories,
     })
   }
 
@@ -320,8 +369,43 @@ export function buildLevelUpPlan(params: {
     })
   }
 
+  if (params.species) {
+    const speciesTraitPicks = params.speciesTraitPicks ?? {}
+    const catalog = params.modifierCatalog ?? []
+    const speciesSlotsBefore = collectSpeciesModifierPlayerChoiceSlots(
+      params.species,
+      speciesTraitPicks,
+      catalog,
+      params.currentTotalLevel,
+    )
+    const speciesSlotsAfter = collectSpeciesModifierPlayerChoiceSlots(
+      params.species,
+      speciesTraitPicks,
+      catalog,
+      newTotalLevel,
+    )
+    const priorMax = new Map(speciesSlotsBefore.map((slot) => [slot.slotKey, slot.maxCount]))
+    for (const slot of speciesSlotsAfter) {
+      if (!LEVEL_UP_MODIFIER_CHOICE_KINDS.has(slot.kind)) continue
+      const previous = priorMax.get(slot.slotKey) ?? 0
+      if (slot.maxCount <= previous) continue
+      const already = modifierPicks[slot.slotKey]?.length ?? 0
+      if (already >= slot.maxCount) continue
+      steps.push({
+        kind: "modifier_choice",
+        id: slot.slotKey,
+        title: slot.label || slot.sourceLabel,
+        classId,
+        slot,
+        required: slot.maxCount,
+      })
+    }
+  }
+
   if (FEAT_MILESTONES.includes(toLevel as (typeof FEAT_MILESTONES)[number])) {
-    const alreadyHasAsiStep = steps.some((step) => step.kind === "feat_or_asi")
+    const alreadyHasAsiStep = steps.some(
+      (step) => step.kind === "feat_or_asi" && isAsiFeature(step.featureName),
+    )
     if (!alreadyHasAsiStep) {
       steps.push({
         kind: "feat_or_asi",

@@ -94,6 +94,44 @@ export function recoverHitDiceOnLongRest(
   return next
 }
 
+/**
+ * Regain up to `amount` expended Hit Point Dice (Divine Respite and similar).
+ * Prefers `preferClassId` when that pool has spent dice; otherwise restores in pool order.
+ */
+export function recoverHitDiceUpTo(
+  usedByClassId: Record<string, number>,
+  pool: HitDicePoolEntry[],
+  amount: number,
+  preferClassId?: string | null,
+): { nextUsedByClassId: Record<string, number>; recovered: number } {
+  let remainingRecovery = Math.max(0, Math.floor(amount))
+  if (remainingRecovery <= 0) {
+    return { nextUsedByClassId: { ...usedByClassId }, recovered: 0 }
+  }
+
+  const next = { ...usedByClassId }
+  let recovered = 0
+  const ordered = preferClassId
+    ? [
+        ...pool.filter((entry) => entry.classId === preferClassId),
+        ...pool.filter((entry) => entry.classId !== preferClassId),
+      ]
+    : pool
+
+  for (const entry of ordered) {
+    if (remainingRecovery <= 0) break
+    const spent = next[entry.classId] ?? 0
+    if (spent <= 0) continue
+    const regain = Math.min(spent, remainingRecovery)
+    next[entry.classId] = spent - regain
+    if (next[entry.classId] === 0) delete next[entry.classId]
+    remainingRecovery -= regain
+    recovered += regain
+  }
+
+  return { nextUsedByClassId: next, recovered }
+}
+
 /** Spend Hit Dice from the pool (feature fuel: Mortal Metamagic, Draconic Vengeance, etc.). */
 export function spendHitDiceFromPool(params: {
   usedByClassId: Record<string, number>

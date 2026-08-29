@@ -10,6 +10,43 @@ This file is for **Cursor and other coding agents**, not for end users. Human co
 
 User-facing setup, PR etiquette, and copyright commit rules live in CONTRIBUTING.md. Keep those wording human and short; put mechanical “always / never” placement rules here.
 
+## What a new session actually sees
+
+A new Cursor agent has **no prior chat history**. It is not spun up with Drive JSON, BYO prompts, or earlier wiring decisions. Typical injected context is this file, plus any `.cursor/rules/` that match, plus the user’s global Cursor rules. Everything else is unread until the agent opens it.
+
+If a session hangs and you start a new one, restate the character/sheet URL and the invariant that still applies. Do not assume the new agent read the last chat.
+
+## Session invariants
+
+These hold in every chat, including after a restart.
+
+### 1. Never commit copyrighted book text or unapproved art
+
+- Do not add Player’s Handbook, setting-book, or other non-SRD **prose** to `lib/srd/`, the Seed button data, or tracked GitHub JSON.
+- Do not `git add` PHB / setting portraits, other unlicensed card art, or `public/images/compendium/local-available-card-art.json`. Public GitHub art is SRD + explicitly allowed packs (Kibbles Tasty, Mage Hand Press) only.
+- Mechanical wiring (enrichment presets, name-keyed modifier attachments) is allowed **without** bundling book text.
+- Import tools assume the **user** owns or may use the source. Agents must not copy copyrighted extracts into the repo.
+- Human-facing detail: [CONTRIBUTING.md](CONTRIBUTING.md#what-not-to-commit), [docs/repository-overview.md](docs/repository-overview.md#copyright-and-licensing).
+
+### 2. Prefer existing common modifiers
+
+- Express mechanics with the shared catalog (`lib/compendium/characteristic-modifiers.ts`, `modifier-catalog.ts`, existing `mechanics[].kind` / FeatureEffect types) so a user can see and edit the wiring in the Compendium.
+- Extend or adjust an existing modifier when it already covers the idea. Do not add a `if (className === "Martyr")` (or similar) branch in `lib/character/` or React when a catalog type can do it.
+- Enrichment presets and detect rules **attach** catalog modifiers; they are not a substitute for a private runtime-only hook.
+- Which system to author: [docs/modifier-vs-feature-effect.md](docs/modifier-vs-feature-effect.md).
+
+### 3. Close the import loop when the lapse was extract/prompt/JSON
+
+If a sheet or import bug existed because Drive JSON, BYO instructions, detect rules, or enrichment missed the mechanic — not only because runtime math was wrong — update the source of the lapse, not just the live character:
+
+1. Runtime: generic modifier / sheet behavior (invariant 2).
+2. Drive import JSON when a fixture exists (paths in [docs/homebrew-import-review.md](docs/homebrew-import-review.md); `HOMEBREW_IMPORT_JSON_DIR`).
+3. BYO / server-AI hints: `lib/import/modifier-wiring-registry.ts`, and `byo-import-kit.ts` / `parse-ai-mechanics.ts` / `detect-feature-modifier-rules.ts` when the kind or phrase is new.
+4. Enrichment preset in `lib/import/enrichment-presets/` when that is how the class is wired.
+5. A test that would fail if the prompt or Drive row regressed (`byo-prompt-guidance` and/or the class Drive import test).
+
+A one-off sheet patch for a single named feature, with no catalog / JSON / prompt update, is the failure mode this rule exists to prevent.
+
 ## Placement map
 
 | Work | Prefer | Avoid |
@@ -39,14 +76,9 @@ Deeper folder “why”: [docs/repository-overview.md](docs/repository-overview.
 - When changing SRD or 5E rules behavior, cite the source in the PR description (see CONTRIBUTING.md).
 - After local content import or art optimize, leave gitignored outputs untracked unless the user asks to ship allowed art.
 
-## Card art and licensed content (agent summary)
-
-- Public GitHub art is limited to what the project is allowed to distribute (SRD and explicitly allowed packs). Optimize locally with `pnpm images:optimize`; do not force-add gitignored PHB/setting files.
-- Mechanical wiring for non-SRD names can live in enrichment / presets without bundling book prose.
-- Import tools assume the **user** owns or may use the source; agents must not copy copyrighted extracts into the repo.
-
 ## Cursor-specific notes
 
 - Project hooks may live under `.cursor/` (for example post-turn verify). Do not disable hooks with `--no-verify` unless the user asks.
+- Always-on and file-scoped agent rules live in `.cursor/rules/`. They repeat the session invariants; do not weaken them.
 - Prefer editing product code over adding new markdown docs the user did not request.
 - `tsconfig.json` / `next-env.d.ts` may be rewritten by `next:dev`; do not commit accidental churn from a concurrent dev server unless it is an intentional fix.

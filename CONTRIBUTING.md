@@ -63,6 +63,7 @@ Changes that affect SRD / 5E rules accuracy (class features, species traits, spe
 
 Please keep copyrighted and personal working files out of the public tree:
 
+- **Rulebook text** — Do not add Player’s Handbook, setting-book, or other non-SRD prose to `lib/srd/`, Seed data, or tracked GitHub JSON. Mechanical wiring without book text is fine.
 - **Card art** — Only ship art you are allowed to distribute. GitHub-eligible optimized art comes from licensed/allowed source folders (for example `SRD/` under the card-source drop directories). Player’s Handbook and other setting-book portraits stay on your machine after `pnpm images:optimize`; do not `git add` those PNGs or `public/images/compendium/local-available-card-art.json`.
 - **Custom content folders** — If you add your own uniquely named art or import folders under `scripts/` or `public/images/compendium/`, leave them uncommitted; the app can still use them locally.
 - **Secrets** — Never commit `.env`, `.env.local`, API keys, or database passwords.
@@ -86,6 +87,8 @@ A short map (see the [README project structure](README.md#project-structure) for
 | Static / browser storage | `lib/data/` |
 
 Put UI in `app/` and `components/`, calculations in `lib/`, and rulebook-style content in seed data or the compendium UI — not hard-coded into a single class component.
+
+Prefer **common modifier** types the user can edit in the Compendium over a one-off class-name branch in sheet or runtime code. If a bug existed because an import JSON extract or the BYO LLM prompt missed the mechanic, update that Drive JSON and/or the BYO hints (`lib/import/modifier-wiring-registry.ts`) as well as the runtime — see [docs/homebrew-import-review.md](docs/homebrew-import-review.md).
 
 ## Code of conduct
 

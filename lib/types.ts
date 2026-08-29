@@ -195,7 +195,14 @@ export interface FeatureEffect {
    */
   classResourceAmountConfig?: RestoreAmountConfig | null
   /** heal_self / similar: how HP restored is calculated */
-  healMode?: "fixed" | "dice" | "character_level" | "proficiency" | "ability_modifier" | null
+  healMode?:
+    | "fixed"
+    | "dice"
+    | "character_level"
+    | "proficiency"
+    | "ability_modifier"
+    | "hit_dice"
+    | null
   healFixed?: number | null
   healDiceCount?: number | null
   healDieType?: "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | null
@@ -335,8 +342,13 @@ export interface FeatureActivation {
   noEconomyCost?: boolean
   /** When you roll initiative (not an action economy cost). */
   onInitiative?: boolean
-  /** Passive or reaction-style trigger when the character drops to 0 HP. */
+  /** Passive trigger when the character drops to 0 HP (not a Reaction unless reaction is also set). */
   onDropToZeroHp?: boolean
+  /**
+   * Named sibling features the player may fire with this one at no extra action cost
+   * (e.g. Undying → Miraculous Healing).
+   */
+  alsoActivateFeatureNames?: string[]
   /** Use the same activation timing as another class feature on this class/subclass. */
   usesExistingClassFeature?: boolean
   /** Name of the sibling class feature whose activation this feature shares. */
@@ -352,6 +364,11 @@ export interface FeatureActivation {
   spendClassResourceAmount?: number | null
   /** Spend this many Hit Point Dice (Hit Dice tracker) to activate. */
   spendHitDice?: number | null
+  /**
+   * Spend this many current Hit Points to activate (Martyr Sacrifice, Hit Point Spellcasting).
+   * Bypasses Temporary Hit Points; does not go through damage resistance.
+   */
+  spendHitPoints?: number | null
   requirements?: FeatureActivationRequirement[]
   /** @deprecated Use effects[] */
   effect?: string | null
@@ -542,6 +559,11 @@ export interface ClassSpellcastingConfig {
     metamagic_cost_cap?: "proficiency_bonus"
     replaces_spell_slots: boolean
   } | null
+  /**
+   * Extra current-HP cost by created/upcast slot level (Martyr Hit Point Spellcasting).
+   * Spent in addition to spell_uses / slots. Bypasses Temporary Hit Points.
+   */
+  hit_point_cost_by_level?: Record<number, number> | null
 }
 
 export interface DndClass {

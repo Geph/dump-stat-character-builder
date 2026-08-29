@@ -221,6 +221,17 @@ describe("WOTC species wiring", () => {
     expect(
       (lineage?.choices?.options ?? []).every((o) => (o.linkedModifiers?.length ?? 0) > 0),
     ).toBe(true)
+    const woodElf = (lineage?.choices?.options ?? []).find((o) => o.name === "Wood Elf")
+    const highElf = (lineage?.choices?.options ?? []).find((o) => o.name === "High Elf")
+    const drow = (lineage?.choices?.options ?? []).find((o) => o.name === "Drow")
+    expect(JSON.stringify(woodElf?.linkedModifiers)).toMatch(/Druidcraft|Longstrider|Pass without Trace/i)
+    expect(JSON.stringify(highElf?.linkedModifiers)).toMatch(/Prestidigitation|Detect Magic|Misty Step/i)
+    expect(JSON.stringify(drow?.linkedModifiers)).toMatch(/Dancing Lights|Faerie Fire|Darkness/i)
+
+    const tiefling = enriched.species?.find((s) => s.name === "Tiefling")
+    const legacy = (tiefling?.traits as TraitRow[] | undefined)?.find((t) => t.name === "Fiendish Legacy")
+    const infernal = (legacy?.choices?.options ?? []).find((o) => o.name === "Infernal")
+    expect(JSON.stringify(infernal?.linkedModifiers)).toMatch(/Fire Bolt|Hellish Rebuke|Darkness/i)
 
     const lorwynElf = enriched.species?.find((s) => s.name === "Lorwyn Elf")
     const lorwynLineage = (lorwynElf?.traits as TraitRow[] | undefined)?.find(

@@ -11,6 +11,7 @@ export const SPECIAL_ATTACK_ICONS_BY_NAME: Record<string, string> = {
   "land's aid": "sprout",
   "lands aid": "sprout",
   "breath weapon": "dragon-breath",
+  reprisal: "crossed-swords",
   "mind leech": "psychic-waves",
   "astral construct": "crystal-bars",
   "telekinetic force": "rear-aura",

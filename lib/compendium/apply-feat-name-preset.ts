@@ -28,9 +28,15 @@ function abilityScoresPayload(mod: Record<string, unknown>): string {
   })
 }
 
+function isAbilityScoresInstance(instance: LinkedModifierInstance): boolean {
+  return Boolean(instance.characteristics?.some((mod) => mod.type === "ability_scores"))
+}
+
 /**
  * Keep hand-written half-feat ASI wiring authoritative when instance IDs match.
  * Repairs legacy unrestricted 1-point pools (e.g. Actor labeled "+1 Charisma").
+ * Appends missing ASI when leftover import modifiers blocked the full name preset
+ * (e.g. Expert Cook stored with only tool proficiency).
  */
 function syncPresetAbilityScores(
   row: Record<string, unknown>,
@@ -39,12 +45,12 @@ function syncPresetAbilityScores(
   const linkedRaw = row.linkedModifiers ?? row.linked_modifiers
   if (!Array.isArray(linkedRaw) || !linkedRaw.length) return row
   const presetLinked = preset.linkedModifiers ?? []
-  if (!presetLinked.length) return row
+  const presetAsiInstances = presetLinked.filter(isAbilityScoresInstance)
+  if (!presetAsiInstances.length) return row
 
   let changed = false
-  const linked = linkedRaw.map((instance) => {
-    const inst = instance as LinkedModifierInstance
-    const presetInst = presetLinked.find((p) => p.instanceId === inst.instanceId)
+  let linked = (linkedRaw as LinkedModifierInstance[]).map((inst) => {
+    const presetInst = presetAsiInstances.find((p) => p.instanceId === inst.instanceId)
     const presetAsi = presetInst?.characteristics?.find((c) => c.type === "ability_scores")
     if (!presetAsi || !Array.isArray(inst.characteristics)) return inst
 
@@ -63,8 +69,34 @@ function syncPresetAbilityScores(
     return { ...inst, characteristics }
   })
 
+  const storedAsi = linked.filter(isAbilityScoresInstance)
+  const matchedAsiIds = new Set(
+    storedAsi
+      .filter((inst) => presetAsiInstances.some((presetInst) => presetInst.instanceId === inst.instanceId))
+      .map((inst) => inst.instanceId),
+  )
+  const presetFixedSingle = presetAsiInstances.filter((inst) => {
+    const asi = inst.characteristics?.find((mod) => mod.type === "ability_scores")
+    if (!asi || asi.mode !== "fixed") return false
+    const bonuses = Object.entries(asi.bonuses ?? {}).filter(([, value]) => typeof value === "number" && value !== 0)
+    return bonuses.length === 1
+  })
+
+  if (!storedAsi.length) {
+    const existingIds = new Set(linked.map((inst) => inst.instanceId))
+    for (const presetInst of presetAsiInstances) {
+      if (existingIds.has(presetInst.instanceId)) continue
+      linked = [...linked, presetInst]
+      changed = true
+    }
+  } else if (presetFixedSingle.length === 1 && matchedAsiIds.size === 0) {
+    // Leftover import wired a pool (or the wrong score) under a different instance id.
+    linked = [...linked.filter((inst) => !isAbilityScoresInstance(inst)), ...presetFixedSingle]
+    changed = true
+  }
+
   if (!changed) return row
-  const synced = syncModifierRefs({ linkedModifiers: linked as LinkedModifierInstance[] })
+  const synced = syncModifierRefs({ linkedModifiers: linked })
   return {
     ...row,
     linked_modifiers: synced.linkedModifiers,

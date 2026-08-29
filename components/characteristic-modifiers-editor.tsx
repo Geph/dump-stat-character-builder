@@ -2184,6 +2184,111 @@ function ModifierFields({
         <RestReplacementEditor mod={mod} onChange={onChange} />
       )
 
+    case "hit_dice_restore":
+      return (
+        <div className="space-y-3">
+          <label className="block text-xs font-semibold text-foreground">
+            Hit Point Dice regained
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={mod.amount}
+              onChange={(e) => onChange({ ...mod, amount: parseInt(e.target.value, 10) || 1 })}
+              className="mt-1 w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="block text-xs font-semibold text-foreground">
+            Restore when finishing
+            <select
+              value={mod.restoreOn ?? "short_rest"}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  restoreOn: e.target.value === "long_rest" ? "long_rest" : "short_rest",
+                })
+              }
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="short_rest">A Short Rest</option>
+              <option value="long_rest">A Long Rest</option>
+            </select>
+          </label>
+          <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-foreground">Amount by class level</label>
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...mod,
+                    amountByLevel: [
+                      ...(mod.amountByLevel ?? []),
+                      defaultBonusByLevelEntry((mod.amountByLevel?.at(-1)?.level ?? 8) + 4),
+                    ],
+                  })
+                }
+                className="text-xs text-primary hover:underline"
+              >
+                + Add tier
+              </button>
+            </div>
+            {(mod.amountByLevel ?? []).length === 0 ? (
+              <p className="text-xs text-muted-foreground">No extra tiers — uses the base amount.</p>
+            ) : (
+              <div className="space-y-2">
+                {(mod.amountByLevel ?? []).map((row, idx) => (
+                  <div key={idx} className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">At level</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={row.level}
+                      onChange={(e) => {
+                        const amountByLevel = [...(mod.amountByLevel ?? [])]
+                        amountByLevel[idx] = { ...row, level: parseInt(e.target.value, 10) || 1 }
+                        onChange({ ...mod, amountByLevel })
+                      }}
+                      className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
+                    />
+                    <span className="text-xs text-muted-foreground">regain</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={row.fixed ?? 0}
+                      onChange={(e) => {
+                        const amountByLevel = [...(mod.amountByLevel ?? [])]
+                        amountByLevel[idx] = {
+                          ...row,
+                          mode: "fixed",
+                          fixed: parseInt(e.target.value, 10) || 1,
+                        }
+                        onChange({ ...mod, amountByLevel })
+                      }}
+                      className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm text-center"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange({
+                          ...mod,
+                          amountByLevel: (mod.amountByLevel ?? []).filter((_, i) => i !== idx),
+                        })
+                      }
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )
+
     case "magical_sleep_immunity":
       return (
         <div className="space-y-2">
@@ -2793,6 +2898,33 @@ function ModifierFields({
               When set, the alert only attaches if the parent action&apos;s resource menu lists a
               matching option.
             </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={Boolean(mod.selectable)}
+              onChange={(e) => onChange({ ...mod, selectable: e.target.checked })}
+            />
+            Optional add-on on the parent action
+          </label>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Replace parent HP spend when selected
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={mod.spendHitPoints ?? ""}
+              onChange={(e) => {
+                const next = e.target.value === "" ? undefined : Number(e.target.value)
+                onChange({
+                  ...mod,
+                  spendHitPoints: next != null && Number.isFinite(next) && next > 0 ? next : undefined,
+                })
+              }}
+              className="w-full max-w-xs px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              placeholder="10"
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">Alert summary</label>

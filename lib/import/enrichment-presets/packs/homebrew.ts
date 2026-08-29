@@ -4,10 +4,10 @@ import {
 } from "@/lib/import/enrichment-presets/builders"
 import { DND_SKILLS } from "@/lib/compendium/constants"
 import { createModifierInstanceId } from "@/lib/compendium/linked-modifiers"
-import { effectCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
+import { characteristicCatalogRefId, effectCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { requiresActiveToggleLimitation } from "@/lib/compendium/modifier-limitations"
 import { fxInstance, modId } from "@/lib/compendium/modifier-instance-builders"
-import type { FeatureChoice } from "@/lib/types"
+import type { Feature, FeatureChoice } from "@/lib/types"
 
 const DEFERRED_MECHANICS_NOTE =
   "Mechanic not fully modeled on sheet — see feature description (Dark Lurker check reduction)."
@@ -1263,6 +1263,135 @@ export { DANCER_PRESETS } from "@/lib/import/enrichment-presets/packs/dancer"
 /** @deprecated Import from packs/vagabond — re-exported for registry compatibility. */
 export { VAGABOND_PRESETS } from "@/lib/import/enrichment-presets/packs/vagabond"
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function htmlToPlainFeatureText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim()
+}
+
+const MARTYR_SACRIFICE_BENEFITS = ["Sacrificial Strike", "Sacrificial Skill"] as const
+
+/** Pull one named Sacrifice benefit so Strike and Skill can be separate sheet cards. */
+export function extractMartyrSacrificeBenefit(
+  description: string | null | undefined,
+  name: (typeof MARTYR_SACRIFICE_BENEFITS)[number],
+): string | null {
+  const plain = htmlToPlainFeatureText(description ?? "")
+  if (!plain) return null
+  const startRe = new RegExp(`${escapeRegExp(name)}\\.?\\s*`, "i")
+  const start = plain.search(startRe)
+  if (start < 0) return null
+  const afterName = plain.slice(start).replace(startRe, "")
+  let end = afterName.length
+  for (const next of MARTYR_SACRIFICE_BENEFITS) {
+    if (next === name) continue
+    const idx = afterName.search(new RegExp(`${escapeRegExp(next)}\\.?`, "i"))
+    if (idx >= 0 && idx < end) end = idx
+  }
+  const noteIdx = afterName.search(/Sacrificial Strike\s*\/\s*Sacrificial Skill self-damage/i)
+  if (noteIdx >= 0 && noteIdx < end) end = noteIdx
+  const body = afterName.slice(0, end).replace(/\s+/g, " ").trim()
+  if (!body) return null
+  return `<p><strong>${name}.</strong> ${body}</p>`
+}
+
+function hideCombinedSacrificeFeature<T extends Feature>(feature: T): T {
+  return {
+    ...feature,
+    sheetDisplay: {
+      ...(feature.sheetDisplay ?? {}),
+      combatActions: false,
+      abilitiesActions: false,
+      featuresTab: false,
+    },
+  }
+}
+
+/** Drop leftover 13/17 rows that only say Divine Respite's HD restore amount increases. */
+function collapseMartyrDivineRespiteScalingNotes<T extends Feature>(features: T[]): T[] {
+  return features.filter((feature) => {
+    if (!/^divine respite$/i.test(feature.name)) return true
+    const text = feature.description ?? ""
+    if (/\bwhen you finish a short rest\b/i.test(text)) return true
+    return !/\bincreases to \d+\b/i.test(text)
+  })
+}
+
+/**
+ * Martyr's Sacrifice table row bundles two different action economies. Expand it into
+ * Sacrificial Strike (Bonus Action) and Sacrificial Skill (Passive) so both live sheets
+ * and imports get separate cards without a reimport.
+ */
+export function expandMartyrSacrificeFeatures<T extends Feature>(
+  features: T[],
+  className: string,
+): T[] {
+  if (!/martyr/i.test(className)) return features
+  const hasStrike = features.some((feature) => /^sacrificial strike$/i.test(feature.name))
+  const hasSkill = features.some((feature) => /^sacrificial skill$/i.test(feature.name))
+  if (hasStrike && hasSkill) {
+    return collapseMartyrDivineRespiteScalingNotes(
+      features.map((feature) =>
+        /^sacrifice$/i.test(feature.name) &&
+        /sacrificial (?:strike|skill)/i.test(feature.description ?? "")
+          ? hideCombinedSacrificeFeature(feature)
+          : feature,
+      ),
+    )
+  }
+
+  const expanded: T[] = []
+  for (const feature of features) {
+    if (!/^sacrifice$/i.test(feature.name)) {
+      expanded.push(feature)
+      continue
+    }
+    const strike = extractMartyrSacrificeBenefit(feature.description, "Sacrificial Strike")
+    const skill = extractMartyrSacrificeBenefit(feature.description, "Sacrificial Skill")
+    if (!strike || !skill) {
+      expanded.push(feature)
+      continue
+    }
+    if (!hasStrike) {
+      expanded.push({
+        ...feature,
+        name: "Sacrificial Strike",
+        description: strike,
+        activation: { bonusAction: true },
+        linkedModifiers: undefined,
+        sheetDisplay: undefined,
+      })
+    }
+    if (!hasSkill) {
+      expanded.push({
+        ...feature,
+        name: "Sacrificial Skill",
+        description: skill,
+        activation: undefined,
+        linkedModifiers: undefined,
+        sheetDisplay: undefined,
+      })
+    }
+  }
+  return collapseMartyrDivineRespiteScalingNotes(expanded)
+}
+
+const SACRIFICIAL_SKILL_ROLLS = [
+  { rollKind: "attack" as const, checkCategory: "attack" as const },
+  { rollKind: "ability" as const, checkCategory: "ability" as const },
+  { rollKind: "skill" as const, checkCategory: "skill" as const },
+  { rollKind: "save" as const, checkCategory: "save" as const },
+]
+
 export const MARTYR_PRESETS: EnrichmentPreset[] = [
   {
     id: "martyr.class.spellcasting",
@@ -1272,7 +1401,7 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
     operations: [
       {
         op: "appendDescription",
-        text: "Hit Point Spellcasting (Radiant self-damage to create a temporary slot) is tracked narratively — apply the Hit Point Spellcasting table damage when you cast. Spell Uses are a separate long-rest pool on the sheet. Do not invent normal spell-slot progression.",
+        text: "The sheet deducts Hit Point Spellcasting damage from current HP when you cast a level 1+ Martyr spell (bypasses Temporary Hit Points; ignores Resistance and Immunity). Spell Uses are a separate long-rest pool. Do not invent normal spell-slot progression.",
       },
     ],
   },
@@ -1282,11 +1411,34 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
     target: "class_feature",
     match: { className: /martyr/i, name: /^miraculous healing$/i },
     operations: [
-      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setActivation", activation: { bonusAction: true, spendHitDice: 1 } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
-        op: "appendDescription",
-        text: "Spend one unexpended Hit Point Die from the sheet Hit Dice tracker when you use this (play-time).",
+        op: "attachNamedPreset",
+        skipIfEffectKinds: ["heal_self"],
+        preset: {
+          kind: "fx_instance",
+          idKey: "miraculous_healing",
+          catalogRefId: "cat_fx_heal_self",
+          activation: { bonusAction: true, spendHitDice: 1 },
+          effects: [
+            {
+              id: "mod_miraculous_healing",
+              kind: "heal_self",
+              healTarget: "self",
+              healMode: "hit_dice",
+              healDiceCount: 1,
+              healAbility: "CON",
+              bonusByLevel: [
+                { level: 1, mode: "fixed", fixed: 1 },
+                { level: 5, mode: "fixed", fixed: 2 },
+                { level: 11, mode: "fixed", fixed: 3 },
+                { level: 17, mode: "fixed", fixed: 4 },
+              ],
+              label: "Hit Point Dice + CON",
+            },
+          ],
+        },
       },
     ],
   },
@@ -1298,6 +1450,37 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
     operations: [
       { op: "setActivation", activation: { reaction: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["special_attack"],
+        preset: {
+          kind: "char_instance",
+          idKey: "reprisal",
+          catalogRefId: "cat_char_special_attack",
+          characteristics: [
+            {
+              id: "mod_reprisal",
+              type: "special_attack",
+              attackName: "Reprisal",
+              icon: "crossed-swords",
+              targetMode: "single",
+              rangeFeet: 5,
+              properties: ["Special"],
+              damageTypes: ["Necrotic", "Radiant"],
+              chooseDamageType: true,
+              damageDiceCount: 1,
+              damageDieType: "d6",
+              damageByLevel: [
+                { level: 1, mode: "dice", dieCount: 1, dieType: "d6" },
+                { level: 5, mode: "dice", dieCount: 2, dieType: "d6" },
+                { level: 11, mode: "dice", dieCount: 3, dieType: "d6" },
+                { level: 17, mode: "dice", dieCount: 4, dieType: "d6" },
+              ],
+              label: "Reaction: halve incoming damage; 1d6 Necrotic or Radiant",
+            },
+          ],
+        },
+      },
     ],
   },
   {
@@ -1306,7 +1489,13 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
     target: "class_feature",
     match: { className: /martyr/i, name: /^undying$/i },
     operations: [
-      { op: "setActivation", activation: { onDropToZeroHp: true } },
+      {
+        op: "setActivation",
+        activation: {
+          onDropToZeroHp: true,
+          alsoActivateFeatureNames: ["Miraculous Healing"],
+        },
+      },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
         op: "setLimitedUses",
@@ -1319,18 +1508,226 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
     ],
   },
   {
-    id: "martyr.class.sacrifice",
+    id: "martyr.class.sacrificial_strike",
     pack: "martyr",
     target: "class_feature",
-    match: { className: /martyr/i, name: /^sacrifice$/i },
+    match: { className: /martyr/i, name: /^sacrificial strike$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true, spendHitPoints: 5 } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "attachNamedPreset",
+        skipIfEffectKinds: ["extra_damage_on_hit"],
+        preset: {
+          kind: "fx_instance",
+          idKey: "sacrificial_strike",
+          catalogRefId: effectCatalogRefId("extra_damage_on_hit"),
+          activation: { bonusAction: true, spendHitPoints: 5 },
+          effects: [
+            {
+              id: "mod_sacrificial_strike",
+              kind: "extra_damage_on_hit",
+              damageTypes: ["Radiant"],
+              bonusConfig: { mode: "fixed", fixed: 10 },
+              bonusAmount: 10,
+              label: "+10 Radiant (take 5 Radiant)",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "martyr.class.sacrificial_skill",
+    pack: "martyr",
+    target: "class_feature",
+    match: { className: /martyr/i, name: /^sacrificial skill$/i },
+    operations: [
+      { op: "setActivation", activation: { oncePerTurn: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["failed_roll_trigger"],
+        preset: {
+          kind: "char_instance",
+          idKey: "sacrificial_skill",
+          catalogRefId: characteristicCatalogRefId("failed_roll_trigger"),
+          characteristics: SACRIFICIAL_SKILL_ROLLS.map(({ rollKind, checkCategory }) => ({
+            id: `mod_sacrificial_skill_${rollKind}`,
+            type: "failed_roll_trigger",
+            triggerOn: "fail",
+            rollKind,
+            targetScope: "self",
+            useReaction: false,
+            spendResourceKey: "hit_points",
+            spendResourceAmount: 10,
+            refundResourceOnStillFailed: true,
+            label: "When you fail a D20 Test: +5 (take 10 Radiant; no damage if still a failure)",
+            effect: {
+              catalogRefId: effectCatalogRefId("check_roll_modifier"),
+              activation: {
+                effects: [
+                  {
+                    id: `mod_sacrificial_skill_${rollKind}_bonus`,
+                    kind: "check_roll_modifier",
+                    checkRollMode: "bonus",
+                    checkCategory,
+                    bonusConfig: { mode: "fixed", fixed: 5 },
+                    label: "+5 to the failed D20 Test",
+                  },
+                ],
+              },
+            },
+          })),
+        },
+      },
+    ],
+  },
+  {
+    id: "martyr.class.divine_respite",
+    pack: "martyr",
+    target: "class_feature",
+    match: { className: /martyr/i, name: /^divine respite$/i, description: /when you finish a short rest/i },
     operations: [
       {
-        op: "appendDescription",
-        text: "Sacrificial Strike / Sacrificial Skill self-damage riders stay narrative/play-time unless a clear passive sheet bonus exists.",
+        op: "setSheetDisplay",
+        sheetDisplay: { abilitiesActions: true, combatActions: false, featuresTab: true },
+      },
+      {
+        op: "setLimitedUses",
+        uses: { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
+      },
+      {
+        op: "setActivation",
+        activation: { action: true, noEconomyCost: true },
+      },
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["hit_dice_restore"],
+        preset: {
+          kind: "char_instance",
+          idKey: "divine_respite",
+          catalogRefId: characteristicCatalogRefId("hit_dice_restore"),
+          characteristics: [
+            {
+              id: "mod_divine_respite",
+              type: "hit_dice_restore",
+              amount: 3,
+              amountByLevel: [
+                { level: 9, mode: "fixed", fixed: 3 },
+                { level: 13, mode: "fixed", fixed: 6 },
+                { level: 17, mode: "fixed", fixed: 10 },
+              ],
+              restoreOn: "short_rest",
+              label: "Divine Respite",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "martyr.class.improved_sacrificial_strike",
+    pack: "martyr",
+    target: "class_feature",
+    match: {
+      className: /martyr/i,
+      name: /^improved sacrificial strike$/i,
+      description: /when you use this feature/i,
+    },
+    operations: [
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { featuresTab: true, combatActions: false, abilitiesActions: false },
+      },
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "improved_sacrificial_strike",
+          catalogRefId: characteristicCatalogRefId("power_rider"),
+          characteristics: [
+            {
+              id: "mod_improved_sacrificial_strike",
+              type: "power_rider",
+              parentPowerNames: ["Sacrificial Strike"],
+              selectable: true,
+              spendHitPoints: 10,
+              alertSummary:
+                "Choose to take 10 Radiant; the target takes an extra 20 Radiant instead of 5 / +10.",
+              label: "Improved Sacrificial Strike",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "martyr.class.sacrifice_foe",
+    pack: "martyr",
+    target: "class_feature",
+    match: { className: /martyr/i, name: /^sacrifice foe$/i },
+    operations: [
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { featuresTab: true, combatActions: false, abilitiesActions: false },
+      },
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "sacrifice_foe",
+          catalogRefId: characteristicCatalogRefId("power_rider"),
+          characteristics: [
+            {
+              id: "mod_sacrifice_foe",
+              type: "power_rider",
+              parentPowerNames: ["Sacrificial Strike", "Sacrificial Skill"],
+              alertSummary:
+                "If the improved attack or damage roll reduces an enemy to 0 Hit Points, you don't take Radiant damage from using Sacrifice.",
+              label: "Sacrifice Foe",
+            },
+          ],
+        },
       },
     ],
   },
 ]
+
+/** Patch already-wired Sacrifice rows so live sheets spend current HP without reimport. */
+export function applyMartyrHitPointSpends<T extends Feature>(feature: T, className: string): T {
+  if (!/martyr/i.test(className)) return feature
+  if (/^sacrificial strike$/i.test(feature.name)) {
+    if ((feature.activation?.spendHitPoints ?? 0) > 0) return feature
+    return {
+      ...feature,
+      activation: { ...(feature.activation ?? {}), bonusAction: true, spendHitPoints: 5 },
+    }
+  }
+  if (!/^sacrificial skill$/i.test(feature.name)) return feature
+  const modifiers = feature.linkedModifiers
+  if (!modifiers?.length) return feature
+  let changed = false
+  const linkedModifiers = modifiers.map((instance) => ({
+    ...instance,
+    characteristics: instance.characteristics?.map((characteristic) => {
+      if (characteristic.type !== "failed_roll_trigger") return characteristic
+      if (characteristic.spendResourceKey === "hit_points" && (characteristic.spendResourceAmount ?? 0) > 0) {
+        return characteristic
+      }
+      changed = true
+      return {
+        ...characteristic,
+        spendResourceKey: "hit_points",
+        spendResourceAmount: characteristic.spendResourceAmount ?? 10,
+        refundResourceOnStillFailed: true,
+      }
+    }),
+  }))
+  return changed ? { ...feature, linkedModifiers } : feature
+}
 
 export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
   {

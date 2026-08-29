@@ -44,6 +44,42 @@ describe("resolveClassResourcesForClass", () => {
     expect(resolved[0]?.uses.dieSidesByLevel).toContainEqual({ level: 2, count: 6 })
   })
 
+  it("maps seed-pack resource_key onto ClassResource.id", () => {
+    const resolved = resolveClassResourcesForClass({
+      id: "cls_gunslinger",
+      name: "Gunslinger",
+      class_resources: [
+        {
+          id: "",
+          name: "Risk Dice",
+          uses: {
+            type: "at_level",
+            atLevelMode: "tier",
+            atLevelTable: [{ level: 2, count: 4 }],
+          },
+        } as ClassResource & { resource_key?: string },
+      ],
+    })
+    const withKey = resolveClassResourcesForClass({
+      id: "cls_gunslinger",
+      name: "Gunslinger",
+      class_resources: [
+        {
+          id: "",
+          name: "Risk Dice",
+          resource_key: "risk_dice",
+          uses: {
+            type: "at_level",
+            atLevelMode: "tier",
+            atLevelTable: [{ level: 2, count: 4 }],
+          },
+        } as ClassResource & { resource_key?: string },
+      ],
+    })
+    expect(resolved).toEqual([])
+    expect(withKey[0]?.id).toBe("risk_dice")
+  })
+
   it("normalizes subclass_name on embedded seed resources", () => {
     const resolved = resolveClassResourcesForClass({
       id: "cls-inventor",

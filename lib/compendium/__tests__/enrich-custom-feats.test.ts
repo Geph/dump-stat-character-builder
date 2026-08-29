@@ -144,7 +144,7 @@ describe("enrichCustomFeatRow PHB presets", () => {
     expect(row.linked_modifiers ?? []).toHaveLength(0)
   })
 
-  it("does not overwrite existing linked modifiers", () => {
+  it("keeps leftover modifiers and appends missing half-feat ASI", () => {
     const existing = [{ instanceId: "custom", catalogRefId: "cat_char_ac", characteristics: [] }]
     const row = enrichCustomFeatRow({
       name: "Actor",
@@ -152,7 +152,14 @@ describe("enrichCustomFeatRow PHB presets", () => {
       description: "Actor",
       linked_modifiers: existing,
     })
-    expect(row.linked_modifiers).toEqual(existing)
+    const linked = (row.linked_modifiers ?? []) as {
+      instanceId?: string
+      catalogRefId?: string
+      characteristics?: { type?: string; mode?: string; bonuses?: Record<string, number> }[]
+    }[]
+    expect(linked.some((inst) => inst.instanceId === "custom")).toBe(true)
+    const asi = linked.flatMap((inst) => inst.characteristics ?? []).find((c) => c.type === "ability_scores")
+    expect(asi).toMatchObject({ mode: "fixed", bonuses: { charisma: 1 } })
   })
 
   it("exposes presets for PHB origin, general, and fighting style feats", () => {

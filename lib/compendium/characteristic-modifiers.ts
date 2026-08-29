@@ -302,6 +302,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     hint: "Selected entry from a system option catalog (Metamagic, Eldritch Invocation)",
   },
   { value: "rest_replacement", label: "Alternate Rest Duration" },
+  {
+    value: "hit_dice_restore",
+    label: "Restore Hit Point Dice",
+    hint: "Regain expended Hit Point Dice when you finish a rest (Divine Respite)",
+  },
   { value: "magical_sleep_immunity", label: "Magical Sleep Immunity" },
   { value: "creature_size", label: "Change Size" },
   { value: "movement_effects", label: "Movement-Related Effects (Passive)" },
@@ -718,6 +723,11 @@ export interface SpecialAttackCharacteristic extends CharacteristicModifierBase 
   alternateAreaLengthFeet?: number | null
   properties: string[]
   damageTypes: string[]
+  /**
+   * When true, the player picks one of `damageTypes` each time they use the attack
+   * (Reprisal: Necrotic or Radiant). Leave false when multiple types are dealt together.
+   */
+  chooseDamageType?: boolean
   damageDiceCount: number
   damageDieType: SpecialAttackDieType
   damageByLevel?: BonusByLevelEntry[]
@@ -744,6 +754,16 @@ export interface SpecialAttackCharacteristic extends CharacteristicModifierBase 
   damageAbilityMinimum?: number | null
   /** Omit positive ability modifier from damage (Explode). */
   omitPositiveAbilityModFromDamage?: boolean
+}
+
+export interface HitDiceRestoreCharacteristic extends CharacteristicModifierBase {
+  type: "hit_dice_restore"
+  /** Base number of expended Hit Point Dice regained. */
+  amount: number
+  /** Higher-level amounts (e.g. 3 at 9, 6 at 13, 10 at 17). */
+  amountByLevel?: BonusByLevelEntry[]
+  /** When the player may choose to restore. Default short_rest. */
+  restoreOn?: "short_rest" | "long_rest"
 }
 
 export interface RestReplacementCharacteristic extends CharacteristicModifierBase {
@@ -1298,6 +1318,8 @@ export interface PowerRiderCharacteristic extends CharacteristicModifierBase {
   appliesToAttackVariants?: Array<"attack" | "primed" | "explode">
   /** When true, the sheet offers this rider as an optional add-on. */
   selectable?: boolean
+  /** When selected, replace the parent action's HP spend with this amount. */
+  spendHitPoints?: number
 }
 
 /** Set listed ability scores equal to another ability's score (Physical Surge). */
@@ -1392,6 +1414,7 @@ export type CharacteristicModifier =
   | WeaponDamageDieOverrideCharacteristic
   | SpecialAttackCharacteristic
   | RestReplacementCharacteristic
+  | HitDiceRestoreCharacteristic
   | MagicalSleepImmunityCharacteristic
   | CreatureSizeCharacteristic
   | MovementEffectsCharacteristic
@@ -1523,10 +1546,13 @@ export function createCharacteristicModifier(
         attackProfile: "melee",
         properties: [],
         damageTypes: [],
+        chooseDamageType: false,
         damageDiceCount: 1,
         damageDieType: "d6",
         damageByLevel: [],
       }
+    case "hit_dice_restore":
+      return { id, type, amount: 3, amountByLevel: [], restoreOn: "short_rest" }
     case "rest_replacement":
       return { id, type, restHours: 4, replacesLongRest: true, description: "" }
     case "magical_sleep_immunity":
@@ -1615,7 +1641,7 @@ export function createCharacteristicModifier(
     case "grant_creature":
       return { id, type, creatureNames: [], count: 1 }
     case "power_rider":
-      return { id, type, parentPowerNames: [], parentMenuOptionNames: [], alertSummary: "" }
+      return { id, type, parentPowerNames: [], parentMenuOptionNames: [], alertSummary: "", selectable: false }
     case "ability_score_override":
       return {
         id,
@@ -1947,6 +1973,10 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
           )
         : undefined,
       selectable: raw.selectable ?? false,
+      spendHitPoints:
+        typeof raw.spendHitPoints === "number" && raw.spendHitPoints > 0
+          ? raw.spendHitPoints
+          : undefined,
     }
   }
 
@@ -2028,9 +2058,20 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       saveHalfDamage: raw.saveHalfDamage ?? false,
       properties: raw.properties ?? [],
       damageTypes: raw.damageTypes ?? [],
+      chooseDamageType: raw.chooseDamageType ?? false,
       damageDiceCount: raw.damageDiceCount ?? 1,
       damageDieType: raw.damageDieType ?? "d6",
       damageByLevel: raw.damageByLevel ?? [],
+    }
+  }
+
+  if (value.type === "hit_dice_restore") {
+    const raw = value as HitDiceRestoreCharacteristic
+    return {
+      ...raw,
+      amount: typeof raw.amount === "number" ? raw.amount : 1,
+      amountByLevel: normalizeBonusByLevel(raw.amountByLevel),
+      restoreOn: raw.restoreOn === "long_rest" ? "long_rest" : "short_rest",
     }
   }
 
@@ -2985,6 +3026,8 @@ export function aggregateCharacteristics(
         break
       case "subclass_unlock":
         break
+      case "hit_dice_restore":
+        break
     }
   }
 
@@ -3218,6 +3261,70 @@ export function sumDamageRollModifiers(
     }
   }
   return bonus
+}
+
+export type AbilityModifierDamageRules = {
+  grantAbilityModifierWhenMissing: boolean
+  bonusDiceWhenModifierIncluded: string | null
+  bonusDiceUsesWeaponDamageType: boolean
+}
+
+function resolveAbilityModifierDamageTarget(entry: AggregatedRollModifier): string {
+  const target = resolveRollModifierTarget(entry)
+  // Import often stored Overkill as target "all"; the feature only affects Ranged weapons.
+  if (
+    target === "all" &&
+    entry.grantAbilityModifierWhenMissing &&
+    entry.bonusDiceWhenModifierIncluded
+  ) {
+    return "ranged"
+  }
+  return target
+}
+
+function damageEntryMatchesWeapon(
+  entry: AggregatedRollModifier,
+  options?: TargetConditionContext & {
+    subcategory?: string
+    properties?: string[]
+    unarmed?: boolean
+  },
+): boolean {
+  if (!targetConditionMatches(entry, options)) return false
+  const target = resolveAbilityModifierDamageTarget(entry)
+  if (options?.unarmed) {
+    return target === "unarmed" || target.includes("unarmed")
+  }
+  if (target === "all") return true
+  if (!target) return false
+  return weaponMatchesAttackTarget(options?.subcategory ?? "", options?.properties ?? [], target)
+}
+
+/** Overkill-style: add ability mod when a weapon omits it, else extra dice. */
+export function collectAbilityModifierDamageRules(
+  aggregated: AggregatedCharacteristics,
+  options?: TargetConditionContext & {
+    subcategory?: string
+    properties?: string[]
+    unarmed?: boolean
+  },
+): AbilityModifierDamageRules {
+  let grantAbilityModifierWhenMissing = false
+  let bonusDiceWhenModifierIncluded: string | null = null
+  let bonusDiceUsesWeaponDamageType = false
+  for (const entry of aggregated.damageRollModifiers) {
+    if (!damageEntryMatchesWeapon(entry, options)) continue
+    if (entry.grantAbilityModifierWhenMissing) grantAbilityModifierWhenMissing = true
+    if (entry.bonusDiceWhenModifierIncluded) {
+      bonusDiceWhenModifierIncluded = entry.bonusDiceWhenModifierIncluded
+      bonusDiceUsesWeaponDamageType = Boolean(entry.bonusDiceUsesWeaponDamageType)
+    }
+  }
+  return {
+    grantAbilityModifierWhenMissing,
+    bonusDiceWhenModifierIncluded,
+    bonusDiceUsesWeaponDamageType,
+  }
 }
 
 export function formatUnarmedStrikeDamage(

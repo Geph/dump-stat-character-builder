@@ -2,6 +2,8 @@
 
 How to give Cursor (and the repo tooling) content for the Mage Hand Press / homebrew **class extract → wiring review → merge → enrich** loop.
 
+This loop is not only for full class audits. If a sheet bug existed because Drive JSON, BYO instructions, detect rules, or enrichment missed a mechanic, update those sources in the same change — see [AGENTS.md](../AGENTS.md) session invariant 3.
+
 ## TL;DR — what to paste into Cursor
 
 Prefer **absolute paths** on disk. Do not paste full class JSON when a Drive file already exists.

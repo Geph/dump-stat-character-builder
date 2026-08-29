@@ -69,6 +69,7 @@ import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
+import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { asCompendiumRows } from "@/lib/data/types"
 import type {
   Character,
@@ -76,6 +77,7 @@ import type {
   DndClass,
   Equipment,
   Feat,
+  Species,
   Spell,
   Subclass,
 } from "@/lib/types"
@@ -104,6 +106,7 @@ type Loaded = {
   equipment: Equipment[]
   customAbilities: CustomAbility[]
   modifierCatalog: ModifierCatalogEntry[]
+  species: Species | null
 }
 
 type HpMethod = "average" | "roll"
@@ -133,7 +136,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
   const [choicePicks, setChoicePicks] = useState<Record<string, string[]>>({})
   const [modifierPicks, setModifierPicks] = useState<Record<string, string[]>>({})
   const [subclassId, setSubclassId] = useState<string | null>(null)
-  const [featId, setFeatId] = useState<string | null>(null)
+  const [featIdsByStep, setFeatIdsByStep] = useState<Record<string, string>>({})
   const [featAsiAllocations, setFeatAsiAllocations] = useState<AsiAllocationsByFeatId>({})
   const [featChoicePicks, setFeatChoicePicks] = useState<Record<string, string[]>>({})
   const [spellIds, setSpellIds] = useState<string[]>([])
@@ -158,6 +161,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         { data: spells },
         { data: equipment },
         { data: customAbilities },
+        { data: speciesRows },
         modifierCatalog,
       ] = await Promise.all([
         db.from("characters").select("*").eq("id", characterId).single(),
@@ -167,6 +171,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         db.from("spells").select("*"),
         db.from("equipment").select("*"),
         db.from("custom_abilities").select("*"),
+        db.from("species").select("*"),
         loadModifierCatalog(db),
       ])
       if (cancelled) return
@@ -191,6 +196,9 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         }>,
         modifierCatalog,
       )
+      const enrichedSpecies = enrichSpeciesList(
+        asCompendiumRows(speciesRows) as unknown as Species[],
+      )
       setLoaded({
         character: char,
         classDetails,
@@ -200,13 +208,14 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         equipment: asCompendiumRows(equipment) as unknown as Equipment[],
         customAbilities: asCompendiumRows(customAbilities) as unknown as CustomAbility[],
         modifierCatalog,
+        species: enrichedSpecies.find((row) => row.id === char.species_id) ?? null,
       })
       setClassId(classDetails[0]?.row.class_id ?? null)
       setChoicePicks(mergeAlchemistDiscoveryPicks(char.feature_choice_picks ?? {}))
       setModifierPicks(char.modifier_player_picks ?? {})
       setStepIndex(0)
       setSubclassId(null)
-      setFeatId(null)
+      setFeatIdsByStep({})
       setFeatAsiAllocations({})
       setFeatChoicePicks(char.feat_choice_picks ?? {})
       setSpellIds([])
@@ -223,6 +232,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
   const selectedEntry = loaded?.classDetails.find((entry) => entry.row.class_id === classId) ?? null
   const plan: LevelUpPlan | null = useMemo(() => {
     if (!loaded || !selectedEntry) return null
+    const builderPicks = normalizeBuilderPicks(loaded.character.builder_picks)
     return buildLevelUpPlan({
       entry: selectedEntry,
       subclasses: loaded.subclasses,
@@ -230,6 +240,9 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       featureChoicePicks: loaded.character.feature_choice_picks ?? {},
       modifierPlayerPicks: loaded.character.modifier_player_picks ?? {},
       modifierCatalog: loaded.modifierCatalog,
+      species: loaded.species,
+      speciesTraitPicks: builderPicks.species_trait_picks ?? {},
+      spells: loaded.spells,
     })
   }, [loaded, selectedEntry])
 
@@ -241,6 +254,9 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
     step.kind === "modifier_choice" ? [step.slot] : [],
   )
 
+  const activeFeatStep = current?.kind === "feat_or_asi" ? current : null
+  const featId = activeFeatStep ? featIdsByStep[activeFeatStep.id] ?? null : null
+
   const eligibleFeats = useMemo(() => {
     if (!loaded) return []
     const ownedFeatIds = loaded.character.feat_ids ?? []
@@ -249,7 +265,10 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       ownedFeatIds,
       feats: loaded.feats,
     })
-    const categories = levelUpFeatCategories(hasFightingStyleAccess)
+    const categories =
+      activeFeatStep?.featCategories?.length
+        ? activeFeatStep.featCategories
+        : levelUpFeatCategories(hasFightingStyleAccess)
     const milestoneLevel = plan?.toLevel ?? 1
     return loaded.feats
       .filter((feat) =>
@@ -270,16 +289,15 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         if (aAsi !== bAsi) return aAsi - bAsi
         return a.name.localeCompare(b.name)
       })
-  }, [loaded, plan?.newTotalLevel, plan?.toLevel])
+  }, [activeFeatStep?.featCategories, loaded, plan?.newTotalLevel, plan?.toLevel])
 
   const selectedFeat = useMemo(
     () => (featId && loaded ? loaded.feats.find((feat) => feat.id === featId) ?? null : null),
     [featId, loaded],
   )
 
-  const featStep = wizardSteps.find((step) => step.kind === "feat_or_asi") ?? null
-  const featSlotKey = featStep
-    ? levelUpFeatSlotKey(featStep.classId, featStep.featureName, featStep.level)
+  const featSlotKey = activeFeatStep
+    ? levelUpFeatSlotKey(activeFeatStep.classId, activeFeatStep.featureName, activeFeatStep.level)
     : null
   const featSourceKey = featSlotKey ? featChoicePickKey(featSlotKey) : null
   const pendingFeatEntry =
@@ -459,23 +477,27 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         ...(loaded.character.feature_choice_picks ?? {}),
         ...choicePicks,
       })
-      const featPersist = featId && featSlotKey
-        ? mergeLevelUpFeatPersist({
-            featId,
-            slotKey: featSlotKey,
-            pendingAllocations: featAsiAllocations,
-            existingFeatIds: loaded.character.feat_ids ?? [],
-            existingPicks: mergedPicks,
-            existingAllocations: loaded.character.asi_allocations,
-          })
-        : {
-            featIds: loaded.character.feat_ids ?? [],
-            featureChoicePicks: mergedPicks,
-            asiAllocations: {
-              ...normalizeAsiAllocationsMap(loaded.character.asi_allocations),
-              ...featAsiAllocations,
-            },
-          }
+      let featPersist = {
+        featIds: loaded.character.feat_ids ?? [],
+        featureChoicePicks: mergedPicks,
+        asiAllocations: {
+          ...normalizeAsiAllocationsMap(loaded.character.asi_allocations),
+          ...featAsiAllocations,
+        },
+      }
+      for (const step of wizardSteps) {
+        if (step.kind !== "feat_or_asi") continue
+        const pickedFeatId = featIdsByStep[step.id]
+        if (!pickedFeatId) continue
+        featPersist = mergeLevelUpFeatPersist({
+          featId: pickedFeatId,
+          slotKey: levelUpFeatSlotKey(step.classId, step.featureName, step.level),
+          pendingAllocations: featPersist.asiAllocations,
+          existingFeatIds: featPersist.featIds,
+          existingPicks: featPersist.featureChoicePicks,
+          existingAllocations: featPersist.asiAllocations,
+        })
+      }
       const nextPicks = featPersist.featureChoicePicks
       const builderPicks = normalizeBuilderPicks(loaded.character.builder_picks)
       const existingSpells = builderPicks.spell_picks_by_class_id?.[plan.classId] ?? []
@@ -624,7 +646,12 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                   <ul className="mt-2 space-y-2">
                     {plan.newFeatures.map((feature) => (
                       <li key={`${feature.source}-${feature.name}`}>
-                        <p className="text-sm font-semibold text-foreground">{feature.name}</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {feature.name}
+                          <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {feature.source}
+                          </span>
+                        </p>
                         {feature.description ? (
                           <RichTextContent
                             html={feature.description}
@@ -645,8 +672,13 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                   </p>
                   <ul className="mt-2 space-y-2">
                     {plan.featureImprovements.map((feature) => (
-                      <li key={`${feature.source}-improve-${feature.name}`}>
-                        <p className="text-sm font-semibold text-foreground">{feature.name}</p>
+                      <li key={`${feature.source}-improve-${feature.name}-${feature.detail}`}>
+                        <p className="text-sm font-semibold text-foreground">
+                          {feature.name}
+                          <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {feature.source}
+                          </span>
+                        </p>
                         <p className="text-xs text-muted-foreground">{feature.detail}</p>
                       </li>
                     ))}
@@ -751,9 +783,12 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
               {current?.kind === "feat_or_asi" ? (
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    Pick a feat. For ability score increases, choose the Ability Score Improvement
-                    feat (or a half-feat that grants +1) and allocate below — there is no separate
-                    ability-score step.
+                    {activeFeatStep?.featCategories?.length &&
+                    !activeFeatStep.featCategories.some((category) =>
+                      /general|ability score/i.test(category),
+                    )
+                      ? `Choose ${activeFeatStep.featCategories.join(" or ")}.`
+                      : "Pick a feat. For ability score increases, choose the Ability Score Improvement feat (or a half-feat that grants +1) and allocate below — there is no separate ability-score step."}
                   </p>
                   <select
                     value={featId ?? ""}
@@ -767,8 +802,21 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                           return next
                         })
                       }
-                      setFeatId(nextId)
-                      setFeatAsiAllocations({})
+                      if (activeFeatStep) {
+                        setFeatIdsByStep((prev) => {
+                          const next = { ...prev }
+                          if (nextId) next[activeFeatStep.id] = nextId
+                          else delete next[activeFeatStep.id]
+                          return next
+                        })
+                      }
+                      setFeatAsiAllocations((prev) => {
+                        if (!featSlotKey) return {}
+                        const prefix = levelUpFeatAllocationPrefix(featSlotKey)
+                        return Object.fromEntries(
+                          Object.entries(prev).filter(([key]) => !key.startsWith(prefix)),
+                        )
+                      })
                     }}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   >

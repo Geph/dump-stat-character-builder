@@ -1088,17 +1088,18 @@ function HealAmountEditor({
           onChange({
             healMode: e.target.value as FeatureEffect["healMode"],
             healFixed: null,
-            healDiceCount: null,
+            healDiceCount: e.target.value === "hit_dice" ? 1 : null,
             healDieType: null,
             healFlatBonus: null,
             healLevelMultiplier: null,
-            healAbility: null,
+            healAbility: e.target.value === "hit_dice" ? "CON" : null,
           })
         }
         className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
       >
         <option value="fixed">Fixed HP</option>
         <option value="dice">Dice + optional flat bonus</option>
+        <option value="hit_dice">Hit Dice + ability (per die)</option>
         <option value="character_level">Character level × multiplier</option>
         <option value="proficiency">Proficiency bonus</option>
         <option value="ability_modifier">Ability modifier</option>
@@ -1165,6 +1166,45 @@ function HealAmountEditor({
               placeholder="0"
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
             />
+          </div>
+        </div>
+      )}
+
+      {mode === "hit_dice" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Dice count</label>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={effect.healDiceCount ?? 1}
+              onChange={(e) =>
+                onChange({ healDiceCount: e.target.value ? parseInt(e.target.value, 10) : 1 })
+              }
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Uses the class Hit Die. Scale the count with Bonus by level when it grows.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Ability per die</label>
+            <select
+              value={effect.healAbility ?? "CON"}
+              onChange={(e) =>
+                onChange({
+                  healAbility: (e.target.value || "CON") as FeatureEffect["healAbility"],
+                })
+              }
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              {ABILITY_MODIFIER_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {key} modifier
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       )}

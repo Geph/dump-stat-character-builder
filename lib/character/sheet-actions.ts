@@ -12,6 +12,8 @@ import {
   shouldSuppressStandaloneBombCard,
 } from "@/lib/character/alchemist-bomb-sheet"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import { isHitPointsResourceKey } from "@/lib/character/hit-point-spend"
+import { resolveHitDiceHealCount } from "@/lib/character/resolve-feature-effect-heal"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import {
   hasManeuverSpendText,
@@ -19,6 +21,7 @@ import {
   inferredSpendToLimitedUses,
 } from "@/lib/character/infer-class-resource-spend"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
+import { resolveFixedValueAtLevel } from "@/lib/compendium/bonus-by-level"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import {
@@ -87,6 +90,10 @@ export type SheetActionEntry = {
   menuOptions?: SheetActionMenuOption[]
   /** Hit Dice spent when this action is used (feature activation.spendHitDice). */
   spendHitDice?: number | null
+  /** Current HP spent when this action is used (bypass temp HP). */
+  spendHitPoints?: number | null
+  /** After spending HP, offer a refund if the triggering roll still fails. */
+  refundHitPointsOnStillFailed?: boolean
   /** Hit die sides for this action's owning class (e.g. Draconic Vengeance damage). */
   hitDieSides?: number | null
   /** Heal, temp HP, and other ally-targetable effects applied when the action is used. */
@@ -103,6 +110,10 @@ export type SheetActionEntry = {
     mode: "combined_level_half_up"
     maxSlotLevel: number
   }
+  /** Divine Respite and similar: regain up to this many expended Hit Point Dice. */
+  restoreHitDiceOnUse?: {
+    amount: number
+  }
   /** Dark Arcana: spend a spell slot to refill a class resource. */
   restoreResourceFromSpellSlotOnUse?: {
     resourceKey: string
@@ -112,6 +123,12 @@ export type SheetActionEntry = {
   spendSpellSlotOnUse?: {
     minSpellLevel: number
   }
+  /** Drop-to-0 escape hatches: Use sets current HP to 1. */
+  dropToOneHpOnUse?: boolean
+  /** Sibling feature names resolved into `alsoActivate` after collect. */
+  alsoActivateFeatureNames?: string[]
+  /** Sibling features the player may fire after using this one (no extra action cost). */
+  alsoActivate?: SheetAlsoActivateAction[]
   /** Persistent editable notes requested by player_note characteristics. */
   playerNotes?: SheetPlayerNote[]
   /** Mundane item linkers that can be changed by the player (Dead Space, etc.). */
@@ -129,6 +146,15 @@ export type SheetEquipmentChoice = {
   label: string
   options: string[]
   allowCustom: boolean
+}
+
+export type SheetAlsoActivateAction = {
+  name: string
+  spendHitDice?: number | null
+  healEffects?: FeatureEffect[]
+  classLevel?: number
+  classId?: string | null
+  hitDieSides?: number | null
 }
 
 export type SheetActionMenuOption = {
@@ -155,6 +181,8 @@ export type SheetActionTalentAlert = {
   appliesToAttackVariants?: Array<"attack" | "primed" | "explode">
   /** When true, the dialog offers this rider as an optional add-on. */
   selectable?: boolean
+  /** When selected, replace the parent action's HP spend with this amount. */
+  spendHitPoints?: number
 }
 
 /** Trigger characteristics that represent a player-elected reaction when `useReaction` is set. */
@@ -194,6 +222,7 @@ const COMBAT_CHARACTERISTIC_TYPES = new Set<CharacteristicModifier["type"]>([
   "unarmed_strike_damage",
   "attack_roll_modifiers",
   "damage_roll_modifiers",
+  "failed_roll_trigger",
 ])
 
 const COMBAT_TEXT_RE =
@@ -298,14 +327,36 @@ function stripHtml(text: string): string {
   return text.replace(/<[^>]+>/g, " ")
 }
 
+/** "Your Sacrificial Strike improves. When you use this feature, you can choose to take 10…" */
+const PARENT_IMPROVES_CHOICE_RE =
+  /\byour\s+(.+?)\s+improves\b[\s\S]{0,160}\bwhen you use this feature\b[\s\S]{0,240}\byou can choose to take\s+(\d+)\b/i
+
+export function inferOptionalParentPowerImprovement(item: ActivatableItem): {
+  parentName: string
+  spendHitPoints: number
+  extraAmount?: number
+} | null {
+  const text = stripHtml(item.description ?? "")
+  const match = PARENT_IMPROVES_CHOICE_RE.exec(text)
+  if (!match) return null
+  const parentName = match[1].replace(/\s+/g, " ").trim()
+  const spendHitPoints = parseInt(match[2], 10)
+  if (!parentName || !Number.isFinite(spendHitPoints) || spendHitPoints < 1) return null
+  const extraMatch = text.match(/\bextra\s+(\d+)\b/i)
+  const extraAmount = extraMatch ? parseInt(extraMatch[1], 10) : undefined
+  return {
+    parentName,
+    spendHitPoints,
+    extraAmount: extraAmount != null && Number.isFinite(extraAmount) ? extraAmount : undefined,
+  }
+}
+
 export function activationKinds(activation?: FeatureActivation | null): ActionEconomyKind[] {
   if (!activation) return []
   const kinds: ActionEconomyKind[] = []
   if (activation.action) kinds.push("action")
   if (activation.bonusAction) kinds.push("bonus")
   if (activation.reaction) kinds.push("reaction")
-  // Drop-to-0 features (Survive) surface as reactions so they appear on the combat panel.
-  if (activation.onDropToZeroHp && !kinds.includes("reaction")) kinds.push("reaction")
   return kinds
 }
 
@@ -332,6 +383,8 @@ function kindsFromLinkedModifiers(
         kinds.add("reaction")
       } else if (characteristic.type === "special_attack" && !fromActivation.length) {
         // Special attacks are combat Actions unless activation was set otherwise.
+        kinds.add("action")
+      } else if (characteristic.type === "hit_dice_restore") {
         kinds.add("action")
       }
     }
@@ -411,6 +464,7 @@ function limitedUsesFromTriggerSpend(item: ActivatableItem): UsesConfig | null {
         spendResourceAmount?: number | null
       }
       if (!spend.spendResourceKey) continue
+      if (isHitPointsResourceKey(spend.spendResourceKey)) continue
       return {
         type: "class_resource",
         classResourceKey: spend.spendResourceKey,
@@ -525,6 +579,7 @@ function hasTriggeredSpendSignal(item: ActivatableItem): boolean {
       if (characteristic.type === "uses" || characteristic.type === "bonus_damage_riders") {
         return true
       }
+      if (characteristic.type === "failed_roll_trigger") return true
       if (
         TRIGGER_SPEND_CHARACTERISTIC_TYPES.has(characteristic.type) &&
         (characteristic as { spendResourceKey?: string | null }).spendResourceKey
@@ -538,11 +593,18 @@ function hasTriggeredSpendSignal(item: ActivatableItem): boolean {
 
 function triggerLabelFromWiring(item: ActivatableItem): string | null {
   if (item.activation?.onInitiative) return "When you roll Initiative"
+  if (item.activation?.onDropToZeroHp) return "When reduced to 0 HP"
   if (item.activation?.onFailedSave) return "When you fail a save"
   for (const instance of item.linkedModifiers ?? []) {
+    if (instance.activation?.onDropToZeroHp) return "When reduced to 0 HP"
     for (const characteristic of instance.characteristics ?? []) {
       if (characteristic.type === "bonus_damage_riders" || characteristic.type === "on_hit_trigger") {
         return "On a hit"
+      }
+      if (characteristic.type === "failed_roll_trigger") {
+        return characteristic.triggerOn === "success"
+          ? "When you succeed on a roll"
+          : "When you fail a roll"
       }
     }
   }
@@ -777,7 +839,50 @@ function resolveMenuOptions(item: ActivatableItem): SheetActionMenuOption[] {
   return options
 }
 
-function resolveSpendHitDice(item: ActivatableItem): number | null {
+function resolveHitDiceHealEffect(item: ActivatableItem): FeatureEffect | null {
+  const fromActivation = (item.activation?.effects ?? []).find((effect) => effect.healMode === "hit_dice")
+  if (fromActivation) return fromActivation
+  for (const instance of item.linkedModifiers ?? []) {
+    const linked = (instance.activation?.effects ?? []).find((effect) => effect.healMode === "hit_dice")
+    if (linked) return linked
+  }
+  return null
+}
+
+function resolveSpendHitPoints(item: ActivatableItem): number | null {
+  const fromActivation = item.activation?.spendHitPoints
+  if (fromActivation != null && fromActivation > 0) return fromActivation
+  for (const instance of item.linkedModifiers ?? []) {
+    const linked = instance.activation?.spendHitPoints
+    if (linked != null && linked > 0) return linked
+    for (const characteristic of instance.characteristics ?? []) {
+      const spend = characteristic as {
+        spendResourceKey?: string | null
+        spendResourceAmount?: number | null
+      }
+      if (isHitPointsResourceKey(spend.spendResourceKey) && (spend.spendResourceAmount ?? 0) > 0) {
+        return Math.floor(spend.spendResourceAmount ?? 0)
+      }
+    }
+  }
+  return null
+}
+
+function resolveRefundHitPointsOnStillFailed(item: ActivatableItem): boolean {
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const characteristic of instance.characteristics ?? []) {
+      if (characteristic.type !== "failed_roll_trigger") continue
+      if (characteristic.refundResourceOnStillFailed && isHitPointsResourceKey(characteristic.spendResourceKey)) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+function resolveSpendHitDice(item: ActivatableItem, classLevel?: number): number | null {
+  const hitDiceHeal = resolveHitDiceHealEffect(item)
+  if (hitDiceHeal) return resolveHitDiceHealCount(hitDiceHeal, classLevel ?? 1)
   const fromActivation = item.activation?.spendHitDice
   if (fromActivation != null && fromActivation > 0) return fromActivation
   for (const instance of item.linkedModifiers ?? []) {
@@ -874,6 +979,86 @@ function resolveSpendsEconomy(item: ActivatableItem): boolean | undefined {
   if (item.activation?.noEconomyCost === true) return false
   if (/^reckless attack$/i.test(item.name.trim())) return false
   if (inferDirectCompanionEffect(item.name, item.description)) return false
+  if (hasHitDiceRestore(item)) return false
+  return undefined
+}
+
+function hasHitDiceRestore(item: ActivatableItem): boolean {
+  return (item.linkedModifiers ?? []).some((instance) =>
+    (instance.characteristics ?? []).some((characteristic) => characteristic.type === "hit_dice_restore"),
+  )
+}
+
+function resolveDropToOneHpOnUse(item: ActivatableItem): boolean | undefined {
+  if (item.activation?.onDropToZeroHp) return true
+  if ((item.linkedModifiers ?? []).some((instance) => instance.activation?.onDropToZeroHp)) {
+    return true
+  }
+  return undefined
+}
+
+/** "you can immediately use your Miraculous Healing (no action required)" */
+const IMMEDIATELY_USE_FEATURE_RE =
+  /\b(?:you can )?immediately use your ([A-Z][\w][\w' ]*?)(?:\s*\([^)]*\))?(?:\.|$)/i
+
+function resolveAlsoActivateFeatureNames(item: ActivatableItem): string[] | undefined {
+  const names: string[] = []
+  const seen = new Set<string>()
+  const push = (raw: string | null | undefined) => {
+    const name = (raw ?? "").replace(/\s+/g, " ").trim()
+    const key = name.toLowerCase()
+    if (!name || seen.has(key)) return
+    seen.add(key)
+    names.push(name)
+  }
+  for (const name of item.activation?.alsoActivateFeatureNames ?? []) push(name)
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const name of instance.activation?.alsoActivateFeatureNames ?? []) push(name)
+  }
+  if (!names.length) {
+    const match = IMMEDIATELY_USE_FEATURE_RE.exec(stripHtml(item.description ?? ""))
+    if (match?.[1]) push(match[1])
+  }
+  return names.length ? names : undefined
+}
+
+function attachAlsoActivateActions(actions: SheetActionEntry[]): SheetActionEntry[] {
+  return actions.map((action) => {
+    const names = action.alsoActivateFeatureNames ?? []
+    if (!names.length) return action
+    const alsoActivate = names.flatMap((name) => {
+      const sibling = actions.find(
+        (other) => other.id !== action.id && other.name.toLowerCase() === name.toLowerCase(),
+      )
+      if (!sibling) return []
+      return [
+        {
+          name: sibling.name,
+          spendHitDice: sibling.spendHitDice,
+          healEffects: sibling.healEffects,
+          classLevel: sibling.classLevel,
+          classId: sibling.classId,
+          hitDieSides: sibling.hitDieSides,
+        } satisfies SheetAlsoActivateAction,
+      ]
+    })
+    return { ...action, alsoActivate: alsoActivate.length ? alsoActivate : undefined }
+  })
+}
+
+function resolveHitDiceRestoreOnUse(
+  item: ActivatableItem,
+  classLevel: number,
+): { amount: number } | undefined {
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const characteristic of instance.characteristics ?? []) {
+      if (characteristic.type !== "hit_dice_restore") continue
+      const amount =
+        resolveFixedValueAtLevel(characteristic.amountByLevel, classLevel, characteristic.amount) ??
+        characteristic.amount
+      if (amount != null && amount > 0) return { amount }
+    }
+  }
   return undefined
 }
 
@@ -1037,7 +1222,8 @@ function pushActivatableItemActions(
   const suppressParent =
     suppressParentForMovementExpansions(feature, movementExpansions) ||
     shouldSuppressStandaloneBombCard(feature.name, resolveSpecialAttacks(feature, levelCap)) ||
-    isSelectableBombFormulaRiderFeature(feature)
+    isSelectableBombFormulaRiderFeature(feature) ||
+    Boolean(inferOptionalParentPowerImprovement(feature))
   const limitedUses = resolveLimitedUsesWithInference(feature, availableResourceKeys)
   const itemWithUses: ActivatableItem = { ...feature, limitedUses }
 
@@ -1082,12 +1268,17 @@ function pushActivatableItemActions(
           specialAttack: specialAttacks[0] ?? null,
           specialAttacks,
           menuOptions: menuOptions.length ? menuOptions : undefined,
-          spendHitDice: resolveSpendHitDice(feature),
+          spendHitDice: resolveSpendHitDice(feature, levelCap),
+          spendHitPoints: resolveSpendHitPoints(feature),
+          refundHitPointsOnStillFailed: resolveRefundHitPointsOnStillFailed(feature),
           hitDieSides: hitDieSides ?? null,
           healEffects: healEffects.length ? healEffects : undefined,
           spendsEconomy: trigger
             ? false
             : (fallback.spendsEconomy ?? resolveSpendsEconomy(feature)),
+          restoreHitDiceOnUse: resolveHitDiceRestoreOnUse(feature, levelCap),
+          dropToOneHpOnUse: resolveDropToOneHpOnUse(feature),
+          alsoActivateFeatureNames: resolveAlsoActivateFeatureNames(feature),
           playerNotes: playerNotes.length ? playerNotes : undefined,
           equipmentChoices: equipmentChoices.length ? equipmentChoices : undefined,
           psionicAugments: resolvePsionicAugments({
@@ -1114,7 +1305,9 @@ function pushActivatableItemActions(
       description: expansion.description,
       classId,
       classResourceKey: resolveActionResourceKey(itemWithUses),
-      spendHitDice: resolveSpendHitDice(feature),
+      spendHitDice: resolveSpendHitDice(feature, levelCap),
+      spendHitPoints: resolveSpendHitPoints(feature),
+      refundHitPointsOnStillFailed: resolveRefundHitPointsOnStillFailed(feature),
       hitDieSides: hitDieSides ?? null,
       healEffects: expansion.healEffects,
     })
@@ -1492,8 +1685,29 @@ function collectTalentAlertsFromFeatures(
             description: feature.description,
             summary,
           }),
+          spendHitPoints:
+            typeof char.spendHitPoints === "number" && char.spendHitPoints > 0
+              ? char.spendHitPoints
+              : inferOptionalParentPowerImprovement(feature)?.spendHitPoints,
         })
       }
+    }
+    const inferredImprove = inferOptionalParentPowerImprovement(feature)
+    if (inferredImprove && !seen.has(`${feature.name}::${inferredImprove.parentName}`)) {
+      const extra =
+        inferredImprove.extraAmount != null
+          ? `; the target takes an extra ${inferredImprove.extraAmount} Radiant`
+          : ""
+      alerts.push({
+        name: feature.name,
+        summary: `Choose to take ${inferredImprove.spendHitPoints} Radiant${extra}.`,
+        description: feature.description ?? null,
+        sourceLabel,
+        parentPowerNames: [inferredImprove.parentName],
+        selectable: true,
+        spendHitPoints: inferredImprove.spendHitPoints,
+      })
+      seen.add(`${feature.name}::${inferredImprove.parentName}`)
     }
     if (isPrimeBombName(feature.name)) return
     if (seen.has(`${feature.name}::Bomb|Bombs`)) return
@@ -1739,6 +1953,7 @@ function attachTalentAlertsToActions(
           parentMenuOptionNames,
           appliesToAttackVariants,
           selectable,
+          spendHitPoints,
         }) => ({
           name,
           summary,
@@ -1747,6 +1962,7 @@ function attachTalentAlertsToActions(
           parentMenuOptionNames,
           appliesToAttackVariants,
           selectable,
+          spendHitPoints,
         }),
       ),
     }
@@ -1867,7 +2083,7 @@ export function collectSheetActions(params: {
     featureUnlocked(params.classDetails, /^eldritch master$/i) ? "all" : "half_round_up"
 
   const seen = new Set<string>()
-  return withRiders
+  return attachAlsoActivateActions(withRiders)
     .map((action) => {
       action = { ...action, icon: resolveSheetActionIcon(action) }
       if (/^magical cunning$/i.test(action.name)) {

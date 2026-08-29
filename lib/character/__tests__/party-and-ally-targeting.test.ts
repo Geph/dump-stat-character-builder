@@ -252,5 +252,28 @@ describe("apply ally effects", () => {
         { characterLevel: 5, proficiencyBonus: 3, abilityMods: {} },
       ),
     ).toBe(6)
+    expect(
+      resolveFeatureEffectHealAmount(
+        {
+          id: "3",
+          kind: "heal_self",
+          healMode: "hit_dice",
+          healDiceCount: 2,
+          healAbility: "CON",
+          bonusByLevel: [
+            { level: 1, mode: "fixed", fixed: 1 },
+            { level: 5, mode: "fixed", fixed: 2 },
+          ],
+        },
+        {
+          characterLevel: 5,
+          classLevel: 5,
+          proficiencyBonus: 3,
+          abilityMods: { CON: 2 },
+          hitDieSides: 12,
+          random: () => 0,
+        },
+      ),
+    ).toBe(6)
   })
 })

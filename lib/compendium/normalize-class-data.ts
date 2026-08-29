@@ -9,6 +9,7 @@ import { wireClassToolProficiencyChoices } from "@/lib/compendium/class-tool-pro
 import { sanitizeAlchemistFeatures } from "@/lib/compendium/alchemist-feature-wiring"
 import { sanitizeCaptainFeatures } from "@/lib/compendium/captain-feature-wiring"
 import { ensureInvestigatorRitualistFeature } from "@/lib/import/enrichment-presets/packs/investigator"
+import { enrichClassFeaturesWithPresets } from "@/lib/import/enrichment-presets/apply"
 import bundledClasses from "@/lib/srd/seed-data/classes.json"
 import { isSrdSource } from "@/lib/srd/source"
 
@@ -194,6 +195,19 @@ export function enrichClassesList<
         enriched = {
           ...enriched,
           features: features.map((feature) => ensureInvestigatorRitualistFeature(feature)),
+        }
+      }
+    }
+    {
+      const features = (enriched as { features?: Feature[] }).features
+      if (Array.isArray(features)) {
+        enriched = {
+          ...enriched,
+          features: enrichClassFeaturesWithPresets(
+            features,
+            enriched.name,
+            (enriched as { spellcasting?: unknown }).spellcasting,
+          ),
         }
       }
     }

@@ -1,0 +1,14 @@
+---
+description: Dump Stat session invariants — copyright, common modifiers, import loop
+alwaysApply: true
+---
+
+# Session invariants
+
+A new chat has no prior transcript. These still apply.
+
+1. **Copyright** — Never commit PHB / setting-book prose into seed or GitHub, and never commit unapproved card art (`local-available-card-art.json`, PHB/setting PNGs). Wiring without book text is fine. See `AGENTS.md` and `docs/repository-overview.md`.
+
+2. **Common modifiers** — Reuse or extend the shared catalog so users can edit wiring in the Compendium. Do not hard-code class/feature names in sheet/runtime when a modifier type exists. See `docs/modifier-vs-feature-effect.md`.
+
+3. **Import loop** — If the bug was a Drive JSON / BYO / detect / enrichment lapse, update those plus a regression test. Do not only patch one character. See `docs/homebrew-import-review.md` and `lib/import/modifier-wiring-registry.ts`.

@@ -481,7 +481,8 @@ describe("MHP Warden feature wiring", () => {
       ],
       species: null,
     })
-    expect(at14.find((a) => a.name === "Survive")?.kinds).toEqual(["reaction"])
+    expect(at14.find((a) => a.name === "Survive")?.trigger).toBe("When reduced to 0 HP")
+    expect(at14.find((a) => a.name === "Survive")?.kinds).not.toContain("reaction")
     expect(at14.find((a) => a.name === "Survive")?.category).toBe("combat")
     expect(at14.find((a) => a.name === "Earthshatter")?.specialAttack?.areaLengthFeet).toBe(10)
     expect(

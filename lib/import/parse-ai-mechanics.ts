@@ -805,6 +805,10 @@ function buildFromMechanic(
               entry === "attack" || entry === "primed" || entry === "explode",
           ),
           selectable: mechanic.selectable ?? false,
+          spendHitPoints:
+            mechanic.spendHitPoints != null && mechanic.spendHitPoints > 0
+              ? mechanic.spendHitPoints
+              : undefined,
         },
       ]),
     }
@@ -1067,6 +1071,11 @@ function buildFromMechanic(
               alwaysPrepared: mechanic.alwaysPrepared ?? true,
               castAsRitual: mechanic.castAsRitual || undefined,
               unlocksAtClassLevel: mechanic.unlocksAtClassLevel,
+              ...(mechanic.unlocksAtClassLevel != null && mechanic.unlocksAtClassLevel > 1
+                ? { freeCastPerLongRest: 1 }
+                : /\bonce\s+(?:free\s+)?per\s+long\s+rest\b/i.test(matchedPhrase)
+                  ? { freeCastPerLongRest: 1 }
+                  : {}),
             })),
             choiceGrants,
             alwaysPrepared: mechanic.alwaysPrepared ?? (spellNames.length > 0 ? true : undefined),
@@ -1571,6 +1580,33 @@ function buildFromMechanic(
             type: "grant_custom_ability",
             abilityNames,
             label: matchedPhrase || `Gain ${abilityNames.join(", ")}`,
+          },
+        ]),
+      }
+    }
+    case "hit_dice_restore": {
+      const amount = mechanic.hitDiceRestoreAmount ?? mechanic.amount
+      if (amount == null || amount < 1) return null
+      const amountByLevel = (mechanic.hitDiceRestoreByLevel ?? []).map((row) => ({
+        level: row.level,
+        mode: "fixed" as const,
+        fixed: row.amount,
+      }))
+      if (!amountByLevel.some((row) => row.fixed === amount)) {
+        amountByLevel.unshift({ level: 1, mode: "fixed", fixed: amount })
+      }
+      return {
+        ruleId: "ai.hit_dice_restore",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("hit_dice_restore"), [
+          {
+            id: modId(instanceKey(ctx, "hit_dice_restore")),
+            type: "hit_dice_restore",
+            amount,
+            amountByLevel,
+            restoreOn: mechanic.restoreOnRest === "long_rest" ? "long_rest" : "short_rest",
+            label: ctx.featureName ?? "Restore Hit Point Dice",
           },
         ]),
       }

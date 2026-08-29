@@ -189,5 +189,6 @@ export function buildWeaponMorphAttack(params: {
     attackBreakdown: base.attackBreakdown,
     attackAbilityMod: attackAbility.mod,
     damageAbilityMod: damageAbility.mod,
+    includesAbilityModifierOnDamage: true,
   }
 }

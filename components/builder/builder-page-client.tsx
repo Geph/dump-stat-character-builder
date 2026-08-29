@@ -279,6 +279,7 @@ import {
 } from "@/lib/builder/background-asi"
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import { collectSubclassAlwaysPreparedSpellIds } from "@/lib/character/subclass-granted-spells"
+import { resolveSpellIdAgainstCatalog } from "@/lib/import/resolve-linked-modifier-spells"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import {
   abilitySpecializationChoice,
@@ -2031,7 +2032,9 @@ export default function BuilderPageClient() {
     })
   }, [draftReady, classSkillPicks, grantedSkillNames])
 
-  const featGrantedSpellIds = aggregatedCharacteristics.spellsKnown.flatMap((entry) => entry.spellIds)
+  const featGrantedSpellIds = aggregatedCharacteristics.spellsKnown.flatMap((entry) =>
+    entry.spellIds.map((id) => resolveSpellIdAgainstCatalog(id, spells)),
+  )
   const subclassGrantedSpellIds = collectSubclassAlwaysPreparedSpellIds(
     activeClassLevels.map((cl) => ({
       subclass: subclasses.find((sc) => sc.id === subclassByClassId[cl.classId]) ?? null,

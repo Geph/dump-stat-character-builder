@@ -368,6 +368,38 @@ describe("Martyr spell uses", () => {
     expect(result.resourceKey).toBe("spell_uses")
     expect(result.baseCost).toBe(1)
     expect(result.canCast).toBe(true)
+    expect(result.hitPointsCost).toBe(0)
+  })
+
+  it("adds Hit Point Spellcasting cost for the created slot level", () => {
+    const result = resolveSpellCastCost({
+      spellLevel: 5,
+      spellcasting: {
+        ability: "Wisdom",
+        hit_point_cost_by_level: { 1: 5, 2: 10, 3: 20, 4: 30, 5: 45 },
+      },
+      classRow: {
+        class_resources: [
+          {
+            id: "spell_uses",
+            name: "Spell Uses",
+            uses: {
+              type: "at_level",
+              atLevelMode: "tier",
+              atLevelTable: [{ level: 1, count: 2 }],
+              recharges: [{ rest: "long_rest" }],
+            },
+          },
+        ],
+      },
+      classLevel: 17,
+      availablePoints: 2,
+      selectedMetamagic: [],
+      ctx,
+    })
+    expect(result.mode).toBe("resource")
+    expect(result.hitPointsCost).toBe(45)
+    expect(result.canCast).toBe(true)
   })
 
   it("does not spend Spell Uses on cantrips", () => {

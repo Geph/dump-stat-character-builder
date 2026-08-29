@@ -261,7 +261,7 @@ export function auditImportWiring(content: unknown): WiringFinding[] {
         id: "martyr.no_slot_progression",
         severity: "warn",
         message:
-          "Martyr should not use normal caster_progression slots — Hit Point Spellcasting is narrative; keep spell_uses + max_spell_level",
+          "Martyr should not use normal caster_progression slots — Hit Point Spellcasting spends current HP; keep spell_uses + max_spell_level",
         path: "classes[0].spellcasting",
       })
     }

@@ -326,6 +326,14 @@ export function SpecialAttackFieldsEditor({
           suggestions={DAMAGE_TYPES}
           placeholder="Add damage type…"
         />
+        <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={Boolean(mod.chooseDamageType)}
+            onChange={(event) => onChange({ ...mod, chooseDamageType: event.target.checked })}
+          />
+          Player chooses one type when using this attack
+        </label>
       </div>
 
       <DamageByLevelEditor rows={damageByLevel} onChange={(rows) => onChange({ ...mod, damageByLevel: rows })} />

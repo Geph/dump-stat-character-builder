@@ -8,12 +8,18 @@ function normalizeClassResource(resource: ClassResource, className: string): Cla
   const legacy = resource as ClassResource & {
     subclass_name?: string | null
     subclassName?: string | null
+    resource_key?: string | null
   }
+  const id = resource.id?.trim() || legacy.resource_key?.trim() || ""
   const subclassName =
     legacy.subclassName ??
     legacy.subclass_name ??
-    inferLegacyClassResourceSubclass(className, resource.id)
-  return subclassName ? { ...resource, subclassName } : resource
+    inferLegacyClassResourceSubclass(className, id)
+  return {
+    ...resource,
+    id,
+    ...(subclassName ? { subclassName } : {}),
+  }
 }
 
 /** Resolve spendable/display resources for a class (table rows → embedded JSON → SRD defaults). */

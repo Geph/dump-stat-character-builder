@@ -306,8 +306,16 @@ export const ImportMechanicSchema = z.object({
   alertSummary: z.string().optional(),
   appliesToAttackVariants: z.array(z.enum(["attack", "primed", "explode"])).optional(),
   selectable: z.boolean().optional(),
-  /** temporary_hit_points */
+  /** power_rider — when selected, replace the parent action's HP spend. */
+  spendHitPoints: z.number().optional(),
+  /** temporary_hit_points / hit_dice_restore fallback */
   amount: z.number().optional(),
+  /** hit_dice_restore — expended Hit Point Dice regained (prefer over amount). */
+  hitDiceRestoreAmount: z.number().optional(),
+  hitDiceRestoreByLevel: z
+    .array(z.object({ level: z.number(), amount: z.number() }))
+    .optional(),
+  restoreOnRest: z.enum(["short_rest", "long_rest"]).optional(),
   amountDice: z.string().optional(),
   amountScaling: z
     .enum(["character_level", "class_resource_die", "ability_modifier", "proficiency"])
@@ -506,6 +514,7 @@ export const ClassSpellcastingImportSchema = z.object({
       replaces_spell_slots: z.boolean(),
     })
     .optional(),
+  hit_point_cost_by_level: z.record(z.string(), z.number()).nullable().optional(),
 })
 
 export const SubclassImportSchema = z.object({
@@ -1088,9 +1097,11 @@ export const CHOICE_EXTRACTION_HINT = `When content requires a player to choose 
 - Put each option's mechanical rules in that option's description (not only in the parent feature list). Dump Stat wires Common Modifiers per option from option descriptions (resistance, speeds, darkvision, etc.) and strips duplicates from the parent.
 - Split per-option vs shared benefits by where they belong: only what DIFFERS between rows goes in options[].description; a benefit that every option grants identically stays on the parent (description + mechanics[]), which applies on top of whichever option the player picks. Do not copy a shared benefit into all five options, and do not drop it because the feature is a choice.
 - Two-column benefit tables (Plane | Damage Resistance | Cantrip, legacy/lineage tables, patron tables): one option per table row, named exactly as the first column, with that row's resistance and cantrip sentence in the option description. A trailing sentence that applies to all rows ("you can cast this cantrip without material components, and your spellcasting ability for it is Intelligence, Wisdom, or Charisma") belongs on the parent — emit it as a parent spellcasting_ability mechanic (see Common Modifier wiring), not per option.
+- Species lineage/legacy spell ladders (Level 1 cantrip, character level 3 spell, character level 5 spell): put the cantrip and any speed/darkvision/resistance in the option description, keep the Level|Spell HTML table, AND emit one spells_known mechanic per unlock tier on that option (spellNames + unlocksAtClassLevel). Do not leave the 3/5 spells only in the table — Wood Elf Longstrider / Pass without Trace style grants must be explicit mechanics so they show on the sheet like Magic Initiate.
 - Choose-from-spell-lists (Circle of the Land land types, domain/oath lists with multiple mutually exclusive tables, Psychokinesis-style specializations that each replace an Alternate Effects table): model as isChoice + choices.options where EACH option's description includes its own HTML <table> of spells (class-level columns for subclass lists; Point Cost | Alternate Effects for psi Alternate Effects). Do not mash every subtype's spell table into the parent feature description alone — the importer wires spells_known per option from that option's table.
 - Feat milestones that grant another feat (Epic Boon, Fighting Style feat picks, Origin Feat picks): do NOT use isChoice — use grant_feat via description phrasing and/or mechanics[] (see Common Modifier wiring). Never model those milestones as isChoice + choices.
 - The Ability Score Improvement feat itself is NOT a grant_feat — its body is +2 to one score or +1 to two. Prefer empty mechanics[] (hand presets wire asi_pool) or omit grant_feat entirely; never tag ASI as grant_feat. This holds even though 2024 class text says "you gain the Ability Score Improvement feat" — Dump Stat's own detection wires the milestone from the feature name; explicit grant_feat mechanics double-wire it.
+- Half-feats that raise one named score ("Your Wisdom ability score increases by 1" / "Increase your Dexterity score by 1") must keep that sentence verbatim. Dump Stat wires those as a fixed +1, not a player-choice pool. Do not rewrite a single named score as "one ability score of your choice".
 - Emit the class Ability Score Improvement feature ONCE at its first level (usually 4), even though the class table repeats it at 8/12/16 — Dump Stat's feat-milestone system grants the later slots automatically. Do not emit one ASI feature per milestone level.
 - Named PHB Origin/General feats with complex spell/skill picks (Magic Initiate, Resilient, Keen Mind, Observant, Elemental Adept): prefer empty mechanics[] and avoid inventing isChoice shells — Dump Stat has name-matched presets. isChoice is fine for true option lists with no preset (homebrew).
 - If a feat grants a choice from a custom ability catalog that a class or subclass also draws from (a discipline, a class-level talent list, an exploit list, etc.) rather than granting a new feat pick, use isChoice: true with choices.options listing each eligible entry by its exact name (see Name and source matching). This is different from grant_feat milestones — the feat is granting a pick from an ability system, not another feat.`
@@ -1135,7 +1146,10 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Battle Dice / pools that refill when you roll Initiative:** also set uses.rechargeOnInitiative: true (full pool) or a number for partial restore
 - **Captain Battle Dice:** spendable pool from the Battle Dice column (NdM) with rechargeOnInitiative. Battle Tactics auto-grants Bolster, Born Leader, Morale Boost, Rally, and Staggering Strike via grant_custom_ability — NOT a class_knacks / Maneuvers Known picker (Vagabond has the pick-N table). Subclass [Maneuver] features are extra named options.
 - **Gunslinger Risk Dice:** short/long rest pool from the Risk Dice column; include dieSidesByLevel (d8/d10/d12). Dire Gambit → rechargeOnInitiative: 1 (not full refill; enrichment sets this from the feature — do not set initiative recharge from the table alone). Keep "expend one Risk Die" on maneuvers. Base Maneuver Options (Bite the Bullet, Blindfire, Dodge Roll, Grazing Shot, Maverick Spirit, Skin of Your Teeth) are auto-known via Risk + grant_custom_ability — NOT a class_knacks picker. Always extract Skin of Your Teeth (PDF places Maneuver Options between Deadeye and Gun Tank). Include Pistolero. Do not contaminate with Captain/Vagabond-only Battle Die maneuvers.
-- **Martyr Spell Uses:** spendable long-rest pool from the Spell Uses column. Hit Point Spellcasting self-damage stays in the Spellcasting feature description (not modeled as normal slots).
+- **Martyr Spell Uses:** spendable long-rest pool from the Spell Uses column. Hit Point Spellcasting spends current HP from the table (not modeled as normal slots); the sheet deducts that HP on cast.
+- **Martyr Divine Respite:** one class feature at the level it is gained (usually 9). Emit hit_dice_restore (hitDiceRestoreAmount 3, hitDiceRestoreByLevel 13→6 and 17→10) plus uses usesFixed 1 / usesRecharge long_rest. Keep the short-rest and scaling sentences on that same feature. Do not emit leftover features at 13/17 that only say the number of Hit Point Dice increases.
+- **Martyr Undying:** Passive when reduced to 0 HP (not a Reaction). Keep \"immediately use your Miraculous Healing (no action required)\" on the same feature. Pair with uses usesFixed 1 / usesRecharge long_rest.
+- **Martyr Improved Sacrificial Strike:** do not emit a second combat action. Emit power_rider parentPowerNames [\"Sacrificial Strike\"], selectable true, spendHitPoints 10. Keep \"you can choose to take 10… extra 20\".
 - **Martyr Max Spell Levels:** special cap (resource_key "max_spell_level") from the Max Spell Levels column — not a spendable pool and not normal caster progression.
 - **Investigator Ritual Level / Finisher / Rushed Incantation / Trinkets:** Ritual Level = special cap; Finisher = special NdM rider with resource_key "finisher" (never "finisher_dice"); Rushed Incantation + Trinkets = spendable short-regain-1 / long-all pools.
 - **Mage Hand Press Warden Interrupt:** Interrupt column → class_resources.interrupt (short rest regain 1 / long rest all). Do not confuse with KibblesTasty Warden Endurance Dice — if "Warden" already exists in the compendium, keep the source name "Warden" in JSON; the import UI will ask the user what to rename it to (suggestion: "Warden (Mage Hand Press)").
@@ -1194,7 +1208,8 @@ export const CUSTOM_CLASS_IMPORT_HINT = `For homebrew/custom classes (e.g. <Desi
 - Extract starting_equipment_groups when an Equipment block lists choice groups (a)/(b)/(c) and fixed items; mirror ONE group { description, options: [{ label, items: [{ name, quantity }] }] } — never a flat [{ label, items }] array; use labels A/B/C
 - **Class-specific / non-SRD weapons:** if starting equipment or class features introduce a weapon that is not a standard SRD item (Revolver, Palisade Gun, etc.), emit a full equipment[] row in the SAME JSON — name, category "Weapon", subcategory, cost, weight, properties.damage, properties.properties (Ammunition / Firearm / Reload / Recoil tags as written), properties.mastery, and the source's property rule text in description when it defines a new property (Firearm, Recoil). Do not only list the name in starting_equipment_groups — Dump Stat flags named starting gear that has no catalog or batch equipment[] row
 - Disciplines, talents, or invocation-like options with point costs should be class/subclass features; note psi/point costs in description
-- Custom spells and feats in spells[] and feats[]; set spell classes to include the custom class name; each spells[] stub needs level, school (use "Unknown" when absent), and concentration (boolean, default false)`
+- Custom spells and feats in spells[] and feats[]; set spell classes to include the custom class name; each spells[] stub needs level, school (use "Unknown" when absent), and concentration (boolean, default false)
+- When a class feature grants named benefits that use different action economies (Bonus Action vs once-per-turn / Passive D20 Test), emit each named benefit as its own features[] row at the same level. Example: Martyr Sacrifice → Sacrificial Strike (Bonus Action) and Sacrificial Skill (Passive). Keep a short parent flavor row only when it has unique text; otherwise omit the combined blob.`
 
 export const IMPORT_PROPOSALS_HINT = `For import_proposals (user confirmation before creating compendium entries):
 - Identify every class resource pool you find (Psi Points, Psi Limit, Rage, Ki, Sorcery Points, etc.)
