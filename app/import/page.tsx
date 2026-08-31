@@ -110,6 +110,7 @@ import {
 import { createClient } from "@/lib/db/client"
 import {
   buildInitialImportCardArtUrlMap,
+  mergeImportCardArtUrlMap,
   collectImportCardArtTargets,
   type ImportCardArtUrlMap,
 } from "@/lib/import/import-card-art"
@@ -653,12 +654,10 @@ export default function ImportPage() {
 
     setCardArtUrlMap((current) => {
       if (!includeCardArt) return {}
-      const initial = buildInitialImportCardArtUrlMap(pendingImport.content)
-      const next = { ...initial }
-      for (const [key, value] of Object.entries(current)) {
-        if (key in next && value.trim()) next[key] = value
-      }
-      return next
+      return mergeImportCardArtUrlMap(
+        buildInitialImportCardArtUrlMap(pendingImport.content),
+        current,
+      )
     })
   }, [pendingImport, includeCardArt])
 

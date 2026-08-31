@@ -7,6 +7,7 @@ import {
   CLASS_CARD_ASPECT_CLASS,
   WIDE_CARD_ASPECT_CLASS,
 } from "@/lib/compendium/card-image"
+import { ensureLocalAvailableCardArtLoaded } from "@/lib/compendium/available-card-art"
 import {
   collectImportCardArtTargets,
   countImportCardArtUrls,
@@ -69,10 +70,15 @@ export function ImportCardArtControls({
   onUrlChange: (next: string) => void
 }) {
   const preview = normalizeCardImageUrl(url)
+  const [previewFailed, setPreviewFailed] = useState(false)
+  useEffect(() => {
+    setPreviewFailed(false)
+  }, [preview])
   const aspectClass = portrait ? CLASS_CARD_ASPECT_CLASS : WIDE_CARD_ASPECT_CLASS
   const previewCropClass = portrait
     ? "h-full w-full object-cover object-top"
     : "h-full w-full object-cover object-center"
+  const showPreview = Boolean(preview) && !previewFailed
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -114,9 +120,14 @@ export function ImportCardArtControls({
           aspectClass,
         )}
       >
-        {preview ? (
+        {showPreview ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="" className={previewCropClass} />
+          <img
+            src={preview!}
+            alt=""
+            className={previewCropClass}
+            onError={() => setPreviewFailed(true)}
+          />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground">
             <ImageIcon className="h-5 w-5 opacity-50" />
@@ -172,6 +183,13 @@ export function ImportCardArtPanel({
   onSourceBulkAction,
   continueReview,
 }: ImportCardArtPanelProps) {
+  const [localArtEpoch, setLocalArtEpoch] = useState(0)
+  useEffect(() => {
+    const onReady = () => setLocalArtEpoch((n) => n + 1)
+    window.addEventListener("dumpstat:local-card-art-available", onReady)
+    void ensureLocalAvailableCardArtLoaded().then(onReady)
+    return () => window.removeEventListener("dumpstat:local-card-art-available", onReady)
+  }, [])
   const targets = useMemo(() => {
     const all = collectImportCardArtTargets(content, { defaultSource, skippedKeys })
     const excluded = excludeSections?.length ? new Set(excludeSections) : null
@@ -181,7 +199,7 @@ export function ImportCardArtPanel({
       if (allowed && !allowed.has(target.section)) return false
       return true
     })
-  }, [content, defaultSource, sections, excludeSections, skippedKeys])
+  }, [content, defaultSource, sections, excludeSections, skippedKeys, localArtEpoch])
   const targetSeedKey = targets.map((target) => `${target.key}:${target.initialUrl ?? ""}`).join("|")
   useEffect(() => {
     const filled = fillBlankImportCardArtUrls(value, targets)

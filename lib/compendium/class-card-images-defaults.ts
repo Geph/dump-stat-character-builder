@@ -1,4 +1,7 @@
-import { filterAvailableDefaultCardImageUrl } from "@/lib/compendium/available-card-art"
+import {
+  maybeFilterDefaultCardImageUrl,
+  type DefaultCardImageAvailability,
+} from "@/lib/compendium/available-card-art"
 import { withBasePath } from "@/lib/config/deploy-mode"
 
 const classCardImage = (slug: string) => withBasePath(`/images/compendium/classes/${slug}.png`)
@@ -29,6 +32,12 @@ export const SRD_CLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
   "Warden (Kibbles Tasty)": classCardImage("warden-kibbles"),
 }
 
-export function defaultClassCardImageUrl(className: string): string | null {
-  return filterAvailableDefaultCardImageUrl(SRD_CLASS_CARD_IMAGES_BY_NAME[className] ?? null)
+export function defaultClassCardImageUrl(
+  className: string,
+  options?: DefaultCardImageAvailability,
+): string | null {
+  return maybeFilterDefaultCardImageUrl(
+    SRD_CLASS_CARD_IMAGES_BY_NAME[className] ?? null,
+    options?.requireAvailable !== false,
+  )
 }

@@ -1,3 +1,4 @@
+import { filterAvailableDefaultCardImageUrl } from "@/lib/compendium/available-card-art"
 import type { CompendiumContentType } from "@/lib/compendium/content-types"
 import {
   compendiumUsesPortraitCardArt,
@@ -35,6 +36,8 @@ export type ImportCardArtTarget = {
   /** Compendium tab used for aspect / crop hints in the review UI. */
   compendiumTab: CompendiumContentType
   initialUrl: string | null
+  /** Mapped or stamped `/images/compendium/…` path to try when the file exists locally. */
+  localCandidateUrl: string | null
 }
 
 export type ImportCardArtUrlMap = Record<string, string>
@@ -63,24 +66,37 @@ export function importCardArtTargetKey(section: ImportCardArtSection, index: num
   return `${section}:${index}`
 }
 
+export function isLocalCompendiumCardArtUrl(url: string): boolean {
+  return /\/images\/compendium\//i.test(url)
+}
+
+/** Keep remote / data URLs; keep local `/images/compendium/…` only when the file is present. */
+export function usableImportCardArtUrl(url: string | null | undefined): string | null {
+  const existing = normalizeCardImageUrl(url)
+  if (!existing) return null
+  if (!isLocalCompendiumCardArtUrl(existing)) return existing
+  return filterAvailableDefaultCardImageUrl(existing)
+}
+
 /** Bundled / hosted card defaults keyed by item name (when the import row has no URL). */
 export function defaultImportCardArtUrl(
   section: ImportCardArtSection,
   name: string,
-  options?: { className?: string | null },
+  options?: { className?: string | null; requireAvailable?: boolean },
 ): string | null {
   if (!shouldAssignBundledCardArt()) return null
   const trimmed = name.trim()
   if (!trimmed) return null
+  const availability = { requireAvailable: options?.requireAvailable !== false }
   switch (section) {
     case "classes":
-      return defaultClassCardImageUrl(trimmed)
+      return defaultClassCardImageUrl(trimmed, availability)
     case "subclasses":
-      return defaultSubclassCardImageUrl(trimmed, options?.className)
+      return defaultSubclassCardImageUrl(trimmed, options?.className, availability)
     case "species":
-      return defaultSpeciesCardImageUrl(trimmed)
+      return defaultSpeciesCardImageUrl(trimmed, availability)
     case "backgrounds":
-      return defaultBackgroundCardImageUrl(trimmed)
+      return defaultBackgroundCardImageUrl(trimmed, availability)
     case "spells":
       return defaultSpellCardImageUrl(trimmed)
     case "equipment":
@@ -89,13 +105,27 @@ export function defaultImportCardArtUrl(
   }
 }
 
+function mappedLocalImportCardArtUrl(
+  section: ImportCardArtSection,
+  row: { name: string; card_image_url?: string | null; class_name?: string | null },
+): string | null {
+  const existing = normalizeCardImageUrl(row.card_image_url)
+  if (existing && isLocalCompendiumCardArtUrl(existing)) return existing
+  const mapped = defaultImportCardArtUrl(section, row.name, {
+    className: row.class_name,
+    requireAvailable: false,
+  })
+  return mapped && isLocalCompendiumCardArtUrl(mapped) ? mapped : null
+}
+
 function rowInitialUrl(
   section: ImportCardArtSection,
   row: { name: string; card_image_url?: string | null; class_name?: string | null },
   options?: { keepExistingUrl?: boolean },
 ): string | null {
   const existing = normalizeCardImageUrl(row.card_image_url)
-  if (options?.keepExistingUrl && existing) return existing
+  const usableExisting = usableImportCardArtUrl(existing)
+  if (options?.keepExistingUrl && usableExisting) return usableExisting
   const bundled = defaultImportCardArtUrl(section, row.name, {
     className: row.class_name,
   })
@@ -103,7 +133,7 @@ function rowInitialUrl(
   if (existing && isHostedDumpstatCardImageUrl(existing)) {
     return bundled
   }
-  return existing ?? bundled
+  return usableExisting ?? bundled
 }
 
 function pushTargets<T extends { name: string; card_image_url?: string | null }>(
@@ -134,6 +164,7 @@ function pushTargets<T extends { name: string; card_image_url?: string | null }>
       detail: options?.detail?.(row),
       compendiumTab,
       initialUrl: rowInitialUrl(section, row, { keepExistingUrl: options?.keepExistingUrl }),
+      localCandidateUrl: mappedLocalImportCardArtUrl(section, row),
     })
   })
 }
@@ -204,6 +235,7 @@ export function buildInitialImportCardArtUrlMap(content: ImportContent): ImportC
 /**
  * Restore bundled / row URLs that the review map is missing or blanked.
  * Used when `type=url` inputs strip relative `/images/compendium/…` paths.
+ * Does not restore local paths that are not present on this install.
  */
 export function fillBlankImportCardArtUrls(
   value: ImportCardArtUrlMap,
@@ -212,12 +244,27 @@ export function fillBlankImportCardArtUrls(
   let changed = false
   const next = { ...value }
   for (const target of targets) {
-    if (!target.initialUrl?.trim()) continue
+    const initial = usableImportCardArtUrl(target.initialUrl)
+    if (!initial) continue
     if ((next[target.key] ?? "").trim()) continue
-    next[target.key] = target.initialUrl
+    next[target.key] = initial
     changed = true
   }
   return changed ? next : null
+}
+
+/** Prefer the reviewer's current URL when it is a remote URL or a present local file. */
+export function mergeImportCardArtUrlMap(
+  initial: ImportCardArtUrlMap,
+  current: ImportCardArtUrlMap,
+): ImportCardArtUrlMap {
+  const next = { ...initial }
+  for (const [key, value] of Object.entries(current)) {
+    if (!(key in next)) continue
+    const kept = usableImportCardArtUrl(value)
+    if (kept) next[key] = kept
+  }
+  return next
 }
 
 export function importCardArtUsesPortraitArt(tab: CompendiumContentType): boolean {

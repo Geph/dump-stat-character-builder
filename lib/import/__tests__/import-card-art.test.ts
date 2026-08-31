@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest"
 import type { ImportContent } from "@/lib/import/content-schema"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 import {
   applyImportCardArtUrls,
   buildInitialImportCardArtUrlMap,
   collectImportCardArtTargets,
   fillBlankImportCardArtUrls,
   importCardArtTargetKey,
+  mergeImportCardArtUrlMap,
+  usableImportCardArtUrl,
 } from "@/lib/import/import-card-art"
 
 describe("import-card-art", () => {
@@ -287,5 +291,56 @@ describe("import-card-art", () => {
     }
     const next = applyImportCardArtUrls(content, urlMap)
     expect(next.species?.[0]?.card_image_url).toBeNull()
+  })
+
+  it("keeps stamped local card paths only when the file is present", () => {
+    const charlatanPath = "/images/compendium/backgrounds/charlatan.png"
+    const acolytePath = "/images/compendium/backgrounds/acolyte.png"
+    const withBackgrounds: ImportContent = {
+      backgrounds: [
+        {
+          name: "Charlatan",
+          description: null,
+          skill_proficiencies: null,
+          feat_granted: null,
+          ability_bonuses: null,
+          card_image_url: charlatanPath,
+        },
+        {
+          name: "Acolyte",
+          description: null,
+          skill_proficiencies: null,
+          feat_granted: null,
+          ability_bonuses: null,
+          card_image_url: acolytePath,
+        },
+      ],
+    }
+    const map = buildInitialImportCardArtUrlMap(withBackgrounds)
+    const charlatanOnDisk = existsSync(
+      join(process.cwd(), "public/images/compendium/backgrounds/charlatan.png"),
+    )
+    expect(map[importCardArtTargetKey("backgrounds", 0)]).toBe(charlatanOnDisk ? charlatanPath : "")
+    expect(map[importCardArtTargetKey("backgrounds", 1)]).toMatch(/\/images\/compendium\/backgrounds\/acolyte\.png$/)
+    expect(usableImportCardArtUrl("https://example.com/art.png")).toBe("https://example.com/art.png")
+    expect(usableImportCardArtUrl(charlatanPath)).toBe(charlatanOnDisk ? charlatanPath : null)
+
+    const targets = collectImportCardArtTargets(withBackgrounds)
+    expect(targets[0]?.localCandidateUrl).toMatch(/charlatan\.png$/)
+    const filled = fillBlankImportCardArtUrls(
+      { [importCardArtTargetKey("backgrounds", 0)]: "" },
+      targets,
+    )
+    if (charlatanOnDisk) {
+      expect(filled?.[importCardArtTargetKey("backgrounds", 0)]).toMatch(/charlatan\.png$/)
+    } else {
+      expect(filled).toBeNull()
+    }
+
+    const merged = mergeImportCardArtUrlMap(
+      { [importCardArtTargetKey("backgrounds", 0)]: "" },
+      { [importCardArtTargetKey("backgrounds", 0)]: charlatanPath },
+    )
+    expect(merged[importCardArtTargetKey("backgrounds", 0)]).toBe(charlatanOnDisk ? charlatanPath : "")
   })
 })

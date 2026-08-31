@@ -1,4 +1,7 @@
-import { filterAvailableDefaultCardImageUrl } from "@/lib/compendium/available-card-art"
+import {
+  maybeFilterDefaultCardImageUrl,
+  type DefaultCardImageAvailability,
+} from "@/lib/compendium/available-card-art"
 import { withBasePath } from "@/lib/config/deploy-mode"
 import {
   isHostedDumpstatCardImageUrl,
@@ -244,6 +247,7 @@ export const SRD_SUBCLASS_CARD_IMAGES_BY_NAME: Record<string, string> = (() => {
 export function defaultSubclassCardImageUrl(
   subclassName: string,
   className?: string | null,
+  options?: DefaultCardImageAvailability,
 ): string | null {
   const trimmed = subclassName.trim()
   if (!trimmed) return null
@@ -275,7 +279,7 @@ export function defaultSubclassCardImageUrl(
     resolved = SRD_SUBCLASS_CARD_IMAGES_BY_NAME[trimmed] ?? null
   }
 
-  return filterAvailableDefaultCardImageUrl(resolved)
+  return maybeFilterDefaultCardImageUrl(resolved, options?.requireAvailable !== false)
 }
 
 function isUpgradeableDefaultCardImage(url: string): boolean {

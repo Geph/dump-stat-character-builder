@@ -2,12 +2,14 @@ import {
   isBundledPublicCardArtPath,
   publicCardArtPathFromUrl,
 } from "@/lib/compendium/bundled-card-art"
+import { withBasePath } from "@/lib/config/deploy-mode"
 
 /** Written by `pnpm images:optimize`; gitignored. Lists local-only card art relative to `public/images/compendium/`. */
 export const LOCAL_AVAILABLE_CARD_ART_MANIFEST_URL = "/images/compendium/local-available-card-art.json"
 export const LOCAL_AVAILABLE_CARD_ART_MANIFEST_REPO_PATH =
   "public/images/compendium/local-available-card-art.json"
-
+/** Hosted / `next dev` fallback when the optimize manifest is missing. */
+export const LOCAL_AVAILABLE_CARD_ART_API_URL = "/api/local-card-art"
 let browserLocalAvailable: Set<string> | null = null
 let browserManifestPromise: Promise<void> | null = null
 
@@ -58,8 +60,9 @@ function existsOnDisk(repoRelative: string): boolean {
 
 /**
  * Whether a default `/images/compendium/…` portrait should be assigned or shown.
- * Git-bundled SRD / Kibbles / Mage Hand Press art (and all species portraits) is always available.
- * Setting-book backgrounds and other local-only art apply when present after optimize.
+ * Git-bundled SRD / Kibbles seed art (and already-shipped species portraits) is always available.
+ * Setting-book backgrounds and other local-only art apply when the PNG is on this install
+ * (optimize manifest, live disk listing, or a file check on the server).
  */
 export function isDefaultCardArtAvailable(url: string | null | undefined): boolean {
   const existing = typeof url === "string" ? url.trim() : ""
@@ -88,9 +91,44 @@ export function filterAvailableDefaultCardImageUrl(url: string | null): string |
   return isDefaultCardArtAvailable(url) ? url : null
 }
 
+export type DefaultCardImageAvailability = {
+  /** When false, return the mapped `/images/compendium/…` path even if the file is missing. */
+  requireAvailable?: boolean
+}
+
+/** Apply availability filtering unless the caller is only peeking at the mapped path. */
+export function maybeFilterDefaultCardImageUrl(
+  url: string | null,
+  requireAvailable = true,
+): string | null {
+  return requireAvailable ? filterAvailableDefaultCardImageUrl(url) : url
+}
+
+function collectCardArtPaths(parsed: { paths?: unknown }): Set<string> {
+  const next = new Set<string>()
+  if (!Array.isArray(parsed.paths)) return next
+  for (const entry of parsed.paths) {
+    if (typeof entry === "string" && entry.trim()) {
+      next.add(entry.replace(/\\/g, "/").replace(/^\//, ""))
+    }
+  }
+  return next
+}
+
+async function fetchCardArtPaths(url: string): Promise<Set<string> | null> {
+  try {
+    const res = await fetch(url, { cache: "no-store" })
+    if (!res.ok) return null
+    return collectCardArtPaths((await res.json()) as { paths?: unknown })
+  } catch {
+    return null
+  }
+}
+
 /**
- * Load the gitignored local-available manifest in the browser.
- * Safe no-op when the file is missing (GitHub / seed-only installs).
+ * Load local-only card-art availability in the browser.
+ * Prefers the gitignored optimize manifest, then the live disk listing from `/api/local-card-art`.
+ * Safe no-op when both are missing (GitHub / seed-only / static installs).
  */
 export function ensureLocalAvailableCardArtLoaded(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve()
@@ -99,19 +137,14 @@ export function ensureLocalAvailableCardArtLoaded(): Promise<void> {
 
   browserManifestPromise = (async () => {
     try {
-      const res = await fetch(LOCAL_AVAILABLE_CARD_ART_MANIFEST_URL, { cache: "no-store" })
-      if (!res.ok) {
-        browserLocalAvailable = new Set()
-        return
-      }
-      const parsed = (await res.json()) as { paths?: unknown }
       const next = new Set<string>()
-      if (Array.isArray(parsed.paths)) {
-        for (const entry of parsed.paths) {
-          if (typeof entry === "string" && entry.trim()) {
-            next.add(entry.replace(/\\/g, "/").replace(/^\//, ""))
-          }
-        }
+      const manifest = await fetchCardArtPaths(withBasePath(LOCAL_AVAILABLE_CARD_ART_MANIFEST_URL))
+      if (manifest) {
+        for (const entry of manifest) next.add(entry)
+      }
+      const live = await fetchCardArtPaths(withBasePath(LOCAL_AVAILABLE_CARD_ART_API_URL))
+      if (live) {
+        for (const entry of live) next.add(entry)
       }
       browserLocalAvailable = next
       window.dispatchEvent(new CustomEvent("dumpstat:local-card-art-available"))

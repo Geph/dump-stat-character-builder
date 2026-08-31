@@ -1,4 +1,7 @@
-import { filterAvailableDefaultCardImageUrl } from "@/lib/compendium/available-card-art"
+import {
+  maybeFilterDefaultCardImageUrl,
+  type DefaultCardImageAvailability,
+} from "@/lib/compendium/available-card-art"
 import { withBasePath } from "@/lib/config/deploy-mode"
 
 const bundledBackgroundCardImage = (slug: string) =>
@@ -62,12 +65,15 @@ const BACKGROUND_CARD_IMAGES_BY_NAME_LOWER = new Map(
   Object.entries(SRD_BACKGROUND_CARD_IMAGES_BY_NAME).map(([name, url]) => [name.toLowerCase(), url]),
 )
 
-export function defaultBackgroundCardImageUrl(backgroundName: string): string | null {
+export function defaultBackgroundCardImageUrl(
+  backgroundName: string,
+  options?: DefaultCardImageAvailability,
+): string | null {
   const trimmed = backgroundName.trim()
   if (!trimmed) return null
   const mapped =
     SRD_BACKGROUND_CARD_IMAGES_BY_NAME[trimmed] ??
     BACKGROUND_CARD_IMAGES_BY_NAME_LOWER.get(trimmed.toLowerCase()) ??
     null
-  return filterAvailableDefaultCardImageUrl(mapped)
+  return maybeFilterDefaultCardImageUrl(mapped, options?.requireAvailable !== false)
 }

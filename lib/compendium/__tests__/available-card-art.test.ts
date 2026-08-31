@@ -29,4 +29,15 @@ describe("available-card-art", () => {
       "https://example.com/art.png",
     )
   })
+
+  it("treats a local-only background as available only when the PNG exists", () => {
+    const url = withBasePath("/images/compendium/backgrounds/charlatan.png")
+    const fs = require("node:fs") as typeof import("node:fs")
+    const path = require("node:path") as typeof import("node:path")
+    const onDisk = fs.existsSync(
+      path.join(process.cwd(), "public/images/compendium/backgrounds/charlatan.png"),
+    )
+    expect(isDefaultCardArtAvailable(url)).toBe(onDisk)
+    expect(filterAvailableDefaultCardImageUrl(url)).toBe(onDisk ? url : null)
+  })
 })
