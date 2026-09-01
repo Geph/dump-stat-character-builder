@@ -66,3 +66,19 @@ export function collectPartyAllyCandidates(
 
   return out
 }
+
+/** Button label for the ally picker — the open character is "Self", not their name. */
+export function allyCandidateDisplayLabel(
+  candidate: {
+    kind: PartyAllyCandidate["kind"]
+    characterId: string
+    label: string
+    companionKey?: string
+  },
+  selfId?: string | null,
+): string {
+  if (candidate.kind === "character" && selfId && candidate.characterId === selfId) {
+    return "Self"
+  }
+  return candidate.label
+}

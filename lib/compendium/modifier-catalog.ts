@@ -18,7 +18,7 @@ import type {
   UsesConfig,
 } from "@/lib/types"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
-import { normalizeFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
+import { normalizeFeatureSheetDisplay } from "@/lib/compendium/normalize-feature-sheet-display"
 import {
   GRANT_FEAT_CATALOG_ID,
   LEGACY_GRANT_FEAT_CATALOG_IDS,

@@ -3155,6 +3155,18 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         { type: "fixed", fixedAmount: 1, recharges: [{ rest: "long_rest" }] },
         "Magical Cunning",
       ),
+      fxInstance("modinst_magical_cunning", CLASS_RESOURCE_CATALOG_ID, {
+        effects: [
+          {
+            id: modId("magical_cunning"),
+            kind: "class_resource",
+            classResourceKey: "pact_magic_slots",
+            classResourceChange: "reset",
+            resourceRefreshFormula: "half_level",
+            label: "Regain half your expended Pact Magic slots (round up)",
+          },
+        ],
+      }),
     ],
   },
   "*::Divine Intervention": {
@@ -3386,6 +3398,19 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
         },
         "Arcane Recovery",
       ),
+      fxInstance("modinst_arcane_recovery", CLASS_RESOURCE_CATALOG_ID, {
+        effects: [
+          {
+            id: modId("arcane_recovery"),
+            kind: "class_resource",
+            classResourceKey: "spell_slots",
+            classResourceChange: "reset",
+            resourceRefreshFormula: "half_level",
+            spellSlotMaxLevel: 5,
+            label: "Recover spell slots totaling half your Wizard level (round up)",
+          },
+        ],
+      }),
     ],
   },
   "*::Ritual Adept": {

@@ -16,6 +16,10 @@ export type PartyEffectTarget =
 const ALLY_TARGET_RE =
   /\b(all(?:y|ies)|another creature|a creature|willing creature|chosen creature|cohort)\b/i
 
+/** Infer ally *buffs* only from explicit ally/cohort wording — not bare "a creature". */
+const ALLY_BUFF_TARGET_RE =
+  /\b(all(?:y|ies)|another creature|willing creature|chosen creature|cohort)\b/i
+
 const HEROIC_INSPIRATION_RE =
   /heroic inspiration|give .{0,40}inspiration|grant .{0,40}inspiration|gains? inspiration/i
 
@@ -152,9 +156,10 @@ export function inferAllyBuffEffect(
   if (inferAllyHealEffect(name, description) || inferDirectCompanionEffect(name, description)) {
     return null
   }
-  if (!ALLY_TARGET_RE.test(text)) return null
+  if (!ALLY_BUFF_TARGET_RE.test(text)) return null
   if (!/\b(?:attack|saving throw|check)\b/i.test(text)) return null
   if (/\bcast a spell\b/i.test(text)) return null
+  if (/\bbegin(?:ning)? (?:your )?dance\b/i.test(text) && !/\bally\b/i.test(text)) return null
   return {
     id: "inferred_ally_buff",
     kind: "modify_creature",

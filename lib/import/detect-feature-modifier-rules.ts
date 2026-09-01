@@ -32,6 +32,7 @@ import {
   requiresActiveToggleLimitation,
   type ModifierLimitation,
 } from "@/lib/compendium/modifier-limitations"
+import { looksLikeSituationalSpeedGrant } from "@/lib/compendium/situational-speed-grant"
 
 export type DetectionConfidence = "high" | "medium" | "low"
 
@@ -317,6 +318,12 @@ function parseLimitationsFromText(text: string): ModifierLimitation[] {
   ) {
     limitations.push(requiresActiveToggleLimitation("while_dancing"))
   }
+  if (
+    /\bfirst\s+(?:round|turn)\s+of\s+combat\b/i.test(text) &&
+    !limitations.some((entry) => entry.value === "first_turn_of_combat")
+  ) {
+    limitations.push(requiresActiveToggleLimitation("first_turn_of_combat"))
+  }
   return limitations
 }
 
@@ -345,6 +352,25 @@ function buildCheckRollModifier(
         ...(options.checkConditionTypes?.length
           ? { checkConditionTypes: options.checkConditionTypes }
           : {}),
+        limitations: sourceText ? parseLimitationsFromText(sourceText) : [],
+      },
+    ],
+  })
+}
+
+function buildIncomingAttackModifier(
+  ctx: DetectFeatureContext,
+  ruleSuffix: string,
+  mode: "advantage" | "disadvantage",
+  sourceText?: string,
+): LinkedModifierInstance {
+  return fxInstance(newInstanceId(), effectCatalogRefId("check_roll_modifier"), {
+    effects: [
+      {
+        id: modId(instanceKey(ctx, ruleSuffix)),
+        kind: "check_roll_modifier",
+        checkCategory: "other",
+        incomingAttackMode: mode,
         limitations: sourceText ? parseLimitationsFromText(sourceText) : [],
       },
     ],
@@ -542,6 +568,7 @@ function buildSpeedEqualToWalkModifier(
   ctx: DetectFeatureContext,
   text: string,
 ): LinkedModifierInstance | null {
+  if (looksLikeSituationalSpeedGrant(ctx.featureName, text)) return null
   const types = parseSpeedTypesEqualToWalk(text)
   if (!types.length) return null
   return charInstance(newInstanceId(), characteristicCatalogRefId("speed"), [
@@ -671,14 +698,22 @@ function buildResourceDieCheckBonus(
 
   if (isAcBonus) {
     const isDieSizeOnly = resourceKey === "dance_die"
+    const limitations = parseLimitationsFromText(text)
+    if (
+      resourceKey === "dance_die" &&
+      !limitations.some((entry) => entry.value === "while_dancing")
+    ) {
+      limitations.push(requiresActiveToggleLimitation("while_dancing"))
+    }
     return charInstance(newInstanceId(), characteristicCatalogRefId("resource_ability_menu"), [
       {
         id: modId(instanceKey(ctx, "resource_die_ac")),
         type: "resource_ability_menu",
         resourceKey,
+        limitations,
         options: [
           {
-            name: "Add die to AC",
+            name: ctx.featureName?.trim() || "Add die to AC",
             description: "Add this class resource die to your AC against one attack.",
             resourceCost: isDieSizeOnly ? 0 : 1,
             bonusConfig,
@@ -1066,6 +1101,13 @@ function buildWeaponDamageModifierFromText(
 // When adding a rule, add a matching entry in lib/import/modifier-wiring-registry.ts (tests enforce coverage).
 
 export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
+  {
+    id: "incoming.attack.disadvantage.first_round",
+    confidence: "high",
+    test: /attacks? against you[\s\S]{0,80}first (?:round|turn) of combat[\s\S]{0,80}disadvantage/i,
+    build: (_match, ctx, text) =>
+      buildIncomingAttackModifier(ctx, "incoming_first_round", "disadvantage", text),
+  },
   {
     id: "proficiency.skills.list",
     confidence: "high",
@@ -2519,7 +2561,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "language.choice",
     confidence: "high",
-    test: /\blearn (one|two|three|four|\d+) languages? of your choice\b/i,
+    test: /\b(?:learn|know) (one|two|three|four|\d+) languages? of your choice\b/i,
     build: (match, ctx) => {
       const wordToCount: Record<string, number> = { one: 1, two: 2, three: 3, four: 4 }
       const raw = match[1]?.toLowerCase() ?? "1"

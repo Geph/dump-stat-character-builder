@@ -1899,6 +1899,307 @@ describe("combat / utility tab classification", () => {
     expect(improved?.firstUseNoAction).toBe(true)
   })
 
+  it("files an incoming-attack feature with no action economy as a Passive reminder", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 2,
+            name: "Nimble Start",
+            description: "Attacks against you during the first round of combat have Disadvantage.",
+            linkedModifiers: [
+              {
+                instanceId: "modinst_nimble",
+                catalogRefId: "cat_fx_check_roll_modifier",
+                activation: {
+                  effects: [
+                    {
+                      id: "mod_nimble",
+                      kind: "check_roll_modifier",
+                      checkCategory: "other",
+                      incomingAttackMode: "disadvantage",
+                      label: "Nimble Start: attacks vs you have Disadvantage (first round)",
+                      limitations: [
+                        {
+                          id: "lim_round1",
+                          kind: "sheet_toggle",
+                          rule: "requires_active",
+                          value: "first_turn_of_combat",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            ],
+          } as unknown as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    const nimble = actions.find((action) => action.name === "Nimble Start")
+    expect(nimble).toMatchObject({
+      trigger: "First round of combat",
+      reminderOnly: true,
+      spendsEconomy: false,
+      category: "combat",
+    })
+  })
+
+  it("splits a resource-die menu off a bonus-action parent onto Passive", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 2,
+              name: "Dance",
+              description: "Bonus Action Dance. Graceful Dodge: add your Dance Die to AC.",
+              activation: { bonusAction: true },
+              sheetDisplay: { combatActions: true },
+              limitedUses: {
+                type: "class_resource",
+                classResourceKey: "dances",
+                classResourceAmount: 1,
+              },
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_gd",
+                  catalogRefId: "cat_char_resource_ability_menu",
+                  characteristics: [
+                    {
+                      id: "mod_gd",
+                      type: "resource_ability_menu",
+                      resourceKey: "dance_die",
+                      options: [
+                        {
+                          name: "Graceful Dodge",
+                          description: "Add your Dance Die to your AC against one attack.",
+                          resourceCost: 0,
+                          bonusConfig: {
+                            mode: "die",
+                            dieScaling: "class_resource",
+                            classResourceKey: "dance_die",
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            } as unknown as Feature,
+          ],
+          3,
+        ),
+      ],
+      species: null,
+    })
+    const dance = actions.find((action) => action.name === "Dance")
+    const dodge = actions.find((action) => action.name === "Graceful Dodge")
+    expect(dance?.kinds).toEqual(["bonus"])
+    expect(dance?.menuOptions ?? []).toEqual([])
+    expect(dodge).toMatchObject({
+      trigger: "While Dancing",
+      spendsEconomy: false,
+      requiresSheetToggle: "while_dancing",
+      classResourceKey: null,
+    })
+    expect(dodge?.useBonuses?.[0]?.bonusConfig).toMatchObject({
+      mode: "die",
+      classResourceKey: "dance_die",
+    })
+    expect(dance?.healEffects ?? []).toEqual([])
+  })
+
+  it("attaches known Dance Styles as activation picks on Dance", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 2,
+              name: "Dance",
+              description:
+                "As a Bonus Action, expend a Dance to begin dancing. When you begin your Dance, choose a Dance Style. Some styles force a creature you can see to make a saving throw.",
+              activation: { bonusAction: true },
+              sheetDisplay: { combatActions: true },
+              limitedUses: {
+                type: "class_resource",
+                classResourceKey: "dances",
+                classResourceAmount: 1,
+              },
+            } as Feature,
+            {
+              level: 2,
+              name: "Dance Styles",
+              description: "When you begin your Dance, choose a Dance Style.",
+              isChoice: true,
+              choices: {
+                category: "Dance Style",
+                count: 1,
+                resourceKey: "dance_styles_known",
+                optionsSource: "class_upgrades",
+                options: [],
+              },
+            } as Feature,
+          ],
+          3,
+        ),
+      ],
+      species: null,
+      featureChoicePicks: { "class-1:L2:Dance Styles": ["Shift"] },
+      customAbilities: [
+        {
+          name: "Shift",
+          ability_role: "upgrade",
+          description: "While Dancing, teleport 10 feet after an attack.",
+        } as never,
+      ],
+    })
+    const dance = actions.find((action) => action.name === "Dance")
+    expect(dance?.healEffects ?? []).toEqual([])
+    expect(dance?.activationPicks).toMatchObject({
+      title: "Choose a Dance Style",
+      chooseCount: 1,
+    })
+    expect(dance?.activationPicks?.options).toEqual([
+      {
+        name: "Shift",
+        description: "While Dancing, teleport 10 feet after an attack.",
+        sheetToggleId: null,
+      },
+    ])
+  })
+
+  it("does not use weapon mastery Shift text as a Dance Style description", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 2,
+              name: "Dance",
+              description: "As a Bonus Action, expend a Dance to begin dancing.",
+              activation: { bonusAction: true },
+              sheetDisplay: { combatActions: true },
+              limitedUses: {
+                type: "class_resource",
+                classResourceKey: "dances",
+                classResourceAmount: 1,
+              },
+            } as Feature,
+            {
+              level: 2,
+              name: "Dance Styles",
+              description: "When you begin your Dance, choose a Dance Style.",
+              isChoice: true,
+              choices: {
+                category: "Dance Style",
+                count: 1,
+                resourceKey: "dance_styles_known",
+                optionsSource: "class_upgrades",
+                options: [],
+              },
+            } as Feature,
+          ],
+          3,
+        ),
+      ],
+      species: null,
+      featureChoicePicks: { "class-1:L2:Dance Styles": ["Shift"] },
+      customAbilities: [
+        {
+          name: "Shift",
+          ability_role: "weapon_mastery",
+          description:
+            "If you hit a creature with this weapon, you can immediately move 10 feet without provoking Opportunity Attacks.",
+        } as never,
+      ],
+    })
+    const dance = actions.find((action) => action.name === "Dance")
+    expect(dance?.activationPicks?.options).toEqual([
+      { name: "Shift", description: null, sheetToggleId: null },
+    ])
+  })
+
+  it("copies Dance duration onto the sheet action from attachClassDetails", () => {
+    const [detail] = attachClassDetails(
+      [{ class_id: "cls_dancer", level: 3, order: 0 }],
+      [
+        {
+          id: "cls_dancer",
+          name: "Dancer",
+          features: [
+            {
+              name: "Dance",
+              level: 2,
+              description: "Bonus Action Dance.",
+            },
+          ],
+        } as DndClass,
+      ],
+      [],
+    )
+    const actions = collectSheetActions({
+      classDetails: [detail],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Dance")?.duration).toBe("1 minute")
+  })
+
+  it("keeps a resource-spend menu on the parent when it has no action economy of its own", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail([
+          {
+            level: 3,
+            name: "Battle Dice",
+            description: "Expend one battle die.",
+            sheetDisplay: { combatActions: true, abilitiesActions: true },
+            limitedUses: {
+              type: "class_resource",
+              classResourceKey: "battle_dice",
+              classResourceAmount: 1,
+            },
+            linkedModifiers: [
+              {
+                instanceId: "modinst_battle",
+                catalogRefId: "cat_char_resource_ability_menu",
+                characteristics: [
+                  {
+                    id: "mod_battle",
+                    type: "resource_ability_menu",
+                    resourceKey: "battle_dice",
+                    options: [
+                      {
+                        name: "Precision Attack",
+                        description: "Add the die to an attack roll.",
+                        resourceCost: 1,
+                        bonusConfig: {
+                          mode: "die",
+                          dieScaling: "class_resource",
+                          classResourceKey: "battle_dice",
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          } as unknown as Feature,
+        ]),
+      ],
+      species: null,
+    })
+    const parent = actions.find((action) => action.name === "Battle Dice")
+    expect(parent?.menuOptions?.map((option) => option.name)).toEqual(["Precision Attack"])
+    expect(actions.find((action) => action.name === "Precision Attack")).toBeUndefined()
+    expect(parent?.menuOptions?.[0]?.bonusConfig).toMatchObject({
+      mode: "die",
+      classResourceKey: "battle_dice",
+    })
+  })
+
   it("surfaces an on-initiative feature as a triggered combat card without a spend", () => {
     const actions = collectSheetActions({
       classDetails: [

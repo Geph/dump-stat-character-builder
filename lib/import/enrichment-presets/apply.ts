@@ -205,6 +205,9 @@ function applyOperations(
           },
         }
         break
+      case "setDuration":
+        next = { ...next, duration: operation.duration }
+        break
       case "setCastingTime":
         next = { ...next, casting_time: operation.castingTime }
         break

@@ -11,6 +11,8 @@ export type ConditionRollEffect = {
   incomingMeleeAttack?: D20RollMode
   incomingRangedAttack?: D20RollMode
   incapacitated?: boolean
+  /** 2024 Grappled / Restrained: Speed is 0. */
+  speedZero?: boolean
 }
 
 /** SRD 2024 condition → roll effect mapping (data table, not per-condition code). */
@@ -24,7 +26,9 @@ export const CONDITION_ROLL_EFFECTS: Record<string, ConditionRollEffect> = {
     selfAbilityCheck: "disadvantage",
     selfAttack: "disadvantage",
   },
-  Grappled: {},
+  Grappled: {
+    speedZero: true,
+  },
   Incapacitated: {
     incapacitated: true,
   },
@@ -55,6 +59,7 @@ export const CONDITION_ROLL_EFFECTS: Record<string, ConditionRollEffect> = {
     selfAttack: "disadvantage",
     selfSave: { dexterity: "disadvantage" },
     incomingAttack: "advantage",
+    speedZero: true,
   },
   Stunned: {
     autoFailSaveAbilities: ["strength", "dexterity"],
@@ -74,6 +79,10 @@ export function conditionEffectForName(name: string): ConditionRollEffect | null
 
 export function isIncapacitatedByConditions(activeConditions: string[]): boolean {
   return activeConditions.some((name) => CONDITION_ROLL_EFFECTS[name]?.incapacitated)
+}
+
+export function isSpeedZeroByConditions(activeConditions: string[]): boolean {
+  return activeConditions.some((name) => CONDITION_ROLL_EFFECTS[name]?.speedZero)
 }
 
 export function collectConditionRollModes(

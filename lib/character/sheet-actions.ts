@@ -14,9 +14,18 @@ import {
   resolveBombRiderAttackVariants,
   shouldSuppressStandaloneBombCard,
 } from "@/lib/character/alchemist-bomb-sheet"
+import {
+  attachActivationPicksToActions,
+  type SheetActivationPicks,
+} from "@/lib/character/activation-style-picks"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { isHitPointsResourceKey } from "@/lib/character/hit-point-spend"
 import { resolveHitDiceHealCount } from "@/lib/character/resolve-feature-effect-heal"
+import {
+  collectFullRestoreLinkedFeatureNames,
+  resolveSpellSlotUseEffects,
+  type SpellSlotUseEffects,
+} from "@/lib/character/spell-slot-use-effects"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import {
   hasManeuverSpendText,
@@ -30,6 +39,7 @@ import {
   inferMenuOptionActionKind,
   parseChooseOneNamedOptions,
 } from "@/lib/compendium/choose-one-named-options"
+import { formatFeatureDuration } from "@/lib/compendium/feature-duration"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
 import {
   collectReplacedFeatureNames,
@@ -46,6 +56,7 @@ import {
   type SpecialAttackCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { expandLegacyLimitations } from "@/lib/compendium/modifier-limitations"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
 import { resolvePsionicAugments } from "@/lib/compendium/resolve-psionic-augments"
 import { resolveSpecialAttackAtLevel } from "@/lib/character/special-attack-empower"
@@ -55,6 +66,12 @@ import {
   collectActionUseBonuses,
   type SheetActionUseBonus,
 } from "@/lib/character/action-use-bonuses"
+import {
+  isResourceDieBonusConfig,
+  requiredToggleFromResourceMenu,
+  triggerLabelForRequiredToggle,
+  bonusFromResourceDieOption,
+} from "@/lib/character/resource-die-use"
 import {
   collectCastSpellEffects,
   type SheetCastSpellChoice,
@@ -66,6 +83,10 @@ import {
   inferGrantInspirationEffect,
   shouldCollectTargetableEffect,
 } from "@/lib/character/effect-target-policy"
+import {
+  passiveReminderTrigger,
+  shouldEmitUpgradePassiveReminder,
+} from "@/lib/character/upgrade-sheet-surfaces"
 import type { CustomAbility, Feat, Feature, FeatureActivation, FeatureEffect, Species, UsesConfig } from "@/lib/types"
 
 export type ActionEconomyKind = "action" | "bonus" | "reaction"
@@ -150,6 +171,8 @@ export type SheetActionEntry = {
    * and has no Use button.
    */
   reminderOnly?: boolean
+  /** Use is available only while this sheet toggle is on (e.g. while_dancing). */
+  requiresSheetToggle?: string | null
   /** First use each turn does not mark Action / Bonus / Reaction spent. */
   firstUseNoAction?: boolean
   /** Divine Respite and similar: regain up to this many expended Hit Point Dice. */
@@ -172,6 +195,8 @@ export type SheetActionEntry = {
   alsoActivateFeatureNames?: string[]
   /** Sibling features the player may fire after using this one (no extra action cost). */
   alsoActivate?: SheetAlsoActivateAction[]
+  /** Known styles / modes to pick when this action is used (e.g. Dance Styles). */
+  activationPicks?: SheetActivationPicks
   /** Persistent editable notes requested by player_note characteristics. */
   playerNotes?: SheetPlayerNote[]
   /** Mundane item linkers that can be changed by the player (Dead Space, etc.). */
@@ -209,6 +234,8 @@ export type SheetActionMenuOption = {
   unlocksAtLevel?: number | null
   /** Cost paid in dice rather than a tracked pool (e.g. "1d6 Sneak Attack die"). */
   costLabel?: string | null
+  /** Structured die / bonus rolled when this option is used. */
+  bonusConfig?: import("@/lib/compendium/roll-bonus-config").RollBonusConfig | null
 }
 
 export type SheetActionTalentAlert = {
@@ -549,6 +576,52 @@ function fallbackKindsForResourceSpend(
     return { kinds: ["action"], spendsEconomy: false }
   }
   return { kinds, spendsEconomy: undefined }
+}
+
+/** Class and subclass features the character has actually reached. */
+function unlockedFeatures(classDetails: CharacterClassDetail[]): Feature[] {
+  const features: Feature[] = []
+  for (const entry of classDetails) {
+    const level = entry.row.level ?? 0
+    for (const feature of [
+      ...((entry.class?.features ?? []) as Feature[]),
+      ...((entry.subclass?.features ?? []) as Feature[]),
+    ]) {
+      if ((feature.level ?? 1) <= level) features.push(feature)
+    }
+  }
+  return features
+}
+
+/**
+ * Slot wiring for content seeded or imported before these features carried a `class_resource`
+ * effect. Re-running the Seed button (SRD) or `scripts/refresh-class-import-modifiers.ts`
+ * (Occultist / Necromancer) makes each row authoritative; this table can go once that has
+ * happened everywhere. Do not add new entries — author the effect instead.
+ */
+const LEGACY_SLOT_HOOKS_BY_FEATURE_NAME: { match: RegExp; hooks: SpellSlotUseEffects }[] = [
+  { match: /^magical cunning$/i, hooks: { restorePactSlotsOnUse: "half_round_up" } },
+  {
+    match: /^arcane recovery$/i,
+    hooks: { restoreSpellSlotsOnUse: { mode: "combined_level_half_up", maxSlotLevel: 5 } },
+  },
+  {
+    match: /^dark arcana$/i,
+    hooks: { restoreResourceFromSpellSlotOnUse: { resourceKey: "charnel_touch", ability: "INT" } },
+  },
+  { match: /^traditional expertise$/i, hooks: { spendSpellSlotOnUse: { minSpellLevel: 1 } } },
+]
+
+function slotHooksFor(action: SheetActionEntry): SpellSlotUseEffects {
+  if (
+    action.restorePactSlotsOnUse ||
+    action.restoreSpellSlotsOnUse ||
+    action.restoreResourceFromSpellSlotOnUse ||
+    action.spendSpellSlotOnUse
+  ) {
+    return {}
+  }
+  return LEGACY_SLOT_HOOKS_BY_FEATURE_NAME.find((entry) => entry.match.test(action.name))?.hooks ?? {}
 }
 
 function featureUnlocked(
@@ -899,6 +972,7 @@ function resolveMenuOptions(item: ActivatableItem): SheetActionMenuOption[] {
               actionKind: option.actionKind,
               hitDiceCost: option.hitDiceCost ?? null,
               unlocksAtLevel: option.unlocksAtLevel ?? null,
+              bonusConfig: option.bonusConfig ?? null,
             }),
           )
         }
@@ -1044,6 +1118,131 @@ function resolveUseBonuses(item: ActivatableItem): SheetActionUseBonus[] | undef
   return useBonuses.length ? useBonuses : undefined
 }
 
+function isNoEconomyResourceDieOption(option: {
+  name: string
+  description?: string
+  actionKind?: ActionEconomyKind
+  bonusConfig?: import("@/lib/compendium/roll-bonus-config").RollBonusConfig | null
+}): boolean {
+  if (!isResourceDieBonusConfig(option.bonusConfig)) return false
+  if (option.actionKind) return false
+  return !inferMenuOptionActionKind(option.description ?? option.name)
+}
+
+function collectResourceDiePassiveEntries(
+  item: ActivatableItem,
+  opts: {
+    idPrefix: string
+    classId: string | null
+    classLevel: number
+    sourceIcon?: string | null
+    splitFromParent: boolean
+    emitStandalone: boolean
+  },
+): SheetActionEntry[] {
+  if (!opts.splitFromParent && !opts.emitStandalone) return []
+  const entries: SheetActionEntry[] = []
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const characteristic of instance.characteristics ?? []) {
+      if (characteristic.type !== "resource_ability_menu") continue
+      for (const option of characteristic.options ?? []) {
+        if (!isNoEconomyResourceDieOption(option)) continue
+        const useBonus = bonusFromResourceDieOption(option)
+        if (!useBonus) continue
+        const toggleId = requiredToggleFromResourceMenu(characteristic, option, item.name)
+        const resourceCost = option.resourceCost ?? 0
+        entries.push({
+          id: `${opts.idPrefix}:${item.level ?? 1}:${item.name}:die:${option.name}`,
+          name: option.name,
+          sourceLabel: item.name,
+          kinds: ["action"],
+          trigger: triggerLabelForRequiredToggle(toggleId),
+          category: "combat",
+          showOnCombatTab: true,
+          limitedUses: null,
+          classLevel: opts.classLevel,
+          description: option.description ?? item.description ?? null,
+          classId: opts.classId,
+          classResourceKey: resourceCost > 0 ? characteristic.resourceKey : null,
+          useBonuses: [useBonus],
+          spendsEconomy: false,
+          requiresSheetToggle: toggleId,
+          sourceIcon: opts.sourceIcon,
+        })
+      }
+    }
+  }
+  return entries
+}
+
+function incomingAttackEffectsFromItem(item: ActivatableItem): FeatureEffect[] {
+  const effects: FeatureEffect[] = []
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const effect of instance.activation?.effects ?? []) {
+      if (effect.incomingAttackMode === "advantage" || effect.incomingAttackMode === "disadvantage") {
+        effects.push(effect)
+      }
+    }
+  }
+  return effects
+}
+
+function toggleFromIncomingAttackEffect(effect: FeatureEffect): string | null {
+  return (
+    expandLegacyLimitations(effect).find(
+      (entry) => entry.kind === "sheet_toggle" && entry.rule === "requires_active",
+    )?.value ?? null
+  )
+}
+
+function incomingAttackReminderTrigger(effect: FeatureEffect): string {
+  const toggleId = toggleFromIncomingAttackEffect(effect)
+  if (toggleId === "first_turn_of_combat") return "First round of combat"
+  if (toggleId) return triggerLabelForRequiredToggle(toggleId)
+  const scope = (effect.checkConditionTypes ?? []).map((entry) => entry.trim()).filter(Boolean)
+  if (scope.length) return scope.join(", ")
+  if (effect.incomingAttackMode === "disadvantage") return "Attacks vs you have Disadvantage"
+  if (effect.incomingAttackMode === "advantage") return "Attacks vs you have Advantage"
+  return "Always on"
+}
+
+function collectIncomingAttackPassiveEntries(
+  item: ActivatableItem,
+  opts: {
+    idPrefix: string
+    classId: string | null
+    classLevel: number
+    sourceLabel: string
+    sourceIcon?: string | null
+    parentHasExplicitEconomy: boolean
+  },
+): SheetActionEntry[] {
+  if (opts.parentHasExplicitEconomy) return []
+  const effects = incomingAttackEffectsFromItem(item)
+  if (!effects.length) return []
+  const primary = effects[0]
+  return [
+    {
+      id: `${opts.idPrefix}:${item.level ?? 1}:${item.name}:incoming`,
+      name: item.name,
+      sourceLabel: opts.sourceLabel,
+      kinds: ["action"],
+      trigger: incomingAttackReminderTrigger(primary),
+      category: "combat",
+      reminderOnly: true,
+      spendsEconomy: false,
+      showOnCombatTab: true,
+      showOnAbilitiesTab: false,
+      showOnRestDialogues: false,
+      limitedUses: null,
+      classLevel: opts.classLevel,
+      description: primary.label?.trim() || item.description || null,
+      classId: opts.classId,
+      sourceIcon: opts.sourceIcon,
+    },
+  ]
+}
+
 type ActivatableItem = {
   name: string
   description?: string | null
@@ -1052,6 +1251,7 @@ type ActivatableItem = {
   limitedUses?: UsesConfig | null
   linkedModifiers?: LinkedModifierInstance[]
   sheetDisplay?: import("@/lib/types").FeatureSheetDisplay | null
+  duration?: import("@/lib/types").FeatureDurationKey | string | null
 }
 
 export type { ActivatableItem }
@@ -1377,15 +1577,27 @@ function pushActivatableItemActions(
     (Boolean(inferOptionalParentPowerImprovement(feature)) && !featureHasReplaceModifier(feature))
   const limitedUses = resolveLimitedUsesWithInference(feature, availableResourceKeys)
   const itemWithUses: ActivatableItem = { ...feature, limitedUses }
+  const inferredKinds = inferActivatableActionKinds(feature)
+  const parentHasExplicitEconomy = inferredKinds.length > 0
+  const fallback = fallbackKindsForResourceSpend(
+    inferredKinds,
+    limitedUses,
+    haystackForItem(feature),
+  )
+  const kinds = fallback.kinds
+  const diePassives = collectResourceDiePassiveEntries(feature, {
+    idPrefix,
+    classId,
+    classLevel: levelCap,
+    sourceIcon,
+    splitFromParent: parentHasExplicitEconomy,
+    emitStandalone: !kinds.length || suppressParent,
+  })
+  const splitDieNames = new Set(
+    parentHasExplicitEconomy ? diePassives.map((entry) => entry.name) : [],
+  )
 
   if (!suppressParent) {
-    const inferredKinds = inferActivatableActionKinds(feature)
-    const fallback = fallbackKindsForResourceSpend(
-      inferredKinds,
-      limitedUses,
-      haystackForItem(feature),
-    )
-    const kinds = fallback.kinds
     const trigger = resolveTriggeredActivationLabel(itemWithUses)
     if (kinds.length) {
       const inferredCategory = inferActivatableActionCategory(itemWithUses)
@@ -1400,7 +1612,9 @@ function pushActivatableItemActions(
         (category === "combat" && display.combatActions) ||
         (category === "utility" && display.abilitiesActions)
       ) {
-        const menuOptions = resolveMenuOptions(feature)
+        const menuOptions = resolveMenuOptions(feature).filter(
+          (option) => !splitDieNames.has(option.name),
+        )
         const healEffects = resolveHealEffects(feature)
         const playerNotes = resolvePlayerNotes(feature)
         const equipmentChoices = resolveEquipmentChoices(feature)
@@ -1436,8 +1650,12 @@ function pushActivatableItemActions(
             ? false
             : (fallback.spendsEconomy ?? resolveSpendsEconomy(feature)),
           restoreHitDiceOnUse: resolveHitDiceRestoreOnUse(feature, levelCap),
+          ...resolveSpellSlotUseEffects(feature),
           dropToOneHpOnUse: resolveDropToOneHpOnUse(feature),
           alsoActivateFeatureNames: resolveAlsoActivateFeatureNames(feature),
+          duration: formatFeatureDuration(
+            feature.duration as import("@/lib/types").FeatureDurationKey | null | undefined,
+          ) || feature.duration || null,
           playerNotes: playerNotes.length ? playerNotes : undefined,
           equipmentChoices: equipmentChoices.length ? equipmentChoices : undefined,
           sourceIcon,
@@ -1448,6 +1666,25 @@ function pushActivatableItemActions(
           }),
         })
       }
+    }
+  }
+
+  for (const entry of diePassives) {
+    if (!actions.some((existing) => existing.id === entry.id || existing.name === entry.name)) {
+      actions.push(entry)
+    }
+  }
+
+  for (const entry of collectIncomingAttackPassiveEntries(feature, {
+    idPrefix,
+    classId,
+    classLevel: levelCap,
+    sourceLabel,
+    sourceIcon,
+    parentHasExplicitEconomy,
+  })) {
+    if (!actions.some((existing) => existing.id === entry.id || existing.name === entry.name)) {
+      actions.push(entry)
     }
   }
 
@@ -1692,7 +1929,22 @@ function pushCustomAbilityActions(
     if (!kinds.length && ability.ability_role === "alchemist_bomb") {
       kinds.push("action")
     }
-    if (!kinds.length) continue
+    if (!kinds.length) {
+      const standaloneDie = collectResourceDiePassiveEntries(item, {
+        idPrefix: `ability:${ability.id}`,
+        classId: ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId,
+        classLevel: levelCap,
+        sourceIcon: sourceIconForAbility(ability, classDetails, classId),
+        splitFromParent: false,
+        emitStandalone: true,
+      })
+      for (const entry of standaloneDie) {
+        if (!actions.some((existing) => existing.id === entry.id || existing.name === entry.name)) {
+          actions.push(entry)
+        }
+      }
+      continue
+    }
     if (
       (ability.ability_role === "alchemist_bomb" || isAlchemistBombName(ability.name)) &&
       actions.some((action) => isAlchemistBombName(action.name))
@@ -1814,6 +2066,51 @@ function pushCustomAbilityActions(
         spendsEconomy: trigger ? false : fallback.spendsEconomy,
       })
     }
+  }
+}
+
+function pushUpgradePassiveReminders(
+  actions: SheetActionEntry[],
+  abilities: CustomAbility[] | undefined,
+  levelCap: number,
+  classId: string | null,
+  classDetails: CharacterClassDetail[],
+) {
+  const existingIds = new Set(
+    actions.map((action) => action.customAbilityId).filter((id): id is string => Boolean(id)),
+  )
+  const existingNames = new Set(actions.map((action) => action.name.trim().toLowerCase()))
+
+  for (const ability of abilities ?? []) {
+    if (!shouldEmitUpgradePassiveReminder(ability)) continue
+    if (ability.level_requirement != null && ability.level_requirement > levelCap) continue
+    if (existingIds.has(ability.id)) continue
+    if (existingNames.has(ability.name.trim().toLowerCase())) continue
+
+    const ownerClassId =
+      ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId
+    const sourceIcon = sourceIconForAbility(ability, classDetails, classId)
+    actions.push({
+      id: `ability:${ability.id}:passive`,
+      name: ability.name,
+      sourceLabel: customAbilitySourceLabel(ability),
+      kinds: ["action"],
+      trigger: passiveReminderTrigger(ability),
+      category: "combat",
+      reminderOnly: true,
+      spendsEconomy: false,
+      showOnCombatTab: true,
+      showOnAbilitiesTab: false,
+      showOnRestDialogues: false,
+      limitedUses: null,
+      classLevel: levelCap,
+      description: ability.description ?? null,
+      classId: ownerClassId,
+      customAbilityId: ability.id,
+      abilityRole: ability.ability_role ?? null,
+      icon: ability.icon,
+      sourceIcon,
+    })
   }
 }
 
@@ -2328,6 +2625,13 @@ export function collectSheetActions(params: {
       params.classDetails,
       allResourceKeys,
     )
+    pushUpgradePassiveReminders(
+      actions,
+      params.customAbilities,
+      Math.max(totalLevel, 1),
+      soleClassId,
+      params.classDetails,
+    )
   }
 
   const withRiders = attachTalentAlertsToActions(actions, [
@@ -2335,33 +2639,23 @@ export function collectSheetActions(params: {
     ...collectTalentAlertsFromCustomAbilities(params.customAbilities, featureChoicePicks),
   ])
 
-  const restorePactSlotsOnUse: NonNullable<SheetActionEntry["restorePactSlotsOnUse"]> =
-    featureUnlocked(params.classDetails, /^eldritch master$/i) ? "all" : "half_round_up"
+  const fullRestoreLinkedNames = collectFullRestoreLinkedFeatureNames(
+    unlockedFeatures(params.classDetails),
+  )
 
   const seen = new Set<string>()
-  return attachAlsoActivateActions(withRiders)
+  return attachActivationPicksToActions(attachAlsoActivateActions(withRiders), {
+    classDetails: params.classDetails,
+    featureChoicePicks,
+    customAbilities: params.customAbilities,
+  })
     .map((action) => {
-      action = { ...action, icon: resolveSheetActionIcon(action) }
-      if (/^magical cunning$/i.test(action.name)) {
-        return { ...action, restorePactSlotsOnUse }
-      }
-      if (/^arcane recovery$/i.test(action.name)) {
-        return {
-          ...action,
-          restoreSpellSlotsOnUse: { mode: "combined_level_half_up" as const, maxSlotLevel: 5 },
-        }
-      }
-      if (/^dark arcana$/i.test(action.name)) {
-        return {
-          ...action,
-          restoreResourceFromSpellSlotOnUse: {
-            resourceKey: "charnel_touch",
-            ability: "INT" as const,
-          },
-        }
-      }
-      if (/^traditional expertise$/i.test(action.name)) {
-        return { ...action, spendSpellSlotOnUse: { minSpellLevel: 1 } }
+      action = { ...action, icon: resolveSheetActionIcon(action), ...slotHooksFor(action) }
+      if (
+        action.restorePactSlotsOnUse &&
+        fullRestoreLinkedNames.has(action.name.trim().toLowerCase())
+      ) {
+        return { ...action, restorePactSlotsOnUse: "all" as const }
       }
       return action
     })

@@ -4,6 +4,11 @@ Dump Stat has two parallel ways to author a mechanical effect on a feature/trait
 legitimate; picking the wrong one is what shows up as "dead aggregate" or "duplicate calculation"
 in architecture audits. This doc is the answer to "which one do I use?"
 
+Inventory, play-state engines, name-keyed leftovers, and the add-type checklist live in
+[custom-modifiers.md](./custom-modifiers.md). A third layer (Rampage Die, Weapon Morph, banked
+pools, illusion tokens) is **not** a catalog type — do not invent `class_resources` or
+`new_toggles` for those.
+
 ## The two systems
 
 | | `CharacteristicModifier` | `FeatureEffect` |
@@ -70,3 +75,5 @@ hook into either — that's the intended ceiling for effects like this.
   `weapon-sheet-context.ts` does.
 - Don't add a field to `AggregatedCharacteristics` without also wiring a consumer on
   `DerivedCharacter` (or documenting, in the same PR, why it's authored-but-not-yet-consumed).
+- After adding or retiring a type, engine, or name-keyed sheet branch, update
+  [custom-modifiers.md](./custom-modifiers.md) in the same change.

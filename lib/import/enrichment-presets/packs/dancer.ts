@@ -12,6 +12,7 @@ const GRACEFUL_DODGE_MENU = {
       id: "mod_graceful_dodge",
       type: "resource_ability_menu",
       resourceKey: "dance_die",
+      limitations: [requiresActiveToggleLimitation("while_dancing")],
       options: [
         {
           name: "Graceful Dodge",
@@ -45,6 +46,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
         },
       },
       { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setDuration", duration: "1_minute" },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true } },
       {
         op: "attachNamedPreset",
@@ -53,7 +55,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
       },
       {
         op: "appendDescription",
-        text: "While Dance is active, enable the Dancing sheet toggle so Dance Style riders gated with while_dancing apply. Graceful Dodge: spend no pool — roll Dance Die (size from dance_die) and add to AC vs one attack.",
+        text: "Using Dance turns on the Dancing sheet toggle (while_dancing) and a 1-minute duration reminder so Dance Style riders apply. Dance ends if you are Incapacitated, your Speed is 0, the reminder is cleared, or you turn Dancing off (no action). Graceful Dodge is a Passive: Use rolls the Dance Die (size from dance_die) and adds it to AC vs one attack; available while Dancing; spends no pool.",
       },
     ],
   },
@@ -193,6 +195,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
           ],
         },
       },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
         op: "appendDescription",
         text: "Enable First turn of combat while resolving round 1 so Nimble Start Disadvantage applies.",
@@ -501,6 +504,23 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
         replaceCharacteristicTypes: ["speed"],
       },
       {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "tumbling_movement",
+          catalogRefId: "cat_char_movement_effects",
+          characteristics: [
+            {
+              id: "char_tumbling_movement",
+              type: "movement_effects",
+              ignoreDifficultTerrain: true,
+              label: "Tumbling — ignore Difficult Terrain (while Agile Movement)",
+            },
+          ],
+        },
+        skipIfCharacteristicTypes: ["movement_effects"],
+      },
+      {
         op: "appendDescription",
         text: "While Agile Movement Dance Style is active: fall damage reduction (5× level), ignore Difficult Terrain, +10 Speed. Gate the speed bonus yourself when not on that style.",
       },
@@ -517,6 +537,33 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
       {
         op: "appendDescription",
         text: "Bonus Action Dodge when you have moved 30+ feet this turn.",
+      },
+    ],
+  },
+  {
+    id: "dancer.subclass.honeyed_words",
+    pack: "dancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /dancer/i, name: /^honeyed words$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "honeyed_words_languages",
+          catalogRefId: "cat_char_languages",
+          characteristics: [
+            {
+              id: "char_honeyed_words_languages",
+              type: "languages",
+              values: [],
+              choiceCount: 2,
+              choicePool: "standard",
+              label: "Honeyed Words — choose 2 languages",
+            },
+          ],
+        },
+        skipIfCharacteristicTypes: ["languages"],
       },
     ],
   },
@@ -660,6 +707,24 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
     operations: [
       { op: "setAbilityRole", role: "upgrade" },
       {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "agile_movement",
+          catalogRefId: "cat_char_movement_effects",
+          characteristics: [
+            {
+              id: "char_agile_movement",
+              type: "movement_effects",
+              moveWithoutOpportunityAttacks: true,
+              label: "Agile Movement — no Opportunity Attacks (while Dancing)",
+              limitations: [requiresActiveToggleLimitation("while_dancing")],
+            },
+          ],
+        },
+        skipIfCharacteristicTypes: ["movement_effects"],
+      },
+      {
         op: "appendDescription",
         text: "While Dancing: your movement doesn't provoke Opportunity Attacks.",
       },
@@ -683,6 +748,8 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
               id: "mod_elegant_form",
               type: "resource_ability_menu",
               resourceKey: "dance_die",
+              appliesOnRollKinds: ["save", "ability"],
+              appliesOnAbilities: ["Dexterity", "Charisma"],
               options: [
                 {
                   name: "Elegant Form",
@@ -726,6 +793,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
               id: "mod_spinning_shot",
               type: "resource_ability_menu",
               resourceKey: "dance_die",
+              appliesOnRollKinds: ["attack"],
               options: [
                 {
                   name: "Spinning Shot",
@@ -743,6 +811,38 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
           ],
         },
         skipIfCharacteristicTypes: ["resource_ability_menu"],
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "spinning_shot_badge",
+          catalogRefId: "cat_char_weapon_sheet_badge",
+          characteristics: [
+            {
+              id: "char_spinning_shot_badge",
+              type: "weapon_sheet_badge",
+              label: "Spinning Shot",
+              description: "Add Dance Die to a ranged weapon attack roll (while Dancing).",
+              appliesTo: "ranged",
+              limitations: [requiresActiveToggleLimitation("while_dancing")],
+            },
+          ],
+        },
+        skipIfCharacteristicTypes: ["weapon_sheet_badge"],
+      },
+    ],
+  },
+  {
+    id: "dancer.proposal.shift",
+    pack: "dancer",
+    target: "proposal_ability",
+    match: { sourceName: /dancer/i, name: /^shift$/i },
+    operations: [
+      { op: "setAbilityRole", role: "upgrade" },
+      {
+        op: "appendDescription",
+        text: "While Dancing: when you take the Attack action, teleport up to 10 feet before or after one of the attacks.",
       },
     ],
   },
@@ -765,7 +865,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
     target: "proposal_ability",
     match: {
       sourceName: /dancer/i,
-      name: /^(dueling stance|inspiring chant|pantomime|deadly d4s|momentum|tumbling|evasive speed)$/i,
+      name: /^(shift|dueling stance|inspiring chant|pantomime|deadly d4s|momentum|tumbling|evasive speed)$/i,
     },
     operations: [{ op: "setAbilityRole", role: "upgrade" }],
   },
@@ -786,6 +886,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
               id: "mod_dueling_stance",
               type: "resource_ability_menu",
               resourceKey: "dance_die",
+              appliesOnRollKinds: ["attack"],
               options: [
                 {
                   name: "Dueling Stance",

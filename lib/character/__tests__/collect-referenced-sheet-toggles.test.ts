@@ -43,6 +43,89 @@ describe("collectReferencedSheetToggleIds", () => {
     expect(ids.has("form_of_dread")).toBe(false)
   })
 
+  it("includes while_dancing from Dance uses even without authored limitations", () => {
+    const ids = collectReferencedSheetToggleIds({
+      features: [
+        {
+          level: 2,
+          name: "Dance",
+          description: "Bonus Action Dance.",
+          limitedUses: {
+            type: "class_resource",
+            classResourceKey: "dances",
+            classResourceAmount: 1,
+          },
+          linkedModifiers: [
+            {
+              instanceId: "modinst_gd",
+              catalogRefId: "cat_char_resource_ability_menu",
+              characteristics: [
+                {
+                  id: "mod_gd",
+                  type: "resource_ability_menu",
+                  resourceKey: "dance_die",
+                  options: [
+                    {
+                      name: "Graceful Dodge",
+                      description: "Add your Dance Die to your AC against one attack.",
+                      resourceCost: 0,
+                      bonusConfig: {
+                        mode: "die",
+                        dieScaling: "class_resource",
+                        classResourceKey: "dance_die",
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        } as unknown as Feature,
+      ],
+      feats: [],
+      catalog: [],
+    })
+    expect(ids.has("while_dancing")).toBe(true)
+  })
+
+  it("includes first_turn_of_combat from an incoming-attack FeatureEffect", () => {
+    const ids = collectReferencedSheetToggleIds({
+      features: [
+        {
+          level: 2,
+          name: "Nimble Start",
+          description: "Attacks against you during the first round of combat have Disadvantage.",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_nimble",
+              catalogRefId: "cat_fx_check_roll_modifier",
+              activation: {
+                effects: [
+                  {
+                    id: "mod_nimble",
+                    kind: "check_roll_modifier",
+                    incomingAttackMode: "disadvantage",
+                    limitations: [
+                      {
+                        id: "lim_round1",
+                        kind: "sheet_toggle",
+                        rule: "requires_active",
+                        value: "first_turn_of_combat",
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        } as unknown as Feature,
+      ],
+      feats: [],
+      catalog: [],
+    })
+    expect(ids.has("first_turn_of_combat")).toBe(true)
+  })
+
   it("buildCharacterSheetToggleDefinitions omits unreferenced builtins and optional toggles", () => {
     const defs = buildCharacterSheetToggleDefinitions(new Set(["while_raging"]), [])
     expect(defs.map((entry) => entry.id)).toEqual(["while_raging"])

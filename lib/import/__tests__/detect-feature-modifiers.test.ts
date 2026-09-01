@@ -449,6 +449,23 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "language choice know phrasing",
+      text: "You know two languages of your choice.",
+      ruleId: "language.choice",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "language.choice")?.instance
+            .characteristics?.[0],
+          "languages",
+        )
+        expect(
+          (char as unknown as import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier & {
+            choiceCount?: number
+          })?.choiceCount,
+        ).toBe(2)
+      },
+    },
+    {
       label: "known language",
       text: "You know Sylvan.",
       ruleId: "language.known",
@@ -773,6 +790,22 @@ describe("detectFeatureModifiers", () => {
 
   it.each(negativeCases)("does not invent modifiers from: %s", (text) => {
     expect(detectFeatureModifiers(text, baseCtx)).toEqual([])
+  })
+
+  it("does not treat maneuver this-turn climb as a standing Speed grant", () => {
+    const text =
+      "When you expend a Battle Die, you gain a climbing speed equal to your walking speed until the end of your turn."
+    expect(
+      detectFeatureModifiers(text, { ...baseCtx, featureName: "Wall Dash [Maneuver]" }).some(
+        (entry) => entry.ruleId === "speed.equal_to_walk",
+      ),
+    ).toBe(false)
+    expect(
+      detectFeatureModifiers(
+        "You gain a climbing speed and swimming speed equal to your walking speed.",
+        baseCtx,
+      ).some((entry) => entry.ruleId === "speed.equal_to_walk"),
+    ).toBe(true)
   })
 
   it("wires species lineage Level|Spell tables with Long Rest free casts", () => {
@@ -1376,5 +1409,19 @@ describe("detectFeatureModifiers by feature name", () => {
       type: "tool_proficiencies",
       grantExpertise: true,
     })
+  })
+
+  it("wires first-round incoming Disadvantage behind first_turn_of_combat", () => {
+    const detections = detectFeatureModifiers(
+      "Attacks against you during the first round of combat have Disadvantage.",
+      { ...baseCtx, featureName: "Nimble Start" },
+    )
+    const fx = detections.find((entry) => entry.ruleId === "incoming.attack.disadvantage.first_round")
+      ?.instance.activation?.effects?.[0]
+    expect(fx).toMatchObject({
+      kind: "check_roll_modifier",
+      incomingAttackMode: "disadvantage",
+    })
+    expect(fx?.limitations?.some((lim) => lim.value === "first_turn_of_combat")).toBe(true)
   })
 })

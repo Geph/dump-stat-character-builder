@@ -751,3 +751,155 @@ describe("remaining SRD and MHP spend hooks", () => {
     expect(expertise?.spendsEconomy).toBe(false)
   })
 })
+
+describe("spell-slot hooks come from class_resource effects, not feature names", () => {
+  function slotEffectClass(featureName: string, effect: Record<string, unknown>) {
+    return {
+      row: { class_id: "homebrew-1", level: 12, subclass_id: null, order: 0 },
+      class: {
+        id: "homebrew-1",
+        name: "Homebrew",
+        features: [
+          {
+            name: featureName,
+            level: 1,
+            description: "Wired through the Compendium row.",
+            activation: { action: true, noEconomyCost: true },
+            linkedModifiers: [
+              {
+                instanceId: `modinst_${featureName.toLowerCase().replace(/\W+/g, "_")}`,
+                catalogRefId: "cat_fx_class_resource",
+                activation: { effects: [{ id: "mod_slot_effect", ...effect }] },
+              },
+            ],
+          },
+        ],
+      } as unknown as CharacterClassDetail["class"],
+      subclass: null,
+    }
+  }
+
+  it("restores pact slots from a pact_magic_slots reset effect", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        slotEffectClass("Occult Refresh", {
+          kind: "class_resource",
+          classResourceKey: "pact_magic_slots",
+          classResourceChange: "reset",
+          resourceRefreshFormula: "half_level",
+        }),
+      ],
+      species: null,
+    })
+    expect(
+      actions.find((action) => action.name === "Occult Refresh")?.restorePactSlotsOnUse,
+    ).toBe("half_round_up")
+  })
+
+  it("upgrades to a full pact restore when another feature links to it", () => {
+    const pactRefresh = slotEffectClass("Occult Refresh", {
+      kind: "class_resource",
+      classResourceKey: "pact_magic_slots",
+      classResourceChange: "reset",
+      resourceRefreshFormula: "half_level",
+    })
+    const upgrade = slotEffectClass("Occult Mastery", {
+      kind: "class_resource",
+      classResourceKey: "pact_magic_slots",
+      classResourceChange: "reset",
+      regainAllOnLinkedFeatureUse: true,
+      linkedFeatureName: "Occult Refresh",
+    })
+    const features = [
+      ...((pactRefresh.class?.features ?? []) as Feature[]),
+      ...((upgrade.class?.features ?? []) as Feature[]),
+    ]
+    const actions = collectSheetActions({
+      classDetails: [
+        { ...pactRefresh, class: { ...pactRefresh.class, features } as typeof pactRefresh.class },
+      ],
+      species: null,
+    })
+    expect(
+      actions.find((action) => action.name === "Occult Refresh")?.restorePactSlotsOnUse,
+    ).toBe("all")
+  })
+
+  it("recovers spell slots by combined level and honours the authored slot-level ceiling", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        slotEffectClass("Studied Recovery", {
+          kind: "class_resource",
+          classResourceKey: "spell_slots",
+          classResourceChange: "reset",
+          resourceRefreshFormula: "half_level",
+          spellSlotMaxLevel: 4,
+        }),
+      ],
+      species: null,
+    })
+    expect(
+      actions.find((action) => action.name === "Studied Recovery")?.restoreSpellSlotsOnUse,
+    ).toEqual({ mode: "combined_level_half_up", maxSlotLevel: 4 })
+  })
+
+  it("spends a spell slot from a spell_slots reduce effect", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        slotEffectClass("Ritual Insight", {
+          kind: "class_resource",
+          classResourceKey: "spell_slots",
+          classResourceChange: "reduce",
+          spellSlotMinLevel: 2,
+        }),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Ritual Insight")?.spendSpellSlotOnUse).toEqual(
+      { minSpellLevel: 2 },
+    )
+  })
+
+  it("converts a spell slot into a class resource from an increase effect", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        slotEffectClass("Grave Bargain", {
+          kind: "class_resource",
+          classResourceKey: "charnel_touch",
+          classResourceChange: "increase",
+          restoreFromSpellSlot: true,
+          classResourceAmountConfig: { mode: "ability_modifier", ability: "INT" },
+        }),
+      ],
+      species: null,
+    })
+    expect(
+      actions.find((action) => action.name === "Grave Bargain")?.restoreResourceFromSpellSlotOnUse,
+    ).toEqual({ resourceKey: "charnel_touch", ability: "INT" })
+  })
+
+  it("wires the SRD Warlock and Wizard rows through the catalog rather than the legacy names", () => {
+    const enriched = enrichSrdClassList(classes as Record<string, unknown>[])
+    const findEffect = (className: string, featureName: string) => {
+      const cls = enriched.find((row) => row.name === className) as unknown as DndClass
+      const feature = (cls.features as Feature[]).find((row) => row.name === featureName)
+      return (feature?.linkedModifiers ?? []).flatMap(
+        (instance) => instance.activation?.effects ?? [],
+      )
+    }
+    expect(findEffect("Warlock", "Magical Cunning")).toContainEqual(
+      expect.objectContaining({
+        kind: "class_resource",
+        classResourceKey: "pact_magic_slots",
+        classResourceChange: "reset",
+      }),
+    )
+    expect(findEffect("Wizard", "Arcane Recovery")).toContainEqual(
+      expect.objectContaining({
+        kind: "class_resource",
+        classResourceKey: "spell_slots",
+        spellSlotMaxLevel: 5,
+      }),
+    )
+  })
+})

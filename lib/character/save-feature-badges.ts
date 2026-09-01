@@ -1,9 +1,11 @@
 import { firstSentenceFromText, stripFeatureHintHtml } from "@/lib/builder/feature-choice-hint"
 import { featureEffectMatchesRollContext } from "@/lib/character/collect-feature-roll-modes"
 import { collectActiveFeatureEffects } from "@/lib/character/collect-limited-feature-effects"
+import { resourceMenuLooksLikeSave } from "@/lib/character/upgrade-sheet-surfaces"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { resolveCheckRollMode } from "@/lib/compendium/class-feature-metadata"
 import type { LimitationEvaluationContext } from "@/lib/compendium/modifier-limitations"
+import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
 import type { Feature, FeatureEffect } from "@/lib/types"
 
 export const SAVE_ABILITY_KEYS = [
@@ -130,16 +132,17 @@ export function collectSaveFeatureBadges(
     if (feature.name) featuresByName.set(feature.name, feature)
   }
 
-  for (const { featureName, effect } of collectActiveFeatureEffects(
-    features,
-    limitationContext,
-    isSaveScopedEffect,
-  )) {
+  const pushBadge = (
+    featureName: string,
+    effect: FeatureEffect,
+    fallbackDescription?: string,
+  ) => {
     const feature = featuresByName.get(featureName)
-    const description = badgeDescription(
-      feature ?? ({ name: featureName, description: null, level: 1 } as unknown as Feature),
-      effect,
-    )
+    const description =
+      badgeDescription(
+        feature ?? ({ name: featureName, description: null, level: 1 } as unknown as Feature),
+        effect,
+      ) || fallbackDescription || featureName
     const label = badgeLabel(featureName)
     const abilities = abilitiesForEffect(effect).filter((ability) =>
       featureEffectMatchesRollContext(effect, { kind: "save", ability }),
@@ -149,7 +152,7 @@ export function collectSaveFeatureBadges(
 
     if (appliesToAllSaves) {
       const id = `${label.toLowerCase()}:all:${effect.id ?? effect.kind}`
-      if (seen.has(id)) continue
+      if (seen.has(id)) return
       seen.add(id)
       allSaves.push({
         id,
@@ -158,7 +161,7 @@ export function collectSaveFeatureBadges(
         sourceLabel: featureName !== label ? featureName : undefined,
         ability: "all",
       })
-      continue
+      return
     }
 
     for (const ability of targets) {
@@ -172,6 +175,60 @@ export function collectSaveFeatureBadges(
         sourceLabel: featureName !== label ? featureName : undefined,
         ability,
       })
+    }
+  }
+
+  for (const { featureName, effect } of collectActiveFeatureEffects(
+    features,
+    limitationContext,
+    isSaveScopedEffect,
+  )) {
+    pushBadge(featureName, effect)
+  }
+
+  for (const feature of features) {
+    const featureName = feature.name ?? "Feature"
+    for (const instance of feature.linkedModifiers ?? []) {
+      for (const characteristic of instance.characteristics ?? []) {
+        if (!modifierLimitationsMet(characteristic, limitationContext)) continue
+        if (characteristic.type === "resource_ability_menu" && resourceMenuLooksLikeSave(characteristic)) {
+          const option = characteristic.options?.[0]
+          pushBadge(
+            featureName,
+            {
+              id: `${characteristic.id}-save-menu`,
+              kind: "check_roll_modifier",
+              checkCategory: "save",
+              checkRollMode: "bonus",
+              bonusConfig: option?.bonusConfig ?? null,
+              label: characteristic.label || option?.description || featureName,
+            },
+            option?.description,
+          )
+          continue
+        }
+        if (characteristic.type === "failed_roll_trigger" && characteristic.rollKind === "save") {
+          pushBadge(featureName, {
+            id: `${characteristic.id}-failed-save`,
+            kind: "check_roll_modifier",
+            checkCategory: "save",
+            checkAbility: characteristic.ability ?? undefined,
+            checkRollMode: "bonus",
+            label: characteristic.label || featureName,
+          })
+          continue
+        }
+        if (characteristic.type === "saving_throw_trigger") {
+          pushBadge(featureName, {
+            id: `${characteristic.id}-save-trigger`,
+            kind: "check_roll_modifier",
+            checkCategory: "save",
+            checkAbility: characteristic.saveAbility ?? undefined,
+            checkRollMode: characteristic.triggerOn === "fail" ? "replace_failure" : "bonus",
+            label: characteristic.label || featureName,
+          })
+        }
+      }
     }
   }
 

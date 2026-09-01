@@ -225,6 +225,11 @@ import { normalizeAsiAllocationsMap } from "@/lib/character/level-up-feat"
 import { catalogFeatPickIdsFromPicks } from "@/lib/builder/catalog-feat-options"
 import { collectKnownDisciplineNames } from "@/lib/builder/aggregate-psionic-talents"
 import { filterCustomAbilitiesForCharacterSheet, filterFeatureTabCustomAbilities } from "@/lib/character/filter-sheet-custom-abilities"
+import {
+  collectUpgradeSurfaceNames,
+  customAbilityAsFeature,
+  mergeSpeedOverlayNotes,
+} from "@/lib/character/upgrade-sheet-surfaces"
 import { applyCustomAbilityModifications } from "@/lib/character/modify-custom-ability"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
@@ -236,7 +241,10 @@ import {
   getEffectiveWeaponProficiencies,
 } from "@/lib/compendium/background-proficiencies"
 import { SRD_CONDITIONS, getConditionDescription } from "@/lib/srd/condition-descriptions"
-import { isIncapacitatedByConditions } from "@/lib/srd/condition-roll-effects"
+import {
+  isIncapacitatedByConditions,
+  isSpeedZeroByConditions,
+} from "@/lib/srd/condition-roll-effects"
 import {
   getExhaustionDerivedEffects,
   clampExhaustionLevel,
@@ -264,6 +272,7 @@ import {
   clearExclusiveSheetToggleGroup,
   END_WEAPON_MORPH_TOGGLE_ID,
   getSheetToggleDefinition,
+  isKnownSheetToggleId,
   GUARDIAN_TACTICS_TOGGLES,
   inactiveSheetToggleLabel,
   PRIMORDIAL_ASPECT_TOGGLES,
@@ -392,11 +401,19 @@ import {
   type FeatureLayoutState,
 } from "@/lib/character/feature-layout"
 import {
+  buildChoiceDescriptionLookup,
   buildFeatureTabSections,
   featureTabNavLabel,
 } from "@/lib/character/feature-tab-sections"
 import { rememberLastCharacterId } from "@/lib/site-settings/resume-last-character"
 import { createDurationReminder, type DurationReminder } from "@/lib/character/duration-reminders"
+import {
+  reminderForSheetToggle,
+  removeRemindersForToggle,
+  sheetToggleIdsClearedWithReminders,
+  toggleIdsEndedByPlayState,
+  upsertToggleDurationReminder,
+} from "@/lib/character/sheet-toggle-duration"
 import type { SheetActionEntry } from "@/lib/character/sheet-actions"
 import { SiteFooter } from "@/components/site-footer"
 import { WILD_SHAPE_DIRECTIONS, WILD_SHAPE_GAME_STATISTICS } from "@/lib/character/srd-beast-forms"
@@ -1848,29 +1865,123 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const toggleSheetToggle = useCallback(
     (toggleId: string) => {
-      setActiveSheetToggleIds((prev) =>
-        applySheetToggleChange(prev, toggleId, sheetToggleDefinitions),
-      )
+      setActiveSheetToggleIds((prev) => {
+        const next = applySheetToggleChange(prev, toggleId, sheetToggleDefinitions)
+        const nowActive = next.includes(toggleId)
+        const def = sheetToggleDefinitions.find((entry) => entry.id === toggleId)
+        if (def) {
+          setDurationReminders((reminders) =>
+            nowActive
+              ? upsertToggleDurationReminder(reminders, def)
+              : removeRemindersForToggle(reminders, toggleId),
+          )
+        }
+        if (!nowActive) {
+          setSheetToggleNotes((notes) => {
+            if (!(toggleId in notes)) return notes
+            const cleared = { ...notes }
+            delete cleared[toggleId]
+            return cleared
+          })
+        }
+        if (!nowActive && toggleId === "while_dancing") {
+          return clearExclusiveSheetToggleGroup(next, "dance_style", sheetToggleDefinitions)
+        }
+        return next
+      })
     },
     [sheetToggleDefinitions],
   )
 
   /** Force a toggle on (does not turn it off if already active). Exclusive groups still clear peers. */
   const activateSheetToggle = useCallback(
-    (toggleId: string) => {
+    (toggleId: string, note?: string) => {
       if (toggleId === END_WEAPON_MORPH_TOGGLE_ID) {
         setActiveSheetToggleIds((prev) =>
           clearExclusiveSheetToggleGroup(prev, WEAPON_MORPH_EXCLUSIVE_GROUP, sheetToggleDefinitions),
         )
         return
       }
+      const def = sheetToggleDefinitions.find((entry) => entry.id === toggleId)
       setActiveSheetToggleIds((prev) => {
         if (prev.includes(toggleId)) return prev
         return applySheetToggleChange(prev, toggleId, sheetToggleDefinitions)
       })
+      if (def) {
+        setDurationReminders((reminders) => upsertToggleDurationReminder(reminders, def))
+      }
+      if (note != null) {
+        setSheetToggleNotes((previous) => {
+          const next = { ...previous }
+          if (note.trim()) next[toggleId] = note.trim()
+          else delete next[toggleId]
+          return next
+        })
+      }
     },
     [sheetToggleDefinitions],
   )
+
+  const handleDurationRemindersChange = useCallback((next: DurationReminder[]) => {
+    setDurationReminders((prev) => {
+      const cleared = sheetToggleIdsClearedWithReminders(prev, next)
+      if (cleared.length) {
+        setActiveSheetToggleIds((ids) => {
+          let remaining = ids.filter((id) => !cleared.includes(id))
+          if (cleared.includes("while_dancing")) {
+            remaining = clearExclusiveSheetToggleGroup(
+              remaining,
+              "dance_style",
+              sheetToggleDefinitions,
+            )
+          }
+          return remaining
+        })
+        setSheetToggleNotes((notes) => {
+          const copy = { ...notes }
+          let changed = false
+          for (const id of cleared) {
+            if (id in copy) {
+              delete copy[id]
+              changed = true
+            }
+          }
+          return changed ? copy : notes
+        })
+      }
+      return next
+    })
+  }, [sheetToggleDefinitions])
+
+  useEffect(() => {
+    const speedZero =
+      (derived != null && derived.speed <= 0) || isSpeedZeroByConditions(activeConditions)
+    const ended = toggleIdsEndedByPlayState({
+      definitions: sheetToggleDefinitions,
+      activeToggleIds: activeSheetToggleIds,
+      incapacitated: isIncapacitatedByConditions(activeConditions),
+      speedZero,
+    })
+    if (!ended.length) return
+    const endedDancing = ended.includes("while_dancing")
+    setActiveSheetToggleIds((prev) => {
+      const withoutEnded = prev.filter((id) => !ended.includes(id))
+      return endedDancing
+        ? clearExclusiveSheetToggleGroup(withoutEnded, "dance_style", sheetToggleDefinitions)
+        : withoutEnded
+    })
+    setDurationReminders((prev) =>
+      ended.reduce((acc, id) => removeRemindersForToggle(acc, id), prev),
+    )
+    if (endedDancing) {
+      setSheetToggleNotes((notes) => {
+        if (!("while_dancing" in notes)) return notes
+        const next = { ...notes }
+        delete next.while_dancing
+        return next
+      })
+    }
+  }, [activeConditions, activeSheetToggleIds, derived, sheetToggleDefinitions])
 
   const spawnIllusionToken = useCallback((kind: IllusionTokenKind) => {
     const next = createIllusionToken({ kind })
@@ -1933,13 +2044,24 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       const active = activeSheetToggleIds.includes(toggle.id)
       const isRagingToggle = toggle.id === "while_raging"
       const isInnateSorceryToggle = toggle.id === "while_innate_sorcery_active"
-      const label = active ? toggle.label : inactiveSheetToggleLabel(toggle.label)
+      const linkedReminder = reminderForSheetToggle(durationReminders, toggle.id)
+      const styleNote = sheetToggleNotes[toggle.id]?.trim()
+      const label = active
+        ? [
+            toggle.label,
+            styleNote,
+            linkedReminder?.remaining,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : inactiveSheetToggleLabel(toggle.label)
       const RagingIcon = active ? Angry : Smile
       const toggleButton = (
         <button
           key={toggle.id}
           type="button"
           aria-pressed={active}
+          title={toggle.hint}
           onClick={() => toggleSheetToggle(toggle.id)}
           className={`min-h-11 w-full shrink-0 whitespace-nowrap rounded-lg border px-3 text-sm font-semibold transition-colors sm:w-auto ${
             active
@@ -2002,7 +2124,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         </div>
       )
     },
-    [activeSheetToggleIds, sheetToggleNotes, toggleSheetToggle],
+    [activeSheetToggleIds, durationReminders, sheetToggleNotes, toggleSheetToggle],
   )
 
   const buildCurrentPlayState = useCallback(
@@ -2780,6 +2902,21 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [character?.builder_picks],
   )
 
+  const choiceDescriptionByName = useMemo(
+    () =>
+      buildChoiceDescriptionLookup([
+        ...customAbilities.map((ability) => ({
+          name: ability.name,
+          description: ability.description,
+          ability_role: ability.ability_role,
+          linked_modifiers: ability.linked_modifiers,
+        })),
+        ...characterFeats,
+        ...(originFeat ? [originFeat] : []),
+      ]),
+    [customAbilities, characterFeats, originFeat],
+  )
+
   const featureTabSections = useMemo(
     () =>
       buildFeatureTabSections({
@@ -2796,6 +2933,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         featIds: character?.feat_ids ?? characterFeats.map((feat) => feat.id),
         choiceLabelByPickId,
         modifierPlayerPicks: character?.modifier_player_picks ?? {},
+        choiceDescriptionByName,
       }),
     [
       classDetails,
@@ -2811,6 +2949,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       choiceLabelByPickId,
       speciesTraitPicks,
       character?.modifier_player_picks,
+      choiceDescriptionByName,
     ],
   )
 
@@ -2824,6 +2963,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     return filterFeatureTabCustomAbilities(sheetCustomAbilities, {
       sheetActionCustomAbilityIds: actionIds,
       sheetActionNames: actionNames,
+      surfacedElsewhereNames: collectUpgradeSurfaceNames(sheetCustomAbilities, [
+        "save",
+        "weapon",
+        "speed",
+      ]),
     })
   }, [sheetActions, sheetCustomAbilities])
 
@@ -3504,7 +3648,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   useEffect(() => {
     const allowed = new Set(sheetToggleDefinitions.map((entry) => entry.id))
     setActiveSheetToggleIds((prev) => {
-      const next = prev.filter((id) => allowed.has(id))
+      const next = prev.filter((id) => allowed.has(id) || isKnownSheetToggleId(id))
       return next.length === prev.length ? prev : next
     })
   }, [sheetToggleDefinitions])
@@ -4088,6 +4232,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const immunities = derived?.immunities ?? []
   const conditionImmunities = derived?.conditionImmunities ?? []
   const movementEffects = derived?.movementEffects ?? null
+  const speedOverlayNotes = mergeSpeedOverlayNotes(movementEffects, sheetCustomAbilities)
   const extraTurns = derived?.extraTurns ?? []
   const movementEffectNotes = movementEffects
     ? [
@@ -4254,7 +4399,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       currentHp,
     },
   })
-  const saveFeatureBadges = collectSaveFeatureBadges(sheetSaveFeatures, {
+  const saveFeatureBadges = collectSaveFeatureBadges(
+    [...sheetSaveFeatures, ...sheetCustomAbilities.map(customAbilityAsFeature)],
+    {
     activeConditions,
     activeSheetToggles: activeSheetToggleSet,
     equippedArmor: limitationEquipment.armor,
@@ -4510,7 +4657,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   <span className="hidden sm:inline-flex">
                     <ManualRollTrigger />
                   </span>
-                  <DurationRemindersPanel reminders={durationReminders} onChange={setDurationReminders} />
+                  <DurationRemindersPanel
+                    reminders={durationReminders}
+                    onChange={handleDurationRemindersChange}
+                  />
                   <div className="relative shrink-0">
                     <button
                       ref={conditionButtonRef}
@@ -5254,6 +5404,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           contributions={
                             statBreakdowns ? breakdownLines(statBreakdowns, "speed") : undefined
                           }
+                          notes={speedOverlayNotes}
                         />
                       </span>
                     </div>
@@ -5719,6 +5870,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     initiative={initiative}
                     speed={speed}
                     speeds={speedEntries}
+                    speedNotes={speedOverlayNotes}
                     maxHp={maxHp}
                     currentHp={currentHp}
                     tempHp={tempHp}

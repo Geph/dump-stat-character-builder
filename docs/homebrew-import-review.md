@@ -2,7 +2,7 @@
 
 How to give Cursor (and the repo tooling) content for the Mage Hand Press / homebrew **class extract → wiring review → merge → enrich** loop.
 
-This loop is not only for full class audits. If a sheet bug existed because Drive JSON, BYO instructions, detect rules, or enrichment missed a mechanic, update those sources in the same change — see [AGENTS.md](../AGENTS.md) session invariant 3.
+This loop is not only for full class audits. If a sheet bug existed because Drive JSON, BYO instructions, detect rules, or enrichment missed a mechanic, update those sources in the same change — see [AGENTS.md](../AGENTS.md) session invariant 3. Which modifier layer to use (and when the sheet already owns the engine): [custom-modifiers.md](./custom-modifiers.md).
 
 ## TL;DR — what to paste into Cursor
 

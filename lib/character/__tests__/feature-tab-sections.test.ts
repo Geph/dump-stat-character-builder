@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest"
 import {
   backgroundFeatureShowsOnFeaturesTab,
+  buildChoiceDescriptionLookup,
   buildFeatureTabSections,
   featAsiChosenSummary,
+  isGenericChoicePrompt,
+  selectedChoiceDescription,
 } from "@/lib/character/feature-tab-sections"
 import { COMBINED_MILESTONE_ASI_KEY } from "@/lib/builder/asi-allocation"
 import type { Feat } from "@/lib/types"
@@ -121,8 +124,57 @@ describe("buildFeatureTabSections", () => {
 
     expect(sections.find((section) => section.id === "species")?.items[0]).toMatchObject({
       chosenNames: ["Drow"],
-      description: "You know Dancing Lights and gain Drow magic.",
     })
+    expect(sections.find((section) => section.id === "species")?.items[0]?.description).toContain(
+      "You know Dancing Lights and gain Drow magic.",
+    )
+    expect(sections.find((section) => section.id === "species")?.items[0]?.description).toContain(
+      "Drow",
+    )
+    expect(sections.find((section) => section.id === "species")?.items[0]?.description).not.toContain(
+      "Choose a lineage.",
+    )
+  })
+
+  it("keeps Dance Styles picker rules and appends the chosen style's effect", () => {
+    const shiftRules =
+      "When you take the Attack action while Dancing, you can teleport up to 10 feet before or after one of the attacks."
+    const sections = buildFeatureTabSections({
+      classDetails: [
+        {
+          row: { class_id: "dancer-1", level: 3, subclass_id: null },
+          class: {
+            id: "dancer-1",
+            name: "Dancer",
+            features: [
+              {
+                level: 2,
+                name: "Dance Styles",
+                description:
+                  "When you begin your Dance, choose one of your Dance Styles. You know one Dance Style of your choice, and you learn an additional Dance Style at Dancer level 13 (Freestyle).",
+                isChoice: true,
+                choices: {
+                  category: "Dance Style",
+                  count: 1,
+                  optionsSource: "class_upgrades",
+                  options: [],
+                },
+              },
+            ],
+          },
+          subclass: null,
+        } as never,
+      ],
+      feats: [],
+      featureChoicePicks: { "dancer-1:L2:Dance Styles": ["Shift"] },
+      choiceDescriptionByName: { shift: shiftRules },
+    })
+
+    const item = sections.find((section) => section.id === "class:dancer-1")?.items[0]
+    expect(item?.chosenNames).toEqual(["Shift"])
+    expect(item?.description).toContain("When you begin your Dance")
+    expect(item?.description).toContain(shiftRules)
+    expect(item?.description).toContain("Shift")
   })
 
   it("shows the chosen Magic Initiate spell list in chrome and specialized prose", () => {
@@ -226,5 +278,90 @@ describe("buildFeatureTabSections", () => {
     expect(sections.find((section) => section.id === "subclass:class-1")?.items.map((i) => i.name)).toEqual([
       "Improved Critical",
     ])
+  })
+})
+
+describe("selectedChoiceDescription", () => {
+  it("treats short choose-prompts as generic", () => {
+    expect(isGenericChoicePrompt("Choose a lineage.")).toBe(true)
+    expect(
+      isGenericChoicePrompt(
+        "When you begin your Dance, choose one of your Dance Styles. You know one Dance Style of your choice.",
+      ),
+    ).toBe(false)
+  })
+
+  it("does not repeat option text already in the parent description", () => {
+    const colossus = "When you hit a creature with a weapon attack, the target takes extra damage."
+    expect(
+      selectedChoiceDescription(
+        {
+          description: `Choose one. Colossus Slayer. ${colossus}`,
+          choices: {
+            options: [{ name: "Colossus Slayer", description: colossus }],
+          },
+        },
+        ["Colossus Slayer"],
+      ),
+    ).toBe(`Choose one. Colossus Slayer. ${colossus}`)
+  })
+
+  it("builds a name-keyed lookup from custom abilities", () => {
+    const lookup = buildChoiceDescriptionLookup([
+      { name: "Shift", description: "Teleport 10 feet as part of the Attack action." },
+      { name: "Elegant Form [Dance Style]", description: "Add your Dance Die to a failed save." },
+    ])
+    expect(lookup.shift?.[0]?.description).toContain("Teleport 10 feet")
+    expect(lookup["elegant form"]?.[0]?.description).toContain("Dance Die")
+  })
+
+  it("prefers an upgrade over a same-named weapon mastery on class_upgrades", () => {
+    const lookup = buildChoiceDescriptionLookup([
+      {
+        name: "Shift",
+        ability_role: "weapon_mastery",
+        description: "If you hit a creature with this weapon, move 10 feet.",
+      },
+      {
+        name: "Shift",
+        ability_role: "upgrade",
+        description: "While Dancing, you can teleport 10 feet after an attack.",
+      },
+    ])
+    expect(
+      selectedChoiceDescription(
+        {
+          description: "When you begin your Dance, choose one of your Dance Styles.",
+          choices: { optionsSource: "class_upgrades", category: "Dance Style", options: [] },
+        },
+        ["Shift"],
+        lookup,
+      ),
+    ).toContain("While Dancing, you can teleport 10 feet after an attack.")
+  })
+
+  it("does not borrow weapon mastery text for a Dance Style pick", () => {
+    const lookup = buildChoiceDescriptionLookup([
+      {
+        name: "Shift",
+        ability_role: "weapon_mastery",
+        description: "If you hit a creature with this weapon, move 10 feet.",
+      },
+    ])
+    const text = selectedChoiceDescription(
+      {
+        description: "When you begin your Dance, choose one of your Dance Styles.",
+        choices: {
+          optionsSource: "class_upgrades",
+          category: "Dance Style",
+          resourceKey: "dance_styles_known",
+          options: [],
+        },
+      },
+      ["Shift"],
+      lookup,
+    )
+    expect(text).toContain("When you begin your Dance")
+    expect(text).not.toContain("If you hit a creature with this weapon")
   })
 })

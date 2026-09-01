@@ -2,6 +2,7 @@ import {
   chosenOptionNames,
   resolveChoicePickLabel,
 } from "@/lib/character/chosen-option-label"
+import { resolveChoiceOptionDescription } from "@/lib/compendium/choice-option-description"
 import { resolveSpeciesTraitPicks } from "@/lib/builder/species-trait-picks"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import {
@@ -175,21 +176,202 @@ function dedupeFeaturesByName(features: Feature[]): { feature: Feature; levels: 
   return order.map((name) => byName.get(name)!)
 }
 
-/** Show the rules for selected variants instead of the generic choice prompt. */
+function stripHtmlToPlain(value: string): string {
+  return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+}
+
+function normalizeChoiceName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s*\[[^\]]+\]\s*$/, "")
+    .replace(/\s+/g, " ")
+}
+
+function escapeHtmlText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
+
+/** True when the parent is only a short "choose / pick / select" prompt. */
+export function isGenericChoicePrompt(text: string | null | undefined): boolean {
+  const plain = stripHtmlToPlain(text ?? "")
+  if (!plain) return true
+  if (plain.length > 120) return false
+  return /^(choose|pick|select)\b/i.test(plain)
+}
+
+function descriptionAlreadyPresent(parent: string, optionText: string): boolean {
+  const parentPlain = stripHtmlToPlain(parent).toLowerCase()
+  const optionPlain = stripHtmlToPlain(optionText).toLowerCase()
+  if (!parentPlain || !optionPlain) return false
+  const needle = optionPlain.length > 48 ? optionPlain.slice(0, 48) : optionPlain
+  return parentPlain.includes(needle)
+}
+
+function formatChosenOptionBlock(name: string, description: string): string {
+  const trimmed = description.trim()
+  const plain = stripHtmlToPlain(trimmed)
+  if (plain.toLowerCase().startsWith(name.trim().toLowerCase())) return trimmed
+  if (/<[a-z][\s\S]*>/i.test(trimmed)) {
+    return `<p><strong>${escapeHtmlText(name)}.</strong></p>${trimmed}`
+  }
+  return `<p><strong>${escapeHtmlText(name)}.</strong> ${trimmed}</p>`
+}
+
+export type ChoiceDescriptionSource = {
+  name?: string | null
+  description?: string | null
+  ability_role?: string | null
+  linkedModifiers?: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[] | null
+  linked_modifiers?: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[] | null
+}
+
+export type ChoiceDescriptionEntry = {
+  description: string
+  role?: string | null
+}
+
+export type ChoiceDescriptionLookup = Record<string, ChoiceDescriptionEntry[]>
+
+function preferredRolesForChoice(item: {
+  choices?: {
+    optionsSource?: string | null
+    category?: string | null
+    resourceKey?: string | null
+  } | null
+}): string[] {
+  const source = item.choices?.optionsSource ?? ""
+  const category = item.choices?.category ?? ""
+  const resourceKey = item.choices?.resourceKey ?? ""
+  if (/dance style/i.test(category) || resourceKey === "dance_styles_known") {
+    return ["upgrade"]
+  }
+  if (source === "class_upgrades") return ["upgrade", "weapon_mastery"]
+  if (source === "class_knacks") return ["knack"]
+  if (source === "class_bomb_formulas") return ["bomb_formula", "alchemist_bomb"]
+  if (source === "class_discoveries") return ["discovery"]
+  if (source === "class_talents" || source === "known_discipline_talents") {
+    return ["class_talent", "talent_pool"]
+  }
+  return []
+}
+
+/** Name → candidate rules texts for picks that live on custom abilities / feats. */
+export function buildChoiceDescriptionLookup(
+  sources: ChoiceDescriptionSource[] | null | undefined,
+): ChoiceDescriptionLookup {
+  const lookup: ChoiceDescriptionLookup = {}
+  for (const source of sources ?? []) {
+    const name = source.name?.trim()
+    if (!name) continue
+    const description = resolveChoiceOptionDescription(
+      {
+        name,
+        description: source.description,
+        linkedModifiers: source.linkedModifiers ?? source.linked_modifiers,
+      },
+      null,
+    ).trim()
+    if (!description) continue
+    const entry: ChoiceDescriptionEntry = {
+      description,
+      role: source.ability_role ?? null,
+    }
+    const keys = new Set([normalizeChoiceName(name), name.trim().toLowerCase()])
+    for (const key of keys) {
+      if (!key) continue
+      const list = lookup[key] ?? []
+      if (list.some((existing) => existing.description === description && existing.role === entry.role)) {
+        continue
+      }
+      list.push(entry)
+      lookup[key] = list
+    }
+  }
+  return lookup
+}
+
+export function lookupChoiceDescription(
+  name: string,
+  lookup: ChoiceDescriptionLookup | Record<string, string> | null | undefined,
+  preferredRoles: string[] = [],
+): string {
+  if (!lookup) return ""
+  const raw = lookup[name.trim().toLowerCase()] ?? lookup[normalizeChoiceName(name)]
+  if (!raw) return ""
+  if (typeof raw === "string") return raw.trim()
+  if (preferredRoles.length) {
+    for (const role of preferredRoles) {
+      const match = raw.find((entry) => entry.role === role)
+      if (match?.description.trim()) return match.description.trim()
+    }
+    const unroled = raw.find((entry) => !entry.role?.trim() && entry.description.trim())
+    return unroled?.description.trim() ?? ""
+  }
+  return raw[0]?.description.trim() ?? ""
+}
+
+type ChoiceDescriptionItem = {
+  description?: string | null
+  choices?: {
+    optionsSource?: string | null
+    category?: string | null
+    resourceKey?: string | null
+    options?: {
+      name: string
+      description?: string | null
+      linkedModifiers?: import("@/lib/compendium/linked-modifiers").LinkedModifierInstance[] | null
+    }[] | null
+  } | null
+}
+
+function resolveChosenOptionDescription(
+  name: string,
+  item: ChoiceDescriptionItem,
+  lookup?: ChoiceDescriptionLookup | Record<string, string> | null,
+): string {
+  const needle = normalizeChoiceName(name)
+  const inline = (item.choices?.options ?? []).find(
+    (option) => normalizeChoiceName(option.name) === needle,
+  )
+  if (inline) {
+    const fromOption = resolveChoiceOptionDescription(inline, item.description).trim()
+    if (fromOption) return fromOption
+  }
+  return lookupChoiceDescription(name, lookup, preferredRolesForChoice(item))
+}
+
+/**
+ * Feature-card body for a picked choice: keep real picker rules, and always include
+ * what the selected option does (inline choices or custom-ability / feat lookup).
+ */
 export function selectedChoiceDescription(
-  item: {
-    description?: string | null
-    choices?: { options?: { name: string; description?: string | null }[] | null } | null
-  },
+  item: ChoiceDescriptionItem,
   chosenNames: string[],
+  lookup?: ChoiceDescriptionLookup | Record<string, string> | null,
 ): string | null | undefined {
-  if (!chosenNames.length || !item.choices?.options?.length) return item.description
-  const chosen = new Set(chosenNames.map((name) => name.trim().toLowerCase()).filter(Boolean))
-  const descriptions = item.choices.options
-    .filter((option) => chosen.has(option.name.trim().toLowerCase()))
-    .map((option) => option.description?.trim())
-    .filter((description): description is string => Boolean(description))
-  return descriptions.length ? descriptions.join("\n\n") : item.description
+  if (!chosenNames.length) return item.description
+  const blocks: string[] = []
+  for (const name of chosenNames) {
+    const trimmed = name.trim()
+    if (!trimmed) continue
+    const description = resolveChosenOptionDescription(trimmed, item, lookup)
+    if (!description) continue
+    blocks.push(formatChosenOptionBlock(trimmed, description))
+  }
+  if (!blocks.length) return item.description
+
+  const parent = item.description?.trim() ?? ""
+  const uniqueBlocks = parent
+    ? blocks.filter((block) => !descriptionAlreadyPresent(parent, block))
+    : blocks
+  if (!uniqueBlocks.length) return item.description
+  if (!parent || isGenericChoicePrompt(parent)) return uniqueBlocks.join("\n\n")
+  return `${parent}\n\n${uniqueBlocks.join("\n\n")}`
 }
 
 export function buildFeatureTabSections(params: {
@@ -213,10 +395,13 @@ export function buildFeatureTabSections(params: {
   choiceLabelByPickId?: Record<string, string> | null
   /** Spell-list / ability picks for Magic Initiate chrome and specialized prose. */
   modifierPlayerPicks?: Record<string, string[]> | null
+  /** Chosen option name → rules text (custom abilities, feats) when choices.options is empty. */
+  choiceDescriptionByName?: ChoiceDescriptionLookup | Record<string, string> | null
 }): FeatureTabSection[] {
   const sections: FeatureTabSection[] = []
   const picks = params.featureChoicePicks
   const choiceLabelByPickId = params.choiceLabelByPickId
+  const choiceDescriptionByName = params.choiceDescriptionByName
 
   for (const entry of params.classDetails) {
     const classUnlocked = ((entry.class?.features as Feature[] | undefined) ?? []).filter(
@@ -241,7 +426,7 @@ export function buildFeatureTabSections(params: {
           name: feature.name,
           level: feature.level,
           levels: levels.length > 1 ? levels : undefined,
-          description: selectedChoiceDescription(feature, chosenNames),
+          description: selectedChoiceDescription(feature, chosenNames, choiceDescriptionByName),
           chosenNames,
           classId: entry.row.class_id,
           feature,
@@ -278,7 +463,7 @@ export function buildFeatureTabSections(params: {
           id: `${sectionId}:${feature.name}:${feature.level}`,
           name: feature.name,
           level: feature.level,
-          description: selectedChoiceDescription(feature, chosenNames),
+          description: selectedChoiceDescription(feature, chosenNames, choiceDescriptionByName),
           chosenNames,
           classId: entry.row.class_id,
           feature,
@@ -308,7 +493,7 @@ export function buildFeatureTabSections(params: {
         return {
           id: `${sectionId}:${trait.name}`,
           name: trait.name,
-          description: selectedChoiceDescription(trait, chosenNames),
+          description: selectedChoiceDescription(trait, chosenNames, choiceDescriptionByName),
           chosenNames,
         }
       }),
@@ -328,7 +513,7 @@ export function buildFeatureTabSections(params: {
         {
           id: `${sectionId}:feature`,
           name: backgroundFeature.name,
-          description: selectedChoiceDescription(backgroundFeature, chosenNames),
+          description: selectedChoiceDescription(backgroundFeature, chosenNames, choiceDescriptionByName),
           chosenNames,
         },
       ],
@@ -357,7 +542,7 @@ export function buildFeatureTabSections(params: {
     )
     const description = specializeMagicInitiateDescription(
       params.originFeat
-        ? selectedChoiceDescription(params.originFeat, chosenNames)
+        ? selectedChoiceDescription(params.originFeat, chosenNames, choiceDescriptionByName)
         : params.originFeatFallbackDescription ?? "Granted by your background at 1st level.",
       { spellList, spellcastingAbility: ability },
     )
@@ -391,7 +576,7 @@ export function buildFeatureTabSections(params: {
     })
     const ability = spellcastingAbilityFromMagicInitiatePicks(modifierPlayerPicks)
     const description = specializeMagicInitiateDescription(
-      selectedChoiceDescription(feat, choiceNames),
+      selectedChoiceDescription(feat, choiceNames, choiceDescriptionByName),
       { spellList, spellcastingAbility: spellList ? ability : null },
     )
     const withList =

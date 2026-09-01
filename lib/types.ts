@@ -184,6 +184,11 @@ export interface FeatureEffect {
   grantAdvantage?: boolean
   /** @deprecated Implicit when kind is check_disadvantage */
   grantDisadvantage?: boolean
+  /**
+   * `resource_key` from the class_resources table. Two keys are reserved and route to the
+   * spell-slot trackers instead of a resource row: `spell_slots` and `pact_magic_slots`.
+   * See `lib/character/spell-slot-use-effects.ts`.
+   */
   classResourceKey?: string | null
   /** How a class_resource effect modifies the pool. */
   classResourceChange?: "reduce" | "increase" | "reset" | null
@@ -265,6 +270,21 @@ export interface FeatureEffect {
   /** class_resource: regain all when using another named class feature. */
   regainAllOnLinkedFeatureUse?: boolean
   linkedFeatureName?: string | null
+  /**
+   * class_resource on the reserved `spell_slots` key: lowest slot level that may be spent
+   * (Traditional Expertise expends any slot, so 1).
+   */
+  spellSlotMinLevel?: number | null
+  /**
+   * class_resource reset on the reserved `spell_slots` key: highest slot level that may be
+   * recovered (Arcane Recovery recovers nothing of 6th level or higher, so 5).
+   */
+  spellSlotMaxLevel?: number | null
+  /**
+   * class_resource increase: the uses are paid for by expending a spell slot rather than
+   * granted outright (Dark Arcana converts a slot into Charnel Touch points).
+   */
+  restoreFromSpellSlot?: boolean
   /** activate_custom_ability: compendium custom ability id to trigger. */
   customAbilityId?: string | null
   /** self_buff_caster: label for the temporary caster state. */

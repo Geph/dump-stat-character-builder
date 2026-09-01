@@ -127,7 +127,7 @@ Shared catalog: how rows are displayed, enriched, and turned into modifiers.
 | `normalize-class-data.ts`, `normalize-backgrounds.ts` | Shape rows before persist |
 | `seed-srd-equipment.ts`, `seed-srd-creatures.ts` | Extra SRD seed shaping |
 
-See [modifier-vs-feature-effect.md](./modifier-vs-feature-effect.md) for which effect system to use.
+See [modifier-vs-feature-effect.md](./modifier-vs-feature-effect.md) for which effect system to use, and [custom-modifiers.md](./custom-modifiers.md) for the catalog inventory, play-state engines, and add-type checklist.
 
 ### Import — `lib/import/`
 
@@ -292,5 +292,6 @@ Product names are used for identification only (README). The app does not collec
 - [Agent session invariants](../AGENTS.md) — what a new Cursor chat sees; copyright, common modifiers, import loop
 - [Homebrew class import review](./homebrew-import-review.md) — Drive extract → audit → enrich loop
 - [CharacteristicModifier vs FeatureEffect](./modifier-vs-feature-effect.md) — which effect system to author
+- [Custom modifiers — agent map](./custom-modifiers.md) — catalog inventory, gaps, play-state engines, add-type checklist
 - [SRD seed](../lib/srd/README.md) — rebuild and attribution
 - [Example seed packs](../lib/seed-packs/README.md) — Kibbles / Mage Hand Press allowlist

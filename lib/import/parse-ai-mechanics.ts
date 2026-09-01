@@ -27,6 +27,7 @@ import type {
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import { inferSpellListClassNames } from "@/lib/compendium/investigator-spell-list"
 import { createModifierLimitation } from "@/lib/compendium/modifier-limitations"
+import { looksLikeSituationalSpeedGrant } from "@/lib/compendium/situational-speed-grant"
 import { buildEvasionModifier } from "@/lib/compendium/shared-feature-modifier-builders"
 import type { FeatureActivation, UsesConfig } from "@/lib/types"
 
@@ -298,7 +299,7 @@ function buildFromMechanic(
       }
     }
 
-    if (!mechanic.checkRollMode) return null
+    if (!mechanic.checkRollMode && !mechanic.incomingAttackMode) return null
     // Freeform qualifiers (e.g. "that involves you dancing") cannot be enforced on the sheet —
     // skip wiring so we don't silently over-grant unrestricted advantage/bonus.
     // Named conditions in conditionNote (Frightened, Charmed, …) map to checkConditionTypes.
@@ -347,7 +348,12 @@ function buildFromMechanic(
             id: modId(instanceKey(ctx, "check_roll")),
             kind: "check_roll_modifier",
             checkRollMode: mechanic.checkRollMode,
-            checkCategory: mechanic.checkCategory ?? (mechanic.checkSkills?.length ? "skill" : "save"),
+            checkCategory: mechanic.incomingAttackMode
+              ? "other"
+              : mechanic.checkCategory ?? (mechanic.checkSkills?.length ? "skill" : "save"),
+            ...(mechanic.incomingAttackMode
+              ? { incomingAttackMode: mechanic.incomingAttackMode }
+              : {}),
             checkAbility: mechanic.checkAbility ?? undefined,
             checkSkills: mechanic.checkSkills,
             ...(bonusConfig ? { bonusConfig } : {}),
@@ -778,8 +784,21 @@ function buildFromMechanic(
                 ...(option.hitDiceCost != null ? { hitDiceCost: option.hitDiceCost } : {}),
                 ...(option.unlocksAtLevel != null ? { unlocksAtLevel: option.unlocksAtLevel } : {}),
                 ...(option.actionKind ? { actionKind: option.actionKind } : {}),
+                ...(option.bonusConfig ? { bonusConfig: option.bonusConfig } : {}),
               }))
             : (mechanic.menuAbilityNames ?? []).map((name) => ({ name })),
+          ...(mechanic.requiresSheetToggle
+            ? {
+                limitations: [
+                  {
+                    id: `lim_${instanceKey(ctx, "resource_menu_toggle")}`,
+                    kind: "sheet_toggle" as const,
+                    rule: "requires_active" as const,
+                    value: mechanic.requiresSheetToggle,
+                  },
+                ],
+              }
+            : {}),
         },
       ]),
     }
@@ -1274,6 +1293,12 @@ function buildFromMechanic(
     case "speed": {
       const isEqualToWalk = mechanic.speedMode === "equal_to_walk"
       if (!isEqualToWalk && mechanic.speedFeet == null) return null
+      if (
+        !mechanic.requiresSheetToggle &&
+        looksLikeSituationalSpeedGrant(ctx.featureName, matchedPhrase)
+      ) {
+        return null
+      }
       return {
         ruleId: "ai.speed",
         confidence: aiConfidence(mechanic),

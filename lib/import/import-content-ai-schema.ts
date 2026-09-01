@@ -113,6 +113,7 @@ const ImportMechanicAiSchema = z.object({
     .nullable(),
   classResourceCostAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
   checkRollMode: z.enum(["advantage", "disadvantage", "bonus"]).nullable(),
+  incomingAttackMode: z.enum(["advantage", "disadvantage"]).nullable(),
   checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative", "death_save"]).nullable(),
   checkAbility: z
     .enum(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"])
@@ -122,13 +123,16 @@ const ImportMechanicAiSchema = z.object({
   checkConditionTypes: z.array(z.string()).nullable(),
   bonusConfig: z
     .object({
-      mode: z.enum(["fixed", "proficiency", "ability_modifier"]),
+      mode: z.enum(["fixed", "proficiency", "ability_modifier", "die"]),
       fixed: z.number().nullable(),
       ability: z
         .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
         .nullable(),
       multiplier: z.number().nullable(),
       minimum: z.number().nullable(),
+      dieCount: z.number().nullable(),
+      dieScaling: z.enum(["fixed", "by_level", "class_resource"]).nullable(),
+      classResourceKey: z.string().nullable(),
     })
     .nullable(),
   targets: z
@@ -295,6 +299,20 @@ const ImportMechanicAiSchema = z.object({
         hitDiceCost: z.number().nullable(),
         unlocksAtLevel: z.number().nullable(),
         actionKind: z.enum(["action", "bonus", "reaction"]).nullable(),
+        bonusConfig: z
+          .object({
+            mode: z.enum(["fixed", "proficiency", "ability_modifier", "die"]),
+            fixed: z.number().nullable(),
+            ability: z
+              .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
+              .nullable(),
+            multiplier: z.number().nullable(),
+            minimum: z.number().nullable(),
+            dieCount: z.number().nullable(),
+            dieScaling: z.enum(["fixed", "by_level", "class_resource"]).nullable(),
+            classResourceKey: z.string().nullable(),
+          })
+          .nullable(),
       }),
     )
     .nullable(),

@@ -1,6 +1,6 @@
 ---
 description: Prefer catalog modifiers over class-name special cases
-globs: lib/character/**/*.ts,lib/compendium/**/*.ts,lib/builder/**/*.ts,components/character-sheet/**/*.tsx,components/builder/**/*.tsx,components/compendium/**/*.tsx
+globs: lib/character/**/*.ts,lib/compendium/**/*.ts,lib/builder/**/*.ts,lib/import/**/*.ts,lib/types.ts,components/character-sheet/**/*.tsx,components/builder/**/*.tsx,components/compendium/**/*.tsx
 alwaysApply: false
 ---
 
@@ -10,3 +10,5 @@ alwaysApply: false
 - Wire through `linkedModifiers` / enrichment presets / detect rules. Users must be able to change the same effect on the Compendium row.
 - Do not add `if (name === "…")` class or feature branches in `lib/character/` or React when a modifier can express it.
 - Pick CharacteristicModifier vs FeatureEffect using `docs/modifier-vs-feature-effect.md`.
+- Inventory, play-state engines, known gaps, and the add-type checklist: `docs/custom-modifiers.md`.
+- Do not invent `class_resources`, `dieSidesByLevel`, or `new_toggles` for sheet-owned play-state engines (Rampage Die, Mutation Die, illusion tokens, Weapon Morph, Balance of Power, Influence).

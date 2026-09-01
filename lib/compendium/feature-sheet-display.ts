@@ -8,7 +8,7 @@ import {
   inferActivatableActionKinds,
   type ActivatableItem,
 } from "@/lib/character/sheet-actions"
-import type { Feature, FeatureSheetDisplay } from "@/lib/types"
+import type { Feature } from "@/lib/types"
 
 export type ResolvedFeatureSheetDisplay = {
   abilitiesActions: boolean
@@ -103,14 +103,4 @@ export function applyFeatureSheetDisplay(feature: Feature): Feature {
   }
 }
 
-export function normalizeFeatureSheetDisplay(
-  display: FeatureSheetDisplay | null | undefined,
-): FeatureSheetDisplay | null {
-  if (!display || typeof display !== "object") return null
-  return {
-    abilitiesActions: display.abilitiesActions ?? false,
-    combatActions: display.combatActions ?? false,
-    featuresTab: display.featuresTab ?? false,
-    restDialogues: display.restDialogues,
-  }
-}
+export { normalizeFeatureSheetDisplay } from "@/lib/compendium/normalize-feature-sheet-display"

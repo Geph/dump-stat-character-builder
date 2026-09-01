@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   collectConditionRollModes,
   CONDITION_ROLL_EFFECTS,
+  isSpeedZeroByConditions,
 } from "@/lib/srd/condition-roll-effects"
 
 describe("CONDITION_ROLL_EFFECTS", () => {
@@ -10,6 +11,12 @@ describe("CONDITION_ROLL_EFFECTS", () => {
       selfAttack: "disadvantage",
       selfAbilityCheck: "disadvantage",
     })
+  })
+
+  it("treats Grappled and Restrained as Speed 0", () => {
+    expect(isSpeedZeroByConditions(["Grappled"])).toBe(true)
+    expect(isSpeedZeroByConditions(["Restrained"])).toBe(true)
+    expect(isSpeedZeroByConditions(["Poisoned"])).toBe(false)
   })
 
   it("maps Restrained to Dex save disadvantage", () => {

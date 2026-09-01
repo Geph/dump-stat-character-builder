@@ -345,10 +345,17 @@ export function buildLevelUpPlan(params: {
   }
   steps.push(...swapSteps)
 
+  const attachedSubclass = params.entry.subclass
+  const subclassesForSlots = attachedSubclass
+    ? [
+        attachedSubclass,
+        ...params.subclasses.filter((sub) => sub.id !== attachedSubclass.id),
+      ]
+    : params.subclasses
   const modifierSlots = collectClassFeatureModifierPlayerChoiceSlots({
     classLevels: [{ classId, level: toLevel }],
     classes: cls ? [cls] : [],
-    subclasses: params.subclasses,
+    subclasses: subclassesForSlots,
     subclassByClassId: params.entry.row.subclass_id
       ? { [classId]: params.entry.row.subclass_id }
       : {},

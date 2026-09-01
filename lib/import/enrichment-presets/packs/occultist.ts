@@ -398,6 +398,24 @@ export const OCCULTIST_PRESETS: EnrichmentPreset[] = [
       { op: "setActivation", activation: { action: true, noEconomyCost: true } },
       { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true, featuresTab: true } },
       {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "traditional_expertise_slot",
+          catalogRefId: "cat_fx_class_resource",
+          effects: [
+            {
+              id: "mod_traditional_expertise_slot",
+              kind: "class_resource",
+              classResourceKey: "spell_slots",
+              classResourceChange: "reduce",
+              spellSlotMinLevel: 1,
+              label: "Expend a spell slot for Advantage on a Wisdom check",
+            },
+          ],
+        },
+      },
+      {
         op: "appendDescription",
         text: "Use when you make a Wisdom check: expend a spell slot to gain Advantage on that check.",
       },

@@ -412,4 +412,59 @@ describe("buildWeaponSheetContext", () => {
     expect(critLines).toHaveLength(1)
     expect(critLines[0]?.sourceLabel).toMatch(/Critical Shot/)
   })
+
+  it("surfaces a save-or-attack resource menu as a ranged weapon badge", () => {
+    const shortbow = {
+      id: "shortbow",
+      name: "Shortbow",
+      category: "Weapon",
+      subcategory: "Simple Ranged Weapons",
+      damage: "1d6",
+      damage_type: "Piercing",
+      mastery: "Vex",
+      properties: ["Ammunition", "Two-Handed"],
+    } as unknown as Equipment
+
+    const context = buildWeaponSheetContext(
+      shortbow,
+      {
+        ...baseInputs,
+        equipment: [shortbow],
+        equippedWeaponId: "shortbow",
+        featureChoicePicks: { "dancer:L2:Dance Styles": ["Spinning Shot"] },
+        customAbilities: [
+          {
+            id: "spinning-shot",
+            name: "Spinning Shot",
+            ability_role: "upgrade",
+            description: "Add Dance Die to a ranged weapon attack.",
+            linked_modifiers: [
+              {
+                instanceId: "menu",
+                catalogRefId: "cat_char_resource_ability_menu",
+                characteristics: [
+                  {
+                    id: "mod_spinning_shot",
+                    type: "resource_ability_menu",
+                    resourceKey: "dance_die",
+                    appliesOnRollKinds: ["attack"],
+                    label: "Spinning Shot — Dance Die to ranged weapon attacks",
+                    options: [
+                      {
+                        name: "Spinning Shot",
+                        description: "Add Dance Die to a ranged weapon attack roll (while Dancing).",
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      } as unknown as CharacterBuildInputs,
+      ["Simple weapons"],
+    )
+
+    expect(context.appliedModifiers.some((row) => /spinning shot/i.test(row.name))).toBe(true)
+  })
 })

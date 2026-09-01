@@ -3772,6 +3772,8 @@ function MovementEffectsEditor({
             ["movementHide", "Hide"],
             ["movementMoveThroughLargerSpaces", "Move through larger creatures' spaces"],
             ["movementHideBehindLargerCreatures", "Hide behind larger creatures"],
+            ["moveWithoutOpportunityAttacks", "Doesn't provoke Opportunity Attacks"],
+            ["ignoreDifficultTerrain", "Ignore Difficult Terrain"],
           ] as const
         ).map(([key, label]) => (
           <label key={key} className="flex items-center gap-2 cursor-pointer">

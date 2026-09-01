@@ -25,6 +25,8 @@ type SheetPersistentStatsBarProps = {
   initiative: number
   speed: number
   speeds?: CharacterSpeedEntry[]
+  /** Non-numeric riders (no OA, dance-style move, ignore Difficult Terrain). */
+  speedNotes?: string[]
   maxHp: number
   currentHp: number
   tempHp: number
@@ -99,6 +101,7 @@ function CombatStatsCompactRow({
   initiative,
   speed,
   speeds = [],
+  speedNotes = [],
   maxHp,
   currentHp,
   tempHp,
@@ -160,6 +163,7 @@ function CombatStatsCompactRow({
           total={speed}
           summable={false}
           contributions={statBreakdowns ? breakdownLines(statBreakdowns, "speed") : undefined}
+          notes={speedNotes}
           className="block w-full text-center text-white hover:text-white/90"
         >
           {speeds.length > 1 ? (
@@ -301,6 +305,7 @@ export function SheetPersistentStatsBar({
   initiative,
   speed,
   speeds,
+  speedNotes = [],
   maxHp,
   currentHp,
   tempHp,
@@ -326,6 +331,7 @@ export function SheetPersistentStatsBar({
         initiative={initiative}
         speed={speed}
         speeds={speeds}
+        speedNotes={speedNotes}
         maxHp={maxHp}
         currentHp={currentHp}
         tempHp={tempHp}
@@ -417,6 +423,7 @@ export function SheetPersistentStatsBar({
               total={speed}
               summable={false}
               contributions={statBreakdowns ? breakdownLines(statBreakdowns, "speed") : undefined}
+              notes={speedNotes}
             />
           }
         >

@@ -7,7 +7,7 @@
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
 import type { ImportContent } from "@/lib/import/content-schema"
-import type { Feature, FeatureChoice, UsesConfig } from "@/lib/types"
+import type { Feature, FeatureChoice, FeatureDurationKey, UsesConfig } from "@/lib/types"
 
 export type EnrichmentMatch = {
   /** Class / source name must match (string = case-insensitive equality, RegExp = test). */
@@ -76,6 +76,7 @@ export type EnrichmentOperation =
       op: "setActivation"
       activation: NonNullable<Feature["activation"]>
     }
+  | { op: "setDuration"; duration: FeatureDurationKey }
   | {
       op: "setCastingTime"
       castingTime: string

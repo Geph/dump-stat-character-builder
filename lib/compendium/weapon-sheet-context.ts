@@ -331,6 +331,40 @@ function collectAppliedModifiers(
         ...appliedModifierSource(mod),
       })
     }
+
+    if (mod.type === "resource_ability_menu") {
+      const kinds = mod.appliesOnRollKinds ?? []
+      const haystack = [mod.label ?? "", ...(mod.options ?? []).flatMap((option) => [option.name, option.description ?? ""])]
+        .join(" ")
+        .toLowerCase()
+      const looksLikeWeapon =
+        kinds.includes("attack") ||
+        /\b(?:ranged|melee|weapon|unarmed)\b.{0,40}\b(?:attack|damage)\b|\b(?:attack|damage)\b.{0,40}\b(?:ranged|melee|weapon|unarmed)\b|\bweapon attacks?\b/.test(
+          haystack,
+        )
+      if (!looksLikeWeapon) continue
+      const appliesTo = /\branged\b/.test(haystack) && !/\bmelee\b/.test(haystack)
+        ? "ranged"
+        : /\bmelee\b/.test(haystack) && !/\branged\b/.test(haystack)
+          ? "melee"
+          : "all"
+      const option = mod.options?.[0]
+      const badge: WeaponSheetBadgeCharacteristic = {
+        id: `${mod.id}_weapon_badge`,
+        type: "weapon_sheet_badge",
+        label: mod.label?.trim() || option?.name || "Weapon rider",
+        description: option?.description?.trim() || mod.label?.trim() || "Weapon rider",
+        appliesTo,
+        includeUnarmed: /\bunarmed\b/.test(haystack),
+        limitations: mod.limitations,
+      }
+      if (!weaponMatchesSheetBadge(weapon, badge)) continue
+      applied.push({
+        name: badge.label?.trim() || "Weapon rider",
+        description: badge.description?.trim() || badge.label || "Weapon rider",
+        ...appliedModifierSource(mod),
+      })
+    }
   }
 
   const seen = new Set<string>()

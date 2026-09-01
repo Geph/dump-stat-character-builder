@@ -29,12 +29,24 @@ describe("Dancer enrichment", () => {
 
     const dance = enriched.classes?.[0]?.features?.[0] as Feature
     expect(dance.activation?.bonusAction).toBe(true)
+    expect(dance.duration).toBe("1_minute")
     expect(dance.limitedUses).toMatchObject({
       type: "class_resource",
       classResourceKey: "dances",
     })
     const chars = (dance.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
-    expect(chars.some((char) => char.type === "resource_ability_menu")).toBe(true)
+    const menu = chars.find((char) => char.type === "resource_ability_menu")
+    expect(menu?.type).toBe("resource_ability_menu")
+    if (menu?.type === "resource_ability_menu") {
+      expect(menu.resourceKey).toBe("dance_die")
+      expect(menu.limitations?.some((lim) => lim.value === "while_dancing")).toBe(true)
+      expect(menu.options?.[0]?.name).toBe("Graceful Dodge")
+      expect(menu.options?.[0]?.bonusConfig).toMatchObject({
+        mode: "die",
+        dieScaling: "class_resource",
+        classResourceKey: "dance_die",
+      })
+    }
   })
 
   it("wires Dance Styles picker to class_upgrades", () => {
@@ -92,7 +104,10 @@ describe("Dancer enrichment", () => {
     const features = enriched.classes?.[0]?.features ?? []
     const nimble = features.find((f) => f.name === "Nimble Start") as Feature
     const effects = (nimble.linkedModifiers ?? []).flatMap((mod) => mod.activation?.effects ?? [])
-    expect(effects.some((fx) => fx.kind === "check_roll_modifier")).toBe(true)
+    const incoming = effects.find((fx) => fx.kind === "check_roll_modifier")
+    expect(incoming?.incomingAttackMode).toBe("disadvantage")
+    expect(incoming?.limitations?.some((lim) => lim.value === "first_turn_of_combat")).toBe(true)
+    expect(nimble.sheetDisplay).toMatchObject({ combatActions: true, featuresTab: true })
 
     const fast = features.find((f) => f.name === "Fast Movement") as Feature
     const speed = (fast.linkedModifiers ?? [])
@@ -191,10 +206,70 @@ describe("Dancer enrichment", () => {
     }
     expect(elegant.ability_role).toBe("upgrade")
     const elegantMenus = (elegant.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
-    expect(elegantMenus.some((char) => char.type === "resource_ability_menu")).toBe(true)
+    expect(elegantMenus.find((char) => char.type === "resource_ability_menu")).toMatchObject({
+      appliesOnRollKinds: ["save", "ability"],
+    })
 
-    const spinning = enriched.import_proposals?.custom_abilities?.[1] as { ability_role?: string }
+    const spinning = enriched.import_proposals?.custom_abilities?.[1] as {
+      ability_role?: string
+      linkedModifiers?: Feature["linkedModifiers"]
+    }
     expect(spinning.ability_role).toBe("upgrade")
+    const spinningChars = (spinning.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(spinningChars.some((char) => char.type === "weapon_sheet_badge")).toBe(true)
+  })
+
+  it("wires Agile Movement as a no-OA movement effect", () => {
+    const enriched = applyImportEnrichmentPresets({
+      import_proposals: {
+        custom_abilities: [
+          {
+            proposal_id: "agile_movement",
+            name: "Agile Movement",
+            definition: "Dance Style",
+            description: "Your movement doesn't provoke Opportunity Attacks.",
+            source_type: "class",
+            source_name: "Dancer",
+            level_requirement: 2,
+          },
+        ],
+      },
+    } as unknown as ImportContent)
+
+    const agile = enriched.import_proposals?.custom_abilities?.[0] as {
+      ability_role?: string
+      linkedModifiers?: Feature["linkedModifiers"]
+    }
+    expect(agile.ability_role).toBe("upgrade")
+    const movement = (agile.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "movement_effects")
+    expect(movement).toMatchObject({ moveWithoutOpportunityAttacks: true })
+  })
+
+  it("marks Dancer Shift as an upgrade so it does not collide with mastery Shift", () => {
+    const enriched = applyImportEnrichmentPresets({
+      import_proposals: {
+        custom_abilities: [
+          {
+            proposal_id: "shift_style",
+            name: "Shift",
+            definition: "Dance Style",
+            description: "Teleport during the Attack action while Dancing.",
+            source_type: "class",
+            source_name: "Dancer",
+            level_requirement: 2,
+          },
+        ],
+      },
+    } as unknown as ImportContent)
+
+    const shift = enriched.import_proposals?.custom_abilities?.[0] as {
+      ability_role?: string
+      description?: string
+    }
+    expect(shift.ability_role).toBe("upgrade")
+    expect(shift.description).toMatch(/teleport/i)
   })
 
   it("wires Deadly D4s as a play-time rider (not die override) and Momentum class resource spend", () => {
@@ -262,5 +337,29 @@ describe("Dancer enrichment", () => {
       type: "class_resource",
       classResourceKey: "momentum",
     })
+  })
+
+  it("wires Courtesan Honeyed Words as two language choices", () => {
+    const enriched = applyImportEnrichmentPresets({
+      subclasses: [
+        {
+          name: "Courtesan",
+          class_name: "Dancer",
+          description: null,
+          features: [
+            {
+              level: 3,
+              name: "Honeyed Words",
+              description: "You know two languages of your choice.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+    const honeyed = enriched.subclasses?.[0]?.features?.[0] as Feature
+    const langs = (honeyed.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "languages") as { choiceCount?: number } | undefined
+    expect(langs?.choiceCount).toBe(2)
   })
 })

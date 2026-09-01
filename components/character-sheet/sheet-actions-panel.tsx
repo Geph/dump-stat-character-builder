@@ -20,9 +20,18 @@ import {
   type SheetActionTalentAlert,
 } from "@/lib/character/sheet-actions"
 import { formatSheetActionUseBonusLines } from "@/lib/character/action-use-bonuses"
+import {
+  isResourceDieBonusConfig,
+  rollResourceDieUseBonuses,
+  bonusFromResourceDieOption,
+} from "@/lib/character/resource-die-use"
 import { grantsExtraWeaponAttack } from "@/lib/character/weapon-attack-actions"
 import { talentAlertAppliesToVariant } from "@/lib/character/alchemist-bomb-sheet"
-import { guardianTacticsToggleIdForOption, sheetToggleIdActivatedByAction } from "@/lib/compendium/sheet-toggle-registry"
+import {
+  getSheetToggleDefinition,
+  guardianTacticsToggleIdForOption,
+  sheetToggleIdActivatedByAction,
+} from "@/lib/compendium/sheet-toggle-registry"
 import { weaponMorphToggleIdForOption } from "@/lib/character/weapon-morph"
 import type { IllusionTokenKind } from "@/lib/character/illusion-tokens"
 import {
@@ -62,7 +71,10 @@ import {
   resolveHitDiceHealCount,
   type HealResolveContext,
 } from "@/lib/character/resolve-feature-effect-heal"
-import type { PartyAllyCandidate } from "@/lib/character/party-ally-candidates"
+import {
+  allyCandidateDisplayLabel,
+  type PartyAllyCandidate,
+} from "@/lib/character/party-ally-candidates"
 import type { FeatureEffect, UsesConfig } from "@/lib/types"
 import {
   formatPsionicAugmentSelectionSummary,
@@ -105,7 +117,7 @@ type SheetActionsPanelProps = {
   /** Refund HP if a failed-roll trigger still fails after the bonus. */
   onRefundHitPoints?: (amount: number) => void
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
-  onActivateSheetToggle?: (toggleId: string) => void
+  onActivateSheetToggle?: (toggleId: string, note?: string) => void
   /** Spawn a Projected Self / Imaginary Ally play-state token. */
   onSpawnIllusionToken?: (kind: IllusionTokenKind) => void
   /** Grant a Flesh Warp Mutation Die (Perfected / Muscular from selected augments). */
@@ -823,7 +835,7 @@ function ActionDetailOverlay({
   onSpendHitPoints?: (amount: number) => void
   onRefundHitPoints?: (amount: number) => void
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
-  onActivateSheetToggle?: (toggleId: string) => void
+  onActivateSheetToggle?: (toggleId: string, note?: string) => void
   onSpawnIllusionToken?: (kind: IllusionTokenKind) => void
   onGrantMutationDie?: (opts: {
     autoApplyStrength: boolean
@@ -871,7 +883,8 @@ function ActionDetailOverlay({
   onCastSpellChoice?: (spell: Spell, choice: SheetCastSpellChoice) => void
 }) {
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
-  const [step, setStep] = useState<"detail" | "roll" | "target" | "spell">("detail")
+  const [step, setStep] = useState<"detail" | "roll" | "target" | "spell" | "style">("detail")
+  const [selectedActivationNames, setSelectedActivationNames] = useState<string[]>([])
   const [useFeedback, setUseFeedback] = useState<string | null>(null)
   const [parentUsedThisOpen, setParentUsedThisOpen] = useState(false)
   const [lastSpentHitPoints, setLastSpentHitPoints] = useState(0)
@@ -903,6 +916,8 @@ function ActionDetailOverlay({
       : (action.kinds[0] ?? "action"),
   )
   const overlayScrollRef = useRef<HTMLDivElement>(null)
+  const history = useSheetRollHistory()
+  const rollCtx = useSheetRollContext()
   const useActionTabs = attackProfiles.length > 1
   const [detailTab, setDetailTab] = useState(
     attackProfiles[0] ? `profile:${attackProfiles[0].id}` : "description",
@@ -942,11 +957,19 @@ function ActionDetailOverlay({
       ? formatPsionicAugmentSelectionSummary(psionicAugments, augmentSelections)
       : null
 
-  const useBonusLines = formatSheetActionUseBonusLines(action.useBonuses, {
-    proficiencyBonus: resolveContext.proficiencyBonus,
+  const rollBonusParams = {
+    proficiencyBonus: resolveContext.proficiencyBonus ?? 0,
     abilityMods: resolveContext.abilityModifiers,
     characterLevel: action.classLevel,
-  })
+    classResourceDieSides: rollCtx.featureEffectContext?.classResourceDieSides,
+  }
+  const useBonusLines = formatSheetActionUseBonusLines(action.useBonuses, rollBonusParams)
+  const requiredToggleId = action.requiresSheetToggle?.trim() || null
+  const requiredToggleActive =
+    !requiredToggleId || Boolean(rollCtx.activeSheetToggles?.has(requiredToggleId))
+  const requiredToggleLabel = requiredToggleId
+    ? getSheetToggleDefinition(requiredToggleId)?.label ?? requiredToggleId.replace(/_/g, " ")
+    : null
   const selectedOption = menuOptions.find((option) => option.name === selectedMenuOption)
   const showEconomyPicker = economyChoices.length > 1 && menuOptions.length === 0
   const hitDiceCost =
@@ -1031,6 +1054,7 @@ function ActionDetailOverlay({
   const primedBlocked = primedModeSelected && primedBombUsedThisTurn
   const canUse =
     !incapacitated &&
+    requiredToggleActive &&
     !chargeExhausted &&
     canAffordPsi &&
     canAffordHitDice &&
@@ -1096,6 +1120,7 @@ function ActionDetailOverlay({
   useEffect(() => {
     setAugmentSelections([])
     setStep("detail")
+    setSelectedActivationNames([])
     setUseFeedback(null)
     setParentUsedThisOpen(false)
     setLastSpentHitPoints(0)
@@ -1114,7 +1139,7 @@ function ActionDetailOverlay({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the opened action changes
   }, [action.id])
 
-  const handleUse = (optionName?: string | null) => {
+  const handleUse = (optionName?: string | null, activationNames?: string[]) => {
     const option =
       (optionName != null && optionName !== ""
         ? menuOptions.find((entry) => entry.name === optionName)
@@ -1135,6 +1160,7 @@ function ActionDetailOverlay({
     const useCanAffordHitDice = useHitDiceNeeded <= 0 || useHitDiceNeeded <= hitDiceRemaining
     const useCanUse =
       !incapacitated &&
+      requiredToggleActive &&
       !useChargeExhausted &&
       canAffordPsi &&
       useCanAffordHitDice &&
@@ -1144,6 +1170,13 @@ function ActionDetailOverlay({
       (menuOptions.length === 0 || Boolean(option)) &&
       !primedBlocked
     if (!useCanUse) return
+
+    const pickedStyles = activationNames ?? selectedActivationNames
+    const stylePicks = action.activationPicks
+    if (stylePicks?.options.length && pickedStyles.length < stylePicks.chooseCount) {
+      setStep("style")
+      return
+    }
 
     if (action.castSpellChoice && onCastSpellChoice) {
       const choice = action.castSpellChoice
@@ -1265,6 +1298,39 @@ function ActionDetailOverlay({
       }
     }
 
+    const optionDieBonus =
+      option && isResourceDieBonusConfig(option.bonusConfig)
+        ? bonusFromResourceDieOption({
+            name: option.name,
+            description: option.description,
+            bonusConfig: option.bonusConfig,
+          })
+        : null
+    const dieBonuses = optionDieBonus ? [optionDieBonus] : action.useBonuses
+    const rolledDie = rollResourceDieUseBonuses(dieBonuses, {
+      proficiencyBonus:
+        rollCtx.featureEffectContext?.proficiencyBonus ?? resolveContext.proficiencyBonus ?? 0,
+      abilityMods: rollCtx.featureEffectContext?.abilityMods ?? {
+        strength: 0,
+        dexterity: 0,
+        constitution: 0,
+        intelligence: 0,
+        wisdom: 0,
+        charisma: 0,
+      },
+      characterLevel: rollCtx.featureEffectContext?.characterLevel ?? action.classLevel,
+      classResourceDieSides: rollCtx.featureEffectContext?.classResourceDieSides,
+    })
+    for (const rolled of rolledDie) {
+      parts.push(rolled.line)
+      history?.logRoll({
+        kind: "manual",
+        label: action.name,
+        summary: `${action.name}: ${rolled.summary}`,
+        natural: rolled.natural,
+      })
+    }
+
     const morphToggleId = option
       ? weaponMorphToggleIdForOption(option.name)
       : null
@@ -1273,8 +1339,17 @@ function ActionDetailOverlay({
       (option ? guardianTacticsToggleIdForOption(option.name) : null) ??
       sheetToggleIdActivatedByAction(action)
     if (toggleId && onActivateSheetToggle) {
-      onActivateSheetToggle(toggleId)
+      const styleNote = pickedStyles.length ? pickedStyles.join(" + ") : undefined
+      onActivateSheetToggle(toggleId, styleNote)
       parts.push(toggleId === "__end_weapon_morph__" ? "Morph ended" : "Toggle on")
+      for (const styleName of pickedStyles) {
+        const styleToggle = stylePicks?.options.find((option) => option.name === styleName)
+          ?.sheetToggleId
+        if (styleToggle && styleToggle !== toggleId) {
+          onActivateSheetToggle(styleToggle)
+        }
+      }
+      if (styleNote) parts.push(styleNote)
     }
 
     const actionName = action.name.trim().toLowerCase()
@@ -1379,6 +1454,7 @@ function ActionDetailOverlay({
         setStep("roll")
         return
       }
+      setStep("detail")
       return
     }
 
@@ -1388,6 +1464,7 @@ function ActionDetailOverlay({
     }
 
     setUseFeedback(parts.join(" · ") || "Used!")
+    setStep("detail")
   }
 
   const handleAlsoActivate = (
@@ -1757,6 +1834,60 @@ function ActionDetailOverlay({
               </div>
             )}
           </div>
+        ) : step === "style" && action.activationPicks ? (
+          <div className="p-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {action.activationPicks.title}
+              {action.activationPicks.chooseCount > 1
+                ? ` (${selectedActivationNames.length}/${action.activationPicks.chooseCount})`
+                : ""}
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {action.activationPicks.options.map((option) => {
+                const selected = selectedActivationNames.includes(option.name)
+                return (
+                  <button
+                    key={option.name}
+                    type="button"
+                    onClick={() => {
+                      if (action.activationPicks!.chooseCount <= 1) {
+                        setSelectedActivationNames([option.name])
+                        handleUse(undefined, [option.name])
+                        return
+                      }
+                      setSelectedActivationNames((prev) => {
+                        if (prev.includes(option.name)) {
+                          return prev.filter((name) => name !== option.name)
+                        }
+                        if (prev.length >= action.activationPicks!.chooseCount) return prev
+                        return [...prev, option.name]
+                      })
+                    }}
+                    className={`rounded-xl border-2 px-3 py-2 text-left text-sm hover:border-primary/50 ${
+                      selected ? "border-primary bg-primary/10" : "border-border"
+                    }`}
+                  >
+                    <div className="font-semibold">{option.name}</div>
+                    {option.description ? (
+                      <div className="mt-1 text-xs text-muted-foreground line-clamp-3">
+                        {option.description}
+                      </div>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+            {action.activationPicks.chooseCount > 1 ? (
+              <button
+                type="button"
+                disabled={selectedActivationNames.length < action.activationPicks.chooseCount}
+                onClick={() => handleUse(undefined, selectedActivationNames)}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-semibold disabled:opacity-50"
+              >
+                Continue
+              </button>
+            ) : null}
+          </div>
         ) : step === "target" ? (
           <div className="p-4 space-y-3">
             <p className="text-sm text-muted-foreground">Choose who receives this effect.</p>
@@ -1788,7 +1919,9 @@ function ActionDetailOverlay({
                       onClick={() => void handlePickTarget(candidate)}
                       className="rounded-xl border-2 border-border px-3 py-2 text-left text-sm hover:border-primary/50 disabled:opacity-50"
                     >
-                      <div className="font-semibold">{candidate.label}</div>
+                      <div className="font-semibold">
+                        {allyCandidateDisplayLabel(candidate, characterId)}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {hpLabel}
                         {tempLabel}
@@ -2323,6 +2456,12 @@ function ActionDetailOverlay({
               ) : null}
               {incapacitated ? (
                 <p className="text-xs text-destructive">Incapacitated — you cannot use this now.</p>
+              ) : !requiredToggleActive ? (
+                <p className="text-xs text-muted-foreground">
+                  {requiredToggleLabel
+                    ? `Requires ${requiredToggleLabel} (use the enabling action first).`
+                    : "Requires an active stance."}
+                </p>
               ) : chargeExhausted ? (
                 <p className="text-xs text-muted-foreground">No uses remaining.</p>
               ) : !canAffordHitDice ? (
@@ -2474,6 +2613,7 @@ export function SheetActionsPanel({
   layoutScope = "default",
   prependGroup = null,
 }: SheetActionsPanelProps) {
+  const rollCtx = useSheetRollContext()
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [openEconomyKind, setOpenEconomyKind] = useState<ActionEconomyKind | null>(null)
   const [groupOrder, setGroupOrder] = useState<string[]>([])
@@ -2735,6 +2875,7 @@ export function SheetActionsPanel({
       proficiencyBonus: resolveContext.proficiencyBonus,
       abilityMods: resolveContext.abilityModifiers,
       characterLevel: entry.classLevel,
+      classResourceDieSides: rollCtx.featureEffectContext?.classResourceDieSides,
     }).join(" · ")
     const costMeta = formatSheetActionCostMeta(entry, usage)
     const subtitleMeta = [

@@ -1,29 +1,7 @@
 /**
- * Declarative import enrichment presets — single registry replacing class-specific
- * enricher modules (alchemist, investigator, psion, monk, alternate ranger/sorcerer).
- *
- * Inventory (transformation → classification):
- *
- * | Pack | Transformation | Class |
- * | --- | --- | --- |
- * | Alchemist | Bomb / formula → dual special_attack | (b) named preset |
- * | Alchemist | Potions table → craftable_items | (b) parseCraftableItemsTable op |
- * | Alchemist | Held items → held_items_cap | (b) |
- * | Alchemist | Discoveries (batch/dose/homunculus/brewing) | (b) |
- * | Alchemist | Reagents recharge rules | (b) ensureResourceRecharges |
- * | Alchemist | Reagent Synthesis description | (b) |
- * | Investigator | Finisher / Improved Finisher triggers | (b) named presets |
- * | Investigator | Holy Trinkets note + equipment seeds | (b) |
- * | Investigator | Rushed Incantation uses / Enigma Arcane / notes | (b) |
- * | Psion | Archetype limitedUses + Climactic Moment trigger | (b) |
- * | Psion | Curious Mind choice + deferred notes | (b) |
- * | Monk | Unarmored Defense AC | (b) |
- * | Monk | focus_points→prefixed ki + resource/feat remap | (b) |
- * | Alt Ranger | Quarry on_hit + class resource seed | (b) |
- * | Alt Sorcerer | Innate Arcanum/Sorcery presets + regen note | (b) |
- *
- * Category (c): none remaining — named preset builders are shared factories, not
- * class-specific enricher modules. Hooks remain available via registerEnrichmentHook.
+ * Declarative import enrichment presets. Pack list: `registry.ts`.
+ * Human inventory: `INVENTORY.md`. Modifier map: `docs/custom-modifiers.md`.
+ * Play-state engines (Rampage Die, Weapon Morph, …) are sheet-owned — not enrichers.
  */
 export {
   applyImportEnrichmentPresets,

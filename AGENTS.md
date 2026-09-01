@@ -33,7 +33,7 @@ These hold in every chat, including after a restart.
 - Express mechanics with the shared catalog (`lib/compendium/characteristic-modifiers.ts`, `modifier-catalog.ts`, existing `mechanics[].kind` / FeatureEffect types) so a user can see and edit the wiring in the Compendium.
 - Extend or adjust an existing modifier when it already covers the idea. Do not add a `if (className === "Martyr")` (or similar) branch in `lib/character/` or React when a catalog type can do it.
 - Enrichment presets and detect rules **attach** catalog modifiers; they are not a substitute for a private runtime-only hook.
-- Which system to author: [docs/modifier-vs-feature-effect.md](docs/modifier-vs-feature-effect.md).
+- Which system to author: [docs/modifier-vs-feature-effect.md](docs/modifier-vs-feature-effect.md). Inventory, play-state engines, and the add-type checklist: [docs/custom-modifiers.md](docs/custom-modifiers.md).
 
 ### 3. Close the import loop when the lapse was extract/prompt/JSON
 

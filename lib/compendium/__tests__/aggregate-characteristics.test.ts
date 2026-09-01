@@ -4,6 +4,7 @@ import {
   computeInitiative,
   normalizeCharacteristics,
 } from "@/lib/compendium/characteristic-modifiers"
+import { requiresActiveToggleLimitation } from "@/lib/compendium/modifier-limitations"
 
 describe("aggregateCharacteristics", () => {
   it("handles legacy import detector shapes that used values instead of typed fields", () => {
@@ -51,6 +52,33 @@ describe("aggregateCharacteristics", () => {
     ])
     expect(aggregated.conditionImmunities).toEqual(["Charmed"])
     expect(aggregated.conditionImmunitySources).toEqual({ Charmed: ["Fey Ancestry"] })
+  })
+
+  it("skips ungated maneuver climb from always-on speed", () => {
+    const tagged = {
+      id: "mod_wall_dash",
+      type: "speed" as const,
+      speedType: "climb" as const,
+      mode: "equal_to_walk" as const,
+      value: 0,
+      label: "Wall Dash [Maneuver]",
+      _contributionSource: {
+        sourceType: "feature" as const,
+        source: "Wall Dash [Maneuver]",
+        label: "Wall Dash [Maneuver]",
+      },
+    }
+    const idle = aggregateCharacteristics([tagged])
+    expect(idle.speedEqualToWalk).toEqual([])
+
+    const gated = aggregateCharacteristics([
+      {
+        ...tagged,
+        id: "mod_wall_dash_gated",
+        limitations: [requiresActiveToggleLimitation("wall_dash_active")],
+      },
+    ], { activeSheetToggles: new Set(["wall_dash_active"]) })
+    expect(gated.speedEqualToWalk).toEqual(["climb"])
   })
 
   it("aggregates climb/swim speeds equal to walk", () => {

@@ -166,6 +166,8 @@ describe("MHP Warmage / Dancer / Vagabond wiring", () => {
     const menu = chars.find((c) => c.type === "resource_ability_menu")
     if (menu?.type === "resource_ability_menu") {
       expect(menu.resourceKey).toBe("dance_die")
+      expect(menu.options?.[0]?.name).toBe("Graceful Dodge")
+      expect(menu.limitations?.some((lim) => lim.value === "while_dancing")).toBe(true)
     }
   })
 

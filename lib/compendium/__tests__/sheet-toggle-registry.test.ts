@@ -28,6 +28,10 @@ describe("sheet-toggle-registry", () => {
     expect(getSheetToggleDefinition("while_concentrating")?.id).toBe("while_concentrating")
     expect(getSheetToggleDefinition("while_flying")?.id).toBe("while_flying")
     expect(getSheetToggleDefinition("while_dancing")?.label).toBe("Dancing")
+    expect(getSheetToggleDefinition("while_dancing")).toMatchObject({
+      defaultDuration: "1_minute",
+      endsWhen: { incapacitated: true, speedZero: true },
+    })
   })
 
   it("resolves Heroes of Faerûn transformation toggles by id", () => {
@@ -103,6 +107,10 @@ describe("sheet-toggle-registry", () => {
       "while_innate_sorcery_active",
     )
     expect(sheetToggleIdActivatedByAction({ name: "Reckless Attack" })).toBe("reckless_attack")
+    expect(sheetToggleIdActivatedByAction({ name: "Dance", classResourceKey: "dances" })).toBe(
+      "while_dancing",
+    )
+    expect(sheetToggleIdActivatedByAction({ name: "Dance" })).toBe("while_dancing")
     expect(sheetToggleIdActivatedByAction({ name: "Bardic Inspiration" })).toBeNull()
   })
 

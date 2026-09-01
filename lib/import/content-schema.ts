@@ -97,6 +97,8 @@ export const ImportMechanicSchema = z.object({
     .optional(),
   classResourceCostAbility: z.enum(USES_ABILITY_CODES).optional(),
   checkRollMode: z.enum(["advantage", "disadvantage", "bonus"]).optional(),
+  /** Attacks against this character (Nimble Start, Escape the Horde, Reckless drawback). */
+  incomingAttackMode: z.enum(["advantage", "disadvantage"]).optional(),
   checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative", "death_save"]).optional(),
   checkAbility: z.enum(SAVE_ABILITY_NAMES).optional(),
   checkSkills: z.array(z.string()).optional(),
@@ -109,12 +111,15 @@ export const ImportMechanicSchema = z.object({
   checkConditionTypes: z.array(z.string()).optional(),
   bonusConfig: z
     .object({
-      mode: z.enum(["fixed", "proficiency", "ability_modifier"]),
+      mode: z.enum(["fixed", "proficiency", "ability_modifier", "die"]),
       fixed: z.number().optional(),
       ability: z.enum(ABILITY_SCORE_KEYS).optional(),
       multiplier: z.number().optional(),
       /** Minimum value of the bonus itself ("minimum bonus of +1"). */
       minimum: z.number().optional(),
+      dieCount: z.number().optional(),
+      dieScaling: z.enum(["fixed", "by_level", "class_resource"]).optional(),
+      classResourceKey: z.string().optional(),
     })
     .optional(),
   /** Shared multi-target / beneficiary scope for die bonuses, THP, movement, etc. */
@@ -305,6 +310,18 @@ export const ImportMechanicSchema = z.object({
         hitDiceCost: z.number().optional(),
         unlocksAtLevel: z.number().optional(),
         actionKind: z.enum(["action", "bonus", "reaction"]).optional(),
+        bonusConfig: z
+          .object({
+            mode: z.enum(["fixed", "proficiency", "ability_modifier", "die"]),
+            fixed: z.number().optional(),
+            ability: z.enum(ABILITY_SCORE_KEYS).optional(),
+            multiplier: z.number().optional(),
+            minimum: z.number().optional(),
+            dieCount: z.number().optional(),
+            dieScaling: z.enum(["fixed", "by_level", "class_resource"]).optional(),
+            classResourceKey: z.string().optional(),
+          })
+          .optional(),
       }),
     )
     .optional(),

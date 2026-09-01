@@ -208,11 +208,18 @@ export function filterFeatureTabCustomAbilities(
   options?: {
     sheetActionCustomAbilityIds?: Iterable<string>
     sheetActionNames?: Iterable<string>
+    /** Names already shown on save / weapon / speed chrome. */
+    surfacedElsewhereNames?: Iterable<string>
   },
 ): CustomAbility[] {
   const actionIds = new Set(options?.sheetActionCustomAbilityIds ?? [])
   const actionNames = new Set(
     [...(options?.sheetActionNames ?? [])].map((name) => name.trim().toLowerCase()).filter(Boolean),
+  )
+  const surfacedNames = new Set(
+    [...(options?.surfacedElsewhereNames ?? [])]
+      .map((name) => name.trim().toLowerCase())
+      .filter(Boolean),
   )
   return abilities.filter((ability) => {
     if (abilityHasCompanionPayload(ability)) return false
@@ -220,6 +227,7 @@ export function filterFeatureTabCustomAbilities(
     if (isManeuverCustomAbility(ability)) return true
     if (actionIds.has(ability.id)) return false
     if (actionNames.has(ability.name.trim().toLowerCase())) return false
+    if (surfacedNames.has(ability.name.trim().toLowerCase())) return false
     return true
   })
 }

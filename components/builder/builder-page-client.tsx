@@ -367,6 +367,7 @@ import {
   usePickerPageSize,
   useSpellPickerPageSize,
 } from "@/hooks/use-picker-page-size"
+import { PortraitCropDialog } from "@/components/builder/portrait-crop-dialog"
 import {
   MAX_PORTRAIT_FILE_BYTES,
   MAX_PORTRAIT_FILE_MB,
@@ -480,6 +481,8 @@ export default function BuilderPageClient() {
   const [customAbilities, setCustomAbilities] = useState<CustomAbility[]>([])
   const [modifierCatalog, setModifierCatalog] = useState<ModifierCatalogEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [portraitCropSrc, setPortraitCropSrc] = useState<string | null>(null)
+  const portraitInputRef = useRef<HTMLInputElement>(null)
 
   // Character draft
   const [character, setCharacter] = useState<CharacterDraft>(EMPTY_CHARACTER)
@@ -1116,6 +1119,7 @@ export default function BuilderPageClient() {
 
   const handlePortraitUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ""
     if (!file) return
 
     if (file.size > MAX_PORTRAIT_FILE_BYTES) {
@@ -1125,7 +1129,7 @@ export default function BuilderPageClient() {
 
     const reader = new FileReader()
     reader.onloadend = () => {
-      patchCharacter({ portrait_url: reader.result as string })
+      if (typeof reader.result === "string") setPortraitCropSrc(reader.result)
     }
     reader.readAsDataURL(file)
   }
@@ -7052,17 +7056,35 @@ export default function BuilderPageClient() {
                     <div className="relative shrink-0">
                     {character.portrait_url ? (
                       <div className="relative">
-                        <img
-                          src={character.portrait_url}
-                          alt="Portrait"
-                          className="h-20 w-20 rounded-xl object-cover border-4 border-border sm:h-32 sm:w-32 sm:rounded-2xl"
-                        />
                         <button
+                          type="button"
+                          onClick={() => setPortraitCropSrc(character.portrait_url)}
+                          className="block"
+                          title="Adjust 1:1 crop"
+                        >
+                          <img
+                            src={character.portrait_url}
+                            alt="Portrait"
+                            className="h-20 w-20 rounded-xl object-cover border-4 border-border sm:h-32 sm:w-32 sm:rounded-2xl"
+                          />
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => patchCharacter({ portrait_url: null })}
                           className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center"
                         >
                           <X className="w-4 h-4" />
                         </button>
+                        <label className="absolute inset-x-0 -bottom-1 mx-auto w-fit cursor-pointer rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-semibold text-foreground shadow-sm ring-1 ring-border hover:text-primary">
+                          Replace
+                          <input
+                            ref={portraitInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePortraitUpload}
+                            className="sr-only"
+                          />
+                        </label>
                       </div>
                     ) : (
                         <label className="flex h-20 w-20 flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted px-1.5 text-center cursor-pointer transition-colors hover:border-primary sm:h-32 sm:w-32 sm:rounded-2xl sm:px-2">
@@ -7072,6 +7094,7 @@ export default function BuilderPageClient() {
                             {formatImageUploadHint("portrait")}
                           </span>
                         <input
+                          ref={portraitInputRef}
                           type="file"
                           accept="image/*"
                           onChange={handlePortraitUpload}
@@ -7974,6 +7997,17 @@ export default function BuilderPageClient() {
 
         return null
       })()}
+      <PortraitCropDialog
+        imageSrc={portraitCropSrc}
+        open={Boolean(portraitCropSrc)}
+        onOpenChange={(next) => {
+          if (!next) setPortraitCropSrc(null)
+        }}
+        onApply={(dataUrl) => {
+          patchCharacter({ portrait_url: dataUrl })
+          setPortraitCropSrc(null)
+        }}
+      />
     </div>
   )
 }

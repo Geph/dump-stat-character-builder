@@ -1,4 +1,11 @@
+import type { FeatureDurationKey } from "@/lib/types"
+
 export type SheetToggleSourceType = "builtin" | "class_feature" | "magic_item"
+
+export type SheetToggleEndsWhen = {
+  incapacitated?: boolean
+  speedZero?: boolean
+}
 
 export type SheetToggleDefinition = {
   id: string
@@ -13,6 +20,10 @@ export type SheetToggleDefinition = {
   notePlaceholder?: string
   /** When set, activating this toggle deactivates other toggles in the same group. */
   exclusiveGroup?: string
+  /** Duration reminder created when this toggle turns on (e.g. Dance → 1 minute). */
+  defaultDuration?: FeatureDurationKey
+  /** Play-state conditions that automatically turn this toggle off. */
+  endsWhen?: SheetToggleEndsWhen
 }
 
 export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
@@ -27,7 +38,14 @@ export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "tides_of_chaos_active", label: "Tides of Chaos", sourceType: "builtin" },
   { id: "dragon_wings_active", label: "Dragon Wings", sourceType: "builtin" },
   { id: "below_half_hp", label: "Bloodied", sourceType: "builtin" },
-  { id: "while_dancing", label: "Dancing", sourceType: "builtin" },
+  {
+    id: "while_dancing",
+    label: "Dancing",
+    sourceType: "builtin",
+    defaultDuration: "1_minute",
+    endsWhen: { incapacitated: true, speedZero: true },
+    hint: "Lasts 1 minute, or until you are Incapacitated, your Speed is 0, or you stop dancing (no action).",
+  },
   { id: "quarry_marked", label: "Quarry marked", sourceType: "builtin" },
   {
     id: "masterwork_weapon_active",
@@ -228,11 +246,13 @@ const ACTION_NAME_ACTIVATES_TOGGLE: Record<string, string> = {
   "reckless attack": "reckless_attack",
   "full awakening": "full_awakening_active",
   "mind rider": "mind_rider_active",
+  dance: "while_dancing",
 }
 
 const RESOURCE_KEY_ACTIVATES_TOGGLE: Record<string, string> = {
   rage: "while_raging",
   wild_shape: "while_wild_shape",
+  dances: "while_dancing",
 }
 
 export function sheetToggleIdActivatedByAction(action: {

@@ -15,6 +15,8 @@ type StatExplainPopoverProps = {
   total: number
   parts?: StatBreakdownPart[]
   contributions?: StatContribution[]
+  /** Non-numeric riders shown under the math (no OA, ignore Difficult Terrain, …). */
+  notes?: string[]
   /** When false, lines are independent final values (e.g. walk vs fly speed), not additive parts. */
   summable?: boolean
   /** Custom trigger content (e.g. the stat number). Defaults to an info icon. */
@@ -27,6 +29,7 @@ export function StatExplainPopover({
   total,
   parts,
   contributions,
+  notes,
   summable = true,
   children,
   className,
@@ -66,7 +69,9 @@ export function StatExplainPopover({
     }
   }, [open])
 
-  if (!lines.length) {
+  const overlayNotes = (notes ?? []).map((note) => note.trim()).filter(Boolean)
+
+  if (!lines.length && !overlayNotes.length) {
     if (children) {
       return <span className={className}>{children}</span>
     }
@@ -128,6 +133,11 @@ export function StatExplainPopover({
                     {summable ? formatSignedValue(line.amount) : `${line.amount} ft`}
                   </span>
                 </div>
+              ))}
+              {overlayNotes.map((note) => (
+                <p key={note} className="text-xs text-foreground leading-snug">
+                  {note}
+                </p>
               ))}
             </div>
             {summable ? (

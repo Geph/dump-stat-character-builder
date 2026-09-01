@@ -14,12 +14,14 @@ import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abi
 import type { DataClient } from "@/lib/db/client"
 import { asCompendiumRows } from "@/lib/data/types"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
+import { enrichSubclassFeaturesWithPresets } from "@/lib/import/enrichment-presets/apply"
 import type {
   Background,
   CustomAbility,
   DndClass,
   Equipment,
   Feat,
+  Feature,
   Species,
   Spell,
   Subclass,
@@ -254,9 +256,20 @@ async function fetchBuilderCompendium(db: DataClient): Promise<BuilderCompendium
     classNameById,
   ).map((subclass) => {
     const parentName = classNameById.get(subclass.class_id ?? "") ?? ""
-    if (!/captain/i.test(parentName)) return subclass
-    const features = sanitizeCaptainSubclassFeatures(subclass.features)
-    return features ? { ...subclass, features } : subclass
+    let next = subclass
+    if (/captain/i.test(parentName)) {
+      const captainFeatures = sanitizeCaptainSubclassFeatures(subclass.features)
+      if (captainFeatures) next = { ...next, features: captainFeatures }
+    }
+    if (!parentName) return next
+    return {
+      ...next,
+      features: enrichSubclassFeaturesWithPresets(
+        (next.features ?? []) as Feature[],
+        parentName,
+        next.name,
+      ),
+    }
   })
   const speciesRows = filterEnabled(
     enrichSpeciesList(

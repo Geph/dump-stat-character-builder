@@ -1,54 +1,47 @@
 # Import enrichment preset inventory
 
-Replaces class-specific enricher modules with declarative presets under
-`lib/import/enrichment-presets/`. Classification:
+Canonical pack list: `lib/import/enrichment-presets/registry.ts`.
+Modifier architecture, play-state engines, and when **not** to add a preset:
+[docs/custom-modifiers.md](../../../docs/custom-modifiers.md).
+
+Classification:
 
 - **(a)** Expressible as FEATURE_NAME / FEATURE_MODIFIER_RULES or linked-modifier presets
 - **(b)** Expressible as data given a small generic operation (attach named preset, remap resource key, seed equipment/resource, parse table, etc.)
-- **(c)** Irreducible custom logic (keyed hooks) — **none remaining**
+- **(c)** Irreducible **runtime** logic — play-state engines in `lib/character/` (Rampage Die, Mutation Die, illusion tokens, Weapon Morph, Balance of Power, Influence). Those are **not** enricher modules. Do not invent `class_resources` / `new_toggles` for them.
 
-| Pack | Transformation | Class | Notes |
-| --- | --- | --- | --- |
-| Alchemist | Bomb ability → dual `special_attack` + reagents uses | (b) | Named preset `alchemist_bomb` |
-| Alchemist | Bomb formula → dual `special_attack` (damage from name) | (b) | `alchemist_bomb_formula_from_name` + regex table |
-| Alchemist | Potions feature → `craftable_items` from HTML table | (b) | `parseCraftableItemsTable` op |
-| Alchemist | Held potions/items → `held_items_cap` | (b) | |
-| Alchemist | Discovery: Batch Brewing / Double Dose | (b) | |
-| Alchemist | Discovery: Homunculus companion block | (b) | `parseCompanionStatBlock` op |
-| Alchemist | Discovery: brewing-only reagent uses | (b) | |
-| Alchemist | Reagents resource recharge (INT synthesis) | (b) | `ensureResourceRecharges` |
-| Alchemist | Reagent Synthesis description note | (b) | |
-| Investigator | Finisher / Improved Finisher on-hit triggers | (b) | Named presets |
-| Investigator | Holy Trinkets note + clear limitedUses | (b) | |
-| Investigator | Name-match wire Amulet / Ankh / Rune effects | (b) | Recognition only — no content seed |
-| Investigator | Subclass trinkets → per-trinket abilities + equipment rows | (b) | `grant_custom_ability` + `grant_equipment` |
-| Investigator | Rushed Incantation limitedUses | (b) | |
-| Investigator | Exploit Weakness stub + note | (b) | |
-| Investigator | Enigma Arcane → innate arcanum preset | (b) | Reuses SRD factory |
-| Investigator | Spellbinder description note | (b) | |
-| Psion | Climactic Moment uses + turn_start_trigger | (b) | `skipSyncRefs` matches legacy |
-| Psion | Shattered Husks / Planeswalker / Balance of Power uses | (b) | |
-| Psion | Practiced Prescience / Rampage Die / Dark Lurker notes | (b) | |
-| Psion | Curious Mind swappable skill choices | (b) | |
-| Monk | Unarmored Defense AC (non-SRD monks) | (b) | |
-| Monk | `focus_points` → prefixed `ki_points` on modifiers | (b) | `remapResourceKeysInModifiers` |
-| Monk | Resource key + feat ki remap helpers | (b) | |
-| Alternate Ranger | Quarry on-hit trigger | (b) | |
-| Alternate Ranger | Quarry class resource seed | (b) | Content seed |
-| Alternate Ranger | Rename + quarry_die/knacks/Bounty Hunter sanitize | (b) | LaserLlama |
-| Alternate Sorcerer | Innate Arcanum / Innate Sorcery presets | (b) | Reuses SRD factories |
-| Alternate Sorcerer | Sorcerous Regeneration description | (b) | Prefixed resource template |
-| Alternate Sorcerer | Metamagic class_knacks + knack library sanitize | (b) | LaserLlama point-pool |
-| Alternate Barbarian | Rage remap + freeUseAfterLevel 20 | (b) | LaserLlama |
-| Alternate Barbarian | Savage Exploits class_knacks + exploits library sanitize | (b) | Shared exploits custom |
-| Alternate Rogue | Exploit dice L17 + Devious Exploits class_knacks | (b) | LaserLlama |
-| Alternate Rogue | Signature exploits grant_custom_ability + Saboteur de-pollute | (b) | Shared exploits custom |
-| Alternate Fighter | Martial Exploits class_knacks + Relentless initiative | (b) | LaserLlama |
-| Alternate Fighter | Signature exploits + Runecarver/Sylvan/Tinker inline catalogs | (b) | Shared exploits custom |
+Registered packs (2026-09-01):
+
+| Pack | File | Notes |
+| --- | --- | --- |
+| Alchemist | `packs/alchemist.ts` | Bombs, craftable potions, held-items cap, discoveries |
+| Investigator | `packs/investigator.ts` + `homebrew.ts` | Finishers, trinkets → custom abilities + equipment |
+| Psion | `homebrew.ts` | Archetype uses, Rampage / Flesh Warp / Morph **notes + gates** (engines stay in sheet) |
+| Monk | `homebrew.ts` | Unarmored Defense; `focus_points` → prefixed `ki_points` |
+| Alternate Ranger | `homebrew.ts` | Quarry on-hit + resource seed |
+| Alternate Sorcerer | `homebrew.ts` | Innate Arcanum / Sorcery; knack sanitize |
+| Warmage | `packs/warmage.ts` | Tricks, Edge, subclass wiring |
+| Occultist | `packs/occultist.ts` | Traditional Expertise and related |
+| Beastheart | `packs/beastheart.ts` | Companion + primal exploits |
+| Kibbles Warden | `packs/kibbles-warden.ts` | Distinct from MHP Warden |
+| Inventor | `packs/inventor.ts` | |
+| Dancer | `packs/dancer.ts` | Dance / `while_dancing`, Graceful Dodge menu, styles |
+| Craftsman | `packs/craftsman.ts` | Masterwork, enchantments |
+| Captain | `packs/captain.ts` | |
+| Vagabond | `packs/vagabond.ts` | |
+| Witch | `packs/witch.ts` | |
+| Gunslinger | `packs/gunslinger.ts` | Risk / maneuvers |
+| Martyr | `homebrew.ts` | Sacrificial strike / Divine Respite |
+| Necromancer | `packs/necromancer.ts` + `homebrew.ts` | Dark Arcana, Charnel riders |
+| MHP Warden | `homebrew.ts` | Distinct from Kibbles Warden |
+
+Not registry presets (table-fill helpers used by LaserLlama import tests):
+`packs/alternate-fighter.ts`, `alternate-monk.ts`, `alternate-rogue.ts`,
+`alternate-barbarian.ts`.
 
 ## Call sites
 
-- `enrichImportedClassRow` → single `enrichClassFeaturesWithPresets` (monk / ranger / sorcerer packs)
-- `enrichImportContentModifiers` → `applyImportEnrichmentPresets` (alchemist / investigator / psion)
-- `mergeTableParsedClassResources` → `mergeAlternateRangerClassResources` (seed)
-- `remapImportedResourceKey` → `remapKiResourceKey` (preset helper)
+- `enrichImportedClassRow` → `enrichClassFeaturesWithPresets`
+- `enrichImportContentModifiers` → `applyImportEnrichmentPresets`
+- `mergeTableParsedClassResources` → `mergeClassResourcesWithPresets`
+- `remapImportedResourceKey` → `remapImportedResourceKeyWithPresets`

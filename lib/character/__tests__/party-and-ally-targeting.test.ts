@@ -5,7 +5,10 @@ import {
   validatePartyMembers,
 } from "@/lib/character/party"
 import { applyAllyEffectLocally } from "@/lib/character/apply-ally-effect"
-import { collectPartyAllyCandidates } from "@/lib/character/party-ally-candidates"
+import {
+  allyCandidateDisplayLabel,
+  collectPartyAllyCandidates,
+} from "@/lib/character/party-ally-candidates"
 import {
   collectTargetableEffects,
   inferAllyBuffEffect,
@@ -157,6 +160,15 @@ describe("ally heal targeting", () => {
       ),
     ).toBeNull()
   })
+
+  it("does not treat Dance as an ally-target buff", () => {
+    expect(
+      inferAllyBuffEffect(
+        "Dance",
+        "As a Bonus Action, expend a Dance to begin dancing. When you begin your Dance, choose a Dance Style. Some styles force a creature you can see to make a Wisdom saving throw or add to an attack.",
+      ),
+    ).toBeNull()
+  })
 })
 
 describe("party ally candidates", () => {
@@ -179,6 +191,18 @@ describe("party ally candidates", () => {
     const companion = rows.find((row) => row.kind === "companion")
     expect(companion?.tempHp).toBe(4)
     expect(companion?.currentHp).toBe(11)
+  })
+
+  it("labels the open character as Self", () => {
+    const self = { kind: "character" as const, characterId: "solo", label: "Druid" }
+    expect(allyCandidateDisplayLabel(self, "solo")).toBe("Self")
+    expect(allyCandidateDisplayLabel(self, "other")).toBe("Druid")
+    expect(
+      allyCandidateDisplayLabel(
+        { kind: "companion", characterId: "solo", companionKey: "wolf", label: "Druid's Ash" },
+        "solo",
+      ),
+    ).toBe("Druid's Ash")
   })
 })
 

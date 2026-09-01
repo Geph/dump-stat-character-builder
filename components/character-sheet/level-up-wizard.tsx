@@ -217,7 +217,13 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       setLoaded({
         character: char,
         classDetails,
-        subclasses: asCompendiumRows(subclasses) as unknown as Subclass[],
+        subclasses: classDetails
+          .flatMap((entry) => (entry.subclass ? [entry.subclass] : []))
+          .concat(
+            (asCompendiumRows(subclasses) as unknown as Subclass[]).filter(
+              (sub) => !classDetails.some((entry) => entry.subclass?.id === sub.id),
+            ),
+          ),
         feats: enrichedFeats,
         spells: asCompendiumRows(spells) as unknown as Spell[],
         equipment: asCompendiumRows(equipment) as unknown as Equipment[],

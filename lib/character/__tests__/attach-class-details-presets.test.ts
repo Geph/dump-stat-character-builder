@@ -328,4 +328,47 @@ describe("attachClassDetails class-feature presets", () => {
       5: 45,
     })
   })
+
+  it("wires Honeyed Words language choices and Dance duration on stored Dancer rows", () => {
+    const dancer = {
+      id: "cls_dancer",
+      name: "Dancer",
+      features: [
+        {
+          name: "Dance",
+          level: 2,
+          description: "Bonus Action Dance.",
+        },
+      ],
+    } as DndClass
+    const courtesan = {
+      id: "sub_courtesan",
+      class_id: "cls_dancer",
+      name: "Courtesan",
+      features: [
+        {
+          name: "Honeyed Words",
+          level: 3,
+          description: "You know two languages of your choice.",
+        },
+      ],
+    } as import("@/lib/types").Subclass
+
+    const [detail] = attachClassDetails(
+      [{ class_id: "cls_dancer", level: 3, subclass_id: "sub_courtesan", order: 0 }],
+      [dancer],
+      [courtesan],
+    )
+    const dance = (detail.class?.features ?? []).find((feature) => feature.name === "Dance") as
+      | Feature
+      | undefined
+    expect(dance?.duration).toBe("1_minute")
+    const honeyed = (detail.subclass?.features ?? []).find(
+      (feature) => feature.name === "Honeyed Words",
+    ) as Feature | undefined
+    const langs = honeyed?.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "languages") as { choiceCount?: number } | undefined
+    expect(langs?.choiceCount).toBe(2)
+  })
 })

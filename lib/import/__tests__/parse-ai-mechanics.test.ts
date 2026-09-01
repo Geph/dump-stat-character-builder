@@ -937,6 +937,32 @@ describe("aiMechanicsToDetections", () => {
     )
   })
 
+  it("wires incomingAttackMode Disadvantage gated by first_turn_of_combat", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "check_roll_modifier",
+          incomingAttackMode: "disadvantage",
+          requiresSheetToggle: "first_turn_of_combat",
+          sourcePhrase: "Attacks against you during the first round of combat have Disadvantage.",
+        },
+      ],
+      { contentKind: "class_feature", sourceName: "Dancer", featureName: "Nimble Start" },
+    )
+    expect(detections).toHaveLength(1)
+    const effect = detections[0]?.instance.activation?.effects?.[0]
+    expect(effect).toMatchObject({
+      kind: "check_roll_modifier",
+      incomingAttackMode: "disadvantage",
+      checkCategory: "other",
+    })
+    expect(effect?.limitations?.[0]).toMatchObject({
+      kind: "sheet_toggle",
+      rule: "requires_active",
+      value: "first_turn_of_combat",
+    })
+  })
+
   it("gates check_roll_modifier behind a sheet toggle via limitations (Peerless Athlete)", () => {
     const detections = aiMechanicsToDetections(
       [
@@ -1025,6 +1051,54 @@ describe("aiMechanicsToDetections", () => {
         { name: "Break Spells" },
       ],
     })
+  })
+
+  it("preserves a resource-die bonusConfig and stance gate on a menu option", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "resource_ability_menu",
+          classResourceKey: "dance_die",
+          requiresSheetToggle: "while_dancing",
+          menuOptions: [
+            {
+              name: "Graceful Dodge",
+              description: "Add your Dance Die to your AC against one attack.",
+              resourceCost: 0,
+              bonusConfig: {
+                mode: "die",
+                dieScaling: "class_resource",
+                classResourceKey: "dance_die",
+              },
+            },
+          ],
+        },
+      ],
+      {
+        contentKind: "class_feature",
+        sourceName: "Dancer",
+        featureName: "Dance",
+      },
+    )
+    const menu = detections[0]?.instance.characteristics?.[0]
+    expect(menu).toMatchObject({
+      type: "resource_ability_menu",
+      resourceKey: "dance_die",
+      options: [
+        {
+          name: "Graceful Dodge",
+          resourceCost: 0,
+          bonusConfig: {
+            mode: "die",
+            dieScaling: "class_resource",
+            classResourceKey: "dance_die",
+          },
+        },
+      ],
+    })
+    if (menu?.type === "resource_ability_menu") {
+      expect(menu.limitations?.some((lim) => lim.value === "while_dancing")).toBe(true)
+    }
   })
 
   it("preserves structured resource-menu costs and descriptions", () => {

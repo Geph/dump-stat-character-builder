@@ -1873,6 +1873,25 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
       { op: "setActivation", activation: { bonusAction: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "dark_arcana",
+          catalogRefId: "cat_fx_class_resource",
+          effects: [
+            {
+              id: modId("dark_arcana"),
+              kind: "class_resource",
+              classResourceKey: "charnel_touch",
+              classResourceChange: "increase",
+              restoreFromSpellSlot: true,
+              classResourceAmountConfig: { mode: "ability_modifier", ability: "INT" },
+              label: "Expend a spell slot to restore Charnel Touch points",
+            },
+          ],
+        },
+      },
+      {
         op: "appendDescription",
         text: "Expend a spell slot to restore Charnel Touch points (INT mod + 1d8 per slot level) — play-time restore into the charnel_touch pool.",
       },

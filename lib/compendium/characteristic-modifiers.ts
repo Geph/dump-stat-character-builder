@@ -367,6 +367,7 @@ import type {
   ModifierLimitation,
 } from "@/lib/compendium/modifier-limitations"
 import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
+import { isUngatedSituationalSpeedGrant } from "@/lib/compendium/situational-speed-grant"
 
 export type { LimitationEvaluationContext, ModifierLimitation } from "@/lib/compendium/modifier-limitations"
 
@@ -838,6 +839,10 @@ export interface MovementEffectsCharacteristic extends CharacteristicModifierBas
   spiderClimb?: boolean
   /** Minimum character level before spider climb applies. */
   spiderClimbMinLevel?: number | null
+  /** Movement does not provoke Opportunity Attacks. */
+  moveWithoutOpportunityAttacks?: boolean
+  /** Movement is unaffected by Difficult Terrain. */
+  ignoreDifficultTerrain?: boolean
   /** When set, movement bonuses apply only to these types (empty = all). */
   movementTypes?: import("@/lib/types").MovementType[]
 }
@@ -2437,6 +2442,9 @@ export type AggregatedCharacteristics = {
     movementHideBehindLargerCreatures: boolean
     spiderClimb: boolean
     spiderClimbMinLevel: number | null
+    moveWithoutOpportunityAttacks: boolean
+    ignoreDifficultTerrain: boolean
+    overlayNotes: string[]
   }
   catalogOptions: CatalogOptionCharacteristic[]
   equipmentMagicItems: EquipmentAndMagicItemsCharacteristic[]
@@ -2547,6 +2555,9 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
     movementHideBehindLargerCreatures: false,
     spiderClimb: false,
     spiderClimbMinLevel: null,
+    moveWithoutOpportunityAttacks: false,
+    ignoreDifficultTerrain: false,
+    overlayNotes: [],
   },
   catalogOptions: [],
   equipmentMagicItems: [],
@@ -2729,6 +2740,7 @@ export function aggregateCharacteristics(
 
   for (const mod of mods) {
     if (!isModifierActive(mod, limitationCtx)) continue
+    if (isUngatedSituationalSpeedGrant(mod)) continue
     switch (mod.type) {
       case "ability_scores":
         if (mod.mode === "asi_pool") break
@@ -2955,6 +2967,16 @@ export function aggregateCharacteristics(
           if (mod.spiderClimbMinLevel != null) {
             result.movementEffects.spiderClimbMinLevel = mod.spiderClimbMinLevel
           }
+        }
+        if (mod.moveWithoutOpportunityAttacks) {
+          result.movementEffects.moveWithoutOpportunityAttacks = true
+        }
+        if (mod.ignoreDifficultTerrain) {
+          result.movementEffects.ignoreDifficultTerrain = true
+        }
+        const overlayNote = mod.label?.trim()
+        if (overlayNote && !result.movementEffects.overlayNotes.includes(overlayNote)) {
+          result.movementEffects.overlayNotes.push(overlayNote)
         }
         break
       case "damage_resistance":

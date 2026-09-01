@@ -14,6 +14,7 @@ import { resolveFixedValueAtLevel } from "@/lib/compendium/bonus-by-level"
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import { collectEquipmentMagicCharacteristics } from "@/lib/compendium/equipment-magic-modifiers"
 import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
+import { isUngatedSituationalSpeedGrant } from "@/lib/compendium/situational-speed-grant"
 import {
   ContributionRecorder,
   type DerivedStatBreakdowns,
@@ -96,7 +97,9 @@ function activeSpeedMods(
 ): SpeedCharacteristic[] {
   return mods.filter(
     (mod): mod is SpeedCharacteristic =>
-      mod.type === "speed" && modifierLimitationsMet(mod, ctx),
+      mod.type === "speed" &&
+      modifierLimitationsMet(mod, ctx) &&
+      !isUngatedSituationalSpeedGrant(mod),
   )
 }
 

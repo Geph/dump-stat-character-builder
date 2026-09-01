@@ -53,6 +53,29 @@ interface CharacterWithRelations extends Character {
 
 type CreatedSort = "newest" | "oldest"
 
+function characterLevelClassLabel(character: CharacterWithRelations): string {
+  const details = (character.class_list ?? []).filter((entry) => entry.class?.name)
+  if (details.length === 1) {
+    return `Lvl ${details[0].row.level} ${details[0].class!.name}`
+  }
+  if (details.length > 1) {
+    return `Lvl ${details.map((entry) => `${entry.row.level} ${entry.class!.name}`).join(" / ")}`
+  }
+  return `Lvl ${character.level} ${character.classes?.name || "Adventurer"}`
+}
+
+function characterMetaBadges(character: CharacterWithRelations): string[] {
+  const subclassName =
+    character.subclasses?.name ||
+    character.class_list?.find((entry) => entry.row.class_id === character.class_id)?.subclass
+      ?.name ||
+    character.class_list?.find((entry) => entry.subclass?.name)?.subclass?.name ||
+    null
+  return [subclassName, character.species?.name, character.backgrounds?.name].filter(
+    (label): label is string => Boolean(label),
+  )
+}
+
 export default function CharactersPage() {
   const [characters, setCharacters] = useState<CharacterWithRelations[]>([])
   const [loading, setLoading] = useState(true)
@@ -502,7 +525,7 @@ export default function CharactersPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="rounded-2xl border-2 border-border hover:border-primary/50 transition-colors group overflow-hidden"
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border-2 border-border transition-colors hover:border-primary/50"
               >
                 {/* Large Portrait as main focus */}
                 <Link href={characterSheetHref(character.id)} className="block relative aspect-square">
@@ -518,8 +541,10 @@ export default function CharactersPage() {
                     </div>
                   )}
                   {/* Level badge overlay */}
-                  <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-lg">
-                    <span className="text-xs font-bold text-white">Lvl {character.level}</span>
+                  <div className="absolute top-3 left-3 max-w-[calc(100%-3.25rem)] px-2 py-1 bg-black/60 backdrop-blur-sm rounded-lg">
+                    <span className="line-clamp-2 text-xs font-bold leading-tight text-white">
+                      {characterLevelClassLabel(character)}
+                    </span>
                   </div>
                   {/* Delete button overlay */}
                   <button
@@ -536,7 +561,7 @@ export default function CharactersPage() {
                 </Link>
                 
                 {/* Character Info - Below the image */}
-                <div className="p-4 bg-card/75 backdrop-blur">
+                <div className="flex-1 p-4 bg-card/75 backdrop-blur">
                   <div className="flex items-start justify-between gap-2">
                     <Link href={characterSheetHref(character.id)} className="min-w-0 flex-1">
                       <h3 className="font-bold text-lg text-foreground truncate hover:text-primary transition-colors">
@@ -569,32 +594,18 @@ export default function CharactersPage() {
                       </Link>
                     </div>
                   </div>
-                  <div className="mt-1 space-y-0.5">
-                    <p className="text-sm text-primary font-medium">
-                      {character.classes?.name || "Adventurer"}
-                    </p>
-                    {(character.subclasses?.name ||
-                      character.class_list?.find(
-                        (entry) => entry.row.class_id === character.class_id,
-                      )?.subclass?.name) && (
-                      <p className="text-xs font-medium text-secondary">
-                        {character.subclasses?.name ||
-                          character.class_list?.find(
-                            (entry) => entry.row.class_id === character.class_id,
-                          )?.subclass?.name}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      {character.species?.name || "Unknown Species"}
-                    </p>
-                    {character.backgrounds?.name && (
-                      <p className="text-xs text-muted-foreground">
-                        {character.backgrounds.name}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground/80 pt-1">
-                      Created {formatCreated(character.created_at)}
-                    </p>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {characterMetaBadges(character).map((label) => (
+                      <span
+                        key={label}
+                        className="inline-flex max-w-full items-center rounded-full border border-border/60 bg-muted/80 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+                      >
+                        <span className="truncate">{label}</span>
+                      </span>
+                    ))}
+                    <span className="inline-flex max-w-full items-center rounded-full border border-border/40 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground/80">
+                      <span className="truncate">Created {formatCreated(character.created_at)}</span>
+                    </span>
                   </div>
                 </div>
               </motion.div>

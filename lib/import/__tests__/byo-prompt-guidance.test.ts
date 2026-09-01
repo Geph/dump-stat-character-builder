@@ -201,6 +201,8 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("- movement_grant:")
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("- weapon_sheet_badge:")
     expect(prompt).toContain("weapon_sheet_badge")
+    expect(prompt).toContain("files no-actionKind die options under Passive")
+    expect(prompt).toContain("rolls the die on Use")
   })
 
   it("tells the LLM to reconstruct domain-spell tables that lost whitespace in PDF extraction (Cleric domains audit)", () => {
