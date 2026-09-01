@@ -19,6 +19,11 @@ const SHEET_DISPLAY_OPTIONS: {
     hint: "Quick-use card on Combat",
   },
   {
+    key: "restDialogues",
+    label: "Rest dialogues",
+    hint: "Choice or Use control on Short Rest and Long Rest",
+  },
+  {
     key: "featuresTab",
     label: "Features tab",
     hint: "Reference card on Features",
@@ -50,7 +55,7 @@ export function FeatureSheetDisplayEditor({ feature, onChange }: FeatureSheetDis
           Any combination can be enabled or left off.
         </p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
         {SHEET_DISPLAY_OPTIONS.map(({ key, label, hint }) => (
           <label key={key} className="flex items-start gap-2 cursor-pointer text-sm min-w-0">
             <input

@@ -190,6 +190,44 @@ export function ActivationEditor({
             label="Once per turn"
             onChange={(checked) => onChange({ ...activation, oncePerTurn: checked })}
           />
+          <ActivationCheckbox
+            checked={!!activation.firstUseNoAction}
+            disabled={inheritActivation}
+            label="First use each turn costs no action"
+            onChange={(checked) =>
+              onChange({
+                ...activation,
+                firstUseNoAction: checked,
+                firstUseNoActionFromLevel: checked
+                  ? (activation.firstUseNoActionFromLevel ?? null)
+                  : null,
+              })
+            }
+          />
+          {activation.firstUseNoAction ? (
+            <div className="ml-6 space-y-1">
+              <label className="block text-xs font-semibold text-foreground">
+                Starting at class level (optional)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={activation.firstUseNoActionFromLevel ?? ""}
+                disabled={inheritActivation}
+                onChange={(e) =>
+                  onChange({
+                    ...activation,
+                    firstUseNoActionFromLevel: e.target.value
+                      ? parseInt(e.target.value, 10)
+                      : null,
+                  })
+                }
+                placeholder="Always"
+                className="w-full max-w-xs px-3 py-2 bg-background border border-border rounded-lg text-sm"
+              />
+            </div>
+          ) : null}
         </div>
       </ActivationCheckboxGroup>
 

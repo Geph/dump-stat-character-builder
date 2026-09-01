@@ -94,4 +94,39 @@ describe("spellMatchesClassName", () => {
       spellMatchesClassName({ name: "Accelerate/decelerate", classes: ["Wizard"] }, "Investigator"),
     ).toBe(false)
   })
+
+  it("accepts official Necromancer list spells even without the class tag", () => {
+    expect(spellMatchesClassName({ name: "Acid Splash", classes: ["Wizard"] }, "Necromancer")).toBe(
+      true,
+    )
+    expect(spellMatchesClassName({ name: "Chill Touch", classes: ["Sorcerer"] }, "Necromancer")).toBe(
+      true,
+    )
+    expect(
+      spellMatchesClassName({ name: "Tasha's Hideous Laughter", classes: ["Bard"] }, "Necromancer"),
+    ).toBe(true)
+    expect(spellMatchesClassName({ name: "Cheat", classes: ["Wizard"] }, "Necromancer")).toBe(true)
+  })
+
+  it("does not let off-list spells onto Necromancer", () => {
+    expect(spellMatchesClassName({ name: "Fireball", classes: ["Wizard"] }, "Necromancer")).toBe(false)
+    expect(spellMatchesClassName({ name: "Cure Wounds", classes: ["Cleric"] }, "Necromancer")).toBe(
+      false,
+    )
+  })
+
+  it("matches any class from a persisted spell_list when catalog tags were overwritten", () => {
+    expect(
+      spellMatchesClassName({ name: "Cure Wounds", classes: ["Cleric"] }, "Artificer", [
+        "Cure Wounds",
+        "Alarm",
+      ]),
+    ).toBe(true)
+    expect(
+      spellMatchesClassName({ name: "Fireball", classes: ["Wizard"] }, "Artificer", [
+        "Cure Wounds",
+        "Alarm",
+      ]),
+    ).toBe(false)
+  })
 })

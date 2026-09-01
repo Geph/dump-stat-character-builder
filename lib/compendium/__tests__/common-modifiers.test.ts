@@ -266,6 +266,43 @@ describe("custom species modifier wiring", () => {
     ).toBe(true)
     expect(warforged.size_options).toEqual(["Small", "Medium"])
   })
+
+  it("wires MOTM Centaur Natural Affinity as a 1-of-4 skill pick", () => {
+    const enriched = enrichCustomSpeciesRow({
+      name: "Centaur",
+      source: "motm",
+      traits: [{ name: "Natural Affinity", description: "" }],
+    })
+    const affinity = (enriched.traits as Trait[]).find((t) => t.name === "Natural Affinity")
+    const skills = affinity?.linkedModifiers
+      ?.flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "skills")
+    expect(skills?.type).toBe("skills")
+    if (skills?.type !== "skills") throw new Error("Expected skills characteristic")
+    expect(skills.allowAnySkill).toBe(false)
+    expect(skills.choiceCount).toBe(1)
+    expect(skills.entries?.map((entry) => entry.skill).sort()).toEqual([
+      "Animal Handling",
+      "Medicine",
+      "Nature",
+      "Survival",
+    ])
+  })
+
+  it("wires MOTM Eladrin Trance with two weapon/tool picks", () => {
+    const enriched = enrichCustomSpeciesRow({
+      name: "Eladrin",
+      source: "motm",
+      traits: [{ name: "Trance", description: "" }],
+    })
+    const trance = (enriched.traits as Trait[]).find((t) => t.name === "Trance")
+    const tools = trance?.linkedModifiers
+      ?.flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "tool_proficiencies")
+    expect(tools?.type).toBe("tool_proficiencies")
+    if (tools?.type !== "tool_proficiencies") throw new Error("Expected tool characteristic")
+    expect(tools.choiceCount).toBe(2)
+  })
 })
 
 describe("subclass feature presets", () => {

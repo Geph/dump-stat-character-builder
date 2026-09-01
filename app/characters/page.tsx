@@ -6,7 +6,7 @@ import { MainNav } from "@/components/main-nav"
 import { pageHeaderStatBadgeClass, pageFloatingHintClass } from "@/lib/compendium/editor-field-styles"
 import { SiteFooter } from "@/components/site-footer"
 import { createClient } from "@/lib/db/client"
-import { Plus, User, Trash2, Pencil, Download, Upload, Users, ArrowUp } from "lucide-react"
+import { Plus, User, Trash2, Pencil, Download, Upload, Users, Award } from "lucide-react"
 import { LevelUpWizard } from "@/components/character-sheet/level-up-wizard"
 import Link from "next/link"
 import { characterSheetHref } from "@/lib/compendium/edit-href"
@@ -558,7 +558,7 @@ export default function CharactersPage() {
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                         title="Level up"
                       >
-                        <ArrowUp className="w-4 h-4" />
+                        <Award className="w-4 h-4" />
                       </button>
                       <Link
                         href={`/builder?edit=${character.id}`}

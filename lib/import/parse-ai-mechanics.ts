@@ -759,7 +759,7 @@ function buildFromMechanic(
       mechanic.classResourceKey ??
       mechanic.spendResourceKey ??
       mechanic.resourceKey
-    if (!resourceKey) return null
+    if (!resourceKey && !mechanic.waiveResourceCost) return null
     return {
       ruleId: "ai.resource_ability_menu",
       confidence: aiConfidence(mechanic),
@@ -768,7 +768,7 @@ function buildFromMechanic(
         {
           id: modId(instanceKey(ctx, "resource_menu")),
           type: "resource_ability_menu",
-          resourceKey,
+          resourceKey: resourceKey ?? "",
           waiveResourceCost: mechanic.waiveResourceCost ?? false,
           options: mechanic.menuOptions?.length
             ? mechanic.menuOptions.map((option) => ({
@@ -777,8 +777,27 @@ function buildFromMechanic(
                 ...(option.resourceCost != null ? { resourceCost: option.resourceCost } : {}),
                 ...(option.hitDiceCost != null ? { hitDiceCost: option.hitDiceCost } : {}),
                 ...(option.unlocksAtLevel != null ? { unlocksAtLevel: option.unlocksAtLevel } : {}),
+                ...(option.actionKind ? { actionKind: option.actionKind } : {}),
               }))
             : (mechanic.menuAbilityNames ?? []).map((name) => ({ name })),
+        },
+      ]),
+    }
+  }
+
+  if (mechanic.kind === "replace_feature") {
+    const replaced = (mechanic.replacedFeatureNames ?? []).map((name) => name.trim()).filter(Boolean)
+    if (!replaced.length) return null
+    return {
+      ruleId: "ai.replace_feature",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: charInstance(instanceId, characteristicCatalogRefId("replace_feature"), [
+        {
+          id: modId(instanceKey(ctx, "replace_feature")),
+          type: "replace_feature",
+          replacedFeatureNames: replaced,
+          label: mechanic.alertSummary?.trim() || undefined,
         },
       ]),
     }
@@ -1548,7 +1567,7 @@ function buildFromMechanic(
       }
     }
     case "weapon_ability_override": {
-      if (!mechanic.alternateAbility) return null
+      if (!mechanic.alternateAbility && !mechanic.treatAsFinesse) return null
       return {
         ruleId: "ai.weapon_ability_override",
         confidence: aiConfidence(mechanic),
@@ -1557,9 +1576,36 @@ function buildFromMechanic(
           {
             id: modId(instanceKey(ctx, "weapon_ability")),
             type: "weapon_ability_override",
-            ability: mechanic.alternateAbility,
+            ability: mechanic.alternateAbility ?? "dexterity",
             appliesTo: mechanic.weaponAbilityAppliesTo ?? "both",
             scope: mechanic.weaponAbilityScope ?? "all",
+            weaponNames: mechanic.weaponNames ?? [],
+            treatAsFinesse: Boolean(mechanic.treatAsFinesse),
+            whenDamageDice: mechanic.whenDamageDice ?? [],
+          },
+        ]),
+      }
+    }
+    case "weapon_sheet_badge": {
+      const label =
+        mechanic.badgeLabel?.trim() ||
+        mechanic.alertSummary?.trim() ||
+        matchedPhrase.trim() ||
+        "Weapon rider"
+      return {
+        ruleId: "ai.weapon_sheet_badge",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("weapon_sheet_badge"), [
+          {
+            id: modId(instanceKey(ctx, "weapon_sheet_badge")),
+            type: "weapon_sheet_badge",
+            label,
+            description: mechanic.badgeDescription?.trim() || mechanic.alertSummary?.trim() || label,
+            whenDamageDice: mechanic.whenDamageDice ?? [],
+            includeUnarmed: Boolean(mechanic.includeUnarmed),
+            requireFirearm: Boolean(mechanic.requireFirearm),
+            appliesTo: mechanic.weaponAbilityScope ?? "all",
             weaponNames: mechanic.weaponNames ?? [],
           },
         ]),

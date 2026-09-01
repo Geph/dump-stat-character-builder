@@ -343,4 +343,17 @@ describe("import-card-art", () => {
     )
     expect(merged[importCardArtTargetKey("backgrounds", 0)]).toBe(charlatanOnDisk ? charlatanPath : "")
   })
+
+  it("assigns Kibbles class art only when the local PNG exists", () => {
+    const inventorPath = "/images/compendium/classes/inventor.png"
+    const map = buildInitialImportCardArtUrlMap({
+      classes: [
+        { name: "Inventor", description: null, hit_die: 8, primary_ability: ["INT"], features: [] },
+      ],
+    })
+    const inventorOnDisk = existsSync(
+      join(process.cwd(), "public/images/compendium/classes/inventor.png"),
+    )
+    expect(map[importCardArtTargetKey("classes", 0)]).toBe(inventorOnDisk ? inventorPath : "")
+  })
 })

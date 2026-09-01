@@ -52,6 +52,11 @@ export function mergeRowForUpdate(
   next.card_image_url = firstFilled(incoming.card_image_url, existing.card_image_url)
   next.icon = firstFilled(existing.icon, incoming.icon)
   next.card_blurb = firstFilled(existing.card_blurb, incoming.card_blurb)
+  if ("spell_list" in existing || "spell_list" in incoming) {
+    const existingList = Array.isArray(existing.spell_list) ? (existing.spell_list as string[]) : []
+    const incomingList = Array.isArray(incoming.spell_list) ? (incoming.spell_list as string[]) : []
+    next.spell_list = [...new Set([...existingList, ...incomingList].map((name) => String(name).trim()).filter(Boolean))]
+  }
   return next
 }
 

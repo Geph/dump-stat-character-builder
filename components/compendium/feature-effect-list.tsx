@@ -937,28 +937,39 @@ function ClassResourceChangeEditor({
               />
             </div>
           )}
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">When refreshed</label>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-foreground">When refreshed</p>
+            <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+              <input
+                type="checkbox"
+                checked={Boolean(effect.resourceRefreshOnInitiative)}
+                onChange={(e) => onChange({ resourceRefreshOnInitiative: e.target.checked })}
+                className="accent-primary"
+              />
+              When you roll Initiative
+            </label>
+            <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+              <input
+                type="checkbox"
+                checked={Boolean(effect.resourceRefreshOnCriticalHit)}
+                onChange={(e) => onChange({ resourceRefreshOnCriticalHit: e.target.checked })}
+                className="accent-primary"
+              />
+              When you score a Critical Hit
+            </label>
             <select
-              value={
-                effect.resourceRefreshOnInitiative
-                  ? "initiative"
-                  : effect.resourceRefreshOnRest ?? ""
-              }
+              value={effect.resourceRefreshOnRest ?? ""}
               onChange={(e) => {
                 const value = e.target.value
                 onChange({
-                  resourceRefreshOnInitiative: value === "initiative",
-                  resourceRefreshOnRest:
-                    value === "initiative" || !value
-                      ? null
-                      : (value as FeatureEffect["resourceRefreshOnRest"]),
+                  resourceRefreshOnRest: value
+                    ? (value as FeatureEffect["resourceRefreshOnRest"])
+                    : null,
                 })
               }}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
             >
-              <option value="">Manual / unspecified</option>
-              <option value="initiative">When you roll Initiative</option>
+              <option value="">No rest refresh</option>
               <option value="short_or_long_rest">After Short or Long Rest</option>
               <option value="short_rest">After Short Rest</option>
               <option value="long_rest">After Long Rest</option>

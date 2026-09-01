@@ -37,6 +37,7 @@ import { mergeToolNameLists, toolNamesForPool, type ToolChoicePool } from "@/lib
 import { SRD_TOOL_NAMES, getAllSeedToolNames } from "@/lib/compendium/srd-tools"
 import { languageOptionsForPool } from "@/lib/compendium/srd-languages"
 import { resolveSpeciesTraitPicks } from "@/lib/builder/species-trait-picks"
+import { getSpellLimits } from "@/lib/builder/spell-limits"
 import type { CustomAbility, DndClass, Feat, Feature, Spell, Species, Subclass } from "@/lib/types"
 
 export type ModifierPlayerChoiceKind =
@@ -83,6 +84,40 @@ const TOOL_NAME_SET = new Set<string>(getAllSeedToolNames())
 
 export function sharedChoiceSlotKey(sourceKey: string, groupId: string): string {
   return `${sourceKey}::shared::${groupId}`
+}
+
+/** Player-chosen resistance/immunity types for a source (Elemental Adept Energy Mastery, etc.). */
+export function chosenDamageTypesFromCharacteristics(
+  characteristics: readonly CharacteristicModifier[] | null | undefined,
+  picks: Record<string, string[]> | null | undefined,
+): string[] {
+  const chosen: string[] = []
+  const seen = new Set<string>()
+  for (const characteristic of characteristics ?? []) {
+    if (characteristic.type !== "damage_resistance" && characteristic.type !== "damage_immunity") {
+      continue
+    }
+    const damage = characteristic as DamageCharacteristic
+    if ((damage.choiceCount ?? 0) <= 0) continue
+    const pool = new Set(
+      (damage.choiceOptions ?? []).map((name) => name.trim().toLowerCase()).filter(Boolean),
+    )
+    const modId = damage.id?.trim()
+    for (const [key, values] of Object.entries(picks ?? {})) {
+      if (!key.includes("damage_type")) continue
+      if (modId && !key.includes(`${modId}::damage_type`)) continue
+      for (const value of values) {
+        const name = value.trim()
+        if (!name) continue
+        const norm = name.toLowerCase()
+        if (seen.has(norm)) continue
+        if (pool.size > 0 && !pool.has(norm)) continue
+        seen.add(norm)
+        chosen.push(name)
+      }
+    }
+  }
+  return chosen
 }
 
 export function modifierPlayerChoiceSlotKey(
@@ -136,7 +171,25 @@ export function characteristicsForFeatSelection(
   return characteristicsFromLinkedModifiers(catalog, instances, refs)
 }
 
-type SlotBuildContext = { classSkillList?: string[]; classLevel?: number }
+type SlotBuildContext = {
+  classSkillList?: string[]
+  classLevel?: number
+  /** Skip player spell picks that duplicate classes[].spellcasting progression. */
+  omitSpellChoiceGrants?: boolean
+}
+
+export function isPrimaryClassSpellcastingFeature(name: string | null | undefined): boolean {
+  return /^(spellcasting|pact magic)$/i.test((name ?? "").trim())
+}
+
+export function classHasNativeSpellPicker(
+  cls: Pick<DndClass, "name" | "spellcasting">,
+  classLevel: number,
+): boolean {
+  if (!cls.spellcasting) return false
+  const limits = getSpellLimits(cls.spellcasting, classLevel, cls.name)
+  return limits.cantrips > 0 || limits.prepared > 0
+}
 
 /** Base choiceCount plus later-level unlocks that are active at `classLevel`. */
 export function skillChoiceCountAtLevel(
@@ -289,7 +342,7 @@ function slotsFromCharacteristic(
   if (mod.type === "spells_known") {
     const spellMod = mod as SpellsKnownCharacteristic
     const grants = spellMod.choiceGrants ?? []
-    if (grants.length === 0) return slots
+    if (grants.length === 0 || context?.omitSpellChoiceGrants) return slots
 
     const spellListSlotKey = modifierPlayerChoiceSlotKey(sourceKey, mod.id, "spell_list_class")
 
@@ -493,6 +546,7 @@ export function collectClassFeatureModifierPlayerChoiceSlots(params: {
     const cls = classes.find((candidate) => candidate.id === entry.classId)
     if (!cls) continue
 
+    const omitNativeSpellChoices = classHasNativeSpellPicker(cls, entry.level)
     const context: SlotBuildContext = {
       classSkillList: cls.skill_choices?.options ?? [],
       classLevel: entry.level,
@@ -507,7 +561,11 @@ export function collectClassFeatureModifierPlayerChoiceSlots(params: {
           cls.name,
           featureChoicePicks,
           catalog,
-          context,
+          {
+            ...context,
+            omitSpellChoiceGrants:
+              omitNativeSpellChoices && isPrimaryClassSpellcastingFeature(feature.name),
+          },
         ),
       )
     }
@@ -525,7 +583,11 @@ export function collectClassFeatureModifierPlayerChoiceSlots(params: {
             `${cls.name} (${subclass.name})`,
             featureChoicePicks,
             catalog,
-            context,
+            {
+              ...context,
+              omitSpellChoiceGrants:
+                omitNativeSpellChoices && isPrimaryClassSpellcastingFeature(feature.name),
+            },
           ),
         )
       }
@@ -763,7 +825,7 @@ export function applyModifierPlayerPicks(
           }
         )
       })
-      return { ...skillMod, entries }
+      return { ...skillMod, entries, choiceCount: 0 }
     }
 
     if (mod.type === "tool_proficiencies") {

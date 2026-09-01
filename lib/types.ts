@@ -252,6 +252,8 @@ export interface FeatureEffect {
   tempHpTrigger?: "passive" | "on_kill" | "on_action" | "bonus_action" | null
   /** class_resource: refresh pool when rolling Initiative (etc.). */
   resourceRefreshOnInitiative?: boolean
+  /** class_resource: refresh pool when you score a critical hit. */
+  resourceRefreshOnCriticalHit?: boolean
   /** class_resource reset: cap restored uses (e.g. until you have 2). */
   resourceRefreshCap?: number | null
   /** class_resource reset: refresh when finishing a rest. */
@@ -329,6 +331,8 @@ export interface FeatureSheetDisplay {
   combatActions?: boolean
   /** Show as a reference card on the Features tab. */
   featuresTab?: boolean
+  /** Show as a choice / Use control on Short Rest and Long Rest overlays. */
+  restDialogues?: boolean
 }
 
 export interface FeatureActivation {
@@ -355,6 +359,13 @@ export interface FeatureActivation {
   existingClassFeatureName?: string | null
   /** Limit to once per turn (Stunning Strike, etc.). */
   oncePerTurn?: boolean
+  /**
+   * First use each turn does not spend Action / Bonus Action / Reaction
+   * (Improved Sacrificial Strike at 17: first Strike without a Bonus Action).
+   */
+  firstUseNoAction?: boolean
+  /** When set, `firstUseNoAction` only applies from this class level. */
+  firstUseNoActionFromLevel?: number | null
   /** React when you fail a saving throw. */
   onFailedSave?: boolean
   /** React when you succeed on a saving throw. */
@@ -601,6 +612,8 @@ export interface DndClass {
   } | null
   features: Feature[]
   class_resources?: ClassResource[] | null
+  /** Official class spell list names. Picker matches these even if catalog tags were overwritten. */
+  spell_list?: string[] | null
   spellcasting: ClassSpellcastingConfig | null
   icon: string | null
   accent_color?: string | null

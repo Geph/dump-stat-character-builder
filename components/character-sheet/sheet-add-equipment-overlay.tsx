@@ -1,8 +1,9 @@
 "use client"
 
-import { useDeferredValue, useMemo, useState } from "react"
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Check, Coins, Plus, X } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { PickerGridPagination } from "@/components/builder/picker-grid-pagination"
 import { MagicEquipmentBadges } from "@/components/character-sheet/magic-equipment-badges"
 import {
@@ -26,6 +27,8 @@ import { usePickerPageSize } from "@/hooks/use-picker-page-size"
 import type { Equipment } from "@/lib/types"
 import { SearchBox } from "@/components/search/search-box"
 import { rankSearchResults } from "@/lib/search/ranked-search"
+
+const ADD_FLASH_MS = 1000
 
 export type AddEquipmentOptions = {
   deductCost: boolean
@@ -61,6 +64,37 @@ export function SheetAddEquipmentOverlay({
   const [pendingItem, setPendingItem] = useState<Equipment | null>(null)
   const [pendingBaseId, setPendingBaseId] = useState<string>("")
   const [pendingDeductCost, setPendingDeductCost] = useState(false)
+  const [flashKeys, setFlashKeys] = useState<Set<string>>(() => new Set())
+  const flashTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+
+  useEffect(() => {
+    const timers = flashTimers.current
+    return () => {
+      for (const id of timers.values()) clearTimeout(id)
+      timers.clear()
+    }
+  }, [])
+
+  const flashAction = (key: string) => {
+    setFlashKeys((prev) => {
+      const next = new Set(prev)
+      next.add(key)
+      return next
+    })
+    const existing = flashTimers.current.get(key)
+    if (existing) clearTimeout(existing)
+    flashTimers.current.set(
+      key,
+      setTimeout(() => {
+        setFlashKeys((prev) => {
+          const next = new Set(prev)
+          next.delete(key)
+          return next
+        })
+        flashTimers.current.delete(key)
+      }, ADD_FLASH_MS),
+    )
+  }
 
   const categoryOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -124,6 +158,7 @@ export function SheetAddEquipmentOverlay({
       deductCost,
       selectedBaseId: baseOptions.length === 1 ? baseOptions[0]?.id : undefined,
     })
+    flashAction(`${item.id}:${deductCost ? "buy" : "add"}`)
   }
 
   const confirmPendingAdd = () => {
@@ -317,6 +352,8 @@ export function SheetAddEquipmentOverlay({
                                 ownedQuantities,
                                 item.id,
                               )
+                              const addFlashed = flashKeys.has(`${item.id}:add`)
+                              const buyFlashed = flashKeys.has(`${item.id}:buy`)
                               return (
                                 <div
                                   key={item.id}
@@ -342,7 +379,12 @@ export function SheetAddEquipmentOverlay({
                                     <button
                                       type="button"
                                       onClick={() => tryAddItem(item, false)}
-                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-lg border border-border bg-card hover:border-primary/50 transition-colors"
+                                      className={cn(
+                                        "inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-colors",
+                                        addFlashed
+                                          ? "border-primary bg-primary text-primary-foreground"
+                                          : "border-border bg-card hover:border-primary/50",
+                                      )}
                                     >
                                       <Plus className="w-3.5 h-3.5" />
                                       {ownedQty > 0 ? "Add another" : "Add"}
@@ -352,7 +394,12 @@ export function SheetAddEquipmentOverlay({
                                         type="button"
                                         disabled={!canBuy}
                                         onClick={() => tryAddItem(item, true)}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-colors"
+                                        className={cn(
+                                          "inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-lg transition-colors",
+                                          buyFlashed
+                                            ? "bg-secondary text-secondary-foreground"
+                                            : "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40",
+                                        )}
                                       >
                                         <Check className="w-3.5 h-3.5" />
                                         Buy

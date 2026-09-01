@@ -1,6 +1,7 @@
 "use client"
 
 import { RotateCcw } from "lucide-react"
+import { GameIcon } from "@/components/game-icon-picker"
 import { resolveUsesAtLevel, formatResourceDieLabel, type ResolveUsesContext } from "@/lib/compendium/resolve-uses-config"
 import { spellSlotTableKey, type SpellSlotTable } from "@/lib/compendium/spell-slots"
 import { applyUsedSpellSlotToResourceRestore } from "@/lib/character/resource-conversion"
@@ -11,6 +12,8 @@ export type ResourceTrackerEntry = {
   name: string
   uses: UsesConfig
   classLevel: number
+  /** Owning class icon shown to the left of the resource name. */
+  icon?: string | null
 }
 
 type ResourceUsesTrackerProps = {
@@ -118,7 +121,12 @@ export function ResourceUsesTracker({
         return (
           <div key={entry.id} className="rounded-lg border border-border/70 bg-muted/25 p-2.5">
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <p className="text-xs font-bold text-foreground">{displayName}</p>
+              <div className="flex min-w-0 items-center gap-1.5">
+                {entry.icon ? (
+                  <GameIcon name={entry.icon} className="h-4 w-4 shrink-0 text-primary" />
+                ) : null}
+                <p className="text-xs font-bold text-foreground">{displayName}</p>
+              </div>
               <span className="text-[10px] tabular-nums text-muted-foreground">
                 {max - used} / {max}
               </span>

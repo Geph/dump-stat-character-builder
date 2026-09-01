@@ -19,4 +19,4 @@ Output: `public/images/compendium/species/*.png` at **771×1024** (**3:4** portr
 
 Wire display names → slugs in `lib/compendium/species-card-images-defaults.ts`.
 
-Source files here are gitignored. **All optimized species portraits ship on GitHub** (original graphics). Organize masters under origin folder names (`SRD/`, `kibbles/`, `eberron/`, …) for your own sorting — they all optimize to the same public folder.
+Source files here are gitignored. Only the already-shipped original portraits (plus SRD attachments) are tracked. Kibbles species portraits stay local; import assigns them when the PNG is present. New local slugs stay gitignored after optimize. Organize masters under origin folder names (`SRD/`, `kibbles/`, `eberron/`, …).

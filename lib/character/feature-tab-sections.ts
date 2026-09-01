@@ -12,10 +12,21 @@ import {
   type AsiAllocation,
   type AsiAllocationsByFeatId,
 } from "@/lib/builder/asi-allocation"
-import { featChoicePickKey } from "@/lib/builder/feat-choices"
+import { featChoicePickKey, grantedFeatChoicePickKey } from "@/lib/builder/feat-choices"
+import { chosenDamageTypesFromCharacteristics } from "@/lib/builder/modifier-player-choices"
+import {
+  resolveMagicInitiateSpellList,
+  specializeMagicInitiateDescription,
+  spellcastingAbilityFromMagicInitiatePicks,
+} from "@/lib/builder/magic-initiate"
+import { parseBackgroundOriginFeat } from "@/lib/compendium/background-origin-feat"
 import { isSubclassFeatureGrant, isSubclassUnlockFeature } from "@/lib/builder/subclass-unlock"
 import { collectAsiPoolsFromFeat } from "@/lib/character/feat-asi-pools"
 import { featureShowsOnSheetTab } from "@/lib/compendium/feature-sheet-display"
+import {
+  collectReplacedFeatureNames,
+  featureIsReplaced,
+} from "@/lib/character/replace-feature"
 import type { Feat, Feature, Trait } from "@/lib/types"
 
 export type FeatureTabItem = {
@@ -77,6 +88,16 @@ export function classFeatureRedundantOnFeaturesTab(feature: Feature): boolean {
 
 function classFeatureShowsOnFeaturesTab(feature: Feature): boolean {
   return featureShowsOnSheetTab(feature) && !classFeatureRedundantOnFeaturesTab(feature)
+}
+
+function featDamageTypeChosenNames(
+  feat: Feat,
+  modifierPlayerPicks: Record<string, string[]> | null | undefined,
+): string[] {
+  return chosenDamageTypesFromCharacteristics(
+    (feat.linkedModifiers ?? []).flatMap((instance) => instance.characteristics ?? []),
+    modifierPlayerPicks,
+  )
 }
 
 /** ASI / half-feat score picks to show beside the feat name on the Features tab. */
@@ -190,14 +211,21 @@ export function buildFeatureTabSections(params: {
   featIds?: string[]
   /** Feat / catalog pick id → display name for Fighting Style chrome, etc. */
   choiceLabelByPickId?: Record<string, string> | null
+  /** Spell-list / ability picks for Magic Initiate chrome and specialized prose. */
+  modifierPlayerPicks?: Record<string, string[]> | null
 }): FeatureTabSection[] {
   const sections: FeatureTabSection[] = []
   const picks = params.featureChoicePicks
   const choiceLabelByPickId = params.choiceLabelByPickId
 
   for (const entry of params.classDetails) {
-    const classFeatures = ((entry.class?.features as Feature[] | undefined) ?? []).filter(
-      (feature) => feature.level <= entry.row.level && classFeatureShowsOnFeaturesTab(feature),
+    const classUnlocked = ((entry.class?.features as Feature[] | undefined) ?? []).filter(
+      (feature) => feature.level <= entry.row.level,
+    )
+    const replacedClassNames = collectReplacedFeatureNames(classUnlocked, entry.row.level)
+    const classFeatures = classUnlocked.filter(
+      (feature) =>
+        classFeatureShowsOnFeaturesTab(feature) && !featureIsReplaced(feature, replacedClassNames),
     )
     if (!classFeatures.length) continue
     const sectionId = `class:${entry.row.class_id}`
@@ -223,8 +251,19 @@ export function buildFeatureTabSections(params: {
   }
 
   for (const entry of params.classDetails) {
-    const subclassFeatures = ((entry.subclass?.features as Feature[] | undefined) ?? []).filter(
-      (feature) => feature.level <= entry.row.level && featureShowsOnSheetTab(feature),
+    const classUnlocked = ((entry.class?.features as Feature[] | undefined) ?? []).filter(
+      (feature) => feature.level <= entry.row.level,
+    )
+    const subclassUnlocked = ((entry.subclass?.features as Feature[] | undefined) ?? []).filter(
+      (feature) => feature.level <= entry.row.level,
+    )
+    const replacedSubclassNames = collectReplacedFeatureNames(
+      [...classUnlocked, ...subclassUnlocked],
+      entry.row.level,
+    )
+    const subclassFeatures = subclassUnlocked.filter(
+      (feature) =>
+        featureShowsOnSheetTab(feature) && !featureIsReplaced(feature, replacedSubclassNames),
     )
     if (!subclassFeatures.length || !entry.subclass) continue
     const sectionId = `subclass:${entry.row.class_id}`
@@ -297,17 +336,43 @@ export function buildFeatureTabSections(params: {
   }
 
   const featItems: FeatureTabItem[] = []
+  const modifierPlayerPicks = params.modifierPlayerPicks ?? {}
   if (params.originFeat || params.originFeatFallbackName) {
+    const parsedFallback = parseBackgroundOriginFeat(params.originFeatFallbackName)
+    const featName = params.originFeat?.name ?? parsedFallback?.featName ?? params.originFeatFallbackName ?? "Origin Feat"
     const chosenNames = params.originFeat
       ? chosenOptionNames(params.originFeat, null, picks, { labelByPickId: choiceLabelByPickId })
       : []
-    featItems.push({
-      id: "feat:origin",
-      name: params.originFeat?.name ?? params.originFeatFallbackName ?? "Origin Feat",
-      description: params.originFeat
+    const spellList = resolveMagicInitiateSpellList({
+      featName,
+      isOriginFeat: true,
+      featGranted: params.originFeatFallbackName,
+      originFeatId: params.originFeat?.id ?? null,
+      picks: modifierPlayerPicks,
+      featureChoicePicks: picks,
+    })
+    const ability = spellcastingAbilityFromMagicInitiatePicks(
+      modifierPlayerPicks,
+      params.originFeat?.id ? grantedFeatChoicePickKey(params.originFeat.id) : null,
+    )
+    const description = specializeMagicInitiateDescription(
+      params.originFeat
         ? selectedChoiceDescription(params.originFeat, chosenNames)
         : params.originFeatFallbackDescription ?? "Granted by your background at 1st level.",
-      chosenNames,
+      { spellList, spellcastingAbility: ability },
+    )
+    const originDamageTypes = params.originFeat
+      ? featDamageTypeChosenNames(params.originFeat, modifierPlayerPicks)
+      : []
+    const originChosen = [
+      ...(spellList && !chosenNames.includes(spellList) ? [...chosenNames, spellList] : chosenNames),
+      ...originDamageTypes.filter((type) => !chosenNames.includes(type) && type !== spellList),
+    ]
+    featItems.push({
+      id: "feat:origin",
+      name: featName,
+      description,
+      chosenNames: originChosen,
       collapsedLines: 4,
     })
   }
@@ -318,11 +383,31 @@ export function buildFeatureTabSections(params: {
       feats: params.feats,
       featureChoicePicks: picks,
     })
+    const spellList = resolveMagicInitiateSpellList({
+      featName: feat.name,
+      featId: feat.id,
+      picks: modifierPlayerPicks,
+      featureChoicePicks: picks,
+    })
+    const ability = spellcastingAbilityFromMagicInitiatePicks(modifierPlayerPicks)
+    const description = specializeMagicInitiateDescription(
+      selectedChoiceDescription(feat, choiceNames),
+      { spellList, spellcastingAbility: spellList ? ability : null },
+    )
+    const withList =
+      spellList && !choiceNames.includes(spellList) ? [...choiceNames, spellList] : choiceNames
+    const damageTypes = featDamageTypeChosenNames(feat, modifierPlayerPicks).filter(
+      (type) => !withList.includes(type),
+    )
     featItems.push({
       id: `feat:${feat.id}`,
       name: feat.name,
-      description: selectedChoiceDescription(feat, choiceNames),
-      chosenNames: asiSummary ? [...choiceNames, asiSummary] : choiceNames,
+      description,
+      chosenNames: [
+        ...withList,
+        ...damageTypes,
+        ...(asiSummary ? [asiSummary] : []),
+      ],
       collapsedLines: 4,
     })
   }

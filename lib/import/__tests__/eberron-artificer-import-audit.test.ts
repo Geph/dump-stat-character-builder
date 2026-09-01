@@ -60,7 +60,6 @@ describe.runIf(hasHomebrewFixture("eberron-artificer-class.json"))(
     expect(replicateChars.types).toContain("equipment_and_magic_items")
 
     expect(content.spells?.some((s) => s.name === "Homunculus Servant" && s.description)).toBe(true)
-    expect(cls?.spell_list).toBeUndefined()
   })
 
   it("merged class JSON includes all five Eberron subclasses with expected wiring", () => {

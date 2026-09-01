@@ -140,11 +140,16 @@ import { enrichSubclassDisplayDefaults } from "@/lib/compendium/enrich-subclass-
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { ClassAbilitiesStepPanel } from "@/components/builder/class-abilities-step-panel"
 import { FeatPickGallery } from "@/components/builder/feat-pick-gallery"
+import { BuilderFeatChoiceButton } from "@/components/builder/builder-feat-choice-button"
 import { WeaponMasteryChoices } from "@/components/builder/weapon-mastery-choices"
 import {
   buildWeaponMasteryDescriptionsLookup,
   weaponMasteryCatalogEntriesFromAbilities,
 } from "@/lib/compendium/weapon-mastery"
+import {
+  resolveChoiceOptionDescription,
+  shouldShowNamedChoiceSummaries,
+} from "@/lib/compendium/choice-option-description"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import { chosenOptionNames, withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import { AsiAllocator } from "@/components/builder/asi-allocator"
@@ -2000,6 +2005,7 @@ export default function BuilderPageClient() {
     choiceLayout: compactPickerLayout,
     skillPickerLayout,
     skillIconByName: customSkillIconByName,
+    magicInitiateFeatGranted: effectiveBackgroundFeatGranted,
   }
   /**
    * Skills handed out by species, background, feats and features. Sorted and re-derived
@@ -2242,7 +2248,9 @@ export default function BuilderPageClient() {
       armorProficiencies: effectiveArmorProficiencies,
       abilityScores: effectiveAbilityScores,
       takenMagicInitiateSpellLists: [
-        ...takenMagicInitiateSpellLists(modifierPlayerChoiceSlots, modifierPlayerPicks),
+        ...takenMagicInitiateSpellLists(modifierPlayerChoiceSlots, modifierPlayerPicks, null, {
+          featGranted: effectiveBackgroundFeatGranted,
+        }),
       ],
     }),
     [
@@ -2250,6 +2258,7 @@ export default function BuilderPageClient() {
       effectiveAbilityScores,
       modifierPlayerChoiceSlots,
       modifierPlayerPicks,
+      effectiveBackgroundFeatGranted,
     ],
   )
 
@@ -3958,6 +3967,7 @@ export default function BuilderPageClient() {
                               cardViewMode={cardViewMode}
                               portrait={useCinematicPortraitCards}
                               selectionVariant={isPrimary ? "primary" : "secondary"}
+                              onLearnMore={() => setDetailsModal({ type: "class", item: cls })}
                               badge={
                                 <span className="rounded bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
                                   Lv {cl.level}
@@ -4321,6 +4331,9 @@ export default function BuilderPageClient() {
                                     item={cardItem}
                                     cardViewMode={cardViewMode}
                                     portrait={useCinematicPortraitCards}
+                                    onLearnMore={() =>
+                                      setDetailsModal({ type: "subclass", item: displaySubclass })
+                                    }
                                     badge={
                                       <span className="rounded bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
                                         {cls.name}
@@ -4568,6 +4581,17 @@ export default function BuilderPageClient() {
                                 bonuses: aggregatedCharacteristics.featureChoiceCountBonuses,
                               },
                             )
+                            const resolvedChoiceOptions = choiceOptions.map((option) => ({
+                              ...option,
+                              description: resolveChoiceOptionDescription(
+                                option,
+                                feature.description,
+                              ),
+                            }))
+                            const showNamedChoiceSummaries = shouldShowNamedChoiceSummaries({
+                              optionsSource: feature.choices?.optionsSource,
+                              options: resolvedChoiceOptions,
+                            })
                             const isWeaponMastery = isWeaponMasteryFeature(feature)
                             const isKnackPool =
                               feature.choices?.optionsSource === "class_knacks"
@@ -4634,7 +4658,7 @@ export default function BuilderPageClient() {
                                   <MultiSelectChoices
                                     title={withChosenOptionChrome(feature.name, featureChoicePicks[key] ?? [])}
                                     hint={masteryHint}
-                                    options={choiceOptions}
+                                    options={resolvedChoiceOptions}
                                     maxCount={choiceCount}
                                     selected={featureChoicePicks[key] ?? []}
                                     unavailableOptions={[...getTakenSkills(skillPickSources, `feature:${key}`)]}
@@ -4644,6 +4668,7 @@ export default function BuilderPageClient() {
                                     showOptionInfo={
                                       !feature.choices!.category.toLowerCase().includes("skill")
                                     }
+                                    showOptionSummaries={showNamedChoiceSummaries}
                                     layout={
                                       feature.choices!.category.toLowerCase().includes("skill")
                                         ? skillPickerLayout
@@ -4992,6 +5017,9 @@ export default function BuilderPageClient() {
                         item={selectedSpecies}
                         cardViewMode={cardViewMode}
                         portrait={useCinematicPortraitCards}
+                        onLearnMore={() =>
+                          setDetailsModal({ type: "species", item: selectedSpecies })
+                        }
                       />
                     ) : null
                   }
@@ -5219,12 +5247,19 @@ export default function BuilderPageClient() {
                         }
                         const choices = trait.choices!
                         const traitKey = speciesTraitPickKey(trait, index)
+                        const traitOptions = choices.options.map((option) => ({
+                          ...option,
+                          description: resolveChoiceOptionDescription(option, trait.description),
+                        }))
+                        const showNamedChoiceSummaries = shouldShowNamedChoiceSummaries({
+                          options: traitOptions,
+                        })
                         return (
                           <MultiSelectChoices
                             key={`${selectedSpecies.id}-${traitKey}`}
                             title={trait.name}
                             hint={choices.category}
-                            options={choices.options}
+                            options={traitOptions}
                             maxCount={choices.count}
                             selected={resolveSpeciesTraitPicks(speciesTraitPicks, trait, index)}
                             unavailableOptions={[
@@ -5239,6 +5274,8 @@ export default function BuilderPageClient() {
                             }
                             accentClass="border-secondary bg-secondary/10"
                             layout={compactPickerLayout}
+                            showOptionInfo={showNamedChoiceSummaries}
+                            showOptionSummaries={showNamedChoiceSummaries}
                           />
                         )
                       })}
@@ -5326,11 +5363,27 @@ export default function BuilderPageClient() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {eligible.map((feat) => {
                                 const isSelected = feat.id === pickedId
+                                const isDuplicate = duplicateOriginFeatNames.some(
+                                  (name) =>
+                                    name.trim().toLowerCase() ===
+                                    feat.name.trim().toLowerCase(),
+                                )
                                 return (
-                          <button
+                                  <BuilderFeatChoiceButton
                                     key={feat.id}
-                            type="button"
-                                    onClick={() => {
+                                    feat={feat}
+                                    selected={isSelected}
+                                    selectedClassName={
+                                      isDuplicate
+                                        ? "border-destructive bg-destructive/15 ring-1 ring-destructive/40"
+                                        : "border-secondary bg-secondary/10"
+                                    }
+                                    nameClassName={`font-semibold text-sm ${
+                                      isSelected && isDuplicate
+                                        ? "text-destructive"
+                                        : "text-foreground"
+                                    }`}
+                                    onSelect={() => {
                                       const choiceKey = featChoicePickKey(slot.key)
                                       setFeatureChoicePicks((prev) => ({
                                         ...prev,
@@ -5345,42 +5398,26 @@ export default function BuilderPageClient() {
                                         clearModifierPicksForSource(prev, choiceKey),
                                       )
                                     }}
-                                    className={`p-3 rounded-lg border-2 text-left transition-all ${
-                                      isSelected
-                                        ? duplicateOriginFeatNames.some(
-                                            (name) =>
-                                              name.trim().toLowerCase() ===
-                                              feat.name.trim().toLowerCase(),
-                                          )
-                                          ? "border-destructive bg-destructive/15 ring-1 ring-destructive/40"
-                                          : "border-secondary bg-secondary/10"
-                                        : "border-border bg-card hover:border-secondary/50"
-                                    }`}
+                                    onShowDetails={(item) =>
+                                      setDetailsModal({ type: "feat", item })
+                                    }
                                   >
-                                    <p
-                                      className={`font-semibold text-sm ${
-                                        isSelected &&
-                                        duplicateOriginFeatNames.some(
-                                          (name) =>
-                                            name.trim().toLowerCase() ===
-                                            feat.name.trim().toLowerCase(),
-                                        )
-                                          ? "text-destructive"
-                                          : "text-foreground"
-                                      }`}
-                                    >
-                                      {feat.name}
-                                    </p>
-                                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                                      {feat.level_requirement && feat.level_requirement > 1 && (
-                                        <span>Lvl {feat.level_requirement}+</span>
-                                      )}
-                                      {feat.repeatable && <span className="text-primary">Repeatable</span>}
-                                    </div>
-                          </button>
+                                    {(feat.level_requirement && feat.level_requirement > 1) ||
+                                    feat.repeatable ? (
+                                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                                        {feat.level_requirement &&
+                                        feat.level_requirement > 1 ? (
+                                          <span>Lvl {feat.level_requirement}+</span>
+                                        ) : null}
+                                        {feat.repeatable ? (
+                                          <span className="text-primary">Repeatable</span>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                  </BuilderFeatChoiceButton>
                                 )
                               })}
-                        </div>
+                            </div>
                             {eligible.length === 0 && feats.length > 0 && (
                               <p className="text-xs text-muted-foreground">
                                 No eligible feats for this choice.
@@ -5457,6 +5494,9 @@ export default function BuilderPageClient() {
                         item={selectedBackground}
                         cardViewMode={cardViewMode}
                         portrait={false}
+                        onLearnMore={() =>
+                          setDetailsModal({ type: "background", item: selectedBackground })
+                        }
                       />
                     ) : null
                   }
@@ -5824,11 +5864,30 @@ export default function BuilderPageClient() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {eligible.map((feat) => {
                                 const isSelected = feat.id === pickedId
+                                const isDuplicate = duplicateOriginFeatNames.some(
+                                  (name) =>
+                                    name.trim().toLowerCase() ===
+                                    feat.name.trim().toLowerCase(),
+                                )
                                 return (
-                                  <button
+                                  <BuilderFeatChoiceButton
                                     key={feat.id}
-                                    type="button"
-                                    onClick={() => {
+                                    feat={feat}
+                                    selected={isSelected}
+                                    compact
+                                    showPrerequisite
+                                    selectedClassName={
+                                      isDuplicate
+                                        ? "border-destructive bg-destructive/15 ring-1 ring-destructive/40"
+                                        : "border-accent bg-accent/10"
+                                    }
+                                    unselectedClassName="border-border bg-card hover:border-accent/50"
+                                    nameClassName={`font-semibold text-xs ${
+                                      isSelected && isDuplicate
+                                        ? "text-destructive"
+                                        : "text-foreground"
+                                    }`}
+                                    onSelect={() => {
                                       const choiceKey = featChoicePickKey(slot.key)
                                       setFeatureChoicePicks((prev) => ({
                                         ...prev,
@@ -5843,41 +5902,13 @@ export default function BuilderPageClient() {
                                         clearModifierPicksForSource(prev, choiceKey),
                                       )
                                     }}
-                                    className={`rounded-lg border-2 text-left transition-all px-2.5 py-1.5 ${
-                                      isSelected
-                                        ? duplicateOriginFeatNames.some(
-                                            (name) =>
-                                              name.trim().toLowerCase() ===
-                                              feat.name.trim().toLowerCase(),
-                                          )
-                                          ? "border-destructive bg-destructive/15 ring-1 ring-destructive/40"
-                                          : "border-accent bg-accent/10"
-                                        : "border-border bg-card hover:border-accent/50"
-                                    }`}
-                                  >
-                                    <p
-                                      className={`font-semibold text-xs ${
-                                        isSelected &&
-                                        duplicateOriginFeatNames.some(
-                                          (name) =>
-                                            name.trim().toLowerCase() ===
-                                            feat.name.trim().toLowerCase(),
-                                        )
-                                          ? "text-destructive"
-                                          : "text-foreground"
-                                      }`}
-                                    >
-                                      {feat.name}
-                                    </p>
-                                    {feat.prerequisite ? (
-                                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
-                                        Prereq: {feat.prerequisite}
-                                      </p>
-                                    ) : null}
-                          </button>
+                                    onShowDetails={(item) =>
+                                      setDetailsModal({ type: "feat", item })
+                                    }
+                                  />
                                 )
                               })}
-                        </div>
+                            </div>
                             {eligible.length === 0 && feats.length > 0 && (
                               <p className="text-xs text-muted-foreground">
                                 No eligible feats for this choice.
@@ -6664,7 +6695,12 @@ export default function BuilderPageClient() {
                         casterClass.name,
                       )
                       const classSpellIds = spellPicksByClassId[casterClass.id] ?? []
-                      const spellCounts = countSelectedSpells(classSpellIds, spells, casterClass.name)
+                      const spellCounts = countSelectedSpells(
+                        classSpellIds,
+                        spells,
+                        casterClass.name,
+                        casterClass.spell_list,
+                      )
                       const maxSpellLevel = spellLimits.maxSpellLevel
                       // Spells the character already knows from another source (feat/modifier
                       // grants or another caster class) can't be picked again here.
@@ -6683,12 +6719,12 @@ export default function BuilderPageClient() {
                           if (s.level === 0) {
                             return (
                               spellLimits.cantrips > 0 &&
-                              spellMatchesClassName(s, casterClass.name)
+                              spellMatchesClassName(s, casterClass.name, casterClass.spell_list)
                             )
                           }
                           if (s.level > maxSpellLevel) return false
                           return (
-                            spellMatchesClassName(s, casterClass.name) ||
+                            spellMatchesClassName(s, casterClass.name, casterClass.spell_list) ||
                             s.classes?.some((c) => extraSpellLists.includes(c))
                           )
                         })
@@ -6896,6 +6932,7 @@ export default function BuilderPageClient() {
                                         spells,
                                         spellLimits,
                                         casterClass.name,
+                                        casterClass.spell_list,
                                       )
                                       const toggleSpellPick = () => {
                                         if (!selectable && !selected) return

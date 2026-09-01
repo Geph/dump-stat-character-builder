@@ -24,6 +24,7 @@ import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spell
 import { parseSubclassSpellTable } from "@/lib/import/subclass-spell-table"
 import { PSIONIC_TALENT_WIRING_RULES } from "@/lib/import/psionic-talent-wiring"
 import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
+import { parseChooseOneNamedOptions } from "@/lib/compendium/choose-one-named-options"
 import type { UsesConfig, FeatureEffect } from "@/lib/types"
 import {
   blockedWhenConditionLimitation,
@@ -273,7 +274,10 @@ function matchSkillName(fragment: string): string | null {
 }
 
 function parseSkillList(fragment: string): string[] {
-  const parts = fragment.split(/\s*,\s*|\s+and\s+/i).map((part) => part.trim()).filter(Boolean)
+  const parts = fragment
+    .split(/\s*,\s*|\s+and\s+|\s+or\s+/i)
+    .map((part) => part.replace(/^(?:or|and)\s+/i, "").trim())
+    .filter(Boolean)
   const skills: string[] = []
   for (const part of parts) {
     const skill = matchSkillName(part)
@@ -1074,6 +1078,27 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           id: modId(instanceKey(ctx, "skills")),
           type: "skills",
           entries: skills.map((skill) => ({ skill, expertise: false })),
+        },
+      ])
+    },
+  },
+  {
+    id: "proficiency.skills.constrained_choice",
+    confidence: "high",
+    test: /\b(?:proficien(?:cy|t)\s+(?:with|in)|choose)\s+(?:one|two|three|1|2|3)\s+of[:\s]+([^.;\n]+)/i,
+    build: (match, ctx) => {
+      const countWord = match[0].match(/\b(one|two|three|1|2|3)\b/i)?.[1]?.toLowerCase() ?? "1"
+      const wordToCount: Record<string, number> = { one: 1, two: 2, three: 3, "1": 1, "2": 2, "3": 3 }
+      const count = wordToCount[countWord] ?? parseInt(countWord, 10)
+      const skills = parseSkillList(match[1] ?? "")
+      if (!Number.isFinite(count) || count < 1 || skills.length < 2) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("skills"), [
+        {
+          id: modId(instanceKey(ctx, "skills_constrained")),
+          type: "skills",
+          entries: skills.map((skill) => ({ skill, expertise: false })),
+          allowAnySkill: false,
+          choiceCount: count,
         },
       ])
     },
@@ -2199,6 +2224,31 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     build: (_match, ctx, text) => buildFreeResourceUseOnRollModifier(ctx, text),
   },
   {
+    id: "menu.choose_one_named_benefits",
+    confidence: "high",
+    scope: "full",
+    test: /\bchoose one of the following(?: benefits)?\b/i,
+    build: (_match, ctx, text) => {
+      const options = parseChooseOneNamedOptions(text)
+      if (options.length < 2) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("resource_ability_menu"), [
+        {
+          id: modId(instanceKey(ctx, "choose_one_menu")),
+          type: "resource_ability_menu",
+          resourceKey: "",
+          waiveResourceCost: true,
+          options: options.map((option) => ({
+            name: option.name,
+            description: option.description,
+            resourceCost: 0,
+            ...(option.actionKind ? { actionKind: option.actionKind } : {}),
+          })),
+          label: options.map((option) => option.name).join(" / "),
+        },
+      ])
+    },
+  },
+  {
     id: "heal.turn_start_low_hp",
     confidence: "high",
     scope: "full",
@@ -2957,6 +3007,41 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     build: (_match, ctx, text) => buildDamageDieScalingByLevelModifier(ctx, text),
   },
   {
+    id: "resource.refresh_one_on_initiative_or_crit",
+    confidence: "high",
+    scope: "full",
+    test: /\bregain (?:one|a|1)\s+(?:expended\s+)?(?:risk|endurance|exploit|battle)\s+die\b[\s\S]{0,160}\b(?:initiative|critical hits?)\b|\b(?:when|whenever) you roll initiative\b[\s\S]{0,160}\bcritical hits?\b[\s\S]{0,80}\bregain (?:one|a|1)\b/i,
+    build: (_match, ctx, text) => {
+      const resourceKey = /risk/i.test(text)
+        ? "risk_dice"
+        : /endurance/i.test(text)
+          ? "endurance_dice"
+          : /exploit/i.test(text)
+            ? "exploit_dice"
+            : /battle/i.test(text)
+              ? "battle_dice"
+              : null
+      if (!resourceKey) return null
+      const onInitiative = /\binitiative\b/i.test(text)
+      const onCriticalHit = /\bcritical hits?\b/i.test(text)
+      if (!onInitiative && !onCriticalHit) return null
+      return fxInstance(newInstanceId(), effectCatalogRefId("class_resource"), {
+        effects: [
+          {
+            id: modId(instanceKey(ctx, "resource_refresh")),
+            kind: "class_resource",
+            classResourceKey: resourceKey,
+            classResourceChange: "increase",
+            classResourceAmount: 1,
+            resourceRefreshOnInitiative: onInitiative,
+            resourceRefreshOnCriticalHit: onCriticalHit,
+            label: `Regain 1 ${resourceKey.replace(/_/g, " ")}`,
+          },
+        ],
+      })
+    },
+  },
+  {
     id: "resource.expend_psi_points",
     confidence: "high",
     scope: "full",
@@ -3100,6 +3185,28 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     scope: "full",
     test: /regain\s+\d+\s+(?:psi\s*(?:die|dice)|psionic\s+energy(?:\s+dice?)?|focus(?:\s+points?)?|sorcery\s+points?)\s+at\s+the\s+start\s+of\s+each\s+of\s+your\s+turns/i,
     build: (_match, ctx, text) => buildTurnStartResourceRestoreModifier(ctx, text),
+  },
+  {
+    id: "feature.replace_improved",
+    confidence: "high",
+    scope: "full",
+    test: /\byour\s+(.+?)\s+improves\b[\s\S]{0,200}\bwhen you use this feature\b/i,
+    build: (match, ctx) => {
+      const parentName = (match[1] ?? "").replace(/\s+/g, " ").trim()
+      if (!parentName || parentName.length > 60) return null
+      if (/\bincreases? (?:by|to)\b|\bextra (?:die|dice)\b/i.test(match[0]) &&
+        !/\byou can choose to take\b/i.test(match[0])) {
+        return null
+      }
+      return charInstance(newInstanceId(), characteristicCatalogRefId("replace_feature"), [
+        {
+          id: modId(instanceKey(ctx, "replace_feature")),
+          type: "replace_feature",
+          replacedFeatureNames: [parentName],
+          label: `Replaces ${parentName}`,
+        },
+      ])
+    },
   },
   ...PSIONIC_TALENT_WIRING_RULES,
 ]

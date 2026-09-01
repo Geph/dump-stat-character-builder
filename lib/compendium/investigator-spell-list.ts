@@ -4,6 +4,8 @@
  * catalog row was never tagged with the Investigator class.
  */
 import type { SpellsKnownChoiceGrant } from "@/lib/compendium/characteristic-modifiers"
+import { isNecromancerListSpell } from "@/lib/compendium/necromancer-spell-list"
+import { spellNameOnClassList } from "@/lib/compendium/spell-name-match"
 
 /** Ritual Level column — max spell level you can add to the grimoire. */
 export const INVESTIGATOR_RITUAL_LEVEL_TIERS: ReadonlyArray<{
@@ -163,17 +165,22 @@ export function isInvestigatorListSpell(name: string): boolean {
 }
 
 /**
- * True when a catalog row belongs on a class list. Investigator SRD rows are often
- * still tagged Wizard/Cleric/Ranger only — the official grimoire list still counts.
+ * True when a catalog row belongs on a class list. Uses the spell's classes[] tag,
+ * then any persisted/import `spell_list` names, then hardcoded Investigator /
+ * Necromancer fallbacks for classes imported before lists were stored.
  */
 export function spellMatchesClassName(
   spell: { name: string; classes?: string[] | null },
   className: string,
+  classSpellList?: readonly string[] | null,
 ): boolean {
   const needle = className.trim().toLowerCase()
   if (!needle) return false
   if (spell.classes?.some((entry) => entry.trim().toLowerCase() === needle)) return true
-  return needle === "investigator" && isInvestigatorListSpell(spell.name)
+  if (spellNameOnClassList(spell.name, classSpellList)) return true
+  if (needle === "investigator") return isInvestigatorListSpell(spell.name)
+  if (needle === "necromancer") return isNecromancerListSpell(spell.name)
+  return false
 }
 
 /**

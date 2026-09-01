@@ -54,7 +54,7 @@ scripts/spell-card-sources/*
 !scripts/spell-card-sources/.gitkeep
 
 # Non-bundled origin folders (PHB, settings books, extras) — never commit, even if
-# someone later un-ignores the drop folders above. Keep SRD / kibbles / magehandpress.
+# someone later un-ignores the drop folders above. Keep SRD / magehandpress.
 scripts/**/PHB/
 scripts/**/phb/
 scripts/**/WotC/
@@ -79,20 +79,92 @@ scripts/**/Planescape/
 # Presence manifest for local-only portraits (written by images:optimize; never commit)
 public/images/compendium/local-available-card-art.json
 
-# Optimized card art: ignore local-only portraits, then re-include bundled SRD / Kibbles / MHP.
-public/images/compendium/classes/artificer.png
+# New local spell portraits stay off GitHub. Tracked SRD cantrips remain in the index.
+public/images/compendium/spells/*
+
+# Optimized card art: ignore local-only portraits, then re-include bundled SRD.
+# Kibbles files already in git stay tracked; do not add new ones.
+public/images/compendium/classes/*
+!public/images/compendium/classes/barbarian.png
+!public/images/compendium/classes/bard.png
+!public/images/compendium/classes/cleric.png
+!public/images/compendium/classes/druid.png
+!public/images/compendium/classes/fighter.png
+!public/images/compendium/classes/monk.png
+!public/images/compendium/classes/paladin.png
+!public/images/compendium/classes/ranger.png
+!public/images/compendium/classes/rogue.png
+!public/images/compendium/classes/sorcerer.png
+!public/images/compendium/classes/warlock.png
+!public/images/compendium/classes/wizard.png
 
 public/images/compendium/backgrounds/*
 !public/images/compendium/backgrounds/acolyte.png
-!public/images/compendium/backgrounds/apothecary.png
 !public/images/compendium/backgrounds/criminal.png
-!public/images/compendium/backgrounds/engineer.png
 !public/images/compendium/backgrounds/sage.png
 !public/images/compendium/backgrounds/soldier.png
-!public/images/compendium/backgrounds/tinker.png
 
-# Species portraits are original graphics — all ship with the repo.
-# (Do not gitignore public/images/compendium/species/)
+# Species: already-shipped originals stay; new local portraits stay off GitHub.
+public/images/compendium/species/*
+!public/images/compendium/species/aarakocra.png
+!public/images/compendium/species/aasimar-2022.png
+!public/images/compendium/species/aasimar-eberron.png
+!public/images/compendium/species/aasimar.png
+!public/images/compendium/species/air-genasi.png
+!public/images/compendium/species/astral-elf.png
+!public/images/compendium/species/autognome.png
+!public/images/compendium/species/boggarts.png
+!public/images/compendium/species/bugbear.png
+!public/images/compendium/species/centaur.png
+!public/images/compendium/species/changeling-2022.png
+!public/images/compendium/species/changeling.png
+!public/images/compendium/species/deep-gnome.png
+!public/images/compendium/species/dhakaani-ghaaldar.png
+!public/images/compendium/species/dhakaani-golindar.png
+!public/images/compendium/species/dhakaani-guuldar.png
+!public/images/compendium/species/dhampir.png
+!public/images/compendium/species/dragonborn.png
+!public/images/compendium/species/duergar.png
+!public/images/compendium/species/dwarf.png
+!public/images/compendium/species/earth-genasi.png
+!public/images/compendium/species/eladrin.png
+!public/images/compendium/species/elf.png
+!public/images/compendium/species/fairy.png
+!public/images/compendium/species/firbolg.png
+!public/images/compendium/species/fire-genasi.png
+!public/images/compendium/species/flamekin.png
+!public/images/compendium/species/giff.png
+!public/images/compendium/species/githyanki.png
+!public/images/compendium/species/githzerai.png
+!public/images/compendium/species/gnoll.png
+!public/images/compendium/species/gnome.png
+!public/images/compendium/species/goblin-2022.png
+!public/images/compendium/species/goliath.png
+!public/images/compendium/species/hadozee.png
+!public/images/compendium/species/halfling.png
+!public/images/compendium/species/hexblood.png
+!public/images/compendium/species/human.png
+!public/images/compendium/species/jhorguntaal.png
+!public/images/compendium/species/kalamer-landwalker-merfolk.png
+!public/images/compendium/species/kalashtar.png
+!public/images/compendium/species/khoravar.png
+!public/images/compendium/species/kithkin.png
+!public/images/compendium/species/lorwyn-changeling.png
+!public/images/compendium/species/lorwyn-elf.png
+!public/images/compendium/species/lorwyn-fairy.png
+!public/images/compendium/species/lupin.png
+!public/images/compendium/species/orc.png
+!public/images/compendium/species/plasmoid.png
+!public/images/compendium/species/reborn.png
+!public/images/compendium/species/rimekin.png
+!public/images/compendium/species/ruinbound.png
+!public/images/compendium/species/sahuagin.png
+!public/images/compendium/species/shifter.png
+!public/images/compendium/species/tabaxi.png
+!public/images/compendium/species/thri-kreen.png
+!public/images/compendium/species/tiefling.png
+!public/images/compendium/species/warforged.png
+!public/images/compendium/species/water-genasi.png
 
 public/images/compendium/subclasses/**
 !public/images/compendium/subclasses/
@@ -102,20 +174,12 @@ public/images/compendium/subclasses/**
 !public/images/compendium/subclasses/cleric/life-domain.png
 !public/images/compendium/subclasses/druid/circle-of-the-land.png
 !public/images/compendium/subclasses/fighter/champion.png
-!public/images/compendium/subclasses/inventor/
-!public/images/compendium/subclasses/inventor/**
 !public/images/compendium/subclasses/monk/warrior-of-the-open-hand.png
-!public/images/compendium/subclasses/occultist/
-!public/images/compendium/subclasses/occultist/**
 !public/images/compendium/subclasses/paladin/oath-of-devotion.png
-!public/images/compendium/subclasses/psion/
-!public/images/compendium/subclasses/psion/**
 !public/images/compendium/subclasses/ranger/hunter.png
 !public/images/compendium/subclasses/rogue/gadgeteer.png
 !public/images/compendium/subclasses/rogue/thief.png
 !public/images/compendium/subclasses/sorcerer/draconic-sorcery.png
-!public/images/compendium/subclasses/warden/
-!public/images/compendium/subclasses/warden/**
 !public/images/compendium/subclasses/warlock/fiend-patron.png
 !public/images/compendium/subclasses/wizard/evoker.png
 # Local third-party / copyrighted import extracts (dev-only; never commit)

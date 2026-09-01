@@ -22,7 +22,7 @@ describe("spell card image defaults", () => {
     )
   })
 
-  it("maps Kibbles import spell names to bundled art", () => {
+  it("maps Kibbles import spell names to local art when the PNG is present", () => {
     expect(defaultSpellCardImageUrl("Mutate")).toMatch(/\/mutate\.png$/)
     expect(defaultSpellCardImageUrl("Awaken Rope")).toMatch(/\/awaken-rope\.png$/)
     expect(defaultSpellCardImageUrl("Dancing Object (Animate Object)")).toMatch(

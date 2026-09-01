@@ -69,7 +69,7 @@ describe("Inventor / Witch homebrew import fixtures", () => {
       expect(parsed).not.toBeNull()
       expect(parsed!.classes?.[0]?.spell_list?.length).toBeGreaterThan(50)
       const merged = applyClassSpellListsToImport(parsed!)
-      expect(merged.classes?.[0]?.spell_list).toBeUndefined()
+      expect(merged.classes?.[0]?.spell_list?.length).toBeGreaterThan(50)
     },
   )
 

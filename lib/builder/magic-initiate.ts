@@ -1,8 +1,10 @@
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import {
   MAGIC_INITIATE_SPELL_LISTS,
+  magicInitiateListFromFeatGranted,
   type MagicInitiateSpellList,
 } from "@/lib/compendium/background-origin-feat"
+import { featChoicePickKey, grantedFeatChoicePickKey } from "@/lib/builder/feat-choices"
 import type { ModifierPlayerChoiceSlot } from "@/lib/builder/modifier-player-choices"
 
 export const MAGIC_INITIATE_ABILITY_OPTIONS: AbilityScoreKey[] = [
@@ -49,6 +51,172 @@ export function isMagicInitiateSourceLabel(sourceLabel: string | null | undefine
   return /^magic initiate\b/i.test((sourceLabel ?? "").trim())
 }
 
+export type MagicInitiateTakenExtras = {
+  /** Background origin text such as "Magic Initiate (Cleric)". */
+  featGranted?: string | null
+  /**
+   * Source keys for Magic Initiate takes that may not be in `slots`
+   * (level-up only collects the pending feat).
+   */
+  additionalSourceKeys?: readonly string[]
+}
+
+const SPELL_LIST_SLOT_SUFFIX = "::spell_list_class"
+const SPELLCASTING_ABILITY_SLOT_SUFFIX = "::spellcasting_ability"
+
+/** Source keys for granted + picked Magic Initiate takes on a character. */
+export function magicInitiateSourceKeysForCharacter(
+  magicInitiateFeatId: string | null | undefined,
+  featureChoicePicks?: Record<string, string[]> | null,
+): string[] {
+  if (!magicInitiateFeatId) return []
+  const keys = [grantedFeatChoicePickKey(magicInitiateFeatId)]
+  const seen = new Set(keys)
+  for (const [slotKey, values] of Object.entries(featureChoicePicks ?? {})) {
+    if (!values.includes(magicInitiateFeatId)) continue
+    const sourceKey = featChoicePickKey(slotKey)
+    if (seen.has(sourceKey)) continue
+    seen.add(sourceKey)
+    keys.push(sourceKey)
+  }
+  return keys
+}
+
+/** Chosen Magic Initiate spell list stored on a modifier pick key. */
+export function spellListFromMagicInitiatePicks(
+  picks: Record<string, string[]> | null | undefined,
+  sourceKey?: string | null,
+): MagicInitiateSpellList | null {
+  const found: MagicInitiateSpellList[] = []
+  for (const [key, values] of Object.entries(picks ?? {})) {
+    if (!key.endsWith(SPELL_LIST_SLOT_SUFFIX)) continue
+    if (sourceKey && !key.startsWith(`${sourceKey}::`)) continue
+    const list = normalizeMagicInitiateSpellList(values?.[0])
+    if (list) found.push(list)
+  }
+  if (sourceKey) return found[0] ?? null
+  const unique = [...new Set(found)]
+  return unique.length === 1 ? unique[0] : null
+}
+
+/** Chosen spellcasting ability stored on a Magic Initiate modifier pick key. */
+export function spellcastingAbilityFromMagicInitiatePicks(
+  picks: Record<string, string[]> | null | undefined,
+  sourceKey?: string | null,
+): AbilityScoreKey | null {
+  for (const [key, values] of Object.entries(picks ?? {})) {
+    if (!key.endsWith(SPELLCASTING_ABILITY_SLOT_SUFFIX)) continue
+    if (sourceKey && !key.startsWith(`${sourceKey}::`)) continue
+    const ability = normalizeSpellcastingAbilityPick(values?.[0])
+    if (ability) return ability
+  }
+  return null
+}
+
+function addTakenList(taken: Set<string>, raw: string | null | undefined): void {
+  const list = normalizeMagicInitiateSpellList(raw)
+  if (list) taken.add(list.toLowerCase())
+}
+
+function addTakenListsFromSourceKeys(
+  taken: Set<string>,
+  picks: Record<string, string[]>,
+  sourceKeys: readonly string[],
+  currentSlotKey?: string | null,
+): void {
+  for (const sourceKey of sourceKeys) {
+    for (const [key, values] of Object.entries(picks)) {
+      if (currentSlotKey && key === currentSlotKey) continue
+      if (!key.startsWith(`${sourceKey}::`) || !key.endsWith(SPELL_LIST_SLOT_SUFFIX)) continue
+      addTakenList(taken, values?.[0])
+    }
+  }
+}
+
+/**
+ * Spell list locked by this Magic Initiate take (origin grant, then modifier picks).
+ */
+export function resolveMagicInitiateSpellList(params: {
+  featName?: string | null
+  isOriginFeat?: boolean
+  featGranted?: string | null
+  originFeatId?: string | null
+  featId?: string | null
+  sourceKey?: string | null
+  picks?: Record<string, string[]> | null
+  featureChoicePicks?: Record<string, string[]> | null
+}): MagicInitiateSpellList | null {
+  const isMagicInitiate =
+    params.isOriginFeat || isMagicInitiateSourceLabel(params.featName)
+  if (!isMagicInitiate) return null
+
+  if (params.isOriginFeat) {
+    const fromGrant = magicInitiateListFromFeatGranted(params.featGranted)
+    if (fromGrant) return fromGrant
+  }
+
+  const sourceKey =
+    params.sourceKey ??
+    (params.isOriginFeat && params.originFeatId
+      ? grantedFeatChoicePickKey(params.originFeatId)
+      : null)
+  if (sourceKey) {
+    const fromSource = spellListFromMagicInitiatePicks(params.picks, sourceKey)
+    if (fromSource) return fromSource
+  }
+
+  const featId = params.featId ?? params.originFeatId ?? null
+  const sourceKeys = magicInitiateSourceKeysForCharacter(featId, params.featureChoicePicks)
+  const fromKeys = sourceKeys
+    .map((key) => spellListFromMagicInitiatePicks(params.picks, key))
+    .filter((list): list is MagicInitiateSpellList => Boolean(list))
+  if (fromKeys.length === 1) return fromKeys[0]
+  if (fromKeys.length > 1) return fromKeys[0]
+
+  return spellListFromMagicInitiatePicks(params.picks)
+}
+
+function formatSpellcastingAbilityLabel(ability: AbilityScoreKey): string {
+  return ability.charAt(0).toUpperCase() + ability.slice(1)
+}
+
+/**
+ * Rewrite generic Magic Initiate prose so the sheet shows the chosen list (and ability).
+ * Keeps the SRD structure; only substitutes the already-made player choice.
+ */
+export function specializeMagicInitiateDescription(
+  description: string | null | undefined,
+  options: {
+    spellList?: string | null
+    spellcastingAbility?: string | null
+  } = {},
+): string | null | undefined {
+  if (!description) return description
+  const spellList = normalizeMagicInitiateSpellList(options.spellList)
+  const ability = normalizeSpellcastingAbilityPick(options.spellcastingAbility)
+  let next = description
+  if (spellList) {
+    next = next
+      .replace(
+        /from the Cleric, Druid, or Wizard spell list/gi,
+        `from the ${spellList} spell list`,
+      )
+      .replace(
+        /from the same list you selected for this feat's cantrips/gi,
+        `from the ${spellList} spell list`,
+      )
+      .replace(/from the chosen spell list/gi, `from the ${spellList} spell list`)
+  }
+  if (ability) {
+    const label = formatSpellcastingAbilityLabel(ability)
+    next = next.replace(
+      /Intelligence, Wisdom, or Charisma is your spellcasting ability for this feat's spells \(choose when you select this feat\)/gi,
+      `${label} is your spellcasting ability for this feat's spells`,
+    )
+  }
+  return next
+}
+
 /**
  * Spell lists already claimed by other Magic Initiate takes.
  * `currentSlotKey` is excluded so the active pick keeps its own option visible.
@@ -57,15 +225,31 @@ export function takenMagicInitiateSpellLists(
   slots: readonly ModifierPlayerChoiceSlot[],
   picks: Record<string, string[]>,
   currentSlotKey?: string | null,
+  extras?: MagicInitiateTakenExtras,
 ): Set<string> {
   const taken = new Set<string>()
   for (const slot of slots) {
     if (slot.kind !== "spell_list_class") continue
     if (!isMagicInitiateSourceLabel(slot.sourceLabel)) continue
     if (currentSlotKey && slot.slotKey === currentSlotKey) continue
-    const list = normalizeMagicInitiateSpellList(picks[slot.slotKey]?.[0])
-    if (list) taken.add(list.toLowerCase())
+    addTakenList(taken, picks[slot.slotKey]?.[0])
   }
+
+  for (const [key, values] of Object.entries(picks)) {
+    if (currentSlotKey && key === currentSlotKey) continue
+    if (!key.includes(":granted:") || !key.endsWith(SPELL_LIST_SLOT_SUFFIX)) continue
+    addTakenList(taken, values?.[0])
+  }
+
+  addTakenListsFromSourceKeys(
+    taken,
+    picks,
+    extras?.additionalSourceKeys ?? [],
+    currentSlotKey,
+  )
+
+  const fromGrant = magicInitiateListFromFeatGranted(extras?.featGranted)
+  if (fromGrant) taken.add(fromGrant.toLowerCase())
   return taken
 }
 
@@ -123,8 +307,9 @@ export function unavailableMagicInitiateSpellListNames(
   slots: readonly ModifierPlayerChoiceSlot[],
   picks: Record<string, string[]>,
   currentSlotKey?: string | null,
+  extras?: MagicInitiateTakenExtras,
 ): string[] {
-  const taken = takenMagicInitiateSpellLists(slots, picks, currentSlotKey)
+  const taken = takenMagicInitiateSpellLists(slots, picks, currentSlotKey, extras)
   return MAGIC_INITIATE_SPELL_LISTS.filter((list) => taken.has(list.toLowerCase()))
 }
 
@@ -175,11 +360,16 @@ export function canTakeAnotherMagicInitiate(params: {
   picks: Record<string, string[]>
   /** Spell lists available on Magic Initiate (defaults to Cleric/Druid/Wizard). */
   spellListOptions?: readonly string[]
+  featGranted?: string | null
+  additionalSourceKeys?: readonly string[]
 }): boolean {
   const options = params.spellListOptions?.length
     ? params.spellListOptions
     : MAGIC_INITIATE_SPELL_LISTS
-  const taken = takenMagicInitiateSpellLists(params.slots, params.picks)
+  const taken = takenMagicInitiateSpellLists(params.slots, params.picks, null, {
+    featGranted: params.featGranted,
+    additionalSourceKeys: params.additionalSourceKeys,
+  })
   return options.some((list) => !taken.has(list.trim().toLowerCase()))
 }
 

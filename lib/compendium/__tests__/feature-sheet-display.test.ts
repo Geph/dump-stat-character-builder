@@ -17,6 +17,7 @@ describe("feature sheet display", () => {
       featuresTab: true,
       abilitiesActions: false,
       combatActions: false,
+      restDialogues: false,
     })
   })
 
@@ -47,6 +48,7 @@ describe("feature sheet display", () => {
       featuresTab: true,
       abilitiesActions: false,
       combatActions: true,
+      restDialogues: false,
     })
   })
 
@@ -66,6 +68,7 @@ describe("feature sheet display", () => {
       featuresTab: false,
       abilitiesActions: true,
       combatActions: false,
+      restDialogues: false,
     })
   })
 
@@ -83,6 +86,7 @@ describe("feature sheet display", () => {
       featuresTab: true,
       abilitiesActions: false,
       combatActions: true,
+      restDialogues: false,
     })
   })
 
@@ -101,6 +105,7 @@ describe("feature sheet display", () => {
       featuresTab: true,
       abilitiesActions: false,
       combatActions: true,
+      restDialogues: false,
     })
   })
 
@@ -116,6 +121,23 @@ describe("feature sheet display", () => {
       featuresTab: true,
       abilitiesActions: true,
       combatActions: false,
+      restDialogues: false,
+    })
+  })
+
+  it("routes short-rest choice features to rest dialogues only", () => {
+    const feature = {
+      level: 9,
+      name: "Divine Respite",
+      description:
+        "When you finish a Short Rest, you can choose to regain up to 3 expended Hit Point Dice.",
+      activation: { action: true, noEconomyCost: true },
+    }
+    expect(inferFeatureSheetDisplay(feature as unknown as import("@/lib/character/sheet-actions").ActivatableItem)).toEqual({
+      featuresTab: true,
+      abilitiesActions: false,
+      combatActions: false,
+      restDialogues: true,
     })
   })
 })

@@ -79,11 +79,13 @@ export function countSelectedSpells(
   spellIds: string[],
   spells: SpellRow[],
   className?: string,
+  classSpellList?: readonly string[] | null,
 ): { cantrips: number; prepared: number } {
   const selected = spells.filter(
     (s) =>
       spellIds.includes(s.id) &&
-      (className == null || spellMatchesClassName({ name: s.name ?? "", classes: s.classes }, className)),
+      (className == null ||
+        spellMatchesClassName({ name: s.name ?? "", classes: s.classes }, className, classSpellList)),
   )
   return {
     cantrips: selected.filter((s) => s.level === 0).length,
@@ -97,15 +99,20 @@ export function canSelectSpell(
   spells: SpellRow[],
   limits: SpellLimits,
   className?: string,
+  classSpellList?: readonly string[] | null,
 ): boolean {
   if (spellIds.includes(spell.id)) return true
   if (
     className &&
-    !spellMatchesClassName({ name: spell.name ?? "", classes: spell.classes }, className)
+    !spellMatchesClassName(
+      { name: spell.name ?? "", classes: spell.classes },
+      className,
+      classSpellList,
+    )
   ) {
     return false
   }
-  const counts = countSelectedSpells(spellIds, spells, className)
+  const counts = countSelectedSpells(spellIds, spells, className, classSpellList)
   if (spell.level === 0) return counts.cantrips < limits.cantrips
   if (spell.level > limits.maxSpellLevel) return false
   return counts.prepared < limits.prepared

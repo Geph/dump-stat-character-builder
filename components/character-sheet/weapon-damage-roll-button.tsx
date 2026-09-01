@@ -190,7 +190,7 @@ export function WeaponDamageRollButton({
           title="Damage roll options"
           aria-label="Damage roll options"
         >
-          {modeBadge ?? (!includeAbilityModifier && showNoModToggle ? "No mod" : "···")}
+          {modeBadge ?? "···"}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
@@ -231,7 +231,7 @@ export function WeaponDamageRollButton({
               onCheckedChange={(checked) => setIncludeAbilityModifier(!checked)}
               onSelect={(event) => event.preventDefault()}
             >
-              No ability mod
+              No modifier
             </DropdownMenuCheckboxItem>
           </>
         ) : null}

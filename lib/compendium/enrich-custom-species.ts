@@ -3,6 +3,7 @@ import type {
   UnarmedStrikeDie,
 } from "@/lib/compendium/characteristic-modifiers"
 import { applyBundledCardImage } from "@/lib/compendium/card-image"
+import { withFilledChoiceOptionDescriptions } from "@/lib/compendium/choice-option-description"
 import {
   lookupSrdSpeciesChoiceOptionPreset,
   speciesRowHasLanguageGrant,
@@ -135,6 +136,7 @@ function skillPoolChoice(skills: string[], count: number, label?: string) {
       id: modId(`skills_${skills.join("_")}_${count}`),
       type: "skills",
       entries: skills.map((skill) => ({ skill, expertise: false })),
+      allowAnySkill: false,
       choiceCount: count,
       label,
     },
@@ -771,6 +773,15 @@ const SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
       ),
     ],
   },
+  "Centaur::Natural Affinity": {
+    linkedModifiers: [
+      skillPoolChoice(
+        ["Animal Handling", "Medicine", "Nature", "Survival"],
+        1,
+        "Natural Affinity (pick 1)",
+      ),
+    ],
+  },
 
   // —— Gnoll ——
   "Gnoll::Bite": {
@@ -1107,6 +1118,14 @@ const SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
         ["dehydration", "malnutrition", "suffocation"],
         "No Exhaustion from dehydration, malnutrition, or suffocation",
       ),
+    ],
+  },
+
+  // MOTM Eladrin Trance also grants two weapon/tool proficiencies until the next rest.
+  "Eladrin::Trance": {
+    linkedModifiers: [
+      ...tranceRest(4, "Trance"),
+      toolChoice(2, "Trance — two weapons or tools until next long rest"),
     ],
   },
 }
@@ -1670,14 +1689,16 @@ function applyPresetToTrait(
     }
   }
 
-  if (preferExactPresets && exactPreset) return stripRedundantTraitSpellcastingAbility(next)
+  if (preferExactPresets && exactPreset) {
+    return stripRedundantTraitSpellcastingAbility(withFilledChoiceOptionDescriptions(next))
+  }
   const detected = enrichFeatureWithMechanicalDetection(next as unknown as Feature, {
     contentKind: "species_trait",
     sourceName: speciesName,
     featureName: trait.name,
     level: trait.level,
   }) as unknown as Trait
-  return stripRedundantTraitSpellcastingAbility(detected)
+  return stripRedundantTraitSpellcastingAbility(withFilledChoiceOptionDescriptions(detected))
 }
 
 function withSpeciesCardImage(row: Record<string, unknown>): Record<string, unknown> {

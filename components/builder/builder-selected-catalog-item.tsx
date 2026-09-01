@@ -19,6 +19,8 @@ type BuilderSelectedCatalogItemProps = {
   className?: string
   /** Portrait cards in a narrow pinned strip; wide cards stay full width. */
   portrait?: boolean
+  /** Opens the same detail overlay as picker cards. Whole card is the hit target. */
+  onLearnMore?: () => void
 }
 
 /** Compact “only the pick you made” preview for collapsed builder picker sections. */
@@ -30,6 +32,7 @@ export function BuilderSelectedCatalogItem({
   selectionVariant = "primary",
   className,
   portrait = true,
+  onLearnMore,
 }: BuilderSelectedCatalogItemProps) {
   const accent = getCompendiumItemAccentColor(item as unknown as Record<string, unknown>)
   const sourceLabel = subtitle?.trim() || item.source?.trim() || "Custom"
@@ -45,6 +48,7 @@ export function BuilderSelectedCatalogItem({
         selectionVariant={selectionVariant}
         badge={badge}
         className={cn("max-w-sm", className)}
+        onLearnMore={onLearnMore}
       />
     )
   }
@@ -62,6 +66,7 @@ export function BuilderSelectedCatalogItem({
         cardShape={portrait ? "portrait" : "wide"}
         imageCrop={portrait ? "top" : "center"}
         showBlurb={false}
+        onLearnMore={onLearnMore}
       />
     </div>
   )

@@ -94,8 +94,11 @@ describe("collectSheetActions", () => {
     })
     const respite = actions.find((action) => action.name === "Divine Respite")
     expect(respite?.category).toBe("utility")
+    expect(respite?.showOnAbilitiesTab).toBe(false)
+    expect(respite?.showOnCombatTab).toBe(false)
+    expect(respite?.showOnRestDialogues).toBe(true)
     expect(respite?.spendsEconomy).toBe(false)
-    expect(respite?.restoreHitDiceOnUse).toEqual({ amount: 3 })
+    expect(respite?.restoreHitDiceOnUse).toEqual({ amount: 3, restoreOn: "short_rest" })
 
     const [at13] = attachClassDetails(
       [{ class_id: "cls_martyr", level: 13, order: 0 }],
@@ -119,7 +122,7 @@ describe("collectSheetActions", () => {
       classDetails: [at13],
       species: null,
     }).find((action) => action.name === "Divine Respite")
-    expect(scaled?.restoreHitDiceOnUse).toEqual({ amount: 6 })
+    expect(scaled?.restoreHitDiceOnUse).toEqual({ amount: 6, restoreOn: "short_rest" })
   })
 
   it("includes features with a top-level activation", () => {
@@ -216,7 +219,174 @@ describe("collectSheetActions", () => {
       kinds: ["action"],
       category: "combat",
       sourceLabel: "Feat",
+      icon: "healing",
     })
+  })
+
+  it("attaches Survivor's proficiency bonus so the Use overlay can state +PB", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([])],
+      species: null,
+      feats: [
+        {
+          id: "feat-survivor",
+          name: "Survivor",
+          description: "Steel Yourself.",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_survivor_steel",
+              catalogRefId: "cat_char_uses",
+              characteristics: [],
+            },
+            {
+              instanceId: "modinst_survivor_steel_bonus",
+              catalogRefId: "cat_fx_check_roll_modifier",
+              activation: {
+                reaction: true,
+                effects: [
+                  {
+                    id: "mod_survivor_steel_bonus",
+                    kind: "check_bonus",
+                    checkCategory: "save",
+                    bonusConfig: { mode: "proficiency" },
+                  },
+                ],
+              },
+            },
+          ],
+        } as unknown as import("@/lib/types").Feat,
+      ],
+    })
+    const survivor = actions.find((action) => action.name === "Survivor")
+    expect(survivor?.useBonuses).toEqual([
+      expect.objectContaining({
+        appliesTo: "saving throws",
+        rollMode: "bonus",
+        bonusConfig: { mode: "proficiency" },
+      }),
+    ])
+  })
+
+  it("files Elemental Adept as a Passive reminder with the chosen energy type", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([])],
+      species: null,
+      modifierPlayerPicks: {
+        "feat:granted:feat-elemental::mod_elemental_adept_type::damage_type": ["Fire"],
+      },
+      feats: [
+        {
+          id: "feat-elemental",
+          name: "Elemental Adept",
+          description:
+            "<p><strong>Energy Mastery.</strong> Choose one of the following damage types: Acid, Cold, Fire, Lightning, or Thunder. You have Resistance to damage of the chosen type.</p><p><strong>Repeatable.</strong> You can take this feat more than once, but you must choose a different damage type each time for Energy Mastery.</p>",
+          icon: "fire-silhouette",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_elemental_adept_type",
+              catalogRefId: "cat_char_damage_resistance",
+              characteristics: [
+                {
+                  id: "mod_elemental_adept_type",
+                  type: "damage_resistance",
+                  damageTypes: [],
+                  choiceCount: 1,
+                  choiceOptions: ["Acid", "Cold", "Fire", "Lightning", "Thunder"],
+                  label: "Energy Mastery",
+                },
+              ],
+            },
+          ],
+        } as unknown as import("@/lib/types").Feat,
+      ],
+    })
+    const adept = actions.find((action) => action.name.startsWith("Elemental Adept"))
+    expect(adept).toMatchObject({
+      name: "Elemental Adept — Fire",
+      reminderOnly: true,
+      trigger: "Fire",
+      category: "combat",
+      sourceLabel: "Feat",
+      icon: "fire-silhouette",
+      spendsEconomy: false,
+    })
+    expect(adept?.menuOptions).toBeUndefined()
+  })
+
+  it("surfaces War Caster Reactive Spell as a reaction that picks a 1-action spell", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([])],
+      species: null,
+      feats: [
+        {
+          id: "feat-war-caster",
+          name: "War Caster",
+          description:
+            "When a creature that you can see within 5 feet of you takes the Disengage action or hits you with an attack, you can take a Reaction to cast a spell at the creature.",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_war_caster_reactive",
+              catalogRefId: "cat_fx_cast_spell",
+              activation: {
+                reaction: true,
+                effects: [
+                  {
+                    id: "mod_war_caster_reactive",
+                    kind: "cast_spell",
+                    castSpellCastingTime: "action",
+                    label: "Reactive Spell",
+                  },
+                ],
+              },
+            },
+          ],
+        } as unknown as import("@/lib/types").Feat,
+      ],
+    })
+    const reactive = actions.find((action) => action.name === "Reactive Spell")
+    expect(reactive).toMatchObject({
+      kinds: ["reaction"],
+      category: "combat",
+      sourceLabel: "War Caster",
+      castSpellChoice: {
+        castingTime: "action",
+        withoutSlot: false,
+        economyKind: "reaction",
+      },
+    })
+    expect(reactive?.healEffects ?? []).toEqual([])
+  })
+
+  it("names an unlabeled War Caster cast from the Reactive Spell benefit heading", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([])],
+      species: null,
+      feats: [
+        {
+          id: "feat-war-caster-stored",
+          name: "War Caster",
+          description:
+            "You gain the following benefits. Ability Score Increase. Increase your Wisdom score by 1. Concentration. You have Advantage on Constitution saving throws. Reactive Spell. When a creature provokes an Opportunity Attack from you by leaving your reach, you can take a Reaction to cast a spell at the creature rather than making an Opportunity Attack.",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_war_caster_reactive",
+              catalogRefId: "cat_fx_cast_spell",
+              activation: {
+                reaction: true,
+                effects: [
+                  {
+                    id: "mod_war_caster_reactive",
+                    kind: "cast_spell",
+                    castSpellCastingTime: "action",
+                  },
+                ],
+              },
+            },
+          ],
+        } as unknown as import("@/lib/types").Feat,
+      ],
+    })
+    expect(actions.find((action) => action.name === "Reactive Spell")?.sourceLabel).toBe("War Caster")
   })
 
   it("derives a reaction from a trigger characteristic with useReaction", () => {
@@ -892,6 +1062,32 @@ describe("collectSheetActions", () => {
     })
     const channel = utilityOnly.find((action) => action.name === "Channel Divinity")
     expect(channel?.category).toBe("utility")
+
+    const restOnly = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+          {
+            level: 9,
+            name: "Divine Respite",
+            description: "When you finish a Short Rest, you can choose to regain Hit Point Dice.",
+            activation: { action: true, noEconomyCost: true },
+            sheetDisplay: {
+              featuresTab: true,
+              combatActions: false,
+              abilitiesActions: false,
+              restDialogues: true,
+            },
+          },
+          ],
+          9,
+        ),
+      ],
+      species: null,
+    })
+    const restAction = restOnly.find((action) => action.name === "Divine Respite")
+    expect(restAction?.showOnAbilitiesTab).toBe(false)
+    expect(restAction?.showOnRestDialogues).toBe(true)
   })
 
   it("surfaces a picked choice option with bonus-action modifiers (Eagle)", () => {
@@ -1415,6 +1611,36 @@ describe("on-hit rider pickers", () => {
     expect(strike?.menuOptions?.[0]?.description).toContain("Constitution save or Poisoned")
   })
 
+  it("parses choose-one benefit lists and keeps Assault as a Bonus Action option", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 14,
+              name: "Kingslayer",
+              description:
+                "Once per turn when you reduce an enemy to 0 Hit Points, choose one of the following benefits.\n\nAssault. As a Bonus Action, you can move up to 15 feet and make a melee attack.\n\nBreak Spells. The creature's spells and ongoing effects end.\n\nShatter Morale. Nearby allies of the creature have the Frightened condition.",
+              sheetDisplay: { combatActions: true },
+            },
+          ],
+          14,
+        ),
+      ],
+      species: null,
+    })
+    const kingslayer = actions.find((action) => action.name === "Kingslayer")
+    expect(kingslayer?.trigger).toBe("When you reduce a creature to 0 HP")
+    expect(kingslayer?.spendsEconomy).toBe(false)
+    expect(kingslayer?.menuOptions?.map((option) => option.name)).toEqual([
+      "Assault",
+      "Break Spells",
+      "Shatter Morale",
+    ])
+    expect(kingslayer?.menuOptions?.[0]?.actionKind).toBe("bonus")
+    expect(kingslayer?.menuOptions?.[1]?.actionKind).toBeUndefined()
+  })
+
   it("charges the authored resource amount for an on-hit trigger spend", () => {
     const actions = collectSheetActions({
       classDetails: [
@@ -1600,41 +1826,101 @@ describe("combat / utility tab classification", () => {
     expect(skill?.spendsEconomy).toBe(false)
     expect(strike?.spendHitPoints).toBe(5)
     expect(skill?.spendHitPoints).toBe(10)
+    expect(strike?.icon).toBe("bleeding-heart")
+    expect(skill?.icon).toBe("bleeding-heart")
     expect(skill?.refundHitPointsOnStillFailed).toBe(true)
     expect(actions.some((action) => action.name === "Sacrifice")).toBe(false)
   })
 
-  it("offers Improved Sacrificial Strike as a selectable rider on Sacrificial Strike", () => {
+  it("replaces Sacrificial Strike with Improved Sacrificial Strike on the combat tab", () => {
+    const [detail] = attachClassDetails(
+      [{ class_id: "cls_martyr", level: 11, order: 0 }],
+      [
+        {
+          id: "cls_martyr",
+          name: "Martyr",
+          features: [
+            {
+              name: "Sacrificial Strike",
+              level: 1,
+              description: "Bonus Action: take 5 Radiant and deal +10 Radiant.",
+            },
+            {
+              name: "Improved Sacrificial Strike",
+              level: 11,
+              description:
+                "Your Sacrificial Strike improves. When you use this feature, you can choose to take 10 Radiant damage, and the target takes an extra 20 Radiant damage.",
+            },
+          ],
+        } as DndClass,
+      ],
+      [],
+    )
+    const actions = collectSheetActions({
+      classDetails: [detail],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Sacrificial Strike")).toBeUndefined()
+    const improved = actions.find((action) => action.name === "Improved Sacrificial Strike")
+    expect(improved?.kinds).toEqual(["bonus"])
+    expect(improved?.spendHitPoints).toBe(10)
+    expect(improved?.firstUseNoAction).toBe(false)
+    expect(improved?.relatedTalentAlerts?.some((alert) => alert.name === "Improved Sacrificial Strike")).toBeFalsy()
+  })
+
+  it("unlocks first-use-no-action on Improved Sacrificial Strike at 17", () => {
+    const [detail] = attachClassDetails(
+      [{ class_id: "cls_martyr", level: 17, order: 0 }],
+      [
+        {
+          id: "cls_martyr",
+          name: "Martyr",
+          features: [
+            {
+              name: "Sacrificial Strike",
+              level: 1,
+              description: "Bonus Action: take 5 Radiant and deal +10 Radiant.",
+            },
+            {
+              name: "Improved Sacrificial Strike",
+              level: 11,
+              description:
+                "Your Sacrificial Strike improves. When you use this feature, you can choose to take 10 Radiant damage, and the target takes an extra 20 Radiant damage.",
+            },
+          ],
+        } as DndClass,
+      ],
+      [],
+    )
+    const improved = collectSheetActions({
+      classDetails: [detail],
+      species: null,
+    }).find((action) => action.name === "Improved Sacrificial Strike")
+    expect(improved?.firstUseNoAction).toBe(true)
+  })
+
+  it("surfaces an on-initiative feature as a triggered combat card without a spend", () => {
     const actions = collectSheetActions({
       classDetails: [
         classDetail(
           [
             {
-              level: 1,
-              name: "Sacrificial Strike",
-              description: "Bonus Action: take 5 Radiant and deal +10 Radiant.",
-              activation: { bonusAction: true, spendHitPoints: 5 },
-              sheetDisplay: { combatActions: true },
-            } as unknown as Feature,
-            {
-              level: 11,
-              name: "Improved Sacrificial Strike",
-              description:
-                "Your Sacrificial Strike improves. When you use this feature, you can choose to take 10 Radiant damage, and the target takes an extra 20 Radiant damage.",
-            } as unknown as Feature,
+              name: "Thrall Rush",
+              level: 10,
+              description: "When you roll Initiative, your thralls move.",
+              activation: { onInitiative: true },
+              sheetDisplay: { combatActions: true, featuresTab: true },
+            },
           ],
-          11,
+          10,
         ),
       ],
       species: null,
     })
-    expect(actions.find((action) => action.name === "Improved Sacrificial Strike")).toBeUndefined()
-    const strike = actions.find((action) => action.name === "Sacrificial Strike")
-    const improved = strike?.relatedTalentAlerts?.find(
-      (alert) => alert.name === "Improved Sacrificial Strike",
-    )
-    expect(improved?.selectable).toBe(true)
-    expect(improved?.spendHitPoints).toBe(10)
-    expect(improved?.summary).toMatch(/10/)
+    expect(actions.find((action) => action.name === "Thrall Rush")).toMatchObject({
+      trigger: "When you roll Initiative",
+      spendsEconomy: false,
+      showOnCombatTab: true,
+    })
   })
 })

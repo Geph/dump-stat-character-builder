@@ -154,8 +154,10 @@ export function resolveStaticResourceLabel(
       const count = resolveTierCountAtLevel(table, classLevel)
       if (uses.dieType || uses.dieSidesByLevel?.length) {
         const die = formatResourceDieLabel(uses, classLevel) ?? uses.dieType
-        return die ? `${die}` : String(count)
+        if (die) return `${die}`
+        return count > 0 ? String(count) : null
       }
+      if (count <= 0) return null
       return String(count)
     }
     return uses.specialDescription?.trim() || null

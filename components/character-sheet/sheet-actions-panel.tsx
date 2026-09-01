@@ -16,8 +16,10 @@ import {
   selectableEconomyKinds,
   type ActionEconomyKind,
   type SheetActionEntry,
+  type SheetActionMenuOption,
   type SheetActionTalentAlert,
 } from "@/lib/character/sheet-actions"
+import { formatSheetActionUseBonusLines } from "@/lib/character/action-use-bonuses"
 import { grantsExtraWeaponAttack } from "@/lib/character/weapon-attack-actions"
 import { talentAlertAppliesToVariant } from "@/lib/character/alchemist-bomb-sheet"
 import { guardianTacticsToggleIdForOption, sheetToggleIdActivatedByAction } from "@/lib/compendium/sheet-toggle-registry"
@@ -28,7 +30,6 @@ import {
   SHEET_ACTION_USAGE_DOT,
 } from "@/lib/character/sheet-status-colors"
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
-import { firstSentenceFromText } from "@/lib/builder/feature-choice-hint"
 import {
   formatSpecialAttackDamageTypes,
   specialAttackChoosesDamageType,
@@ -38,9 +39,15 @@ import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/re
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
 import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
+  filterSpellsForCastChoice,
+  spellLevelLabel,
+  type SheetCastSpellChoice,
+} from "@/lib/character/cast-spell-choice"
+import {
   collectTargetableEffects,
   type PartyEffectTarget,
 } from "@/lib/character/effect-target-policy"
+import type { Spell } from "@/lib/types"
 import { applyAllyEffectLocally } from "@/lib/character/apply-ally-effect"
 import { applyPartyHealEffect } from "@/lib/character/apply-party-heal"
 import { applyResourceToResourceRestore } from "@/lib/character/resource-conversion"
@@ -129,6 +136,10 @@ type SheetActionsPanelProps = {
   onBankBalanceOfPower?: (amount: number) => void
   /** Party allies + companions available as effect targets. */
   allyCandidates?: PartyAllyCandidate[]
+  /** Known / prepared spells for features that let the player pick one to cast. */
+  knownSpells?: Spell[]
+  /** Open the spell overlay to cast through a feature (Reactive Spell, etc.). */
+  onCastSpellChoice?: (spell: Spell, choice: SheetCastSpellChoice) => void
   healContext?: HealResolveContext | null
   /** Force a single card column (e.g. narrow combat right rail). */
   singleColumn?: boolean
@@ -152,6 +163,8 @@ type SheetActionsPanelProps = {
   /** One Primed Bomb per Attack action; Extra Attack still allows extra regular bombs. */
   primedBombUsedThisTurn?: boolean
   onPrimedBombUsed?: () => void
+  firstUseNoActionUsedById?: Record<string, boolean>
+  onFirstUseNoActionUsed?: (actionId: string) => void
   /**
    * Which buckets to show. Combat layout puts extra-attack grants and passive (no-economy)
    * entries under weapons (`weapon-attacks`) and action/bonus/reaction in the actions column
@@ -463,15 +476,6 @@ function hitDiceHealLabel(entry: SheetActionEntry): string | null {
   const sides = entry.hitDieSides != null && entry.hitDieSides > 0 ? entry.hitDieSides : 8
   const ability = effect.healAbility ?? "CON"
   return `${count}d${sides} + ${ability}`
-}
-
-function actionSummaryLine(entry: SheetActionEntry): string | null {
-  const fromDescription = firstSentenceFromText(entry.description ?? "")
-  if (fromDescription) {
-    return fromDescription.length > 140 ? `${fromDescription.slice(0, 137).trimEnd()}…` : fromDescription
-  }
-  const meta = [entry.castingTime, entry.range, entry.duration].filter(Boolean)
-  return meta.length ? meta.join(" · ") : null
 }
 
 function ActionStatTile({
@@ -802,7 +806,11 @@ function ActionDetailOverlay({
   onSpendSpellSlot,
   primedBombUsedThisTurn = false,
   onPrimedBombUsed,
+  firstUseNoActionUsedById = {},
+  onFirstUseNoActionUsed,
   initialEconomyKind = null,
+  knownSpells = [],
+  onCastSpellChoice,
 }: {
   action: SheetActionEntry
   usage: ActionUsage | null
@@ -856,10 +864,14 @@ function ActionDetailOverlay({
   onSpendSpellSlot?: (minSpellLevel: number) => string | null
   primedBombUsedThisTurn?: boolean
   onPrimedBombUsed?: () => void
+  firstUseNoActionUsedById?: Record<string, boolean>
+  onFirstUseNoActionUsed?: (actionId: string) => void
   initialEconomyKind?: ActionEconomyKind | null
+  knownSpells?: Spell[]
+  onCastSpellChoice?: (spell: Spell, choice: SheetCastSpellChoice) => void
 }) {
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
-  const [step, setStep] = useState<"detail" | "roll" | "target">("detail")
+  const [step, setStep] = useState<"detail" | "roll" | "target" | "spell">("detail")
   const [useFeedback, setUseFeedback] = useState<string | null>(null)
   const [parentUsedThisOpen, setParentUsedThisOpen] = useState(false)
   const [lastSpentHitPoints, setLastSpentHitPoints] = useState(0)
@@ -930,8 +942,13 @@ function ActionDetailOverlay({
       ? formatPsionicAugmentSelectionSummary(psionicAugments, augmentSelections)
       : null
 
+  const useBonusLines = formatSheetActionUseBonusLines(action.useBonuses, {
+    proficiencyBonus: resolveContext.proficiencyBonus,
+    abilityMods: resolveContext.abilityModifiers,
+    characterLevel: action.classLevel,
+  })
   const selectedOption = menuOptions.find((option) => option.name === selectedMenuOption)
-  const showEconomyPicker = economyChoices.length > 1 && !selectedOption?.actionKind
+  const showEconomyPicker = economyChoices.length > 1 && menuOptions.length === 0
   const hitDiceCost =
     selectedOption?.hitDiceCost ??
     action.spendHitDice ??
@@ -1023,6 +1040,59 @@ function ActionDetailOverlay({
     (menuOptions.length === 0 || Boolean(selectedMenuOption)) &&
     !primedBlocked
 
+  const optionUseAffordable = (option: SheetActionMenuOption) => {
+    const optionHd = option.hitDiceCost != null && option.hitDiceCost > 0 ? option.hitDiceCost : 0
+    const optionResource =
+      option.resourceCost != null
+        ? option.resourceCost
+        : resourceCostMode === "fixed"
+          ? configuredResourceCost
+          : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
+    const optionExhausted =
+      usage != null && optionResource > 0 && usage.max - usage.used < optionResource
+    return (
+      !incapacitated &&
+      !optionExhausted &&
+      canAffordPsi &&
+      (optionHd <= 0 || optionHd <= hitDiceRemaining) &&
+      (psiCost === 0 || Boolean(psiResourceId)) &&
+      (optionHd === 0 || Boolean(onSpendHitDice)) &&
+      (!overloadedChargeActive || overloadedChargeAffordable) &&
+      !primedBlocked
+    )
+  }
+
+  const buttonCostLabel = (option?: SheetActionMenuOption) => {
+    const optionHd =
+      option?.hitDiceCost != null && option.hitDiceCost > 0
+        ? option.hitDiceCost
+        : !option && hitDiceNeeded > 0
+          ? hitDiceNeeded
+          : 0
+    const optionResource =
+      option?.resourceCost != null
+        ? option.resourceCost
+        : !option
+          ? resourceSpend
+          : resourceCostMode === "fixed"
+            ? configuredResourceCost
+            : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
+    const extras: string[] = []
+    if (option?.actionKind) extras.push(ACTION_KIND_LABELS[option.actionKind])
+    else if (showEconomyPicker) extras.push(ACTION_KIND_LABELS[selectedEconomyKind])
+    if (usage && action.classResourceKey) {
+      if (optionResource < 0) extras.push(`refund ${Math.abs(optionResource)} ${usage.resourceName ?? "resource"}`)
+      else if (optionResource > 0) extras.push(`${optionResource} ${usage.resourceName ?? "resource"}`)
+    }
+    if (empower && empowerApplied > 0) {
+      extras.push(`+${empowerResourceCost} ${empowerPool?.resourceName ?? "resource"}`)
+    }
+    if (optionHd > 0) extras.push(`${optionHd} HD`)
+    if (!option && hitPointsNeeded > 0) extras.push(`${hitPointsNeeded} HP`)
+    if (psiCost > 0) extras.push(`${psiCost} psi`)
+    return extras.length ? ` (${extras.join(", ")})` : ""
+  }
+
   useEffect(() => {
     setAugmentSelections([])
     setStep("detail")
@@ -1044,11 +1114,56 @@ function ActionDetailOverlay({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the opened action changes
   }, [action.id])
 
-  const handleUse = () => {
-    if (!canUse) return
+  const handleUse = (optionName?: string | null) => {
+    const option =
+      (optionName != null && optionName !== ""
+        ? menuOptions.find((entry) => entry.name === optionName)
+        : selectedOption) ?? undefined
+    const useHitDiceCost =
+      option?.hitDiceCost ??
+      action.spendHitDice ??
+      (menuOptions.length === 0 ? null : option?.hitDiceCost ?? null)
+    const useHitDiceNeeded = useHitDiceCost != null && useHitDiceCost > 0 ? useHitDiceCost : 0
+    const useResourceSpend =
+      option?.resourceCost != null
+        ? option.resourceCost
+        : resourceCostMode === "fixed"
+          ? configuredResourceCost
+          : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
+    const useChargeExhausted =
+      usage != null && useResourceSpend > 0 && usage.max - usage.used < useResourceSpend
+    const useCanAffordHitDice = useHitDiceNeeded <= 0 || useHitDiceNeeded <= hitDiceRemaining
+    const useCanUse =
+      !incapacitated &&
+      !useChargeExhausted &&
+      canAffordPsi &&
+      useCanAffordHitDice &&
+      (psiCost === 0 || Boolean(psiResourceId)) &&
+      (useHitDiceNeeded === 0 || Boolean(onSpendHitDice)) &&
+      (!overloadedChargeActive || overloadedChargeAffordable) &&
+      (menuOptions.length === 0 || Boolean(option)) &&
+      !primedBlocked
+    if (!useCanUse) return
 
-    if (hitDiceNeeded > 0 && onSpendHitDice) {
-      const ok = onSpendHitDice(hitDiceNeeded, action.classId)
+    if (action.castSpellChoice && onCastSpellChoice) {
+      const choice = action.castSpellChoice
+      const matches = filterSpellsForCastChoice(knownSpells, choice)
+      if (choice.spellName) {
+        const named = matches[0]
+        if (!named) {
+          setUseFeedback(`You do not have ${choice.spellName} prepared.`)
+          return
+        }
+        onCastSpellChoice(named, choice)
+        onClose()
+        return
+      }
+      setStep("spell")
+      return
+    }
+
+    if (useHitDiceNeeded > 0 && onSpendHitDice) {
+      const ok = onSpendHitDice(useHitDiceNeeded, action.classId)
       if (!ok) {
         setUseFeedback("Not enough Hit Dice")
         return
@@ -1071,7 +1186,7 @@ function ActionDetailOverlay({
     const sharesEmpowerPool =
       empowerPool != null && usage != null && empowerPool.resourceId === usage.resourceId
     if (usage && !spendViaAugments) {
-      usage.setUsed(usage.used + resourceSpend + (sharesEmpowerPool ? empowerResourceCost : 0))
+      usage.setUsed(usage.used + useResourceSpend + (sharesEmpowerPool ? empowerResourceCost : 0))
     }
     setParentUsedThisOpen(true)
     if (empowerPool && empowerResourceCost > 0 && !sharesEmpowerPool) {
@@ -1139,23 +1254,23 @@ function ActionDetailOverlay({
     if (appliedRiders.length) {
       parts.push(`Riders: ${appliedRiders.map((alert) => alert.name).join(", ")}`)
     }
-    if (selectedOption) {
+    if (option) {
       parts.push(
-        selectedOption.costLabel
-          ? `${selectedOption.name} (${selectedOption.costLabel})`
-          : selectedOption.name,
+        option.costLabel
+          ? `${option.name} (${option.costLabel})`
+          : option.name,
       )
-      if (resourceSpend < 0) {
-        parts.push(`Recovered ${Math.abs(resourceSpend)} ${usage?.resourceName ?? "resource"}`)
+      if (useResourceSpend < 0) {
+        parts.push(`Recovered ${Math.abs(useResourceSpend)} ${usage?.resourceName ?? "resource"}`)
       }
     }
 
-    const morphToggleId = selectedOption
-      ? weaponMorphToggleIdForOption(selectedOption.name)
+    const morphToggleId = option
+      ? weaponMorphToggleIdForOption(option.name)
       : null
     const toggleId =
       morphToggleId ??
-      (selectedOption ? guardianTacticsToggleIdForOption(selectedOption.name) : null) ??
+      (option ? guardianTacticsToggleIdForOption(option.name) : null) ??
       sheetToggleIdActivatedByAction(action)
     if (toggleId && onActivateSheetToggle) {
       onActivateSheetToggle(toggleId)
@@ -1192,24 +1307,29 @@ function ActionDetailOverlay({
       parts.push(perfected ? "Mutation Die (Perfected)" : "Mutation Die")
     }
 
-    if (action.spendsEconomy !== false && onMarkEconomy) {
-      const economyKinds = selectedOption?.actionKind
-        ? [selectedOption.actionKind]
-        : economyChoices.length
-          ? [selectedEconomyKind]
-          : action.kinds
-      for (const kind of economyKinds) {
-        onMarkEconomy(kind)
+    const firstUseFree =
+      Boolean(action.firstUseNoAction) && !firstUseNoActionUsedById[action.id]
+    if (firstUseFree) {
+      onFirstUseNoActionUsed?.(action.id)
+      parts.push("First use this turn (no action)")
+    } else if (onMarkEconomy) {
+      if (option?.actionKind) {
+        onMarkEconomy(option.actionKind)
+      } else if (action.spendsEconomy !== false) {
+        const economyKinds = economyChoices.length ? [selectedEconomyKind] : action.kinds
+        for (const kind of economyKinds) {
+          onMarkEconomy(kind)
+        }
       }
     }
     if ((specialAttack?.damageDiceCount ?? 0) > 0 && onMarkDamageDealt) {
       onMarkDamageDealt()
     }
-    if (hitDiceNeeded > 0) parts.push(`Spent ${hitDiceNeeded} Hit Dice`)
+    if (useHitDiceNeeded > 0) parts.push(`Spent ${useHitDiceNeeded} Hit Dice`)
     if (psiCost > 0) parts.push(`Spent ${psiCost} psi`)
     if (augmentSummary) parts.push(augmentSummary)
-    if (usage && !spendViaAugments && resourceSpend > 0) {
-      parts.push(`Spent ${resourceSpend} ${usage.resourceName ?? "resource"}`)
+    if (usage && !spendViaAugments && useResourceSpend > 0) {
+      parts.push(`Spent ${useResourceSpend} ${usage.resourceName ?? "resource"}`)
     }
 
     const actionHealCtx = healContextForAction(healContext, action)
@@ -1474,6 +1594,8 @@ function ActionDetailOverlay({
     )
   }
 
+  const overlayIcon = action.icon?.trim() || specialAttack?.icon?.trim() || ""
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -1494,8 +1616,8 @@ function ActionDetailOverlay({
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="flex items-center gap-2 text-lg font-black text-foreground">
-                {specialAttack?.icon ? (
-                  <GameIcon name={specialAttack.icon} className="h-5 w-5 shrink-0 text-primary" />
+                {overlayIcon ? (
+                  <GameIcon name={overlayIcon} className="h-5 w-5 shrink-0 text-primary" />
                 ) : null}
                 {action.name}
               </h2>
@@ -1604,6 +1726,37 @@ function ActionDetailOverlay({
             augmentSummary={augmentSummary}
             onClose={onClose}
           />
+        ) : step === "spell" && action.castSpellChoice ? (
+          <div className="p-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Choose a spell with a casting time of one action.
+            </p>
+            {filterSpellsForCastChoice(knownSpells, action.castSpellChoice).length === 0 ? (
+              <p className="text-sm text-destructive">
+                No one-action spells are prepared. Add a 1-action spell on this sheet first.
+              </p>
+            ) : (
+              <div className="grid gap-2">
+                {filterSpellsForCastChoice(knownSpells, action.castSpellChoice).map((spell) => (
+                  <button
+                    key={spell.id}
+                    type="button"
+                    onClick={() => {
+                      onCastSpellChoice?.(spell, action.castSpellChoice!)
+                      onClose()
+                    }}
+                    className="rounded-xl border-2 border-border px-3 py-2 text-left text-sm hover:border-primary/50"
+                  >
+                    <div className="font-semibold">{spell.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {spellLevelLabel(spell.level)}
+                      {spell.casting_time ? ` · ${spell.casting_time}` : ""}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ) : step === "target" ? (
           <div className="p-4 space-y-3">
             <p className="text-sm text-muted-foreground">Choose who receives this effect.</p>
@@ -2038,8 +2191,22 @@ function ActionDetailOverlay({
             </div>
             )}
 
-            {(!useActionTabs || detailTab !== "description") ? (
+            {!action.reminderOnly && (!useActionTabs || detailTab !== "description") ? (
             <div className="sticky bottom-0 space-y-2 border-t border-border bg-card/95 p-4 backdrop-blur-sm">
+              {useBonusLines.length ? (
+                <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-primary">
+                    Bonus
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {useBonusLines.map((line) => (
+                      <li key={line} className="text-sm font-semibold text-foreground">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {usage &&
               action.classResourceKey &&
               selectedResourceCost == null &&
@@ -2197,31 +2364,37 @@ function ActionDetailOverlay({
                   </div>
                 </div>
               ) : null}
-              <button
-                type="button"
-                disabled={!canUse}
-                onClick={handleUse}
-                className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Use {action.name}
-                {useActionTabs && specialAttack
-                  ? ` — ${attackProfileActionLabel(specialAttack)}`
-                  : ""}
-                {showEconomyPicker ? ` (${ACTION_KIND_LABELS[selectedEconomyKind]})` : ""}
-                {usage && action.classResourceKey
-                  ? resourceSpend < 0
-                    ? ` (refund ${Math.abs(resourceSpend)} ${usage.resourceName ?? "resource"})`
-                    : resourceSpend > 0
-                      ? ` (${resourceSpend} ${usage.resourceName ?? "resource"})`
-                      : ""
-                  : ""}
-                {empower && empowerApplied > 0
-                  ? ` (+${empowerResourceCost} ${empowerPool?.resourceName ?? "resource"})`
-                  : ""}
-                {hitDiceNeeded > 0 ? ` (${hitDiceNeeded} HD)` : ""}
-                {hitPointsNeeded > 0 ? ` (${hitPointsNeeded} HP)` : ""}
-                {psiCost > 0 ? ` (${psiCost} psi)` : ""}
-              </button>
+              {menuOptions.length > 0 ? (
+                <div className="grid gap-2">
+                  {menuOptions.map((option) => (
+                    <button
+                      key={`use-${option.name}`}
+                      type="button"
+                      disabled={!optionUseAffordable(option)}
+                      onClick={() => handleUse(option.name)}
+                      className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Use {option.name}
+                      {buttonCostLabel(option)}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!canUse}
+                  onClick={() => handleUse()}
+                  className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {action.castSpellChoice && !action.castSpellChoice.spellName
+                    ? "Choose a spell"
+                    : `Use ${action.name}`}
+                  {useActionTabs && specialAttack
+                    ? ` — ${attackProfileActionLabel(specialAttack)}`
+                    : ""}
+                  {buttonCostLabel()}
+                </button>
+              )}
               {(action.alsoActivate ?? []).map((also) => {
                 const alsoHd = alsoActivateHitDiceNeeded(also)
                 const canAlso =
@@ -2280,6 +2453,8 @@ export function SheetActionsPanel({
   onMarkDamageDealt,
   onBankBalanceOfPower,
   allyCandidates = [],
+  knownSpells = [],
+  onCastSpellChoice,
   healContext = null,
   singleColumn = true,
   playerNoteValues = {},
@@ -2292,6 +2467,8 @@ export function SheetActionsPanel({
   onSpendSpellSlot,
   primedBombUsedThisTurn = false,
   onPrimedBombUsed,
+  firstUseNoActionUsedById = {},
+  onFirstUseNoActionUsed,
   sections = "all",
   groupLayout = "stack",
   layoutScope = "default",
@@ -2367,7 +2544,7 @@ export function SheetActionsPanel({
     return Math.max(0, max - used)
   }, [psiResource, usedResourcesById, resolveContext])
 
-  if (!actions.length) {
+  if (!actions.length && !prependGroup?.node) {
     return null
   }
 
@@ -2554,15 +2731,24 @@ export function SheetActionsPanel({
       )
       .filter((label): label is string => Boolean(label))
     const hdHealLabel = hitDiceHealLabel(entry)
-    const summary = isSpecialAttack || hdHealLabel ? null : actionSummaryLine(entry)
+    const useBonusPreview = formatSheetActionUseBonusLines(entry.useBonuses, {
+      proficiencyBonus: resolveContext.proficiencyBonus,
+      abilityMods: resolveContext.abilityModifiers,
+      characterLevel: entry.classLevel,
+    }).join(" · ")
     const costMeta = formatSheetActionCostMeta(entry, usage)
-    const titleMeta = [
+    const subtitleMeta = [
       entry.trigger,
       costMeta,
       isSpecialAttack ? specialAttackProfileLabel(primaryAttack!) : null,
+      hdHealLabel,
+      !isSpecialAttack && !hdHealLabel && entry.menuOptions?.length
+        ? `${entry.menuOptions.length} options`
+        : null,
     ]
       .filter(Boolean)
       .join(" · ")
+    const showOwnUses = Boolean(usage && !usesClassResource)
 
     return (
       <div
@@ -2597,7 +2783,7 @@ export function SheetActionsPanel({
             : undefined
         }
         className={cn(
-          "relative flex min-w-0 flex-col gap-1.5 rounded border px-2.5 py-2",
+          "relative flex min-w-0 flex-col gap-1 rounded border px-2.5 py-1.5",
           usesClassResource ? SHEET_ACTION_CARD.classResource : SHEET_ACTION_CARD.default,
           interactive &&
             (usesClassResource
@@ -2607,7 +2793,7 @@ export function SheetActionsPanel({
         )}
       >
         <div className="flex items-stretch justify-between gap-2">
-          <div className="min-w-0 flex-1 space-y-1">
+          <div className="min-w-0 flex-1 space-y-0.5">
             <div className="flex flex-wrap items-center gap-x-1.5">
               {entry.icon ? (
                 <span
@@ -2633,10 +2819,26 @@ export function SheetActionsPanel({
                 </span>
               ) : null}
               <p className="text-xs font-semibold text-foreground">{entry.name}</p>
-              {titleMeta ? (
-                <p className="text-[10px] text-muted-foreground">{titleMeta}</p>
-              ) : null}
             </div>
+
+            {subtitleMeta || showOwnUses ? (
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 text-[10px] leading-snug text-muted-foreground">
+                  {[
+                    subtitleMeta,
+                    usage && showOwnUses ? `${usage.max - usage.used} / ${usage.max}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {usage && showOwnUses ? (
+                  <UseDots usage={usage} label={entry.name} tone="default" />
+                ) : null}
+              </div>
+            ) : null}
+            {useBonusPreview ? (
+              <p className="text-[10px] font-semibold text-primary">{useBonusPreview}</p>
+            ) : null}
 
             {isSpecialAttack ? (
               <>
@@ -2672,32 +2874,6 @@ export function SheetActionsPanel({
                   </div>
                 ) : null}
               </>
-            ) : hdHealLabel ? (
-              <p className="text-[10px] text-foreground">
-                <span className="font-medium">{hdHealLabel}</span>
-              </p>
-            ) : summary ? (
-              <p className="text-[10px] leading-snug text-muted-foreground">{summary}</p>
-            ) : entry.menuOptions?.length ? (
-              <p className="text-[10px] text-muted-foreground">
-                {entry.menuOptions.length} options
-              </p>
-            ) : null}
-
-            {usage ? (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] tabular-nums text-muted-foreground">
-                  {usage.max - usage.used} / {usage.max}
-                  {usage.resourceName ? (
-                    <span className="ml-1 text-muted-foreground/70">{usage.resourceName}</span>
-                  ) : null}
-                </span>
-                <UseDots
-                  usage={usage}
-                  label={entry.name}
-                  tone={usesClassResource ? "classResource" : "default"}
-                />
-              </div>
             ) : null}
           </div>
 
@@ -2937,6 +3113,8 @@ export function SheetActionsPanel({
             }
             resolveResourcePool={resolveResourcePool}
             allyCandidates={allyCandidates}
+            knownSpells={knownSpells}
+            onCastSpellChoice={onCastSpellChoice}
             healContext={healContext}
             playerNoteValues={playerNoteValues}
             onPlayerNoteChange={onPlayerNoteChange}
@@ -2948,6 +3126,8 @@ export function SheetActionsPanel({
             onSpendSpellSlot={onSpendSpellSlot}
             primedBombUsedThisTurn={primedBombUsedThisTurn}
             onPrimedBombUsed={onPrimedBombUsed}
+            firstUseNoActionUsedById={firstUseNoActionUsedById}
+            onFirstUseNoActionUsed={onFirstUseNoActionUsed}
           />
         ) : null}
       </AnimatePresence>

@@ -154,6 +154,7 @@ export function inferAllyBuffEffect(
   }
   if (!ALLY_TARGET_RE.test(text)) return null
   if (!/\b(?:attack|saving throw|check)\b/i.test(text)) return null
+  if (/\bcast a spell\b/i.test(text)) return null
   return {
     id: "inferred_ally_buff",
     kind: "modify_creature",

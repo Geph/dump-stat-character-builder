@@ -1,3 +1,7 @@
+import {
+  maybeFilterDefaultCardImageUrl,
+  type DefaultCardImageAvailability,
+} from "@/lib/compendium/available-card-art"
 import { withBasePath } from "@/lib/config/deploy-mode"
 
 const spellCardImage = (slug: string) => withBasePath(`/images/compendium/spells/${slug}.png`)
@@ -152,6 +156,12 @@ export const BUNDLED_SPELL_CARD_IMAGES_BY_NAME: Record<string, string> = Object.
   }),
 )
 
-export function defaultSpellCardImageUrl(spellName: string): string | null {
-  return BUNDLED_SPELL_CARD_IMAGES_BY_NAME[spellName] ?? null
+export function defaultSpellCardImageUrl(
+  spellName: string,
+  options?: DefaultCardImageAvailability,
+): string | null {
+  return maybeFilterDefaultCardImageUrl(
+    BUNDLED_SPELL_CARD_IMAGES_BY_NAME[spellName] ?? null,
+    options?.requireAvailable !== false,
+  )
 }

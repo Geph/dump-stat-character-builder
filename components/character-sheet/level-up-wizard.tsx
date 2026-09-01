@@ -47,6 +47,11 @@ import {
 } from "@/lib/builder/feat-choices"
 import { isFeatEligibleForCategories } from "@/lib/builder/feat-selection"
 import {
+  magicInitiateSourceKeysForCharacter,
+  takenMagicInitiateSpellLists,
+} from "@/lib/builder/magic-initiate"
+import { getEffectiveBackgroundFeatGranted } from "@/lib/compendium/background-origin-feat"
+import {
   clearModifierPicksForSource,
   collectModifierPlayerChoiceSlots,
   optionsForExpertiseSlot,
@@ -64,6 +69,10 @@ import {
   characterHasFightingStyleAccess,
   levelUpFeatCategories,
 } from "@/lib/builder/fighting-style-access"
+import {
+  resolveChoiceOptionDescription,
+  shouldShowNamedChoiceSummaries,
+} from "@/lib/compendium/choice-option-description"
 import { mergeAlchemistDiscoveryPicks } from "@/lib/compendium/alchemist-feature-wiring"
 import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
@@ -107,6 +116,7 @@ type Loaded = {
   customAbilities: CustomAbility[]
   modifierCatalog: ModifierCatalogEntry[]
   species: Species | null
+  featGranted: string | null
 }
 
 type HpMethod = "average" | "roll"
@@ -162,6 +172,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         { data: equipment },
         { data: customAbilities },
         { data: speciesRows },
+        { data: backgrounds },
         modifierCatalog,
       ] = await Promise.all([
         db.from("characters").select("*").eq("id", characterId).single(),
@@ -172,6 +183,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         db.from("equipment").select("*"),
         db.from("custom_abilities").select("*"),
         db.from("species").select("*"),
+        db.from("backgrounds").select("id, feat_granted"),
         loadModifierCatalog(db),
       ])
       if (cancelled) return
@@ -199,6 +211,9 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       const enrichedSpecies = enrichSpeciesList(
         asCompendiumRows(speciesRows) as unknown as Species[],
       )
+      const background = asCompendiumRows<{ id: string; feat_granted: string | null }>(
+        backgrounds,
+      ).find((row) => row.id === char.background_id)
       setLoaded({
         character: char,
         classDetails,
@@ -209,6 +224,10 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         customAbilities: asCompendiumRows(customAbilities) as unknown as CustomAbility[],
         modifierCatalog,
         species: enrichedSpecies.find((row) => row.id === char.species_id) ?? null,
+        featGranted: getEffectiveBackgroundFeatGranted(
+          background ?? null,
+          char.feature_choice_picks ?? {},
+        ),
       })
       setClassId(classDetails[0]?.row.class_id ?? null)
       setChoicePicks(mergeAlchemistDiscoveryPicks(char.feature_choice_picks ?? {}))
@@ -257,6 +276,28 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
   const activeFeatStep = current?.kind === "feat_or_asi" ? current : null
   const featId = activeFeatStep ? featIdsByStep[activeFeatStep.id] ?? null : null
 
+  const magicInitiateFeatId = useMemo(
+    () => loaded?.feats.find((feat) => /^magic initiate$/i.test(feat.name.trim()))?.id ?? null,
+    [loaded?.feats],
+  )
+  const magicInitiateSourceKeys = useMemo(
+    () =>
+      magicInitiateSourceKeysForCharacter(
+        magicInitiateFeatId,
+        loaded?.character.feature_choice_picks ?? {},
+      ),
+    [loaded?.character.feature_choice_picks, magicInitiateFeatId],
+  )
+  const takenMagicInitiateLists = useMemo(() => {
+    if (!loaded) return []
+    return [
+      ...takenMagicInitiateSpellLists(levelUpModifierSlots, modifierPicks, null, {
+        featGranted: loaded.featGranted,
+        additionalSourceKeys: magicInitiateSourceKeys,
+      }),
+    ]
+  }, [loaded, levelUpModifierSlots, modifierPicks, magicInitiateSourceKeys])
+
   const eligibleFeats = useMemo(() => {
     if (!loaded) return []
     const ownedFeatIds = loaded.character.feat_ids ?? []
@@ -280,6 +321,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           speciesId: loaded.character.species_id,
           backgroundId: loaded.character.background_id,
           hasFightingStyleAccess,
+          takenMagicInitiateSpellLists: takenMagicInitiateLists,
         }),
       )
       .slice()
@@ -289,7 +331,13 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         if (aAsi !== bAsi) return aAsi - bAsi
         return a.name.localeCompare(b.name)
       })
-  }, [activeFeatStep?.featCategories, loaded, plan?.newTotalLevel, plan?.toLevel])
+  }, [
+    activeFeatStep?.featCategories,
+    loaded,
+    plan?.newTotalLevel,
+    plan?.toLevel,
+    takenMagicInitiateLists,
+  ])
 
   const selectedFeat = useMemo(
     () => (featId && loaded ? loaded.feats.find((feat) => feat.id === featId) ?? null : null),
@@ -718,7 +766,10 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                   }
                   options={featureChoiceOptions.map((option) => ({
                     name: option.name,
-                    description: option.description,
+                    description: resolveChoiceOptionDescription(
+                      option,
+                      current.feature.description,
+                    ),
                   }))}
                   maxCount={current.required}
                   selected={choicePicks[current.id] ?? []}
@@ -731,6 +782,16 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                       featureName: current.feature.name,
                     })
                   }
+                  showOptionSummaries={shouldShowNamedChoiceSummaries({
+                    optionsSource: current.feature.choices?.optionsSource,
+                    options: featureChoiceOptions.map((option) => ({
+                      name: option.name,
+                      description: resolveChoiceOptionDescription(
+                        option,
+                        current.feature.description,
+                      ),
+                    })),
+                  })}
                 />
               ) : null}
 
@@ -746,6 +807,8 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                     spells={loaded?.spells ?? []}
                     kinds={[current.slot.kind]}
                     showSkillInfo={false}
+                    magicInitiateFeatGranted={loaded?.featGranted}
+                    magicInitiateSourceKeys={magicInitiateSourceKeys}
                     onChange={(slotKey, selected) => {
                       const slot = levelUpModifierSlots.find((entry) => entry.slotKey === slotKey)
                       if (!slot) return
@@ -878,6 +941,8 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                       knownLanguages={loaded.character.languages ?? []}
                       existingExpertiseSkills={loaded.character.skill_expertise ?? []}
                       showSkillInfo={false}
+                      magicInitiateFeatGranted={loaded.featGranted}
+                      magicInitiateSourceKeys={magicInitiateSourceKeys}
                       onChange={(slotKey, selected) => {
                         const slotEntry = pendingFeatModifierSlots.find(
                           (entry) => entry.slotKey === slotKey,
@@ -1043,8 +1108,15 @@ function SpellPickStep({
 }) {
   const [detailSpell, setDetailSpell] = useState<Spell | null>(null)
   const eligible = useMemo(
-    () => spellsEligibleForLevelUp(spells, current.className, current.maxSpellLevel, alreadyKnown),
-    [alreadyKnown, current.className, current.maxSpellLevel, spells],
+    () =>
+      spellsEligibleForLevelUp(
+        spells,
+        current.className,
+        current.maxSpellLevel,
+        alreadyKnown,
+        current.spellList,
+      ),
+    [alreadyKnown, current.className, current.maxSpellLevel, current.spellList, spells],
   )
   const cantrips = eligible.filter((spell) => (spell.level ?? 0) === 0)
   const leveled = eligible.filter((spell) => (spell.level ?? 0) > 0)

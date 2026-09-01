@@ -5,6 +5,7 @@ import { serializeRow, serializeRows } from "./serialize"
 import type { TableName } from "./schema"
 import type { CompendiumTable, ResolvableTable } from "./tables"
 import { isCompendiumTable } from "./tables"
+import { unionSpellClassNames } from "@/lib/import/class-spell-lists"
 
 export type Filter =
   | { op: "eq"; column: string; value: unknown }
@@ -136,11 +137,22 @@ export async function upsertByName(table: CompendiumTable, rows: Record<string, 
     const name = row.name as string
     if (!name) continue
     const [existing] = await db.select().from(t).where(eq(t.name, name)).limit(1)
-    const payload = { ...row, id: (existing as { id?: string } | undefined)?.id ?? randomUUID() }
+    const payload: Record<string, unknown> = {
+      ...row,
+      id: (existing as { id?: string } | undefined)?.id ?? randomUUID(),
+    }
     if (existing) {
       // Keep the user's enable/disable toggle across SRD reseeds.
       if ("enabled" in (existing as object)) {
         ;(payload as Record<string, unknown>).enabled = (existing as { enabled: unknown }).enabled
+      }
+      if (table === "spells") {
+        ;(payload as Record<string, unknown>).classes = unionSpellClassNames(
+          Array.isArray((existing as { classes?: unknown }).classes)
+            ? ((existing as { classes: string[] }).classes)
+            : null,
+          Array.isArray(payload.classes) ? (payload.classes as string[]) : null,
+        )
       }
       const { id: _id, created_at: _c, ...rest } = payload as Record<string, unknown>
       await db.update(t).set(rest as never).where(eq(t.id, (existing as { id: string }).id))

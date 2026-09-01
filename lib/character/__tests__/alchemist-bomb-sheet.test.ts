@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   expandAlchemistBombProfiles,
+  isRestDialogueChoiceText,
   isShortRestActivityText,
   resolveBombRiderAttackVariants,
   shouldSuppressStandaloneBombCard,
@@ -110,5 +111,20 @@ describe("isShortRestActivityText", () => {
         "When you finish a Short Rest, you can choose to regain up to 3 expended Hit Point Dice.",
       ),
     ).toBe(true)
+  })
+})
+
+describe("isRestDialogueChoiceText", () => {
+  it("matches finish-a-rest choice wording, not spend-minutes downtime", () => {
+    expect(
+      isRestDialogueChoiceText(
+        "Divine Respite",
+        "When you finish a Short Rest, you can choose to regain up to 3 expended Hit Point Dice.",
+      ),
+    ).toBe(true)
+    expect(isRestDialogueChoiceText("Potion Brewing", "Brew potions.")).toBe(false)
+    expect(
+      isRestDialogueChoiceText("Workshop", "You can spend 10 minutes to finish the item."),
+    ).toBe(false)
   })
 })

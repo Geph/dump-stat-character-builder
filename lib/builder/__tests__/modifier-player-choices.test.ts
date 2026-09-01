@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { proficientSkillsInBuilder } from "@/lib/builder/choices"
 import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 import {
+  chosenDamageTypesFromCharacteristics,
   collectClassFeatureModifierPlayerChoiceSlots,
   collectModifierPlayerChoiceSlots,
   isSpellRelatedModifierSlot,
@@ -244,5 +245,120 @@ describe("feat spell grant player choices", () => {
       expect(spellSlots.some((slot) => slot.kind === "spell" && slot.spellLevel === 1)).toBe(true)
       expect(spellSlots.every(isSpellRelatedModifierSlot)).toBe(true)
     }
+  })
+})
+
+describe("chosenDamageTypesFromCharacteristics", () => {
+  it("reads the Energy Mastery damage-type pick for a resistance choice", () => {
+    expect(
+      chosenDamageTypesFromCharacteristics(
+        [
+          {
+            id: "mod_elemental_adept_type",
+            type: "damage_resistance",
+            damageTypes: [],
+            choiceCount: 1,
+            choiceOptions: ["Acid", "Cold", "Fire", "Lightning", "Thunder"],
+          },
+        ],
+        { "feat:granted:feat-1::mod_elemental_adept_type::damage_type": ["Cold"] },
+      ),
+    ).toEqual(["Cold"])
+  })
+})
+
+describe("class Spellcasting choice grants vs native progression", () => {
+  function spellcastingFeature(name = "Spellcasting"): Feature {
+    return {
+      level: 1,
+      name,
+      description: "You know three cantrips of your choice.",
+      linkedModifiers: [
+        {
+          instanceId: "spellcasting-known",
+          catalogRefId: "cat_char_spells_known",
+          characteristics: [
+            {
+              id: "spells_known_picks",
+              type: "spells_known",
+              spells: [],
+              choiceGrants: [
+                { level: 0, count: 3 },
+                { level: 1, count: 4 },
+              ],
+            },
+          ],
+        },
+      ],
+    } as Feature
+  }
+
+  it("does not duplicate cantrip/prepared picks when the class already has progression", () => {
+    const cls = {
+      id: "necromancer",
+      name: "Necromancer",
+      spellcasting: {
+        ability: "intelligence",
+        caster_progression: "full",
+        prepared: true,
+        progression: [{ level: 1, cantrips: 3, prepared: 4, max_spell_level: 1 }],
+      },
+      features: [spellcastingFeature()],
+    } as unknown as DndClass
+
+    const slots = collectClassFeatureModifierPlayerChoiceSlots({
+      classLevels: [{ classId: "necromancer", level: 1 }],
+      classes: [cls],
+      subclasses: [],
+      subclassByClassId: {},
+      featureChoicePicks: {},
+      catalog: [],
+    })
+
+    expect(slots.filter((slot) => slot.kind === "spell")).toEqual([])
+  })
+
+  it("keeps extra-feature spell grants and ability-only casters", () => {
+    const prepared = {
+      id: "necromancer",
+      name: "Necromancer",
+      spellcasting: {
+        ability: "intelligence",
+        caster_progression: "full",
+        prepared: true,
+        progression: [{ level: 1, cantrips: 3, prepared: 4, max_spell_level: 1 }],
+      },
+      features: [spellcastingFeature("Dark Gift Cantrip")],
+    } as unknown as DndClass
+
+    const extraSlots = collectClassFeatureModifierPlayerChoiceSlots({
+      classLevels: [{ classId: "necromancer", level: 1 }],
+      classes: [prepared],
+      subclasses: [],
+      subclassByClassId: {},
+      featureChoicePicks: {},
+      catalog: [],
+    })
+    expect(extraSlots.filter((slot) => slot.kind === "spell").map((slot) => slot.label)).toEqual([
+      "Choose 3 cantrips",
+      "Choose 4 level-1 spells",
+    ])
+
+    const cantripOnly = {
+      id: "warmage",
+      name: "Warmage",
+      spellcasting: { ability: "intelligence" },
+      features: [spellcastingFeature()],
+    } as unknown as DndClass
+
+    const warmageSlots = collectClassFeatureModifierPlayerChoiceSlots({
+      classLevels: [{ classId: "warmage", level: 1 }],
+      classes: [cantripOnly],
+      subclasses: [],
+      subclassByClassId: {},
+      featureChoicePicks: {},
+      catalog: [],
+    })
+    expect(warmageSlots.some((slot) => slot.kind === "spell")).toBe(true)
   })
 })

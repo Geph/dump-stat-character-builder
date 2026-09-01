@@ -54,7 +54,7 @@ import {
   mergeRowForUpdate,
   shouldMergeClassResources,
 } from "@/lib/import/merge-collision-update"
-import { mergeIncomingSpellsWithExisting } from "@/lib/import/merge-spell-persist"
+import { spellRowsToUpsertForClassLists } from "@/lib/import/merge-spell-persist"
 
 function withResolvedFeatureSpells(
   rows: Record<string, unknown>[],
@@ -272,14 +272,21 @@ async function persistImportedContentLocalBody(
     }
   }
 
-  if (sanitized.spells?.length) {
-    const incomingSpells = mergeIncomingSpellsWithExisting(
-      sanitized.spells.map((s) => stampSource({ ...s }, source)),
-      await listRowsLocal("spells"),
-    )
-    await upsertByNameLocal("spells", incomingSpells)
-    breakdown.spells = sanitized.spells.length
-    totalImported += sanitized.spells.length
+  if (sanitized.classes?.length || sanitized.spells?.length) {
+    const { catalogPatches, incoming } = spellRowsToUpsertForClassLists({
+      existingSpells: await listRowsLocal("spells"),
+      existingClasses: await listRowsLocal("classes"),
+      incomingClasses: sanitized.classes as unknown as Record<string, unknown>[] | undefined,
+      incomingSpells: sanitized.spells?.map((s) => stampSource({ ...s }, source)),
+    })
+    const spellRows = [...catalogPatches, ...incoming]
+    if (spellRows.length) {
+      await upsertByNameLocal("spells", spellRows)
+    }
+    if (sanitized.spells?.length) {
+      breakdown.spells = sanitized.spells.length
+      totalImported += sanitized.spells.length
+    }
     spellCatalog = await loadSpellCatalogLocal()
     // Re-link class/species spell grants now that same-batch spells exist.
     if (enrichedClasses.length) {

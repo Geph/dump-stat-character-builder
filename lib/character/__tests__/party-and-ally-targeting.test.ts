@@ -148,6 +148,15 @@ describe("ally heal targeting", () => {
       rollTarget: "ally",
     })
   })
+
+  it("does not treat War Caster Reactive Spell as an ally-target buff", () => {
+    expect(
+      inferAllyBuffEffect(
+        "War Caster",
+        "When a creature that you can see within 5 feet of you takes the Disengage action or hits you with an attack, you can take a Reaction to cast a spell at the creature.",
+      ),
+    ).toBeNull()
+  })
 })
 
 describe("party ally candidates", () => {

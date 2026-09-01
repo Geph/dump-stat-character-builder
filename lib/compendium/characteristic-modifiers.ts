@@ -247,6 +247,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     hint: "Shows an alert on related sheet actions (e.g. Flickering Escape on Phase Rift)",
   },
   {
+    value: "replace_feature",
+    label: "Replace Prior Feature",
+    hint: "Hide a named earlier feature and use this one as the sheet action instead (Improved Sacrificial Strike)",
+  },
+  {
     value: "ability_score_override",
     label: "Ability Score Override",
     hint: "Set one or more ability scores equal to another (Physical Surge)",
@@ -334,6 +339,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     value: "weapon_ability_override",
     label: "Weapon Attack/Damage Ability",
     hint: "Use a chosen ability for weapon attack and/or damage rolls (Hex Warrior, Shillelagh)",
+  },
+  {
+    value: "weapon_sheet_badge",
+    label: "Weapon Sheet Badge",
+    hint: "Named info badge on matching equipped weapons (optional damage riders, Extra Finesse–style notes)",
   },
   {
     value: "custom_skill",
@@ -487,7 +497,29 @@ export interface WeaponAbilityOverrideCharacteristic extends CharacteristicModif
   scope: WeaponAbilityScope
   /** When scope is "specific", match these weapon names (case-insensitive). */
   weaponNames?: string[]
+  /**
+   * Use the Finesse rule (higher of Strength or Dexterity) instead of a fixed `ability`.
+   * Extra Finesse–style grants set this with `whenDamageDice`.
+   */
+  treatAsFinesse?: boolean
+  /** When set, the override only applies if the weapon's leading damage die is one of these (`1d4`, `1d6`). */
+  whenDamageDice?: string[]
   conditionLabel?: string
+}
+
+/** Informational badge on matching Combat weapon cards (optional riders, not a numeric rewrite). */
+export interface WeaponSheetBadgeCharacteristic extends CharacteristicModifierBase {
+  type: "weapon_sheet_badge"
+  /** Overlay body; `label` is the badge text. */
+  description?: string
+  /** When set, only weapons whose printed die is one of these (`1d4`, `1d6`, `2d4`). */
+  whenDamageDice?: string[]
+  /** Also match Unarmed Strike even when its printed damage is a flat 1. */
+  includeUnarmed?: boolean
+  /** Only Firearm weapons (property tag or Firearm subcategory). */
+  requireFirearm?: boolean
+  appliesTo?: WeaponAbilityScope
+  weaponNames?: string[]
 }
 
 export interface CustomSkillCharacteristic extends CharacteristicModifierBase {
@@ -1322,6 +1354,13 @@ export interface PowerRiderCharacteristic extends CharacteristicModifierBase {
   spendHitPoints?: number
 }
 
+/** Hide a prior feature and treat this one as its successor on the sheet. */
+export interface ReplaceFeatureCharacteristic extends CharacteristicModifierBase {
+  type: "replace_feature"
+  /** Feature names this upgrade supersedes (hidden from Features + action cards). */
+  replacedFeatureNames: string[]
+}
+
 /** Set listed ability scores equal to another ability's score (Physical Surge). */
 export interface AbilityScoreOverrideCharacteristic extends CharacteristicModifierBase {
   type: "ability_score_override"
@@ -1399,6 +1438,7 @@ export type CharacteristicModifier =
   | SavingThrowAlternateAbilityCharacteristic
   | ForcedSaveAbilityRemapCharacteristic
   | WeaponAbilityOverrideCharacteristic
+  | WeaponSheetBadgeCharacteristic
   | CustomSkillCharacteristic
   | ListCharacteristic
   | WeaponProficienciesCharacteristic
@@ -1450,6 +1490,7 @@ export type CharacteristicModifier =
   | PlayerNoteCharacteristic
   | CatalogOptionCharacteristic
   | PowerRiderCharacteristic
+  | ReplaceFeatureCharacteristic
   | AbilityScoreOverrideCharacteristic
   | HealingReceivedModifierCharacteristic
   | GrantCustomAbilityCharacteristic
@@ -1491,6 +1532,20 @@ export function createCharacteristicModifier(
         ability: "charisma",
         appliesTo: "both",
         scope: "all",
+        weaponNames: [],
+        treatAsFinesse: false,
+        whenDamageDice: [],
+      }
+    case "weapon_sheet_badge":
+      return {
+        id,
+        type,
+        label: "Weapon rider",
+        description: "",
+        whenDamageDice: [],
+        includeUnarmed: false,
+        requireFirearm: false,
+        appliesTo: "all",
         weaponNames: [],
       }
     case "custom_skill":
@@ -1642,6 +1697,8 @@ export function createCharacteristicModifier(
       return { id, type, creatureNames: [], count: 1 }
     case "power_rider":
       return { id, type, parentPowerNames: [], parentMenuOptionNames: [], alertSummary: "", selectable: false }
+    case "replace_feature":
+      return { id, type, replacedFeatureNames: [] }
     case "ability_score_override":
       return {
         id,
@@ -1760,12 +1817,32 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       alternateAbility?: AbilityScoreKey
       weaponAbilityAppliesTo?: WeaponAbilityAppliesTo
       weaponAbilityScope?: WeaponAbilityScope
+      treatAsFinesse?: boolean
+      whenDamageDice?: string[]
     }
     return {
       ...raw,
       ability: raw.ability ?? raw.alternateAbility ?? "strength",
       appliesTo: raw.appliesTo ?? raw.weaponAbilityAppliesTo ?? "both",
       scope: raw.scope ?? raw.weaponAbilityScope ?? "all",
+      treatAsFinesse: Boolean(raw.treatAsFinesse),
+      whenDamageDice: Array.isArray(raw.whenDamageDice)
+        ? raw.whenDamageDice.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+        : [],
+    }
+  }
+
+  if (value.type === "weapon_sheet_badge") {
+    const raw = value as WeaponSheetBadgeCharacteristic
+    return {
+      ...raw,
+      whenDamageDice: Array.isArray(raw.whenDamageDice)
+        ? raw.whenDamageDice.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+        : [],
+      includeUnarmed: Boolean(raw.includeUnarmed),
+      requireFirearm: Boolean(raw.requireFirearm),
+      appliesTo: raw.appliesTo ?? "all",
+      weaponNames: Array.isArray(raw.weaponNames) ? raw.weaponNames : [],
     }
   }
 
@@ -1977,6 +2054,14 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
         typeof raw.spendHitPoints === "number" && raw.spendHitPoints > 0
           ? raw.spendHitPoints
           : undefined,
+    }
+  }
+
+  if (value.type === "replace_feature") {
+    const raw = value as ReplaceFeatureCharacteristic
+    return {
+      ...raw,
+      replacedFeatureNames: coerceStringArray(raw.replacedFeatureNames),
     }
   }
 
@@ -2308,6 +2393,8 @@ export type AggregatedCharacteristics = {
   resistances: string[]
   immunities: string[]
   conditionImmunities: string[]
+  /** Feature / item names that grant each condition immunity (same keys as conditionImmunities). */
+  conditionImmunitySources: Record<string, string[]>
   criticalHitMinimum: number | null
   criticalHitMinimumByLevel: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
   attunementSlots: number | null
@@ -2422,6 +2509,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   resistances: [],
   immunities: [],
   conditionImmunities: [],
+  conditionImmunitySources: {},
   criticalHitMinimum: null,
   criticalHitMinimumByLevel: [],
   attunementSlots: null,
@@ -2471,6 +2559,28 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   featureChoiceCountBonuses: [],
   featureChoiceOptionGrants: [],
 })
+
+function modifierSourceName(mod: CharacteristicModifier): string | undefined {
+  const tagged = (mod as { _contributionSource?: { source?: string } })._contributionSource
+  const name = tagged?.source?.trim() || mod.label?.trim()
+  return name || undefined
+}
+
+function recordConditionImmunity(
+  result: AggregatedCharacteristics,
+  conditions: string[] | null | undefined,
+  sourceName?: string,
+) {
+  pushUnique(result.conditionImmunities, conditions)
+  if (!sourceName) return
+  for (const raw of conditions ?? []) {
+    const condition = raw.trim()
+    if (!condition) continue
+    const existing = result.conditionImmunitySources[condition] ?? []
+    if (existing.some((entry) => entry.toLowerCase() === sourceName.toLowerCase())) continue
+    result.conditionImmunitySources[condition] = [...existing, sourceName]
+  }
+}
 
 function pushUnique(list: string[], values: string[] | null | undefined) {
   for (const value of values ?? []) {
@@ -2629,6 +2739,8 @@ export function aggregateCharacteristics(
         break
       case "skills":
         if (mod.grantsProficiency === false) break
+        // Unresolved player pick: entries are the allowed pool, not granted skills.
+        if ((mod.choiceCount ?? 0) > 0) break
         if (mod.expertiseIfProficient) {
           for (const entry of getSkillEntries(mod)) {
             pushUnique(result.expertiseIfProficientSkills, [entry.skill])
@@ -2854,7 +2966,7 @@ export function aggregateCharacteristics(
         if (mod.fromSpells) pushUnique(result.immunities, ["Spell damage"])
         break
       case "condition_immunity":
-        pushUnique(result.conditionImmunities, mod.conditions)
+        recordConditionImmunity(result, mod.conditions, modifierSourceName(mod))
         break
       case "attunement_slots":
         if (mod.totalSlots != null) {
@@ -2866,11 +2978,13 @@ export function aggregateCharacteristics(
       case "aura":
         result.auras.push(mod)
         if (mod.conditionImmunities?.length) {
-          pushUnique(result.conditionImmunities, mod.conditionImmunities)
+          recordConditionImmunity(result, mod.conditionImmunities, modifierSourceName(mod))
         }
         break
       case "weapon_ability_override":
         result.weaponAbilityOverrides.push(mod)
+        break
+      case "weapon_sheet_badge":
         break
       case "saving_throw_alternate_ability":
         result.savingThrowAlternateAbilities.push(mod)
@@ -3002,6 +3116,8 @@ export function aggregateCharacteristics(
         break
       case "power_rider":
         result.powerRiders.push(mod)
+        break
+      case "replace_feature":
         break
       case "ability_score_override":
         result.abilityScoreOverrides.push(mod)

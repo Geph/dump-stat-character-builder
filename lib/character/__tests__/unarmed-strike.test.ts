@@ -157,14 +157,14 @@ describe("unarmed strike on the sheet", () => {
     expect(derived.unarmedStrikeAttack?.damageDisplay).toMatch(/1 \+ 3 Bludgeoning/)
   })
 
-  it("is hidden while wielding a two-handed weapon", () => {
+  it("stays available while wielding a two-handed weapon", () => {
     const derived = computeDerivedCharacter(fighterArcheryBackgroundFixture())
     expect(derived.equippedWeaponAttack).not.toBeNull()
-    expect(derived.unarmedStrikeAttack).toBeNull()
-    expect(derived.unarmedStrikeWeapon).toBeNull()
+    expect(derived.unarmedStrikeAttack).not.toBeNull()
+    expect(derived.unarmedStrikeWeapon?.name).toBe("Unarmed Strike")
   })
 
-  it("is hidden with a weapon and shield", () => {
+  it("stays available with a weapon and shield", () => {
     const derived = computeDerivedCharacter(
       baseInputs({
         classLevels: [{ classId: fighterClass.id, level: 1 }],
@@ -176,7 +176,7 @@ describe("unarmed strike on the sheet", () => {
       }),
     )
     expect(derived.equippedWeaponAttack).not.toBeNull()
-    expect(derived.unarmedStrikeAttack).toBeNull()
+    expect(derived.unarmedStrikeAttack).not.toBeNull()
   })
 
   it("stays available next to a one-handed weapon", () => {

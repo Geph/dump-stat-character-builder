@@ -125,6 +125,61 @@ describe("buildFeatureTabSections", () => {
     })
   })
 
+  it("shows the chosen Magic Initiate spell list in chrome and specialized prose", () => {
+    const feat = {
+      id: "feat-mi",
+      name: "Magic Initiate",
+      description:
+        "You learn two cantrips of your choice from the Cleric, Druid, or Wizard spell list.",
+    } as Feat
+    const sections = buildFeatureTabSections({
+      classDetails: [],
+      originFeat: feat,
+      originFeatFallbackName: "Magic Initiate (Cleric)",
+      feats: [],
+      featureChoicePicks: {},
+    })
+    const item = sections.find((section) => section.id === "feats")?.items[0]
+    expect(item?.name).toBe("Magic Initiate")
+    expect(item?.chosenNames).toEqual(["Cleric"])
+    expect(item?.description).toContain("from the Cleric spell list")
+    expect(item?.description).not.toContain("Druid, or Wizard")
+  })
+
+  it("shows the chosen Energy Mastery damage type on Elemental Adept", () => {
+    const feat = {
+      id: "feat-elemental",
+      name: "Elemental Adept",
+      description: "Energy Mastery",
+      linkedModifiers: [
+        {
+          instanceId: "modinst_elemental_adept_type",
+          catalogRefId: "cat_char_damage_resistance",
+          characteristics: [
+            {
+              id: "mod_elemental_adept_type",
+              type: "damage_resistance",
+              damageTypes: [],
+              choiceCount: 1,
+              choiceOptions: ["Acid", "Cold", "Fire", "Lightning", "Thunder"],
+            },
+          ],
+        },
+      ],
+    } as unknown as Feat
+    const sections = buildFeatureTabSections({
+      classDetails: [],
+      feats: [feat],
+      featureChoicePicks: {},
+      modifierPlayerPicks: {
+        "feat:granted:feat-elemental::mod_elemental_adept_type::damage_type": ["Lightning"],
+      },
+    })
+    expect(sections.find((section) => section.id === "feats")?.items[0]?.chosenNames).toEqual([
+      "Lightning",
+    ])
+  })
+
   it("attaches ASI allocations to Ability Score Improvement feats", () => {
     const sections = buildFeatureTabSections({
       classDetails: [],

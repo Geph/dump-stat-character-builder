@@ -138,7 +138,7 @@ Vercel is **not recommended** (no persistent MySQL on the same project).
 
 ## Local card art (optional)
 
-In visual mode the public repo ships Midjourney-created card art for **SRD 5.2.1**, **species portraits** and potentially more I may have added since writing this. Player’s Handbook / setting-book backgrounds and other class/subclass art can still run on *your* copy when present locally; you can also import JSONs of art sources from external URLs.
+In visual mode the public repo ships Midjourney-created card art for **SRD 5.2.1** and the original species portraits already in git. **Kibbles Tasty** portraits are local-only: drop masters under `scripts/*-card-sources/kibbles/`, run `pnpm images:optimize`, and import will attach the URL when the PNG is present. They are not part of Seed Example Content. Leftover Kibbles files may still exist in git history — do not add new ones. Player’s Handbook / setting-book art works the same way on *your* copy; you can also import JSONs of art sources from external URLs.
 
 **What is safe to commit** is documented in [CONTRIBUTING.md](CONTRIBUTING.md#what-not-to-commit). Drop-folder notes live next to the masters:
 
@@ -146,7 +146,7 @@ In visual mode the public repo ships Midjourney-created card art for **SRD 5.2.1
 |-------------|------------------|
 | `scripts/subclass-card-sources/` | `public/images/compendium/subclasses/{class}/{slug}.png` (771×1024) |
 | `scripts/class-card-sources/` | `public/images/compendium/classes/{slug}.png` (771×1024) |
-| `scripts/species-card-sources/` | `public/images/compendium/species/{slug}.png` (all ship on GitHub) |
+| `scripts/species-card-sources/` | `public/images/compendium/species/{slug}.png` (already-shipped originals only; new local slugs stay gitignored) |
 | `scripts/background-card-sources/` | `public/images/compendium/backgrounds/{slug}.png` (1680×720) |
 
 Put full-resolution masters in origin folders (`SRD/`, `kibbles/`, `magehandpress/`, `PHB/`, `eberron/`, …), then:

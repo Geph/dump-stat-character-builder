@@ -442,3 +442,38 @@ describe("background Planar Pact grant wiring", () => {
     expect(slots[0]?.featCategories).toEqual(["Dark Gift"])
   })
 })
+
+describe("Magic Initiate repeatable spell-list exclusivity", () => {
+  const magicInitiate = feat({
+    id: "mi",
+    name: "Magic Initiate",
+    category: "Origin",
+    repeatable: true,
+  })
+  const context: FeatSlotContext = {
+    totalLevel: 4,
+    classIds: ["martyr"],
+    feats: [magicInitiate],
+    ownedFeatIds: ["mi"],
+    speciesId: null,
+    backgroundId: "acolyte",
+  }
+
+  it("still offers Magic Initiate when one spell list is already taken", () => {
+    expect(
+      isFeatEligibleForCategories(magicInitiate, ["General"], 4, {
+        ...context,
+        takenMagicInitiateSpellLists: ["Cleric"],
+      }),
+    ).toBe(true)
+  })
+
+  it("hides Magic Initiate when every spell list is already taken", () => {
+    expect(
+      isFeatEligibleForCategories(magicInitiate, ["General"], 4, {
+        ...context,
+        takenMagicInitiateSpellLists: ["Cleric", "Druid", "Wizard"],
+      }),
+    ).toBe(false)
+  })
+})

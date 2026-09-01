@@ -12,6 +12,10 @@ describe("listLocalOnlyCardArtRelativePaths", () => {
     )
     expect(paths.includes("backgrounds/charlatan.png")).toBe(charlatanOnDisk)
     expect(paths.includes("backgrounds/acolyte.png")).toBe(false)
+    const inventorOnDisk = existsSync(
+      join(process.cwd(), "public/images/compendium/classes/inventor.png"),
+    )
+    expect(paths.includes("classes/inventor.png")).toBe(inventorOnDisk)
     expect(
       isBundledPublicCardArtPath("public/images/compendium/backgrounds/acolyte.png"),
     ).toBe(true)

@@ -31,7 +31,26 @@ describe("aggregateCharacteristics", () => {
     const aggregated = aggregateCharacteristics(mods)
     expect(aggregated.resistances).toEqual(["Fire", "Cold"])
     expect(aggregated.conditionImmunities).toEqual(["Frightened"])
+    expect(aggregated.conditionImmunitySources).toEqual({})
     expect(aggregated.savingThrows).toEqual(["Wisdom"])
+  })
+
+  it("records the feature that grants a condition immunity", () => {
+    const aggregated = aggregateCharacteristics([
+      {
+        id: "mod_fey",
+        type: "condition_immunity",
+        conditions: ["Charmed"],
+        label: "Fey Ancestry",
+        _contributionSource: {
+          sourceType: "species",
+          source: "Fey Ancestry",
+          label: "Fey Ancestry (Elf)",
+        },
+      } as never,
+    ])
+    expect(aggregated.conditionImmunities).toEqual(["Charmed"])
+    expect(aggregated.conditionImmunitySources).toEqual({ Charmed: ["Fey Ancestry"] })
   })
 
   it("aggregates climb/swim speeds equal to walk", () => {
@@ -102,5 +121,36 @@ describe("aggregateCharacteristics", () => {
     }
     const initiative = computeInitiative(1, aggregated, abilityMods, 2)
     expect(initiative).toBe(5)
+  })
+
+  it("does not grant a constrained skill pool until the player picks", () => {
+    const pooled = aggregateCharacteristics([
+      {
+        id: "mod_affinity",
+        type: "skills",
+        entries: [
+          { skill: "Animal Handling", expertise: false },
+          { skill: "Medicine", expertise: false },
+          { skill: "Nature", expertise: false },
+          { skill: "Survival", expertise: false },
+        ],
+        allowAnySkill: false,
+        choiceCount: 1,
+        label: "Natural Affinity (pick 1)",
+      },
+    ])
+    expect(pooled.skills).toEqual([])
+
+    const chosen = aggregateCharacteristics([
+      {
+        id: "mod_affinity",
+        type: "skills",
+        entries: [{ skill: "Nature", expertise: false }],
+        allowAnySkill: false,
+        choiceCount: 0,
+        label: "Natural Affinity (pick 1)",
+      },
+    ])
+    expect(chosen.skills).toEqual(["Nature"])
   })
 })

@@ -1746,6 +1746,104 @@ function ModifierFields({
               placeholder="Add weapon name..."
             />
           )}
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={Boolean(mod.treatAsFinesse)}
+              onChange={(e) => onChange({ ...mod, treatAsFinesse: e.target.checked })}
+            />
+            Treat as Finesse (higher of Strength or Dexterity)
+          </label>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Only when damage die is
+            </label>
+            <TagInput
+              values={mod.whenDamageDice ?? []}
+              onChange={(whenDamageDice) => onChange({ ...mod, whenDamageDice })}
+              placeholder="Add die (1d4, 1d6)…"
+            />
+          </div>
+        </div>
+      )
+
+    case "weapon_sheet_badge":
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Shows a named badge with an info tip on matching Combat weapon cards. Use this for
+            optional riders (Deadly D4s, similar) that should be visible on the weapon without
+            rewriting its printed die.
+          </p>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">Badge label</label>
+            <input
+              value={mod.label ?? ""}
+              onChange={(e) => onChange({ ...mod, label: e.target.value })}
+              placeholder="Dervish Fighting"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Overlay description
+            </label>
+            <textarea
+              value={mod.description ?? ""}
+              onChange={(e) => onChange({ ...mod, description: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Only when damage die is
+            </label>
+            <TagInput
+              values={mod.whenDamageDice ?? []}
+              onChange={(whenDamageDice) => onChange({ ...mod, whenDamageDice })}
+              placeholder="Add die (1d4, 1d6, 2d4)…"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={Boolean(mod.includeUnarmed)}
+              onChange={(e) => onChange({ ...mod, includeUnarmed: e.target.checked })}
+            />
+            Include Unarmed Strike
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={Boolean(mod.requireFirearm)}
+              onChange={(e) => onChange({ ...mod, requireFirearm: e.target.checked })}
+            />
+            Firearms only
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm text-muted-foreground">Weapons</label>
+            <select
+              value={mod.appliesTo ?? "all"}
+              onChange={(e) =>
+                onChange({ ...mod, appliesTo: e.target.value as typeof mod.appliesTo })
+              }
+              className="px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              <option value="all">All matching</option>
+              <option value="melee">Melee</option>
+              <option value="ranged">Ranged</option>
+              <option value="finesse">Finesse</option>
+              <option value="specific">Named weapons</option>
+            </select>
+          </div>
+          {mod.appliesTo === "specific" ? (
+            <TagInput
+              values={mod.weaponNames ?? []}
+              onChange={(weaponNames) => onChange({ ...mod, weaponNames })}
+              placeholder="Add weapon name..."
+            />
+          ) : null}
         </div>
       )
 
@@ -2849,6 +2947,36 @@ function ModifierFields({
               <option value="equipment">Equipment item</option>
             </select>
           </label>
+        </div>
+      )
+
+    case "replace_feature":
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Features this replaces
+            </label>
+            <textarea
+              value={(mod.replacedFeatureNames ?? []).join("\n")}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  replacedFeatureNames: e.target.value
+                    .split(/[\n,]/)
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                })
+              }
+              rows={3}
+              placeholder={"Sacrificial Strike"}
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Named features are hidden on Features and Combat/Abilities. This feature becomes
+              the sheet action instead of a rider note.
+            </p>
+          </div>
         </div>
       )
 

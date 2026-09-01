@@ -37,7 +37,7 @@ type CompendiumSelectionCardProps = {
   badge?: ReactNode
   accentColor?: CompendiumThemeColorId | null
   onSelect?: () => void
-  onLearnMore?: (e: React.MouseEvent) => void
+  onLearnMore?: (e?: React.MouseEvent) => void
   learnMoreLabel?: string
   selectLabel?: string
   /** When false, hide the overlay blurb and lift the source label into that space. */
@@ -65,6 +65,7 @@ function CardContent({
   learnMoreLabel,
   selectLabel,
   accent,
+  showLearnMoreButton,
 }: {
   item: CompendiumCardVisual & { name: string }
   subtitle?: string
@@ -75,10 +76,11 @@ function CardContent({
   selected: boolean
   disabled: boolean
   onSelect?: () => void
-  onLearnMore?: (e: React.MouseEvent) => void
+  onLearnMore?: (e?: React.MouseEvent) => void
   learnMoreLabel: string
   selectLabel: string
   accent: ReturnType<typeof compendiumAccentColorStyles>
+  showLearnMoreButton: boolean
 }) {
   const sourceLabel = subtitle?.trim() || item.source?.trim() || null
 
@@ -126,6 +128,7 @@ function CardContent({
         </p>
       ) : null}
 
+      {(showBlurb || showLearnMoreButton || onSelect) ? (
       <div
         className={cn(
           "mt-3 flex items-center gap-3",
@@ -145,7 +148,7 @@ function CardContent({
           <span className="min-w-0 flex-1 max-sm:hidden" />
         ) : null}
         <div className="flex shrink-0 items-center gap-2">
-          {onLearnMore && (
+          {showLearnMoreButton && onLearnMore && (
             <button
               type="button"
               onClick={(e) => {
@@ -181,6 +184,7 @@ function CardContent({
           )}
         </div>
       </div>
+      ) : null}
     </div>
   )
 }
@@ -219,6 +223,8 @@ export function CompendiumSelectionCard({
       : "border-primary ring-2 ring-primary/40 shadow-primary/20"
 
   const isPortrait = cardShape === "portrait"
+  const detailsOnCard = Boolean(onLearnMore && !onSelect)
+  const activateCard = onSelect ?? (detailsOnCard ? () => onLearnMore?.() : undefined)
   const cardShellClass = cn(
     "group relative flex w-full flex-col overflow-hidden rounded-lg text-left transition-shadow",
     "border-2 shadow-lg",
@@ -226,21 +232,23 @@ export function CompendiumSelectionCard({
     selected
       ? selectedBorderClass
       : "border-primary/50 hover:border-primary/80 hover:shadow-xl",
+    activateCard && !disabled && "cursor-pointer",
     disabled && "pointer-events-none opacity-50",
     className,
   )
 
   const cardShellProps = {
-    role: onSelect ? ("button" as const) : undefined,
-    tabIndex: onSelect && !disabled ? 0 : undefined,
+    role: activateCard ? ("button" as const) : undefined,
+    tabIndex: activateCard && !disabled ? 0 : undefined,
+    "aria-label": detailsOnCard ? `View ${item.name} details` : undefined,
     whileHover: disabled ? undefined : { scale: 1.02 },
     whileTap: disabled ? undefined : { scale: 0.98 },
-    onClick: disabled ? undefined : onSelect,
+    onClick: disabled ? undefined : activateCard,
     onKeyDown: (e: React.KeyboardEvent) => {
-      if (!onSelect || disabled) return
+      if (!activateCard || disabled) return
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault()
-        onSelect()
+        activateCard()
       }
     },
     className: cardShellClass,
@@ -265,6 +273,7 @@ export function CompendiumSelectionCard({
     learnMoreLabel,
     selectLabel,
     accent,
+    showLearnMoreButton: Boolean(onLearnMore && onSelect),
   }
 
   return (

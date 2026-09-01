@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatRollBonusSummary } from "@/lib/compendium/roll-bonus-config"
+import { formatResolvedRollBonus, formatRollBonusSummary } from "@/lib/compendium/roll-bonus-config"
 
 describe("formatRollBonusSummary — die mode", () => {
   it("falls back to a bare resource-key label when the die size isn't known", () => {
@@ -32,5 +32,30 @@ describe("formatRollBonusSummary — die mode", () => {
 
   it("still formats fixed-size dice unaffected by the resolver", () => {
     expect(formatRollBonusSummary({ mode: "die", dieCount: 1, dieType: "d8" })).toBe("1d8")
+  })
+})
+
+describe("formatResolvedRollBonus", () => {
+  it("states the numeric proficiency bonus", () => {
+    expect(formatResolvedRollBonus({ mode: "proficiency" }, { proficiencyBonus: 2 })).toBe(
+      "+2 (Proficiency Bonus)",
+    )
+  })
+
+  it("falls back to the label when proficiency is unknown", () => {
+    expect(formatResolvedRollBonus({ mode: "proficiency" })).toBe("Proficiency Bonus")
+  })
+
+  it("states an ability modifier with its score key", () => {
+    expect(
+      formatResolvedRollBonus(
+        { mode: "ability_modifier", ability: "INT" },
+        { abilityMods: { INT: 3 } },
+      ),
+    ).toBe("+3 (INT modifier)")
+  })
+
+  it("does not roll die bonuses", () => {
+    expect(formatResolvedRollBonus({ mode: "die", dieCount: 1, dieType: "d8" })).toBe("1d8")
   })
 })

@@ -128,7 +128,7 @@ describe("attachClassDetails class-feature presets", () => {
     expect(attack?.effect?.activation?.effects?.[0]?.bonusConfig?.fixed).toBe(5)
   })
 
-  it("wires Improved Sacrificial Strike as a selectable rider on Sacrificial Strike", () => {
+  it("wires Improved Sacrificial Strike as a replacement for Sacrificial Strike", () => {
     const martyr = {
       id: "cls_martyr",
       name: "Martyr",
@@ -144,32 +144,40 @@ describe("attachClassDetails class-feature presets", () => {
           description:
             "Your Sacrificial Strike improves. When you use this feature, you can choose to take 10 Radiant damage, and the target takes an extra 20 Radiant damage.",
         },
+        {
+          name: "Improved Sacrificial Strike (Bonus Action Free)",
+          level: 17,
+          description:
+            "The first time you use your Sacrificial Strike on each of your turns, you can do so without taking a Bonus Action.",
+        },
       ],
     } as DndClass
 
     const [detail] = attachClassDetails(
-      [{ class_id: "cls_martyr", level: 11, order: 0 }],
+      [{ class_id: "cls_martyr", level: 17, order: 0 }],
       [martyr],
       [],
     )
-    const improved = (detail.class?.features ?? []).find(
-      (feature) => feature.name === "Improved Sacrificial Strike",
-    ) as Feature | undefined
+    const features = (detail.class?.features ?? []) as Feature[]
+    expect(features.some((feature) => /bonus action free/i.test(feature.name))).toBe(false)
+    const improved = features.find((feature) => feature.name === "Improved Sacrificial Strike")
     expect(improved?.sheetDisplay).toMatchObject({
-      combatActions: false,
+      combatActions: true,
       abilitiesActions: false,
     })
-    const rider = improved?.linkedModifiers
-      ?.flatMap((instance) => instance.characteristics ?? [])
-      .find((char) => char.type === "power_rider") as
-      | { parentPowerNames?: string[]; selectable?: boolean; spendHitPoints?: number }
-      | undefined
-    expect(rider).toMatchObject({
-      type: "power_rider",
-      parentPowerNames: ["Sacrificial Strike"],
-      selectable: true,
+    expect(improved?.activation).toMatchObject({
+      bonusAction: true,
       spendHitPoints: 10,
+      firstUseNoAction: true,
+      firstUseNoActionFromLevel: 17,
     })
+    const replace = improved?.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "replace_feature") as
+      | { replacedFeatureNames?: string[] }
+      | undefined
+    expect(replace?.replacedFeatureNames).toEqual(["Sacrificial Strike"])
+    expect(improved?.description).toMatch(/first time you use/i)
   })
 
   it("attaches Sacrifice Foe as a notice on Sacrificial Strike and Skill", () => {
@@ -289,8 +297,9 @@ describe("attachClassDetails class-feature presets", () => {
     const respite = respiteRows[0]
     expect(respite?.activation).toMatchObject({ action: true, noEconomyCost: true })
     expect(respite?.sheetDisplay).toMatchObject({
-      abilitiesActions: true,
+      abilitiesActions: false,
       combatActions: false,
+      restDialogues: true,
     })
     const restore = respite?.linkedModifiers
       ?.flatMap((instance) => instance.characteristics ?? [])

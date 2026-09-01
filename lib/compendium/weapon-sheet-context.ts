@@ -10,13 +10,16 @@ import {
   type OnHitTriggerCharacteristic,
   type RollModifierEntry,
   type WeaponReachModifierCharacteristic,
+  type WeaponSheetBadgeCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import { collectEquipmentMagicCharacteristics } from "@/lib/compendium/equipment-magic-modifiers"
 import {
   getWeaponMastery,
   getWeaponPropertyTags,
+  hasWeaponProperty,
   isUnarmedStrikeWeapon,
   isWeaponProficient,
+  weaponDamageDiceMatches,
 } from "@/lib/compendium/combat-stats"
 import { describeWeaponMastery, weaponMasteryCatalogEntriesFromAbilities } from "@/lib/compendium/weapon-mastery"
 import {
@@ -169,6 +172,44 @@ function appliedModifierSource(mod: CharacteristicModifier): Pick<
   }
 }
 
+function isFirearmWeapon(weapon: Equipment): boolean {
+  if (hasWeaponProperty(weapon, "firearm")) return true
+  return /firearm/i.test(weapon.subcategory ?? "")
+}
+
+function weaponMatchesSheetBadge(weapon: Equipment, badge: WeaponSheetBadgeCharacteristic): boolean {
+  if (badge.requireFirearm && !isFirearmWeapon(weapon)) return false
+  const isUnarmed = isUnarmedStrikeWeapon(weapon)
+  const isRanged = weapon.subcategory?.toLowerCase().includes("ranged") ?? false
+  const isMelee = weapon.subcategory?.toLowerCase().includes("melee") ?? !isRanged
+  const weaponName = weapon.name.trim().toLowerCase()
+  const scope = badge.appliesTo ?? "all"
+  let matches = false
+  switch (scope) {
+    case "all":
+      matches = true
+      break
+    case "melee":
+      matches = isMelee
+      break
+    case "ranged":
+      matches = isRanged
+      break
+    case "finesse":
+      matches = hasWeaponProperty(weapon, "finesse")
+      break
+    case "specific": {
+      const names = (badge.weaponNames ?? []).map((name) => name.trim().toLowerCase()).filter(Boolean)
+      matches = names.some((name) => name === weaponName)
+      break
+    }
+  }
+  if (!matches) return false
+  if (isUnarmed) return Boolean(badge.includeUnarmed)
+  if (badge.whenDamageDice?.length) return weaponDamageDiceMatches(weapon, badge.whenDamageDice)
+  return true
+}
+
 function collectAppliedModifiers(
   weapon: Equipment,
   mods: CharacteristicModifier[],
@@ -278,6 +319,17 @@ function collectAppliedModifiers(
           ...appliedModifierSource(mod),
         })
       }
+    }
+
+    if (mod.type === "weapon_sheet_badge") {
+      const badge = mod as WeaponSheetBadgeCharacteristic
+      if (!weaponMatchesSheetBadge(weapon, badge)) continue
+      const name = badge.label?.trim() || "Weapon rider"
+      applied.push({
+        name,
+        description: badge.description?.trim() || name,
+        ...appliedModifierSource(mod),
+      })
     }
   }
 

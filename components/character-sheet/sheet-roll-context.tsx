@@ -22,6 +22,10 @@ export type SheetRollContextValue = LimitationEvaluationContext & {
   classFeatures: Feature[]
   /** Params for gated roll bonuses (Jack of All Trades, etc.). */
   featureEffectContext?: SheetFeatureEffectContext
+  /** Lowest d20 that scores a critical hit on attack rolls (default 20). */
+  criticalHitMinimum?: number
+  /** Feature-gated restores such as Dire Gambit (1 Risk Die). */
+  onAttackCriticalHit?: () => void
 }
 
 const defaultValue: SheetRollContextValue = {

@@ -32,6 +32,7 @@ describe("audit-modifier-catalog", () => {
       "on_creature_death_trigger",
       "skill_check_alternate_ability",
       "turn_start_trigger",
+      "weapon_sheet_badge",
     ])
   })
 

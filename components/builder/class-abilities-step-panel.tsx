@@ -22,6 +22,7 @@ import {
   type ModifierPlayerChoiceSlot,
 } from "@/lib/builder/modifier-player-choices"
 import { isFeatEligibleForCategories } from "@/lib/builder/feat-selection"
+import { takenMagicInitiateSpellLists } from "@/lib/builder/magic-initiate"
 import { filterPreferredSourceReplacements } from "@/lib/compendium/prefer-same-source"
 import { featChoicePickKey } from "@/lib/builder/feat-choices"
 import type {
@@ -257,6 +258,8 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
                     [key]: selected,
                   }))
                 }
+                showOptionInfo
+                showOptionSummaries
               />
             )
           })}
@@ -341,6 +344,12 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
               preferredSources: preferredFeatSources,
               armorProficiencies,
               abilityScores,
+              takenMagicInitiateSpellLists: [
+                ...takenMagicInitiateSpellLists(
+                  modifierPlayerChoiceSlots,
+                  modifierPlayerPicks,
+                ),
+              ],
             }
             const eligibleFeats = filterPreferredSourceReplacements(
               feats.filter((feat) =>

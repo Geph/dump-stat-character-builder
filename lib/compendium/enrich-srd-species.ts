@@ -1,6 +1,7 @@
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import { applySrdItemIcon, SRD_SPECIES_ICONS_BY_NAME } from "@/lib/compendium/srd-item-icons-defaults"
 import { applySrdCardImage } from "@/lib/compendium/card-image"
+import { withFilledChoiceOptionDescriptions } from "@/lib/compendium/choice-option-description"
 import { SPECIES_CARD_IMAGES_BY_NAME } from "@/lib/compendium/species-card-images-defaults"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
@@ -1040,7 +1041,7 @@ function applyPresetToTrait(speciesName: string, trait: Trait): Trait {
     level: trait.level,
   }) as unknown as Trait
 
-  return stripRedundantTraitSpellcastingAbility(detected)
+  return stripRedundantTraitSpellcastingAbility(withFilledChoiceOptionDescriptions(detected))
 }
 
 /** SRD 2024 species that let the player choose their size (Medium or Small). */

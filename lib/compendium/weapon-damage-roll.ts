@@ -1,9 +1,12 @@
 import {
   getWeaponAttackAbility,
+  getWeaponDamageDiceNotation,
   getWeaponDamageText,
   hasWeaponProperty,
+  isUnarmedStrikeWeapon,
   weaponOmitsAbilityModifierFromDamage,
 } from "@/lib/compendium/combat-stats"
+import type { PowerRiderCharacteristic } from "@/lib/compendium/characteristic-modifiers"
 import { replaceDamageDiceSides } from "@/lib/compendium/weapon-damage-die-override"
 import type { Equipment } from "@/lib/types"
 
@@ -87,6 +90,39 @@ export function weaponDamageDiceOptions(
     optionsList.push({ id: "two-handed", label: "Two-handed", dice: versatile })
   }
   return optionsList
+}
+
+function riderMentions(rider: PowerRiderCharacteristic, pattern: RegExp): boolean {
+  return (
+    pattern.test(rider.id) ||
+    pattern.test(rider.label ?? "") ||
+    pattern.test(rider.alertSummary ?? "")
+  )
+}
+
+function isFirearmWeapon(weapon: Equipment): boolean {
+  if (hasWeaponProperty(weapon, "firearm")) return true
+  return /firearm/i.test(weapon.subcategory ?? "")
+}
+
+/** Optional play-time replacements (Deadly D4s / Dervish Firearms) — never rewrite the printed die. */
+export function optionalWeaponDamageReplacements(
+  weapon: Equipment,
+  riders: readonly PowerRiderCharacteristic[] | null | undefined,
+): WeaponDamageDiceOption[] {
+  if (!riders?.length) return []
+  const deadly = riders.some((rider) => riderMentions(rider, /deadly[_ ]?d4s/i))
+  const firearms = riders.some((rider) => riderMentions(rider, /dervish firearms/i))
+  if (!deadly && !firearms) return []
+  const notation = getWeaponDamageDiceNotation(weapon)
+  const options: WeaponDamageDiceOption[] = []
+  if (deadly && (notation === "1d4" || notation === "1d6" || isUnarmedStrikeWeapon(weapon))) {
+    options.push({ id: "deadly-d4s", label: "Deadly D4s", dice: "2d4" })
+  }
+  if (firearms && notation === "2d4" && isFirearmWeapon(weapon)) {
+    options.push({ id: "dervish-firearms", label: "Dervish Firearms", dice: "3d4" })
+  }
+  return options
 }
 
 export function buildWeaponDamageExpression(params: {

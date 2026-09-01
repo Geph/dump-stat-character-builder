@@ -6,9 +6,9 @@ import { WeaponDamageRollButton } from "@/components/character-sheet/weapon-dama
 import { GameIcon } from "@/components/game-icon-picker"
 import type { CharacterBuildInputs } from "@/lib/character/types"
 import {
+  getEffectiveWeaponPropertyTags,
   getWeaponDamageText,
   getWeaponMastery,
-  getWeaponPropertyTags,
   getWeaponRangeText,
   isThrownWeapon,
 } from "@/lib/compendium/combat-stats"
@@ -18,7 +18,14 @@ import {
   describeWeaponRange,
 } from "@/lib/compendium/weapon-property-reference"
 import { buildWeaponSheetContext } from "@/lib/compendium/weapon-sheet-context"
-import { weaponDamageDiceOptions } from "@/lib/compendium/weapon-damage-roll"
+import {
+  optionalWeaponDamageReplacements,
+  weaponDamageDiceOptions,
+} from "@/lib/compendium/weapon-damage-roll"
+import type {
+  PowerRiderCharacteristic,
+  WeaponAbilityOverrideCharacteristic,
+} from "@/lib/compendium/characteristic-modifiers"
 import { weaponModifierBadgeClass } from "@/lib/character/sheet-status-colors"
 import { canMountWeapon, isWeaponMounted } from "@/lib/character/mounted-weapon"
 import { Switch } from "@/components/ui/switch"
@@ -61,6 +68,8 @@ type SheetEquippedWeaponsPanelProps = {
   hideHeading?: boolean
   activeSheetToggleIds?: readonly string[]
   onToggleMounted?: (weaponId: string) => void
+  powerRiders?: readonly PowerRiderCharacteristic[]
+  weaponAbilityOverrides?: readonly WeaponAbilityOverrideCharacteristic[]
 }
 
 function WeaponAttackCard({
@@ -82,6 +91,8 @@ function WeaponAttackCard({
   onDamageRoll,
   activeSheetToggleIds,
   onToggleMounted,
+  powerRiders,
+  weaponAbilityOverrides,
 }: EquippedWeaponCard & {
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
@@ -92,10 +103,12 @@ function WeaponAttackCard({
   onDamageRoll?: () => void
   activeSheetToggleIds?: readonly string[]
   onToggleMounted?: (weaponId: string) => void
+  powerRiders?: readonly PowerRiderCharacteristic[]
+  weaponAbilityOverrides?: readonly WeaponAbilityOverrideCharacteristic[]
 }) {
   const range = getWeaponRangeText(weapon)
   const mastery = getWeaponMastery(weapon)
-  const properties = getWeaponPropertyTags(weapon)
+  const properties = getEffectiveWeaponPropertyTags(weapon, weaponAbilityOverrides)
   const isBasicMeleeRange =
     (weapon.subcategory ?? "").toLowerCase().includes("melee") &&
     !properties.some((property) => /^reach(?:\s|\(|$)/i.test(property)) &&
@@ -106,7 +119,10 @@ function WeaponAttackCard({
     ? canMountWeapon(weapon, buildInputs, weaponProficiencies)
     : false
   const mounted = canMount && isWeaponMounted(activeSheetToggleIds, weapon.id)
-  const diceOptions = weaponDamageDiceOptions(weapon, { stepDice: mounted })
+  const diceOptions = [
+    ...weaponDamageDiceOptions(weapon, { stepDice: mounted }),
+    ...optionalWeaponDamageReplacements(weapon, powerRiders),
+  ]
   const sheetContext = buildInputs
     ? buildWeaponSheetContext(weapon, buildInputs, weaponProficiencies)
     : null
@@ -216,25 +232,26 @@ function WeaponAttackCard({
                   />
                 </span>
               ))}
-              {appliedModifiers.length > 0 ? (
+              {appliedModifiers.map((modifier, index) => (
                 <span
+                  key={`${modifier.name}-${modifier.sourceLabel ?? index}`}
                   className={cn(
                     "inline-flex max-w-full items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-left text-[10px] font-medium",
                     weaponModifierBadgeClass("feature"),
                   )}
                 >
-                  Attack modifiers ({appliedModifiers.length})
+                  {modifier.name}
                   <ConditionInfoTip
-                    description=""
-                    details={appliedModifiers.map((modifier) => ({
-                      label: modifier.name,
-                      description: modifier.description,
-                      source: modifier.sourceLabel,
-                    }))}
-                    ariaLabel={`${weapon.name} attack modifiers`}
+                    description={modifier.description}
+                    details={
+                      modifier.sourceLabel
+                        ? [{ label: modifier.name, description: modifier.description, source: modifier.sourceLabel }]
+                        : undefined
+                    }
+                    ariaLabel={`${modifier.name} on ${weapon.name}`}
                   />
                 </span>
-              ) : null}
+              ))}
             </div>
           ) : null}
 
@@ -331,6 +348,8 @@ export function SheetEquippedWeaponsPanel({
   hideHeading = false,
   activeSheetToggleIds,
   onToggleMounted,
+  powerRiders,
+  weaponAbilityOverrides,
 }: SheetEquippedWeaponsPanelProps) {
   if (!weapons.length) return null
 
@@ -355,6 +374,8 @@ export function SheetEquippedWeaponsPanel({
             onDamageRoll={onDamageRoll}
             activeSheetToggleIds={activeSheetToggleIds}
             onToggleMounted={onToggleMounted}
+            powerRiders={powerRiders}
+            weaponAbilityOverrides={weaponAbilityOverrides}
           />
         ))}
       </div>

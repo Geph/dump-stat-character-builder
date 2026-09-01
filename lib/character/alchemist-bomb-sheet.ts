@@ -154,3 +154,11 @@ export function isLongRestActivityText(
 ): boolean {
   return LONG_REST_ACTIVITY_RE.test(parts.filter(Boolean).join(" "))
 }
+
+/** Chosen rest activity ("When you finish a Short/Long Rest, you can…"), not spend-N-minutes downtime. */
+export function isRestDialogueChoiceText(
+  ...parts: Array<string | null | undefined>
+): boolean {
+  const haystack = parts.filter(Boolean).join(" ")
+  return SHORT_REST_ACTIVITY_RE.test(haystack) || LONG_REST_ACTIVITY_RE.test(haystack)
+}

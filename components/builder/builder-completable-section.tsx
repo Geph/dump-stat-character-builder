@@ -74,6 +74,7 @@ export function BuilderCompletableSection({
       <button
         type="button"
         aria-expanded={expanded}
+        aria-label={canToggle ? (expanded ? `${title}: collapse` : `${title}: edit selection`) : undefined}
         disabled={!canToggle}
         onClick={() => {
           if (!canToggle) return
@@ -109,17 +110,18 @@ export function BuilderCompletableSection({
         {canToggle ? (
           <span
             className={cn(
-              "mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-              "border border-border bg-muted/50 text-foreground",
+              "mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full",
+              "border border-border bg-muted/50 px-2.5 py-1 text-[11px] font-semibold text-foreground",
               "transition-colors group-hover:border-foreground/30 group-hover:bg-muted",
             )}
-            aria-hidden
           >
+            Edit selection
             <ChevronDown
               className={cn(
-                "h-4 w-4 transition-transform duration-200",
+                "h-3.5 w-3.5 transition-transform duration-200",
                 expanded && "rotate-180",
               )}
+              aria-hidden
             />
           </span>
         ) : null}

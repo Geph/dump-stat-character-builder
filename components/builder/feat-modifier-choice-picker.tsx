@@ -1,6 +1,7 @@
 "use client"
 
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
+import { shouldShowNamedChoiceSummaries } from "@/lib/compendium/choice-option-description"
 import {
   resolveFeatureChoiceOptions,
   type ResolveFeatureChoiceOptionsParams,
@@ -70,6 +71,10 @@ export function FeatModifierChoicePicker({
       accentClass={accentClass}
       layout={layout}
       showOptionInfo
+      showOptionSummaries={shouldShowNamedChoiceSummaries({
+        optionsSource: feat.choices.optionsSource,
+        options: resolvedOptions,
+      })}
     />
   )
 }

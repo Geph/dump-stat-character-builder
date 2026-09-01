@@ -7,6 +7,7 @@ import {
   normalizeCharacterClassRows,
 } from "@/lib/character/character-classes"
 import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
+import { unionSpellClassNames } from "@/lib/import/class-spell-lists"
 
 const DB_NAME = "dump-stat"
 /** Bump when COMPENDIUM_TABLES or app stores gain a new store (v6: parties + character_snapshots). */
@@ -254,6 +255,12 @@ async function upsertByName(
     // Keep the user's enable/disable toggle across SRD reseeds.
     if (prev && "enabled" in prev) {
       payload.enabled = prev.enabled
+    }
+    if (storeName === "spells" && prev) {
+      payload.classes = unionSpellClassNames(
+        Array.isArray(prev.classes) ? (prev.classes as string[]) : null,
+        Array.isArray(payload.classes) ? (payload.classes as string[]) : null,
+      )
     }
     byName.set(name, payload)
     saved.push(payload)

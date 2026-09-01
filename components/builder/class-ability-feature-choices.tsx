@@ -11,6 +11,10 @@ import { validateKnackSelectionChange } from "@/lib/builder/knack-choices"
 import { validateUpgradeSelectionChange } from "@/lib/builder/upgrade-choices"
 import type { FeatureChoiceCountBonusCharacteristic, FeatureChoiceOptionGrantCharacteristic } from "@/lib/compendium/characteristic-modifiers"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
+import {
+  resolveChoiceOptionDescription,
+  shouldShowNamedChoiceSummaries,
+} from "@/lib/compendium/choice-option-description"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import type { CustomAbility, Equipment, Feature } from "@/lib/types"
@@ -181,6 +185,14 @@ export function ClassAbilityFeatureChoices({
             prerequisite: ability?.prerequisites ?? null,
           })
         }
+        const resolvedOptions = optionsWithLocked.map((option) => ({
+          ...option,
+          description: resolveChoiceOptionDescription(option, feature.description),
+        }))
+        const showNamedChoiceSummaries = shouldShowNamedChoiceSummaries({
+          optionsSource: feature.choices?.optionsSource,
+          options: resolvedOptions,
+        })
         const sourceLabel =
           entry.source === "subclass" && subclassName
             ? `${className} (${subclassName})`
@@ -250,7 +262,7 @@ export function ClassAbilityFeatureChoices({
                 title={withChosenOptionChrome(feature.name, featureChoicePicks[key] ?? [])}
                 hint={hint}
                 hintDetails={hintDetails}
-                options={optionsWithLocked}
+                options={resolvedOptions}
                 maxCount={choiceCount}
                 selected={featureChoicePicks[key] ?? []}
                 lockedOptions={lockedOptions}
@@ -258,6 +270,7 @@ export function ClassAbilityFeatureChoices({
                 unavailableOptions={unavailableOptions}
                 showSkillInfo={feature.choices!.category.toLowerCase().includes("skill")}
                 showOptionInfo={!feature.choices!.category.toLowerCase().includes("skill")}
+                showOptionSummaries={showNamedChoiceSummaries}
                 layout={
                   feature.choices!.category.toLowerCase().includes("skill")
                     ? skillPickerLayout

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 import {
   defaultClassIconForName,
   HOMEBREW_CLASS_ICONS_BY_NAME,
+  resolveAttachedClassIcon,
   SRD_CLASS_ICONS_BY_NAME,
 } from "@/lib/compendium/class-icons-defaults"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
@@ -15,6 +16,11 @@ describe("class icon defaults", () => {
     expect(defaultClassIconForName("KibblesTasty Psion")).toBe("rear-aura")
     expect(defaultClassIconForName("Kibbles' Tasty Psion")).toBe("rear-aura")
     expect(defaultClassIconForName("Fighter")).toBe(SRD_CLASS_ICONS_BY_NAME.Fighter)
+    expect(resolveAttachedClassIcon({ name: "Martyr", icon: null })).toBe("bleeding-heart")
+    expect(resolveAttachedClassIcon({ name: "Martyr", icon: "drop" })).toBe("drop")
+    expect(
+      resolveAttachedClassIcon({ name: "Martyr", icon: "bleeding-heart" }, { icon: "heart-plus" }),
+    ).toBe("heart-plus")
     expect(defaultClassIconForName("LaserLlama Psion")).toBeNull()
   })
 
@@ -35,6 +41,7 @@ describe("class icon defaults", () => {
       HOMEBREW_CLASS_ICONS_BY_NAME.Warden,
       HOMEBREW_CLASS_ICONS_BY_NAME.Inventor,
       HOMEBREW_CLASS_ICONS_BY_NAME.Dancer,
+      HOMEBREW_CLASS_ICONS_BY_NAME.Martyr,
     ]) {
       expect(fs.existsSync(path.join(process.cwd(), "public/icons", `${icon}.svg`))).toBe(true)
     }

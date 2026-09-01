@@ -383,3 +383,80 @@ describe("Overkill weapon damage", () => {
     expect(derived.unarmedStrikeAttack?.damageDisplay).not.toMatch(/1d8/)
   })
 })
+
+describe("Extra Finesse (1d4 / 1d6 treatAsFinesse)", () => {
+  const extraFinesse = {
+    id: "char_extra_finesse_weapons",
+    type: "weapon_ability_override" as const,
+    ability: "dexterity" as const,
+    appliesTo: "both" as const,
+    scope: "all" as const,
+    treatAsFinesse: true,
+    whenDamageDice: ["1d4", "1d6"],
+  }
+  const mace = {
+    id: "mace",
+    name: "Mace",
+    category: "Weapon",
+    subcategory: "Simple Melee Weapons",
+    properties: { damage: "1d6 Bludgeoning" },
+  } as unknown as Equipment
+  const trident = {
+    id: "trident",
+    name: "Trident",
+    category: "Weapon",
+    subcategory: "Martial Melee Weapons",
+    properties: { damage: "1d8 Piercing" },
+  } as unknown as Equipment
+
+  it("uses the higher of STR/DEX on a 1d6 weapon that is not natively Finesse", () => {
+    expect(
+      getWeaponAttackAbility(mace, dexMods, { overrides: [extraFinesse], forRoll: "attack" }),
+    ).toMatchObject({ ability: "dexterity", mod: 4, label: "Dexterity (Finesse)" })
+    expect(
+      getWeaponAttackAbility(mace, strMods, { overrides: [extraFinesse], forRoll: "damage" }),
+    ).toMatchObject({ ability: "strength", mod: 3 })
+  })
+
+  it("does not grant Finesse to a 1d8 weapon", () => {
+    expect(
+      getWeaponAttackAbility(trident, dexMods, { overrides: [extraFinesse], forRoll: "attack" }),
+    ).toMatchObject({ ability: "strength", mod: 1 })
+  })
+
+  it("applies Extra Finesse on a derived Mace attack", () => {
+    const dancer = {
+      ...fighterClass,
+      id: "class_dancer_test",
+      name: "Dancer",
+      features: [
+        {
+          name: "Dervish Fighting",
+          level: 1,
+          description: "",
+          linkedModifiers: linked([extraFinesse]),
+        },
+      ],
+    } as DndClass
+    const derived = computeDerivedCharacter(
+      baseInputs({
+        baseAbilityScores: {
+          strength: 12,
+          dexterity: 18,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 10,
+        },
+        classLevels: [{ classId: dancer.id, level: 1 }],
+        classes: [dancer],
+        primaryClassId: dancer.id,
+        extraWeaponProficiencies: ["Simple weapons"],
+        equipment: [mace],
+        equippedWeaponId: mace.id,
+      }),
+    )
+    expect(derived.equippedWeaponAttack?.attackAbilityMod).toBe(4)
+    expect(derived.equippedWeaponAttack?.damageDisplay).toMatch(/1d6 \+ 4/)
+  })
+})

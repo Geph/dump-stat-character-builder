@@ -1326,6 +1326,48 @@ function collapseMartyrDivineRespiteScalingNotes<T extends Feature>(features: T[
   })
 }
 
+const IMPROVED_STRIKE_FIRST_USE_NOTE =
+  "At Martyr level 17, the first time you use your Sacrificial Strike on each of your turns, you can do so without taking a Bonus Action."
+
+function isMartyrImprovedStrikeFirstUseOnly(feature: Feature): boolean {
+  const name = feature.name.trim()
+  if (/^improved sacrificial strike \(bonus action free\)$/i.test(name)) return true
+  if (!/^improved sacrificial strike$/i.test(name)) return false
+  const text = feature.description ?? ""
+  if (/\bwhen you use this feature\b/i.test(text) || /\btake 10 radiant\b/i.test(text)) return false
+  return /\bfirst time you use\b/i.test(text) && /\bwithout taking a bonus action\b/i.test(text)
+}
+
+/** Fold the level-17 first-use-free sentence onto Improved Sacrificial Strike. */
+function collapseMartyrImprovedSacrificialStrikeNotes<T extends Feature>(features: T[]): T[] {
+  const leftover = features.find(isMartyrImprovedStrikeFirstUseOnly)
+  const kept = features.filter((feature) => !isMartyrImprovedStrikeFirstUseOnly(feature))
+  return kept.map((feature) => {
+    if (!/^improved sacrificial strike$/i.test(feature.name)) return feature
+    if (/\bwhen you use this feature\b/i.test(feature.description ?? "") === false &&
+      /\btake 10 radiant\b/i.test(feature.description ?? "") === false) {
+      return feature
+    }
+    let description = feature.description ?? ""
+    if (leftover && !/\bfirst time you use\b/i.test(description)) {
+      description = `${description.trim()}\n<p>${IMPROVED_STRIKE_FIRST_USE_NOTE}</p>`
+    }
+    const activation = feature.activation ?? {}
+    if (activation.firstUseNoAction && activation.firstUseNoActionFromLevel === 17 && description === feature.description) {
+      return feature
+    }
+    return {
+      ...feature,
+      description,
+      activation: {
+        ...activation,
+        firstUseNoAction: true,
+        firstUseNoActionFromLevel: 17,
+      },
+    }
+  })
+}
+
 /**
  * Martyr's Sacrifice table row bundles two different action economies. Expand it into
  * Sacrificial Strike (Bonus Action) and Sacrificial Skill (Passive) so both live sheets
@@ -1339,12 +1381,14 @@ export function expandMartyrSacrificeFeatures<T extends Feature>(
   const hasStrike = features.some((feature) => /^sacrificial strike$/i.test(feature.name))
   const hasSkill = features.some((feature) => /^sacrificial skill$/i.test(feature.name))
   if (hasStrike && hasSkill) {
-    return collapseMartyrDivineRespiteScalingNotes(
-      features.map((feature) =>
-        /^sacrifice$/i.test(feature.name) &&
-        /sacrificial (?:strike|skill)/i.test(feature.description ?? "")
-          ? hideCombinedSacrificeFeature(feature)
-          : feature,
+    return collapseMartyrImprovedSacrificialStrikeNotes(
+      collapseMartyrDivineRespiteScalingNotes(
+        features.map((feature) =>
+          /^sacrifice$/i.test(feature.name) &&
+          /sacrificial (?:strike|skill)/i.test(feature.description ?? "")
+            ? hideCombinedSacrificeFeature(feature)
+            : feature,
+        ),
       ),
     )
   }
@@ -1382,7 +1426,9 @@ export function expandMartyrSacrificeFeatures<T extends Feature>(
       })
     }
   }
-  return collapseMartyrDivineRespiteScalingNotes(expanded)
+  return collapseMartyrImprovedSacrificialStrikeNotes(
+    collapseMartyrDivineRespiteScalingNotes(expanded),
+  )
 }
 
 const SACRIFICIAL_SKILL_ROLLS = [
@@ -1591,7 +1637,12 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
     operations: [
       {
         op: "setSheetDisplay",
-        sheetDisplay: { abilitiesActions: true, combatActions: false, featuresTab: true },
+        sheetDisplay: {
+          abilitiesActions: false,
+          combatActions: false,
+          featuresTab: true,
+          restDialogues: true,
+        },
       },
       {
         op: "setLimitedUses",
@@ -1633,30 +1684,61 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
     match: {
       className: /martyr/i,
       name: /^improved sacrificial strike$/i,
-      description: /when you use this feature/i,
+      description: /when you use this feature|take 10 radiant/i,
     },
     operations: [
       {
         op: "setSheetDisplay",
-        sheetDisplay: { featuresTab: true, combatActions: false, abilitiesActions: false },
+        sheetDisplay: { featuresTab: true, combatActions: true, abilitiesActions: false },
+      },
+      {
+        op: "setActivation",
+        activation: {
+          bonusAction: true,
+          spendHitPoints: 10,
+          firstUseNoAction: true,
+          firstUseNoActionFromLevel: 17,
+        },
       },
       {
         op: "attachNamedPreset",
-        skipIfCharacteristicTypes: ["power_rider"],
+        skipIfCharacteristicTypes: ["replace_feature"],
+        replaceCharacteristicTypes: ["power_rider"],
         preset: {
           kind: "char_instance",
-          idKey: "improved_sacrificial_strike",
-          catalogRefId: characteristicCatalogRefId("power_rider"),
+          idKey: "improved_sacrificial_strike_replace",
+          catalogRefId: characteristicCatalogRefId("replace_feature"),
           characteristics: [
             {
-              id: "mod_improved_sacrificial_strike",
-              type: "power_rider",
-              parentPowerNames: ["Sacrificial Strike"],
-              selectable: true,
-              spendHitPoints: 10,
-              alertSummary:
-                "Choose to take 10 Radiant; the target takes an extra 20 Radiant instead of 5 / +10.",
-              label: "Improved Sacrificial Strike",
+              id: "mod_improved_sacrificial_strike_replace",
+              type: "replace_feature",
+              replacedFeatureNames: ["Sacrificial Strike"],
+              label: "Replaces Sacrificial Strike",
+            },
+          ],
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        skipIfEffectKinds: ["extra_damage_on_hit"],
+        preset: {
+          kind: "fx_instance",
+          idKey: "improved_sacrificial_strike",
+          catalogRefId: effectCatalogRefId("extra_damage_on_hit"),
+          activation: {
+            bonusAction: true,
+            spendHitPoints: 10,
+            firstUseNoAction: true,
+            firstUseNoActionFromLevel: 17,
+          },
+          effects: [
+            {
+              id: "mod_improved_sacrificial_strike_damage",
+              kind: "extra_damage_on_hit",
+              damageTypes: ["Radiant"],
+              bonusConfig: { mode: "fixed", fixed: 20 },
+              bonusAmount: 20,
+              label: "+20 Radiant (take 10 Radiant)",
             },
           ],
         },
@@ -1739,6 +1821,23 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
       {
         op: "appendDescription",
         text: "Import Undead Thralls as creatures[] first. Prefer mechanics grant_creature with creatureChoiceOptions for Skeleton, Zombie, Spirit, and other thrall names. Thralls / CR Total columns are control caps (special), not spendable pools — never optionsSource class_upgrades.",
+      },
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { featuresTab: true, restDialogues: true },
+      },
+    ],
+  },
+  {
+    id: "necromancer.class.dead_space",
+    pack: "necromancer",
+    target: "class_feature",
+    match: { className: /necromancer/i, name: /^dead space$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true } },
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { abilitiesActions: true, featuresTab: true },
       },
     ],
   },
@@ -2039,6 +2138,77 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
     operations: [
       { op: "setActivation", activation: { onInitiative: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.overcharged_thralls",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^overcharged thralls$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["on_creature_death_trigger"],
+        preset: {
+          kind: "char_instance",
+          idKey: "overcharged_thralls_death",
+          catalogRefId: "cat_char_on_creature_death_trigger",
+          characteristics: [
+            {
+              id: "mod_overcharged_thralls_death",
+              type: "on_creature_death_trigger",
+              creatureFilter: "ally",
+              rangeFeet: 120,
+              useReaction: false,
+              effect: {
+                catalogRefId: "cat_fx_class_resource",
+                activation: {
+                  effects: [
+                    {
+                      id: "mod_overcharged_thralls_restore",
+                      kind: "class_resource",
+                      classResourceKey: "charnel_touch",
+                      classResourceChange: "increase",
+                      label: "Regain Charnel Touch equal to your Necromancer level",
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "When a thrall dies or is released, restore Charnel Touch points equal to your Necromancer level (play-time restore into the charnel_touch pool).",
+      },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "necromancer.subclass.death_knight_extra_attack",
+    pack: "necromancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /necromancer/i, name: /^extra attack$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["power_rider"],
+        preset: {
+          kind: "char_instance",
+          idKey: "death_knight_cantrip_attack",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "mod_death_knight_cantrip_attack",
+              type: "power_rider",
+              parentPowerNames: ["Attack"],
+              alertSummary:
+                "You can replace one of the attacks with a cantrip that has a casting time of an action.",
+            },
+          ],
+        },
+      },
     ],
   },
   {

@@ -58,3 +58,44 @@ describe("Superiority Dice die ladder on the resource", () => {
     expect(resolveUsesAtLevel(superiority.uses, 15)).toBe(6)
   })
 })
+
+describe("tier tables that unlock after level 1", () => {
+  const dances: import("@/lib/types").ClassResource = {
+    id: "dances",
+    name: "Dances",
+    uses: {
+      type: "at_level",
+      atLevelMode: "tier",
+      recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+      atLevelTable: [
+        { level: 2, count: 2 },
+        { level: 5, count: 3 },
+      ],
+    },
+  }
+  const danceDie: import("@/lib/types").ClassResource = {
+    id: "dance_die",
+    name: "Dance Die",
+    uses: {
+      type: "special",
+      atLevelMode: "tier",
+      dieSidesByLevel: [
+        { level: 2, count: 4 },
+        { level: 5, count: 6 },
+      ],
+    },
+  }
+
+  it("does not grant Dances before the first table row", () => {
+    expect(resolveUsesAtLevel(dances.uses, 1)).toBe(0)
+    expect(resolveUsesAtLevel(dances.uses, 2)).toBe(2)
+    expect(resolveUsesAtLevel(dances.uses, 5)).toBe(3)
+  })
+
+  it("hides Dance Die until its first listed level", () => {
+    expect(resolveDieSidesAtLevel(danceDie.uses, 1)).toBeNull()
+    expect(resolveStaticResourceLabel(danceDie, 1)).toBeNull()
+    expect(resolveDieSidesAtLevel(danceDie.uses, 2)).toBe(4)
+    expect(resolveStaticResourceLabel(danceDie, 2)).toBe("d4")
+  })
+})

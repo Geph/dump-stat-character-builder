@@ -92,6 +92,8 @@ export type EnrichmentOperation =
       skipIfEffectKinds?: string[]
       /** Drop existing linkedModifiers that include these characteristic types before attaching. */
       replaceCharacteristicTypes?: string[]
+      /** Drop existing linkedModifiers that include these FeatureEffect kinds before attaching. */
+      replaceEffectKinds?: string[]
       /** When true, do not call syncModifierRefs (legacy psion Climactic Moment). */
       skipSyncRefs?: boolean
     }

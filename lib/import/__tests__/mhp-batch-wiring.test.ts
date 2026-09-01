@@ -103,6 +103,8 @@ describe("MHP batch wiring (Risk / Martyr / Thralls / Warden)", () => {
         (mod.activation?.effects ?? []).some(
           (effect) =>
             effect.resourceRefreshOnInitiative === true &&
+            effect.resourceRefreshOnCriticalHit === true &&
+            effect.classResourceAmount === 1 &&
             effect.classResourceKey === "risk_dice",
         ),
       ),

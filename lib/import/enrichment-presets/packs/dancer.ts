@@ -88,11 +88,52 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
               type: "power_rider",
               parentPowerNames: ["Attack", "Unarmed Strike"],
               alertSummary:
-                "Deadly D4s: when you roll damage with a 1d4/1d6 weapon or Unarmed Strike, you can deal 2d4 instead. Dervish Firearms (optional): 2d4 → 3d4. Extra Finesse on 1d4/1d6 weapons.",
+                "Deadly D4s: when you roll damage with a 1d4/1d6 weapon or Unarmed Strike, you can deal 2d4 instead. Dervish Firearms (optional): Firearm weapons that deal 2d4 can deal 3d4 instead. Extra Finesse on 1d4/1d6 weapons.",
             },
           ],
         },
         replaceCharacteristicTypes: ["power_rider", "weapon_damage_die_override"],
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "extra_finesse_weapons",
+          catalogRefId: "cat_char_weapon_ability_override",
+          characteristics: [
+            {
+              id: "char_extra_finesse_weapons",
+              type: "weapon_ability_override",
+              ability: "dexterity",
+              appliesTo: "both",
+              scope: "all",
+              treatAsFinesse: true,
+              whenDamageDice: ["1d4", "1d6"],
+              label: "Extra Finesse (1d4 / 1d6 weapons)",
+            },
+          ],
+        },
+        skipIfCharacteristicTypes: ["weapon_ability_override"],
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "dervish_fighting_badge",
+          catalogRefId: "cat_char_weapon_sheet_badge",
+          characteristics: [
+            {
+              id: "char_dervish_fighting_badge",
+              type: "weapon_sheet_badge",
+              label: "Dervish Fighting",
+              description:
+                "Optional 2d4 instead of 1d4/1d6 or Unarmed Strike. Extra Finesse on those weapons. Firearm weapons that already deal 2d4 can deal 3d4 instead.",
+              whenDamageDice: ["1d4", "1d6"],
+              includeUnarmed: true,
+            },
+          ],
+        },
+        skipIfCharacteristicTypes: ["weapon_sheet_badge"],
       },
       {
         op: "appendDescription",

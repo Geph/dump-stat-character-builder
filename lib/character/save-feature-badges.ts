@@ -25,6 +25,12 @@ export type SaveFeatureBadge = {
 
 export type SaveFeatureBadgesByAbility = Record<AbilityScoreKey, SaveFeatureBadge[]>
 
+export type CollectedSaveFeatureBadges = {
+  byAbility: SaveFeatureBadgesByAbility
+  /** Advantages/bonuses that apply to every ability save — shown on the section title. */
+  allSaves: SaveFeatureBadge[]
+}
+
 const SAVE_ABILITY_LABELS: Record<AbilityScoreKey, string> = {
   strength: "Strength",
   dexterity: "Dexterity",
@@ -59,6 +65,13 @@ function abilitiesForEffect(effect: FeatureEffect): AbilityScoreKey[] {
   const specific = normalizeAbilityKey(effect.checkAbility)
   if (specific) return [specific]
   return [...SAVE_ABILITY_KEYS]
+}
+
+function isAllSaveTargetSet(targets: AbilityScoreKey[]): boolean {
+  return (
+    targets.length === SAVE_ABILITY_KEYS.length &&
+    SAVE_ABILITY_KEYS.every((key) => targets.includes(key))
+  )
 }
 
 function summarizeEffect(effect: FeatureEffect): string {
@@ -107,8 +120,9 @@ function badgeLabel(featureName: string): string {
 export function collectSaveFeatureBadges(
   features: Feature[],
   limitationContext: LimitationEvaluationContext = {},
-): SaveFeatureBadgesByAbility {
+): CollectedSaveFeatureBadges {
   const byAbility = Object.fromEntries(SAVE_ABILITY_KEYS.map((key) => [key, [] as SaveFeatureBadge[]])) as SaveFeatureBadgesByAbility
+  const allSaves: SaveFeatureBadge[] = []
   const seen = new Set<string>()
 
   const featuresByName = new Map<string, Feature>()
@@ -131,6 +145,21 @@ export function collectSaveFeatureBadges(
       featureEffectMatchesRollContext(effect, { kind: "save", ability }),
     )
     const targets = abilities.length ? abilities : [...SAVE_ABILITY_KEYS]
+    const appliesToAllSaves = !normalizeAbilityKey(effect.checkAbility) && isAllSaveTargetSet(targets)
+
+    if (appliesToAllSaves) {
+      const id = `${label.toLowerCase()}:all:${effect.id ?? effect.kind}`
+      if (seen.has(id)) continue
+      seen.add(id)
+      allSaves.push({
+        id,
+        label,
+        description,
+        sourceLabel: featureName !== label ? featureName : undefined,
+        ability: "all",
+      })
+      continue
+    }
 
     for (const ability of targets) {
       const id = `${label.toLowerCase()}:${ability}:${effect.id ?? effect.kind}`
@@ -146,7 +175,7 @@ export function collectSaveFeatureBadges(
     }
   }
 
-  return byAbility
+  return { byAbility, allSaves }
 }
 
 export function saveFeatureBadgeAbilityLabel(ability: AbilityScoreKey): string {

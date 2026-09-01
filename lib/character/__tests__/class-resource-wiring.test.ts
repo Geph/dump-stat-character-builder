@@ -7,6 +7,7 @@ import { inferClassResourceSpendFromText } from "@/lib/character/infer-class-res
 import { resolveSpellCastCost } from "@/lib/character/resolve-spell-cast-cost"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
 import {
+  applyInitiativeResourceRecharge,
   applySheetRest,
   charnelTouchRestoreFromSlot,
   pactSlotRestoreCount,
@@ -327,6 +328,142 @@ describe("feature resource refresh", () => {
       trigger: "initiative",
     })
     expect(refreshed.usedResourcesById[resourceId]).toBe(1)
+  })
+
+  it("restores one die on initiative and on a critical hit, not the whole pool", () => {
+    const resourceId = "gunslinger_risk_dice"
+    const detail: CharacterClassDetail = {
+      row: { class_id: "gunslinger", level: 15, subclass_id: null, order: 0 },
+      class: {
+        id: "gunslinger",
+        name: "Gunslinger",
+        features: [
+          {
+            name: "Dire Gambit",
+            level: 15,
+            description:
+              "When you roll initiative or score a critical hit, you regain one expended Risk Die.",
+            linkedModifiers: [
+              {
+                instanceId: "dire_gambit",
+                catalogRefId: "cat_fx_class_resource",
+                activation: {
+                  effects: [
+                    {
+                      id: "mod_dire_gambit_init",
+                      kind: "class_resource",
+                      classResourceKey: "risk_dice",
+                      classResourceChange: "increase",
+                      classResourceAmount: 1,
+                      resourceRefreshOnInitiative: true,
+                      resourceRefreshOnCriticalHit: true,
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      } as unknown as DndClass,
+    }
+    const effects = collectResourceRefreshEffects([detail])
+    const dire = effects.find((effect) => /dire gambit/i.test(effect.featureName))
+    expect(dire).toMatchObject({
+      resourceKey: "risk_dice",
+      onInitiative: true,
+      onCriticalHit: true,
+      restoreAmount: 1,
+    })
+
+    const resourceEntries = [
+      {
+        id: resourceId,
+        uses: { type: "fixed" as const, fixedAmount: 5, rechargeOnInitiative: true },
+        classLevel: 15,
+      },
+    ]
+    const afterPool = applyInitiativeResourceRecharge(
+      { [resourceId]: 4 },
+      resourceEntries,
+      ctx,
+      effects.filter((effect) => effect.onInitiative).map((effect) => effect.resourceKey),
+    )
+    expect(afterPool[resourceId]).toBe(4)
+
+    const onInitiative = applyFeatureResourceRefresh({
+      usedResourcesById: afterPool,
+      resourceEntries,
+      resolveContext: ctx,
+      effects,
+      trigger: "initiative",
+    })
+    expect(onInitiative.usedResourcesById[resourceId]).toBe(3)
+
+    const onCrit = applyFeatureResourceRefresh({
+      usedResourcesById: { [resourceId]: 3 },
+      resourceEntries,
+      resolveContext: ctx,
+      effects,
+      trigger: "critical_hit",
+    })
+    expect(onCrit.usedResourcesById[resourceId]).toBe(2)
+  })
+
+  it("infers a critical-hit restore from initiative wiring plus feature prose", () => {
+    const resourceId = "gunslinger_risk_dice"
+    const detail: CharacterClassDetail = {
+      row: { class_id: "gunslinger", level: 15, subclass_id: null, order: 0 },
+      class: {
+        id: "gunslinger",
+        name: "Gunslinger",
+        features: [
+          {
+            name: "Dire Gambit",
+            level: 15,
+            description: "Regain one Risk Die when you roll initiative or score a critical hit.",
+            linkedModifiers: [
+              {
+                instanceId: "dire_legacy",
+                catalogRefId: "cat_fx_class_resource",
+                activation: {
+                  effects: [
+                    {
+                      id: "mod_dire_gambit_init",
+                      kind: "class_resource",
+                      classResourceKey: "risk_dice",
+                      classResourceChange: "reset",
+                      resourceRefreshOnInitiative: true,
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      } as unknown as DndClass,
+    }
+    const effects = collectResourceRefreshEffects([detail])
+    const dire = effects.find((effect) => /dire gambit/i.test(effect.featureName))
+    expect(dire).toMatchObject({
+      onInitiative: true,
+      onCriticalHit: true,
+      restoreAmount: 1,
+    })
+
+    const refreshed = applyFeatureResourceRefresh({
+      usedResourcesById: { [resourceId]: 4 },
+      resourceEntries: [
+        {
+          id: resourceId,
+          uses: { type: "fixed", fixedAmount: 5 },
+          classLevel: 15,
+        },
+      ],
+      resolveContext: ctx,
+      effects,
+      trigger: "critical_hit",
+    })
+    expect(refreshed.usedResourcesById[resourceId]).toBe(3)
   })
 
   it("lets Stroke of Luck recharge on a short rest", () => {

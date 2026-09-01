@@ -56,6 +56,7 @@ export const classes = mysqlTable("classes", {
   multiclass_proficiencies_gained: json("multiclass_proficiencies_gained").$type<string[]>(),
   features: json("features").$type<unknown[]>().default([]),
   class_resources: json("class_resources").$type<unknown[]>().default([]),
+  spell_list: json("spell_list").$type<string[]>(),
   spellcasting: json("spellcasting"),
   special_ability: json("special_ability").$type<
     import("@/lib/types").DndClass["special_ability"]

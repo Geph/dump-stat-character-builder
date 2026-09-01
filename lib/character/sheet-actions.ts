@@ -1,4 +1,7 @@
 import { featureChoiceKey } from "@/lib/builder/choices"
+import { chosenDamageTypesFromCharacteristics } from "@/lib/builder/modifier-player-choices"
+import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
+import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { isBombFormulaAbility } from "@/lib/builder/aggregate-bomb-formulas"
 import { isDisciplinePackageAbility } from "@/lib/builder/aggregate-psionic-talents"
 import {
@@ -22,7 +25,18 @@ import {
 } from "@/lib/character/infer-class-resource-spend"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import { resolveFixedValueAtLevel } from "@/lib/compendium/bonus-by-level"
+import {
+  descriptionBeforeChooseOneOptions,
+  inferMenuOptionActionKind,
+  parseChooseOneNamedOptions,
+} from "@/lib/compendium/choose-one-named-options"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
+import {
+  collectReplacedFeatureNames,
+  featureHasReplaceModifier,
+  featureIsReplaced,
+  resolveFirstUseNoAction,
+} from "@/lib/character/replace-feature"
 import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
 import {
   resolveUsesConfig,
@@ -35,7 +49,16 @@ import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
 import { resolvePsionicAugments } from "@/lib/compendium/resolve-psionic-augments"
 import { resolveSpecialAttackAtLevel } from "@/lib/character/special-attack-empower"
+import { resolveAttachedClassIcon } from "@/lib/compendium/class-icons-defaults"
 import { resolveSpecialAttackIcon } from "@/lib/compendium/special-attack-icons-defaults"
+import {
+  collectActionUseBonuses,
+  type SheetActionUseBonus,
+} from "@/lib/character/action-use-bonuses"
+import {
+  collectCastSpellEffects,
+  type SheetCastSpellChoice,
+} from "@/lib/character/cast-spell-choice"
 import {
   inferAllyBuffEffect,
   inferAllyHealEffect,
@@ -75,6 +98,8 @@ export type SheetActionEntry = {
   psionicAugments?: PsionicAugmentsConfig | null
   /** game-icons slug shown on the combat/utility card. */
   icon?: string | null
+  /** Owning class/subclass icon used when the action has no more specific art. */
+  sourceIcon?: string | null
   /** Structured attack/damage profile when this action is a special attack power. */
   specialAttack?: SpecialAttackCharacteristic | null
   /** All selectable profiles when one action supports multiple modes (Bomb Attack / Explode). */
@@ -98,6 +123,10 @@ export type SheetActionEntry = {
   hitDieSides?: number | null
   /** Heal, temp HP, and other ally-targetable effects applied when the action is used. */
   healEffects?: FeatureEffect[]
+  /** Resolved roll bonuses (PB, ability mod, advantage) shown on the Use overlay. */
+  useBonuses?: SheetActionUseBonus[]
+  /** Cast a known spell (optionally filtered by casting time) instead of picking a target. */
+  castSpellChoice?: SheetCastSpellChoice
   /**
    * When false, Use does not mark Action/Bonus/Reaction spent
    * (Reckless Attack and similar free declarations).
@@ -110,9 +139,23 @@ export type SheetActionEntry = {
     mode: "combined_level_half_up"
     maxSlotLevel: number
   }
+  /** When set, overrides category for Combat tab listing. */
+  showOnCombatTab?: boolean
+  /** When set, overrides category for Abilities tab listing. */
+  showOnAbilitiesTab?: boolean
+  /** When set, controls Short/Long Rest overlay listing. */
+  showOnRestDialogues?: boolean
+  /**
+   * Always-on reminder (chosen resistance, Energy Mastery, etc.). Filed under Passive
+   * and has no Use button.
+   */
+  reminderOnly?: boolean
+  /** First use each turn does not mark Action / Bonus / Reaction spent. */
+  firstUseNoAction?: boolean
   /** Divine Respite and similar: regain up to this many expended Hit Point Dice. */
   restoreHitDiceOnUse?: {
     amount: number
+    restoreOn?: "short_rest" | "long_rest"
   }
   /** Dark Arcana: spend a spell slot to refill a class resource. */
   restoreResourceFromSpellSlotOnUse?: {
@@ -211,6 +254,7 @@ const COMBAT_EFFECT_KINDS = new Set<string>([
   "force_save_control",
   "heal_self",
   "movement_option",
+  "cast_spell",
 ])
 
 /** Characteristic types that mark an action as combat-focused. */
@@ -270,7 +314,7 @@ export function flexibleEconomyKindsFromText(
   description?: string | null,
 ): ActionEconomyKind[] {
   if (!description) return []
-  const text = stripHtml(description)
+  const text = descriptionBeforeChooseOneOptions(description)
   const kinds = new Set<ActionEconomyKind>()
   if (ACTION_OR_BONUS_RE.test(text)) {
     kinds.add("action")
@@ -533,7 +577,7 @@ const NEGATED_ACTION_RE =
 /** Last-resort detection of an action-economy cost from the feature/trait prose. */
 function kindsFromText(description: string | null | undefined): ActionEconomyKind[] {
   if (!description) return []
-  const text = stripHtml(description).replace(NEGATED_ACTION_RE, " ")
+  const text = descriptionBeforeChooseOneOptions(description).replace(NEGATED_ACTION_RE, " ")
   const kinds = new Set<ActionEconomyKind>()
   for (const { re, kind } of ACTION_TEXT_PATTERNS) {
     if (re.test(text)) kinds.add(kind)
@@ -546,6 +590,10 @@ function kindsFromText(description: string | null | undefined): ActionEconomyKin
  * or Reaction (Font of Inspiration, Stroke of Luck, Hurl Through Hell). First match wins.
  */
 const TRIGGER_TEXT_PATTERNS: { re: RegExp; label: string }[] = [
+  {
+    re: /\bwhen you reduce (?:an? |the )?(?:enemy|creature|hostile creature|target) to 0 hit points\b/i,
+    label: "When you reduce a creature to 0 HP",
+  },
   { re: /\breduced to 0 hit points\b/i, label: "When reduced to 0 HP" },
   { re: /\b(?:when|whenever) you roll initiative\b/i, label: "When you roll Initiative" },
   { re: /\b(?:when|whenever|if) you miss\b/i, label: "When you miss" },
@@ -588,15 +636,38 @@ function hasTriggeredSpendSignal(item: ActivatableItem): boolean {
       }
     }
   }
+  if (parseChooseOneNamedOptions(item.description).length >= 2) return true
   return TRIGGERED_SPEND_TEXT_RE.test(stripHtml(item.description ?? ""))
 }
 
-function triggerLabelFromWiring(item: ActivatableItem): string | null {
+function deathTriggerLabel(filter: "enemy" | "ally" | "any" | undefined): string {
+  if (filter === "ally") return "When an ally or companion dies"
+  if (filter === "enemy") return "When an enemy dies"
+  return "When a creature dies"
+}
+
+/** Authored trigger flags/characteristics — enough to surface a card without a spend signal. */
+function authoredTriggerLabel(item: ActivatableItem): string | null {
   if (item.activation?.onInitiative) return "When you roll Initiative"
   if (item.activation?.onDropToZeroHp) return "When reduced to 0 HP"
   if (item.activation?.onFailedSave) return "When you fail a save"
   for (const instance of item.linkedModifiers ?? []) {
+    if (instance.activation?.onInitiative) return "When you roll Initiative"
     if (instance.activation?.onDropToZeroHp) return "When reduced to 0 HP"
+    if (instance.activation?.onFailedSave) return "When you fail a save"
+    for (const characteristic of instance.characteristics ?? []) {
+      if (characteristic.type === "on_creature_death_trigger") {
+        return deathTriggerLabel(characteristic.creatureFilter)
+      }
+    }
+  }
+  return null
+}
+
+function triggerLabelFromWiring(item: ActivatableItem): string | null {
+  const authored = authoredTriggerLabel(item)
+  if (authored) return authored
+  for (const instance of item.linkedModifiers ?? []) {
     for (const characteristic of instance.characteristics ?? []) {
       if (characteristic.type === "bonus_damage_riders" || characteristic.type === "on_hit_trigger") {
         return "On a hit"
@@ -612,12 +683,15 @@ function triggerLabelFromWiring(item: ActivatableItem): string | null {
 }
 
 /**
- * Label for a feature that fires off an event and lets the player spend something, but costs no
- * action economy. These need a sheet card so the spend is trackable, yet they must not be filed
- * under Action / Bonus Action / Reaction. Returns null when the feature already has an action cost.
+ * Label for a feature that fires off an event (initiative, companion death, elective spend)
+ * but costs no action economy. These need a sheet card so the trigger is visible, yet they
+ * must not be filed under Action / Bonus Action / Reaction. Returns null when the feature
+ * already has an action cost.
  */
 export function resolveTriggeredActivationLabel(item: ActivatableItem): string | null {
   if (explicitActionKinds(item).length) return null
+  const authored = authoredTriggerLabel(item)
+  if (authored) return authored
   if (!hasTriggeredSpendSignal(item)) return null
   const fromWiring = triggerLabelFromWiring(item)
   if (fromWiring) return fromWiring
@@ -625,6 +699,7 @@ export function resolveTriggeredActivationLabel(item: ActivatableItem): string |
   for (const { re, label } of TRIGGER_TEXT_PATTERNS) {
     if (re.test(text)) return label
   }
+  if (parseChooseOneNamedOptions(item.description).length >= 2) return "Choose one"
   return null
 }
 
@@ -765,16 +840,19 @@ export function resolveSheetActionIcon(input: {
   icon?: string | null
   specialAttack?: SpecialAttackCharacteristic | null
   specialAttacks?: SpecialAttackCharacteristic[]
+  sourceIcon?: string | null
 }): string | null {
   const explicit = input.icon?.trim()
   if (explicit) return explicit
   const attack = input.specialAttacks?.[0] ?? input.specialAttack ?? null
-  return resolveSpecialAttackIcon({
+  const fromAttack = resolveSpecialAttackIcon({
     icon: attack?.icon,
     attackName: attack?.attackName ?? input.name,
     label: attack?.label ?? input.name,
     attackVariant: attack?.attackVariant,
   })
+  if (fromAttack) return fromAttack
+  return input.sourceIcon?.trim() || null
 }
 
 function describeRiderCost(rider: BonusDamageRiderEntry): string | null {
@@ -801,20 +879,28 @@ function describeRider(rider: BonusDamageRiderEntry): string | undefined {
   return parts.length ? parts.join(" · ") : undefined
 }
 
+function withInferredOptionActionKind(option: SheetActionMenuOption): SheetActionMenuOption {
+  if (option.actionKind) return option
+  const inferred = inferMenuOptionActionKind(option.description ?? option.name)
+  return inferred ? { ...option, actionKind: inferred } : option
+}
+
 function resolveMenuOptions(item: ActivatableItem): SheetActionMenuOption[] {
   const options: SheetActionMenuOption[] = []
   for (const instance of item.linkedModifiers ?? []) {
     for (const characteristic of instance.characteristics ?? []) {
       if (characteristic.type === "resource_ability_menu") {
         for (const option of characteristic.options ?? []) {
-          options.push({
-            name: option.name,
-            description: option.description,
-            resourceCost: option.resourceCost,
-            actionKind: option.actionKind,
-            hitDiceCost: option.hitDiceCost ?? null,
-            unlocksAtLevel: option.unlocksAtLevel ?? null,
-          })
+          options.push(
+            withInferredOptionActionKind({
+              name: option.name,
+              description: option.description,
+              resourceCost: option.resourceCost,
+              actionKind: option.actionKind,
+              hitDiceCost: option.hitDiceCost ?? null,
+              unlocksAtLevel: option.unlocksAtLevel ?? null,
+            }),
+          )
         }
         continue
       }
@@ -836,7 +922,12 @@ function resolveMenuOptions(item: ActivatableItem): SheetActionMenuOption[] {
       }
     }
   }
-  return options
+  if (options.length) return options
+  return parseChooseOneNamedOptions(item.description).map((option) => ({
+    name: option.name,
+    description: option.description,
+    actionKind: option.actionKind,
+  }))
 }
 
 function resolveHitDiceHealEffect(item: ActivatableItem): FeatureEffect | null {
@@ -892,6 +983,32 @@ function resolveSpendHitDice(item: ActivatableItem, classLevel?: number): number
   return null
 }
 
+function collectCastSpellEffectsFromItem(item: ActivatableItem): FeatureEffect[] {
+  const effects = collectCastSpellEffects(item.activation?.effects)
+  for (const instance of item.linkedModifiers ?? []) {
+    effects.push(...collectCastSpellEffects(instance.activation?.effects))
+  }
+  return effects
+}
+
+function resolveCastSpellChoice(
+  item: ActivatableItem,
+  kinds: ActionEconomyKind[],
+): SheetCastSpellChoice | undefined {
+  const effect = collectCastSpellEffectsFromItem(item)[0]
+  if (!effect) return undefined
+  return {
+    castingTime: effect.castSpellCastingTime ?? null,
+    spellName: effect.castSpellName ?? null,
+    withoutSlot: Boolean(effect.castSpellWithoutSlot),
+    economyKind: kinds.includes("reaction")
+      ? "reaction"
+      : kinds.includes("bonus")
+        ? "bonus"
+        : kinds[0],
+  }
+}
+
 function resolveHealEffects(item: ActivatableItem): FeatureEffect[] {
   const effects: FeatureEffect[] = []
   const seen = new Set<string>()
@@ -908,6 +1025,7 @@ function resolveHealEffects(item: ActivatableItem): FeatureEffect[] {
   for (const instance of item.linkedModifiers ?? []) {
     push(instance.activation?.effects)
   }
+  if (collectCastSpellEffectsFromItem(item).length) return effects
   if (!effects.length) {
     const inferredHeal = inferAllyHealEffect(item.name, item.description)
     if (inferredHeal) effects.push(inferredHeal)
@@ -919,6 +1037,11 @@ function resolveHealEffects(item: ActivatableItem): FeatureEffect[] {
     if (inferred) effects.push(inferred)
   }
   return effects
+}
+
+function resolveUseBonuses(item: ActivatableItem): SheetActionUseBonus[] | undefined {
+  const useBonuses = collectActionUseBonuses(item)
+  return useBonuses.length ? useBonuses : undefined
 }
 
 type ActivatableItem = {
@@ -1049,14 +1172,19 @@ function attachAlsoActivateActions(actions: SheetActionEntry[]): SheetActionEntr
 function resolveHitDiceRestoreOnUse(
   item: ActivatableItem,
   classLevel: number,
-): { amount: number } | undefined {
+): { amount: number; restoreOn?: "short_rest" | "long_rest" } | undefined {
   for (const instance of item.linkedModifiers ?? []) {
     for (const characteristic of instance.characteristics ?? []) {
       if (characteristic.type !== "hit_dice_restore") continue
       const amount =
         resolveFixedValueAtLevel(characteristic.amountByLevel, classLevel, characteristic.amount) ??
         characteristic.amount
-      if (amount != null && amount > 0) return { amount }
+      if (amount != null && amount > 0) {
+        return {
+          amount,
+          restoreOn: characteristic.restoreOn === "long_rest" ? "long_rest" : "short_rest",
+        }
+      }
     }
   }
   return undefined
@@ -1201,9 +1329,31 @@ function suppressParentForMovementExpansions(
   return true
 }
 
+/** "Reactive Spell. … cast a spell …" → Reactive Spell when the effect has no label yet. */
+function titledCastSpellBenefitName(description: string | null | undefined): string | null {
+  const text = stripHtml(description ?? "")
+  const match = text.match(
+    /([A-Z][A-Za-z]+(?:[ \t]+[A-Z][A-Za-z]+){0,3})\.\s+[^.]*\bcast a spell\b/i,
+  )
+  const name = match?.[1]?.replace(/\s+/g, " ").trim()
+  return name && name.length <= 40 ? name : null
+}
+
+function resolveCastSpellActionTitle(feature: ActivatableItem): string | null {
+  const effect = collectCastSpellEffectsFromItem(feature)[0]
+  if (!effect) return null
+  return effect.label?.trim() || titledCastSpellBenefitName(feature.description)
+}
+
 function resolveSheetActionName(feature: ActivatableItem): string {
   if (/^healer$/i.test(feature.name.trim())) return "Battle Medic"
-  return feature.name
+  return resolveCastSpellActionTitle(feature) ?? feature.name
+}
+
+function resolveSheetActionSourceLabel(feature: ActivatableItem, sourceLabel: string): string {
+  const title = resolveCastSpellActionTitle(feature)
+  if (title && title !== feature.name && sourceLabel === "Feat") return feature.name
+  return sourceLabel
 }
 
 function pushActivatableItemActions(
@@ -1215,6 +1365,7 @@ function pushActivatableItemActions(
   classId: string | null,
   hitDieSides?: number | null,
   availableResourceKeys: readonly string[] = [],
+  sourceIcon?: string | null,
 ) {
   if ((feature.level ?? 1) > levelCap) return
   const display = resolveFeatureSheetDisplay(feature as unknown as Feature)
@@ -1223,7 +1374,7 @@ function pushActivatableItemActions(
     suppressParentForMovementExpansions(feature, movementExpansions) ||
     shouldSuppressStandaloneBombCard(feature.name, resolveSpecialAttacks(feature, levelCap)) ||
     isSelectableBombFormulaRiderFeature(feature) ||
-    Boolean(inferOptionalParentPowerImprovement(feature))
+    (Boolean(inferOptionalParentPowerImprovement(feature)) && !featureHasReplaceModifier(feature))
   const limitedUses = resolveLimitedUsesWithInference(feature, availableResourceKeys)
   const itemWithUses: ActivatableItem = { ...feature, limitedUses }
 
@@ -1245,21 +1396,27 @@ function pushActivatableItemActions(
             ? "utility"
             : inferredCategory
       if (
-        (category !== "combat" || display.combatActions) &&
-        (category !== "utility" || display.abilitiesActions)
+        display.restDialogues ||
+        (category === "combat" && display.combatActions) ||
+        (category === "utility" && display.abilitiesActions)
       ) {
         const menuOptions = resolveMenuOptions(feature)
         const healEffects = resolveHealEffects(feature)
         const playerNotes = resolvePlayerNotes(feature)
         const equipmentChoices = resolveEquipmentChoices(feature)
         const specialAttacks = resolveSpecialAttacks(feature, levelCap)
+        const castSpellChoice = resolveCastSpellChoice(feature, kinds)
         actions.push({
           id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
           name: resolveSheetActionName(feature),
-          sourceLabel,
+          sourceLabel: resolveSheetActionSourceLabel(feature, sourceLabel),
           kinds,
           trigger,
           category,
+          showOnCombatTab: display.combatActions,
+          showOnAbilitiesTab: display.abilitiesActions,
+          showOnRestDialogues: display.restDialogues,
+          firstUseNoAction: resolveFirstUseNoAction(feature.activation, levelCap),
           limitedUses,
           classLevel: levelCap,
           description: feature.description ?? null,
@@ -1273,6 +1430,8 @@ function pushActivatableItemActions(
           refundHitPointsOnStillFailed: resolveRefundHitPointsOnStillFailed(feature),
           hitDieSides: hitDieSides ?? null,
           healEffects: healEffects.length ? healEffects : undefined,
+          useBonuses: resolveUseBonuses(itemWithUses),
+          castSpellChoice,
           spendsEconomy: trigger
             ? false
             : (fallback.spendsEconomy ?? resolveSpendsEconomy(feature)),
@@ -1281,6 +1440,7 @@ function pushActivatableItemActions(
           alsoActivateFeatureNames: resolveAlsoActivateFeatureNames(feature),
           playerNotes: playerNotes.length ? playerNotes : undefined,
           equipmentChoices: equipmentChoices.length ? equipmentChoices : undefined,
+          sourceIcon,
           psionicAugments: resolvePsionicAugments({
             name: feature.name,
             description: feature.description ?? null,
@@ -1300,6 +1460,9 @@ function pushActivatableItemActions(
       sourceLabel: feature.name,
       kinds: expansion.kinds,
       category: expansion.category,
+      showOnCombatTab: display.combatActions,
+      showOnAbilitiesTab: display.abilitiesActions,
+      showOnRestDialogues: display.restDialogues,
       limitedUses,
       classLevel: levelCap,
       description: expansion.description,
@@ -1310,6 +1473,7 @@ function pushActivatableItemActions(
       refundHitPointsOnStillFailed: resolveRefundHitPointsOnStillFailed(feature),
       hitDieSides: hitDieSides ?? null,
       healEffects: expansion.healEffects,
+      sourceIcon,
     })
   }
 }
@@ -1325,6 +1489,7 @@ function pushPickedChoiceOptionActions(
   featureChoicePicks: Record<string, string[]> | undefined,
   hitDieSides?: number | null,
   availableResourceKeys: readonly string[] = [],
+  sourceIcon?: string | null,
 ) {
   if (!classId || !featureChoicePicks) return
   if (!feature.isChoice || !feature.choices?.options?.length) return
@@ -1350,6 +1515,7 @@ function pushPickedChoiceOptionActions(
       classId,
       hitDieSides,
       availableResourceKeys,
+      sourceIcon,
     )
   }
 }
@@ -1364,8 +1530,11 @@ function pushFeatureActions(
   featureChoicePicks?: Record<string, string[]>,
   hitDieSides?: number | null,
   availableResourceKeys: readonly string[] = [],
+  sourceIcon?: string | null,
 ) {
+  const replacedNames = collectReplacedFeatureNames(features ?? [], levelCap)
   for (const feature of features ?? []) {
+    if (featureIsReplaced(feature, replacedNames)) continue
     pushActivatableItemActions(
       actions,
       feature,
@@ -1375,6 +1544,7 @@ function pushFeatureActions(
       classId,
       hitDieSides,
       availableResourceKeys,
+      sourceIcon,
     )
     pushPickedChoiceOptionActions(
       actions,
@@ -1386,6 +1556,7 @@ function pushFeatureActions(
       featureChoicePicks,
       hitDieSides,
       availableResourceKeys,
+      sourceIcon,
     )
   }
 }
@@ -1449,6 +1620,18 @@ function resourceKeysForAbility(
     : null
   if (owner?.class) return classResourceKeysForClass(owner.class)
   return [...fallbackKeys]
+}
+
+function sourceIconForAbility(
+  ability: CustomAbility,
+  classDetails: CharacterClassDetail[],
+  classId: string | null,
+): string | null {
+  const ownerId =
+    ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId
+  if (!ownerId) return null
+  const owner = classDetails.find((entry) => entry.row.class_id === ownerId)
+  return owner ? resolveAttachedClassIcon(owner.class) : null
 }
 
 function pushCustomAbilityActions(
@@ -1538,6 +1721,7 @@ function pushCustomAbilityActions(
       customAbilityId: ability.id,
       abilityRole: ability.ability_role ?? null,
       icon: ability.icon,
+      sourceIcon: sourceIconForAbility(ability, classDetails, classId),
       psionicAugments: resolvePsionicAugments(ability),
       specialAttack: resolveSpecialAttack(item, levelCap),
       specialAttacks: resolveSpecialAttacks(item, levelCap),
@@ -1547,6 +1731,7 @@ function pushCustomAbilityActions(
       duration: ability.duration ?? null,
       concentration: ability.concentration,
       healEffects: healEffects.length ? healEffects : undefined,
+      useBonuses: resolveUseBonuses(item),
       spendsEconomy: trigger ? false : fallback.spendsEconomy,
     })
   }
@@ -1616,6 +1801,7 @@ function pushCustomAbilityActions(
         classResourceKey: resolveActionResourceKey(itemWithUses),
         customAbilityId: ability.id,
         icon: ability.icon,
+        sourceIcon: sourceIconForAbility(ability, classDetails, classId),
         psionicAugments: resolvePsionicAugments({
           name: entryName,
           description: entry.description ?? entry.summary ?? null,
@@ -1623,6 +1809,7 @@ function pushCustomAbilityActions(
         }),
         specialAttack: resolveSpecialAttack(item, levelCap),
         specialAttacks: resolveSpecialAttacks(item, levelCap),
+        useBonuses: resolveUseBonuses(itemWithUses),
         castingTime: entry.summary?.match(/\b\d+\s+(?:bonus\s+)?action\b/i)?.[0] ?? null,
         spendsEconomy: trigger ? false : fallback.spendsEconomy,
       })
@@ -1692,7 +1879,9 @@ function collectTalentAlertsFromFeatures(
         })
       }
     }
-    const inferredImprove = inferOptionalParentPowerImprovement(feature)
+    const inferredImprove = featureHasReplaceModifier(feature)
+      ? null
+      : inferOptionalParentPowerImprovement(feature)
     if (inferredImprove && !seen.has(`${feature.name}::${inferredImprove.parentName}`)) {
       const extra =
         inferredImprove.extraAmount != null
@@ -1969,6 +2158,54 @@ function attachTalentAlertsToActions(
   })
 }
 
+function flattenItemCharacteristics(
+  item: { linkedModifiers?: LinkedModifierInstance[] | null },
+): CharacteristicModifier[] {
+  return (item.linkedModifiers ?? []).flatMap((instance) => instance.characteristics ?? [])
+}
+
+function featHasDamageTypeChoice(feat: Feat): boolean {
+  return flattenItemCharacteristics(feat).some(
+    (characteristic) =>
+      (characteristic.type === "damage_resistance" || characteristic.type === "damage_immunity") &&
+      (characteristic.choiceCount ?? 0) > 0,
+  )
+}
+
+function pushFeatPassiveReminder(
+  actions: SheetActionEntry[],
+  feat: Feat,
+  levelCap: number,
+  sourceIcon: string | null,
+  modifierPlayerPicks?: Record<string, string[]>,
+) {
+  if (!featHasDamageTypeChoice(feat)) return
+  const chosenTypes = chosenDamageTypesFromCharacteristics(
+    flattenItemCharacteristics(feat),
+    modifierPlayerPicks,
+  )
+  const name = withChosenOptionChrome(feat.name, chosenTypes)
+  actions.push({
+    id: `feat-${feat.id}:1:${feat.name}:passive`,
+    name,
+    sourceLabel: "Feat",
+    kinds: ["action"],
+    trigger: chosenTypes.length ? chosenTypes.join(", ") : "Always on",
+    category: "combat",
+    reminderOnly: true,
+    spendsEconomy: false,
+    showOnCombatTab: true,
+    showOnAbilitiesTab: false,
+    showOnRestDialogues: false,
+    limitedUses: null,
+    classLevel: levelCap,
+    description: feat.description ?? null,
+    classId: null,
+    sourceIcon,
+    icon: sourceIcon,
+  })
+}
+
 export function collectSheetActions(params: {
   classDetails: CharacterClassDetail[]
   species: Species | null
@@ -1976,6 +2213,7 @@ export function collectSheetActions(params: {
   customAbilities?: CustomAbility[]
   feats?: Feat[]
   featureChoicePicks?: Record<string, string[]>
+  modifierPlayerPicks?: Record<string, string[]>
 }): SheetActionEntry[] {
   const actions: SheetActionEntry[] = []
   const featureChoicePicks = params.featureChoicePicks
@@ -1984,6 +2222,7 @@ export function collectSheetActions(params: {
     const className = entry.class?.name ?? "Class"
     const hitDieSides = entry.class?.hit_die ?? null
     const resourceKeys = classResourceKeysForClass(entry.class)
+    const classIcon = resolveAttachedClassIcon(entry.class)
     pushFeatureActions(
       actions,
       entry.class?.features as Feature[] | undefined,
@@ -1994,6 +2233,7 @@ export function collectSheetActions(params: {
       featureChoicePicks,
       hitDieSides,
       resourceKeys,
+      classIcon,
     )
     if (entry.subclass) {
       pushFeatureActions(
@@ -2006,6 +2246,7 @@ export function collectSheetActions(params: {
         featureChoicePicks,
         hitDieSides,
         resourceKeys,
+        resolveAttachedClassIcon(entry.class, entry.subclass),
       )
     }
   }
@@ -2040,6 +2281,8 @@ export function collectSheetActions(params: {
       const key = `${feat.name}:${feat.id}`.toLowerCase()
       if (seenFeatKeys.has(key)) continue
       seenFeatKeys.add(key)
+      const featIcon = getCompendiumItemIcon("feats", feat)
+      const before = actions.length
       pushFeatureActions(
         actions,
         [
@@ -2054,7 +2297,20 @@ export function collectSheetActions(params: {
         "Feat",
         `feat-${feat.id}`,
         null,
+        undefined,
+        undefined,
+        [],
+        featIcon,
       )
+      if (actions.length === before) {
+        pushFeatPassiveReminder(
+          actions,
+          feat,
+          Math.max(totalLevel, 1),
+          featIcon,
+          params.modifierPlayerPicks,
+        )
+      }
     }
   }
 

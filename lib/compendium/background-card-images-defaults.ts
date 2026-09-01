@@ -10,8 +10,8 @@ const bundledBackgroundCardImage = (slug: string) =>
 /**
  * Background card art under public/images/compendium/backgrounds/.
  * Only names with masters in `scripts/background-card-sources` are mapped — never remote hosts.
- * PHB / Eberron / Ravenloft / Planescape art applies on import when present locally;
- * GitHub only ships SRD + Kibbles backgrounds (see bundled-card-art allowlist).
+ * PHB / Eberron / Ravenloft / Planescape / Kibbles art applies on import when present locally;
+ * GitHub only ships SRD backgrounds (see bundled-card-art allowlist).
  */
 export const SRD_BACKGROUND_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Acolyte: bundledBackgroundCardImage("acolyte"),

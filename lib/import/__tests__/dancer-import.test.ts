@@ -240,6 +240,16 @@ describe("Dancer enrichment", () => {
     const chars = (dervish.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
     expect(chars.some((char) => char.type === "weapon_damage_die_override")).toBe(false)
     expect(chars.some((char) => char.type === "power_rider")).toBe(true)
+    const extraFinesse = chars.find((char) => char.type === "weapon_ability_override")
+    expect(extraFinesse).toMatchObject({
+      treatAsFinesse: true,
+      whenDamageDice: ["1d4", "1d6"],
+    })
+    expect(chars.find((char) => char.type === "weapon_sheet_badge")).toMatchObject({
+      label: "Dervish Fighting",
+      whenDamageDice: ["1d4", "1d6"],
+      includeUnarmed: true,
+    })
 
     const ud = enriched.classes?.[0]?.features?.find((f) => f.name === "Unarmored Defense") as Feature
     const ac = (ud.linkedModifiers ?? [])

@@ -1,3 +1,7 @@
+import { spellNameMatchKeys, spellNameOnClassList } from "@/lib/compendium/spell-name-match"
+
+export { spellNameMatchKeys, spellNameOnClassList }
+
 /** Standard SRD spell list classes (matches spell editor checkboxes). */
 export const STANDARD_SPELL_CLASSES = [
   "Bard",
@@ -27,7 +31,8 @@ export const CLASS_SPELL_LIST_IMPORT_HINT = `When a class has its own dedicated 
 - For each spell on that list, include the class's exact name in the spell's classes array (e.g. "Artificer").
 - Custom/non-SRD classes are not among the standard eight (Bard, Cleric, Druid, Paladin, Ranger, Sorcerer, Warlock, Wizard); use the class name directly — never store the literal word "Other".
 - Spells may also appear on standard class lists; include all applicable class names in classes.
-- A class chapter may include its spell list in the same extract: keep the full class features[] and still populate spell_list + spells[] stubs from the list tables.`
+- A class chapter may include its spell list in the same extract: keep the full class features[] and still populate spell_list + spells[] stubs from the list tables.
+- Persist keeps spell_list on the class and stamps those names onto matching catalog rows even when the user links/skips existing spells (so a later SRD overwrite cannot drop the class tag).`
 
 export const SPELL_SCHOOL_IMPORT_HINT = `Spell schools (school field on spells[]):
 - Use the school name exactly as written in the source.
@@ -56,41 +61,103 @@ function cleanSpellListName(name: string): string {
   return name.replace(/\*+$/g, "").trim()
 }
 
-/** Compare imported list names to catalog rows (apostrophes, Disk/Disc, "Tenser's …"). */
-export function spellNameMatchKeys(name: string): string[] {
-  const base = cleanSpellListName(name)
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/['’]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-  if (!base) return []
-
-  const keys = new Set<string>([base])
-  const diskSwap = base.replace(/\bdisc\b/g, "disk")
-  const discSwap = base.replace(/\bdisk\b/g, "disc")
-  keys.add(diskSwap)
-  keys.add(discSwap)
-
-  const withoutPossessive = base.replace(/^[a-z]+s\s+/, "")
-  if (withoutPossessive && withoutPossessive !== base) {
-    keys.add(withoutPossessive)
-    keys.add(withoutPossessive.replace(/\bdisc\b/g, "disk"))
-    keys.add(withoutPossessive.replace(/\bdisk\b/g, "disc"))
-  }
-
-  return [...keys]
-}
-
-function normalizeSpellClassNames(classes: string[] | null | undefined): string[] {
+export function unionSpellClassNames(
+  ...groups: Array<string[] | null | undefined>
+): string[] {
   const merged = new Set<string>()
-  for (const raw of classes ?? []) {
-    const c = raw.trim()
-    if (!c || /^other$/i.test(c)) continue
-    merged.add(c)
+  for (const group of groups) {
+    for (const raw of group ?? []) {
+      const name = raw.trim()
+      if (!name || /^other$/i.test(name)) continue
+      if ([...merged].some((have) => have.toLowerCase() === name.toLowerCase())) continue
+      merged.add(name)
+    }
   }
   return [...merged].sort((a, b) => a.localeCompare(b))
+}
+
+export type ClassSpellListGrant = {
+  className: string
+  names: string[]
+}
+
+export function cleanedSpellListNames(names: readonly string[] | null | undefined): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const raw of names ?? []) {
+    const display = cleanSpellListName(String(raw ?? ""))
+    if (!display) continue
+    const key = spellNameMatchKeys(display)[0]
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(display)
+  }
+  return out
+}
+
+export function collectClassSpellLists(
+  classes: Array<{ name?: string | null; spell_list?: string[] | null } | Record<string, unknown>>,
+): ClassSpellListGrant[] {
+  const byClass = new Map<string, { className: string; names: string[] }>()
+  for (const row of classes) {
+    const className = String((row as { name?: unknown }).name ?? "").trim()
+    const names = cleanedSpellListNames(
+      (row as { spell_list?: string[] | null }).spell_list,
+    )
+    if (!className || !names.length) continue
+    const key = className.toLowerCase()
+    const existing = byClass.get(key)
+    if (!existing) {
+      byClass.set(key, { className, names })
+      continue
+    }
+    existing.names = cleanedSpellListNames([...existing.names, ...names])
+  }
+  return [...byClass.values()]
+}
+
+function grantsFromClassLists(lists: ClassSpellListGrant[]): Map<string, Set<string>> {
+  const grants = new Map<string, Set<string>>()
+  for (const list of lists) {
+    for (const name of list.names) {
+      for (const key of spellNameMatchKeys(name)) {
+        if (!grants.has(key)) grants.set(key, new Set())
+        grants.get(key)!.add(list.className)
+      }
+    }
+  }
+  return grants
+}
+
+/** Union class tags from stored/import spell lists onto catalog or incoming spell rows. */
+export function stampClassSpellListsOntoSpellRows<T extends Record<string, unknown>>(
+  spells: T[],
+  lists: ClassSpellListGrant[],
+): { all: T[]; changed: T[] } {
+  if (!spells.length || !lists.length) return { all: spells, changed: [] }
+  const grants = grantsFromClassLists(lists)
+  const changed: T[] = []
+  const all = spells.map((spell) => {
+    const fromList = classNamesForSpell(String(spell.name ?? ""), grants)
+    if (!fromList.size) return spell
+    const nextClasses = unionSpellClassNames(
+      Array.isArray(spell.classes) ? (spell.classes as string[]) : null,
+      [...fromList],
+    )
+    const prev = unionSpellClassNames(
+      Array.isArray(spell.classes) ? (spell.classes as string[]) : null,
+    )
+    if (
+      nextClasses.length === prev.length &&
+      nextClasses.every((name, index) => name === prev[index])
+    ) {
+      return spell
+    }
+    const next = { ...spell, classes: nextClasses }
+    changed.push(next)
+    return next
+  })
+  return { all, changed }
 }
 
 function classNamesForSpell(
@@ -109,42 +176,32 @@ function classNamesForSpell(
 /**
  * Stamp each class `spell_list` onto matching `spells[]` rows, emit a class-tag stub
  * for list names that are not in the batch (so persist can union onto existing SRD
- * catalog rows), then strip `spell_list` from classes.
+ * catalog rows), and keep a cleaned `spell_list` on the class for later catalog stamps.
  */
 export function applyClassSpellListsToImport<T extends ImportContentWithSpellLists>(content: T): T {
   const rawClasses = content.classes ?? []
   if (!rawClasses.length && !content.spells?.length) return content
 
-  const grants = new Map<string, Set<string>>()
+  const lists = collectClassSpellLists(rawClasses)
+  const grants = grantsFromClassLists(lists)
   const listEntries: { name: string; classes: Set<string> }[] = []
-
-  for (const cls of rawClasses) {
-    const className = cls.name?.trim()
-    if (!className || !cls.spell_list?.length) continue
-    for (const rawName of cls.spell_list) {
-      const display = cleanSpellListName(String(rawName ?? ""))
-      if (!display) continue
+  for (const list of lists) {
+    for (const display of list.names) {
       const keys = spellNameMatchKeys(display)
-      if (!keys.length) continue
-      for (const key of keys) {
-        if (!grants.has(key)) grants.set(key, new Set())
-        grants.get(key)!.add(className)
-      }
       const existing = listEntries.find((entry) =>
         spellNameMatchKeys(entry.name).some((key) => keys.includes(key)),
       )
-      if (existing) existing.classes.add(className)
-      else listEntries.push({ name: display, classes: new Set([className]) })
+      if (existing) existing.classes.add(list.className)
+      else listEntries.push({ name: display, classes: new Set([list.className]) })
     }
   }
 
   const spells = (content.spells ?? []).map((spell) => {
     const fromList = classNamesForSpell(spell.name, grants)
-    const merged = new Set(normalizeSpellClassNames(spell.classes))
-    for (const className of fromList) merged.add(className)
+    const merged = unionSpellClassNames(spell.classes, [...fromList])
     return {
       ...spell,
-      classes: merged.size ? [...merged].sort((a, b) => a.localeCompare(b)) : spell.classes,
+      classes: merged.length ? merged : spell.classes,
     }
   })
 
@@ -162,7 +219,10 @@ export function applyClassSpellListsToImport<T extends ImportContentWithSpellLis
     for (const key of spellNameMatchKeys(entry.name)) presentKeys.add(key)
   }
 
-  const cleanedClasses = rawClasses.map(({ spell_list: _spellList, ...rest }) => rest)
+  const cleanedClasses = rawClasses.map((cls) => {
+    const names = cleanedSpellListNames(cls.spell_list)
+    return names.length ? { ...cls, spell_list: names } : cls
+  })
 
   return {
     ...content,

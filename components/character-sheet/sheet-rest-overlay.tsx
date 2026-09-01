@@ -4,6 +4,7 @@ import { motion } from "framer-motion"
 import { Flame, Moon, Sun, X } from "lucide-react"
 import { ShortRestHitDiceBox } from "@/components/character-sheet/short-rest-hit-dice-box"
 import type { HitDicePoolEntry } from "@/lib/character/hit-dice"
+import type { RestHitDiceRestoreActivity } from "@/lib/character/sheet-rest"
 import type { Feature, RestType } from "@/lib/types"
 
 export type LongRestWeaponMasteryChoice = {
@@ -26,6 +27,10 @@ type SheetRestOverlayProps = {
   maxHp?: number
   onHeal?: (amount: number) => void
   onSpendDice?: (classId: string, count: number) => void
+  /** Short/long rest choice features that restore expended Hit Point Dice. */
+  hitDiceRestoreActivities?: RestHitDiceRestoreActivity[]
+  expendedHitDice?: number
+  onUseHitDiceRestore?: (activity: RestHitDiceRestoreActivity) => void
   /** Long rest — swap known Weapon Mastery weapon types. */
   weaponMasteryChoices?: LongRestWeaponMasteryChoice[]
   onWeaponMasteryChange?: (key: string, next: string[]) => void
@@ -49,6 +54,9 @@ export function SheetRestOverlay({
   maxHp = 0,
   onHeal,
   onSpendDice,
+  hitDiceRestoreActivities = [],
+  expendedHitDice = 0,
+  onUseHitDiceRestore,
   weaponMasteryChoices = [],
   onWeaponMasteryChange,
   extraWeaponMasteryChoices = [],
@@ -106,13 +114,56 @@ export function SheetRestOverlay({
           </div>
         </div>
 
-        <ul className="mb-4 space-y-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-          {summary.map((line, index) => (
-            <li key={`${index}-${line}`} className="text-sm text-foreground">
-              {line}
-            </li>
-          ))}
-        </ul>
+        {summary.length > 0 ? (
+          <ul className="mb-4 space-y-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+            {summary.map((line, index) => (
+              <li key={`${index}-${line}`} className="text-sm text-foreground">
+                {line}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {hitDiceRestoreActivities.length > 0 && onUseHitDiceRestore ? (
+          <div className="mb-4 space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-primary">
+              Restore Hit Dice
+            </p>
+            {hitDiceRestoreActivities.map((activity) => {
+              const exhausted = activity.max != null && activity.used >= activity.max
+              const noExpended = expendedHitDice <= 0
+              const disabled = exhausted || noExpended
+              const remaining =
+                activity.max != null ? Math.max(0, activity.max - activity.used) : null
+              return (
+                <div
+                  key={activity.actionId}
+                  className="space-y-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{activity.name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Regain up to {activity.amount} expended Hit Point Dice
+                      {remaining != null ? ` · ${remaining} / ${activity.max} remaining` : ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onUseHitDiceRestore(activity)}
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {exhausted
+                      ? "Already used"
+                      : noExpended
+                        ? "No expended Hit Dice"
+                        : `Use ${activity.name}`}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
 
         {showHitDice ? (
           <div className="mb-4 space-y-2">

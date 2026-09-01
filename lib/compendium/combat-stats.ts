@@ -14,11 +14,27 @@ export type AbilityMods = {
   charisma: number
 }
 
-function getPropertyRecord(equipment: Equipment): Record<string, unknown> {
-  if (equipment.properties && typeof equipment.properties === "object" && !Array.isArray(equipment.properties)) {
-    return equipment.properties as unknown as Record<string, unknown>
+function parsePropertiesRecord(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>
   }
-  return {}
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (!trimmed.startsWith("{")) return null
+    try {
+      const parsed = JSON.parse(trimmed) as unknown
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+function getPropertyRecord(equipment: Equipment): Record<string, unknown> {
+  return parsePropertiesRecord(equipment.properties) ?? {}
 }
 
 export function isShieldItem(equipment: Equipment): boolean {
@@ -43,7 +59,25 @@ export function getArmorAcText(equipment: Equipment): string | null {
 export function getWeaponDamageText(equipment: Equipment): string | null {
   if (equipment.damage) return equipment.damage
   const damage = getPropertyRecord(equipment).damage
-  return typeof damage === "string" ? damage : null
+  return typeof damage === "string" && damage.trim() ? damage : null
+}
+
+/** Leading die notation (`1d4`, `1d6`, `2d8`) from the weapon's damage text. */
+export function getWeaponDamageDiceNotation(equipment: Equipment): string | null {
+  const text = getWeaponDamageText(equipment)
+  const match = text?.trim().match(/^(\d+d\d+)/i)
+  return match?.[1]?.toLowerCase() ?? null
+}
+
+export function weaponDamageDiceMatches(
+  equipment: Equipment,
+  notations: readonly string[] | null | undefined,
+): boolean {
+  if (!notations?.length) return true
+  const actual = getWeaponDamageDiceNotation(equipment)
+  if (!actual) return false
+  const allowed = new Set(notations.map((entry) => entry.trim().toLowerCase()).filter(Boolean))
+  return allowed.has(actual)
 }
 
 export function hasWeaponProperty(equipment: Equipment, property: string): boolean {
@@ -141,7 +175,7 @@ export function getWeaponAttackAbility(
 ): { ability: AbilityScoreKey; mod: number; label: string } {
   const forRoll = options?.forRoll ?? "attack"
   const override = findMatchingWeaponAbilityOverride(weapon, options?.overrides, forRoll)
-  if (override) {
+  if (override && !override.treatAsFinesse) {
     const labels: Record<AbilityScoreKey, string> = {
       strength: "Strength",
       dexterity: "Dexterity",
@@ -157,7 +191,7 @@ export function getWeaponAttackAbility(
     }
   }
 
-  if (hasWeaponProperty(weapon, "finesse")) {
+  if (override?.treatAsFinesse || hasWeaponProperty(weapon, "finesse")) {
     return abilityMods.dexterity > abilityMods.strength
       ? { ability: "dexterity", mod: abilityMods.dexterity, label: "Dexterity (Finesse)" }
       : { ability: "strength", mod: abilityMods.strength, label: "Strength (Finesse)" }
@@ -171,7 +205,7 @@ export function getWeaponAttackAbility(
 
 function findMatchingWeaponAbilityOverride(
   weapon: Equipment,
-  overrides: WeaponAbilityOverrideCharacteristic[] | null | undefined,
+  overrides: readonly WeaponAbilityOverrideCharacteristic[] | null | undefined,
   forRoll: "attack" | "damage",
 ): WeaponAbilityOverrideCharacteristic | null {
   if (!overrides?.length) return null
@@ -201,9 +235,28 @@ function findMatchingWeaponAbilityOverride(
         break
       }
     }
+    if (matches && override.whenDamageDice?.length) {
+      matches = !isUnarmedStrikeWeapon(weapon) && weaponDamageDiceMatches(weapon, override.whenDamageDice)
+    }
     if (matches) return override
   }
   return null
+}
+
+/** Property tags plus Finesse granted by a matching treatAsFinesse override. */
+export function getEffectiveWeaponPropertyTags(
+  weapon: Equipment,
+  overrides?: readonly WeaponAbilityOverrideCharacteristic[] | null,
+): string[] {
+  const tags = getWeaponPropertyTags(weapon)
+  if (tags.some((tag) => /finesse/i.test(tag))) return tags
+  const granted = findMatchingWeaponAbilityOverride(
+    weapon,
+    overrides?.filter((override) => override.treatAsFinesse),
+    "attack",
+  )
+  if (granted?.treatAsFinesse) return [...tags, "Finesse"]
+  return tags
 }
 
 function weaponNameMatchesProficiency(proficiency: string, weaponName: string): boolean {

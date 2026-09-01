@@ -256,6 +256,14 @@ function applyOperations(
               ),
           )
         }
+        if (operation.replaceEffectKinds?.length) {
+          baseModifiers = baseModifiers.filter(
+            (mod) =>
+              !(mod.activation?.effects ?? []).some((effect) =>
+                operation.replaceEffectKinds!.includes(effect.kind),
+              ),
+          )
+        }
         const attached = resolveNamedPreset(operation.preset, {
           className: ctx.className,
           name: ctx.name ?? next.name,

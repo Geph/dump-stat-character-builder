@@ -63,7 +63,6 @@ import {
 } from "@/lib/compendium/combat-stats"
 import {
   buildUnarmedStrikeEquipment,
-  characterHasFreeHand,
   characterIsEmptyHanded,
   extraUnarmedStrikeAbilityOverrides,
 } from "@/lib/character/unarmed-strike"
@@ -1022,17 +1021,15 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     offHandWeapon: equippedOffHandWeapon,
     shield: equippedShield,
   }
-  const unarmedStrikeWeapon = characterHasFreeHand(unarmedHands)
-    ? buildUnarmedStrikeEquipment({
-        die: aggregatedCharacteristics.unarmedStrikeDie,
-        dieByLevel: aggregatedCharacteristics.unarmedStrikeDieByLevel,
-        emptyHandedDie: aggregatedCharacteristics.unarmedStrikeEmptyHandedDie,
-        emptyHanded: characterIsEmptyHanded(unarmedHands),
-        damageType: aggregatedCharacteristics.unarmedStrikeDamageType,
-        ability: aggregatedCharacteristics.unarmedStrikeAbility,
-        characterLevel: totalLevel,
-      })
-    : null
+  const unarmedStrikeWeapon = buildUnarmedStrikeEquipment({
+    die: aggregatedCharacteristics.unarmedStrikeDie,
+    dieByLevel: aggregatedCharacteristics.unarmedStrikeDieByLevel,
+    emptyHandedDie: aggregatedCharacteristics.unarmedStrikeEmptyHandedDie,
+    emptyHanded: characterIsEmptyHanded(unarmedHands),
+    damageType: aggregatedCharacteristics.unarmedStrikeDamageType,
+    ability: aggregatedCharacteristics.unarmedStrikeAbility,
+    characterLevel: totalLevel,
+  })
   const unarmedStrikeAttack = unarmedStrikeWeapon
     ? buildWeaponAttackDerived(unarmedStrikeWeapon, {
         ...weaponAttackContext,
@@ -1113,6 +1110,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     resistances: aggregatedCharacteristics.resistances,
     immunities: aggregatedCharacteristics.immunities,
     conditionImmunities: aggregatedCharacteristics.conditionImmunities,
+    conditionImmunitySources: aggregatedCharacteristics.conditionImmunitySources,
     movementEffects: aggregatedCharacteristics.movementEffects,
     extraTurns: aggregatedCharacteristics.extraTurns,
     healingReceivedModifiers: aggregatedCharacteristics.healingReceivedModifiers,
@@ -1122,6 +1120,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     featureChoiceCountBonuses: aggregatedCharacteristics.featureChoiceCountBonuses,
     featureChoiceOptionGrants: aggregatedCharacteristics.featureChoiceOptionGrants,
     powerRiders: aggregatedCharacteristics.powerRiders,
+    weaponAbilityOverrides: aggregatedCharacteristics.weaponAbilityOverrides,
     equippedWeaponAttack,
     equippedOffHandWeaponAttack,
     unarmedStrikeWeapon,

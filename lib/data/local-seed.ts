@@ -21,6 +21,19 @@ import {
   upsertByName,
 } from "./indexed-db-store"
 import { shouldAssignBundledCardArt } from "@/lib/site-settings/app-presentation-mode"
+import {
+  collectClassSpellLists,
+  stampClassSpellListsOntoSpellRows,
+} from "@/lib/import/class-spell-lists"
+
+async function restampSpellClassesFromStoredLists() {
+  const classRows = await getAllFromStore("classes")
+  const lists = collectClassSpellLists(classRows)
+  if (!lists.length) return
+  const spells = await getAllFromStore("spells")
+  const { changed } = stampClassSpellListsOntoSpellRows(spells, lists)
+  if (changed.length) await upsertByName("spells", changed)
+}
 
 export type LocalSeedResult = {
   total: number
@@ -96,6 +109,7 @@ async function ensureBundledSrdFresh(): Promise<void> {
     "spells",
     enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
   )
+  await restampSpellClassesFromStoredLists()
   await seedSrdEquipment({
     upsertByName: upsertByName as unknown as (table: "equipment", rows: Record<string, unknown>[]) => Promise<void>,
     listEquipmentByName: async () => {
@@ -159,6 +173,7 @@ export async function seedLocalSrd(): Promise<LocalSeedResult> {
     "spells",
     enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
   )
+  await restampSpellClassesFromStoredLists()
   const spellCatalog = (await getAllFromStore("spells")).map((row) => ({
     id: row.id as string,
     name: row.name as string,

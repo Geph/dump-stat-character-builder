@@ -104,3 +104,112 @@ export function formatRollBonusSummary(
       return "—"
   }
 }
+
+export type ResolveRollBonusDisplayParams = {
+  proficiencyBonus?: number
+  abilityMods?: Partial<Record<string, number>>
+  characterLevel?: number
+  classResourceDieSides?: Record<string, number>
+  classResourceCounts?: Record<string, number>
+}
+
+const ABILITY_MOD_TO_SCORE: Record<string, string> = {
+  STR: "strength",
+  DEX: "dexterity",
+  CON: "constitution",
+  INT: "intelligence",
+  WIS: "wisdom",
+  CHA: "charisma",
+}
+
+const SCORE_TO_ABILITY_MOD: Record<string, string> = {
+  strength: "STR",
+  dexterity: "DEX",
+  constitution: "CON",
+  intelligence: "INT",
+  wisdom: "WIS",
+  charisma: "CHA",
+}
+
+function signedBonus(amount: number): string {
+  return amount >= 0 ? `+${amount}` : `${amount}`
+}
+
+function lookupAbilityMod(
+  mods: Partial<Record<string, number>> | undefined,
+  ability: string | null | undefined,
+): number | undefined {
+  if (!mods || !ability) return undefined
+  const upper = ability.toUpperCase()
+  if (mods[upper] != null) return mods[upper]
+  const scoreKey = ABILITY_MOD_TO_SCORE[upper] ?? ability.toLowerCase()
+  if (mods[scoreKey] != null) return mods[scoreKey]
+  if (mods[ability] != null) return mods[ability]
+  return undefined
+}
+
+function abilityDisplayLabel(ability: string | null | undefined): string | null {
+  if (!ability) return null
+  const upper = ability.toUpperCase()
+  if (ABILITY_MOD_TO_SCORE[upper]) return upper
+  return SCORE_TO_ABILITY_MOD[ability.toLowerCase()] ?? ability
+}
+
+/** Resolved bonus for the Use overlay — numbers when known, dice notation without rolling. */
+export function formatResolvedRollBonus(
+  config: RollBonusConfig | null | undefined,
+  params: ResolveRollBonusDisplayParams = {},
+): string | null {
+  if (!config) return null
+  switch (config.mode) {
+    case "fixed":
+      return config.fixed != null ? signedBonus(config.fixed) : null
+    case "proficiency": {
+      const pb = params.proficiencyBonus
+      const factor = config.multiplier ?? 1
+      if (pb == null) return factor === 1 ? "Proficiency Bonus" : `×${factor} Proficiency Bonus`
+      const amount = Math.floor(pb * factor)
+      const label = factor === 1 ? "Proficiency Bonus" : `×${factor} Proficiency Bonus`
+      return `${signedBonus(amount)} (${label})`
+    }
+    case "ability_modifier": {
+      const label = abilityDisplayLabel(config.ability)
+      const mod = lookupAbilityMod(params.abilityMods, config.ability)
+      if (mod == null) return label ? `${label} modifier` : "Ability modifier"
+      return `${signedBonus(mod)} (${label ?? "ability"} modifier)`
+    }
+    case "multiplier": {
+      const factor = config.multiplier ?? 1
+      const source = config.ability
+        ? `${abilityDisplayLabel(config.ability) ?? config.ability} modifier`
+        : "Proficiency Bonus"
+      const base = config.ability
+        ? lookupAbilityMod(params.abilityMods, config.ability)
+        : params.proficiencyBonus
+      if (base == null) return `×${factor} (${source})`
+      return `${signedBonus(Math.floor(base * factor))} (×${factor} ${source})`
+    }
+    case "character_level": {
+      const level = params.characterLevel
+      if (level == null) return "character level"
+      return `${signedBonus(level)} (character level)`
+    }
+    case "class_resource_count": {
+      const key = config.classResourceKey?.trim()
+      const count = key ? params.classResourceCounts?.[key] : undefined
+      const label = key ? `${key.replace(/_/g, " ")} (Class Cap)` : "Class Cap"
+      if (count == null) return label
+      return `${signedBonus(count)} (${label})`
+    }
+    case "die":
+      return formatRollBonusSummary(config, {
+        classResourceDieSides: params.classResourceDieSides,
+      })
+    case "spell_attack":
+      return "Spell attack modifier"
+    default:
+      return formatRollBonusSummary(config, {
+        classResourceDieSides: params.classResourceDieSides,
+      })
+  }
+}

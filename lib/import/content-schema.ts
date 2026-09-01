@@ -213,6 +213,15 @@ export const ImportMechanicSchema = z.object({
   weaponAbilityAppliesTo: z.enum(["attack", "damage", "both"]).optional(),
   weaponAbilityScope: z.enum(["all", "melee", "ranged", "finesse", "specific"]).optional(),
   weaponNames: z.array(z.string()).optional(),
+  /** Extra Finesse–style grants: use higher of STR/DEX instead of a fixed alternateAbility. */
+  treatAsFinesse: z.boolean().optional(),
+  /** Restrict Extra Finesse / weapon_sheet_badge to printed dice (`1d4`, `1d6`, `2d4`). */
+  whenDamageDice: z.array(z.string()).optional(),
+  /** weapon_sheet_badge */
+  badgeLabel: z.string().optional(),
+  badgeDescription: z.string().optional(),
+  includeUnarmed: z.boolean().optional(),
+  requireFirearm: z.boolean().optional(),
   fromSaveAbility: z.enum(["any", "STR", "DEX", "CON", "INT", "WIS", "CHA"]).optional(),
   toSaveAbility: z.enum(USES_ABILITY_CODES).optional(),
   forcedSaveScope: z.enum(["your_spells", "your_features", "all"]).optional(),
@@ -295,6 +304,7 @@ export const ImportMechanicSchema = z.object({
         resourceCost: z.number().optional(),
         hitDiceCost: z.number().optional(),
         unlocksAtLevel: z.number().optional(),
+        actionKind: z.enum(["action", "bonus", "reaction"]).optional(),
       }),
     )
     .optional(),
@@ -308,6 +318,11 @@ export const ImportMechanicSchema = z.object({
   selectable: z.boolean().optional(),
   /** power_rider — when selected, replace the parent action's HP spend. */
   spendHitPoints: z.number().optional(),
+  /** replace_feature — prior feature names this upgrade supersedes. */
+  replacedFeatureNames: z.array(z.string()).optional(),
+  /** First use each turn does not spend action economy. */
+  firstUseNoAction: z.boolean().optional(),
+  firstUseNoActionFromLevel: z.number().optional(),
   /** temporary_hit_points / hit_dice_restore fallback */
   amount: z.number().optional(),
   /** hit_dice_restore — expended Hit Point Dice regained (prefer over amount). */
@@ -472,6 +487,7 @@ export const ClassFeatureSchema = z.object({
       abilitiesActions: z.boolean().optional(),
       combatActions: z.boolean().optional(),
       featuresTab: z.boolean().optional(),
+      restDialogues: z.boolean().optional(),
     })
     .optional(),
 })
@@ -1145,19 +1161,22 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Spendable pools** (Rage, Ki, Psi Points, Exploit Dice, Battle Dice, Dances, Arcane Surge, etc.): include recharges as [{ "rest": "short_rest" }, { "rest": "long_rest" }] (object form preferred; bare ["short_rest","long_rest"] strings are accepted but discouraged)
 - **Battle Dice / pools that refill when you roll Initiative:** also set uses.rechargeOnInitiative: true (full pool) or a number for partial restore
 - **Captain Battle Dice:** spendable pool from the Battle Dice column (NdM) with rechargeOnInitiative. Battle Tactics auto-grants Bolster, Born Leader, Morale Boost, Rally, and Staggering Strike via grant_custom_ability — NOT a class_knacks / Maneuvers Known picker (Vagabond has the pick-N table). Subclass [Maneuver] features are extra named options.
-- **Gunslinger Risk Dice:** short/long rest pool from the Risk Dice column; include dieSidesByLevel (d8/d10/d12). Dire Gambit → rechargeOnInitiative: 1 (not full refill; enrichment sets this from the feature — do not set initiative recharge from the table alone). Keep "expend one Risk Die" on maneuvers. Base Maneuver Options (Bite the Bullet, Blindfire, Dodge Roll, Grazing Shot, Maverick Spirit, Skin of Your Teeth) are auto-known via Risk + grant_custom_ability — NOT a class_knacks picker. Always extract Skin of Your Teeth (PDF places Maneuver Options between Deadeye and Gun Tank). Include Pistolero. Do not contaminate with Captain/Vagabond-only Battle Die maneuvers.
+- **Gunslinger Risk Dice:** short/long rest pool from the Risk Dice column; include dieSidesByLevel (d8/d10/d12). Dire Gambit → feature-gated restore of 1 die on Initiative and on a Critical Hit (resourceRefreshOnInitiative + resourceRefreshOnCriticalHit + classResourceAmount 1). Do not set rechargeOnInitiative on the Risk Dice pool. Keep "expend one Risk Die" on maneuvers. Base Maneuver Options (Bite the Bullet, Blindfire, Dodge Roll, Grazing Shot, Maverick Spirit, Skin of Your Teeth) are auto-known via Risk + grant_custom_ability — NOT a class_knacks picker. Always extract Skin of Your Teeth (PDF places Maneuver Options between Deadeye and Gun Tank). Include Pistolero. Do not contaminate with Captain/Vagabond-only Battle Die maneuvers.
 - **Martyr Spell Uses:** spendable long-rest pool from the Spell Uses column. Hit Point Spellcasting spends current HP from the table (not modeled as normal slots); the sheet deducts that HP on cast.
-- **Martyr Divine Respite:** one class feature at the level it is gained (usually 9). Emit hit_dice_restore (hitDiceRestoreAmount 3, hitDiceRestoreByLevel 13→6 and 17→10) plus uses usesFixed 1 / usesRecharge long_rest. Keep the short-rest and scaling sentences on that same feature. Do not emit leftover features at 13/17 that only say the number of Hit Point Dice increases.
+- **Martyr Divine Respite:** one class feature at the level it is gained (usually 9). Emit hit_dice_restore (hitDiceRestoreAmount 3, hitDiceRestoreByLevel 13→6 and 17→10) plus uses usesFixed 1 / usesRecharge long_rest. Set sheetDisplay restDialogues (not abilitiesActions or combatActions). Keep the short-rest and scaling sentences on that same feature. Do not emit leftover features at 13/17 that only say the number of Hit Point Dice increases.
 - **Martyr Undying:** Passive when reduced to 0 HP (not a Reaction). Keep \"immediately use your Miraculous Healing (no action required)\" on the same feature. Pair with uses usesFixed 1 / usesRecharge long_rest.
-- **Martyr Improved Sacrificial Strike:** do not emit a second combat action. Emit power_rider parentPowerNames [\"Sacrificial Strike\"], selectable true, spendHitPoints 10. Keep \"you can choose to take 10… extra 20\".
+- **Martyr Improved Sacrificial Strike:** emit as its own Bonus Action that replaces Sacrificial Strike (replace_feature replacedFeatureNames [\"Sacrificial Strike\"], spendHitPoints 10, extra 20 Radiant). Keep the 11 and 17 sentences on that same feature (firstUseNoActionFromLevel 17). Do not emit a leftover 17-only \"first use without a Bonus Action\" row, and do not emit power_rider.
 - **Martyr Max Spell Levels:** special cap (resource_key "max_spell_level") from the Max Spell Levels column — not a spendable pool and not normal caster progression.
 - **Investigator Ritual Level / Finisher / Rushed Incantation / Trinkets:** Ritual Level = special cap; Finisher = special NdM rider with resource_key "finisher" (never "finisher_dice"); Rushed Incantation + Trinkets = spendable short-regain-1 / long-all pools.
 - **Mage Hand Press Warden Interrupt:** Interrupt column → class_resources.interrupt (short rest regain 1 / long rest all). Do not confuse with KibblesTasty Warden Endurance Dice — if "Warden" already exists in the compendium, keep the source name "Warden" in JSON; the import UI will ask the user what to rename it to (suggestion: "Warden (Mage Hand Press)").
 - **Guardian Tactics:** Block / Challenge / Grasp as a free Bonus Action menu (Dump Stat wires resource_ability_menu); ally/enemy effects stay play-time. Extended Tactics widens ranges to 10 feet.
 - **Necromancer Charnel Touch:** spendable pool equal to 5 × class level — uses must be { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. Do not use uses.type \"multiply_level\".
-- **Necromancer Spellcasting:** INT full prepared caster — classes[].spellcasting { ability: \"Intelligence\", caster_progression: \"full\", prepared: true } plus progression[] from the Cantrips / Prepared Spells columns (3 cantrips + 4 prepared at 1st; cantrips 4 at 4th / 5 at 10th; prepared scales to 22 at 20th). Cantrip spellChoiceGrants stay incremental (3, +1@4, +1@10). Do not invent a \"table missing level-10 cantrip\" editorial note — the source table shows 5 cantrips at 10th.
+- **Necromancer Spellcasting:** INT full prepared caster — classes[].spellcasting { ability: \"Intelligence\", caster_progression: \"full\", prepared: true } plus progression[] from the Cantrips / Prepared Spells columns (3 cantrips + 4 prepared at 1st; cantrips 4 at 4th / 5 at 10th; prepared scales to 22 at 20th). Do not put spellChoiceGrants on the Spellcasting feature — cantrips and prepared spells come from progression[] (the class spell picker). Populate spell_list from the official Spell / School / Special tables — Dump Stat keeps that list on the class and stamps matching catalog rows on import. Extra always-prepared grants (Animate Dead) stay on their own features. Do not invent a \"table missing level-10 cantrip\" editorial note — the source table shows 5 cantrips at 10th.
 - **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools and not class_upgrades pickers. Import thrall creatures[] with the class; Thralls → grant_creature with BOTH creatureNames and creatureChoiceOptions (the latter is only the player-pick subset). Deadnaught is a companion (level-scaled HP).
-- **Necromancer Dead Space:** emit equipment_and_magic_items with itemOptions [\"Bag\",\"Cloak\",\"Backpack\"], choiceCount 1, allowCustom true; uses with usesFixed 12 and no rest recharge (the dots track occupied corpse/Undead capacity); and player_note with notePrompt \"Dead Space notes\", a useful contents/linked-item placeholder, and noteTarget \"feature\". Preserve both Magic-action and Short-Rest relinking sentences so it appears in Actions and explains when the linked item can change.
+- **Necromancer Dead Space:** emit equipment_and_magic_items with itemOptions [\"Bag\",\"Cloak\",\"Backpack\"], choiceCount 1, allowCustom true; uses with usesFixed 12 and no rest recharge (the dots track occupied corpse/Undead capacity); and player_note with notePrompt \"Dead Space notes\", a useful contents/linked-item placeholder, and noteTarget \"feature\". Preserve both Magic-action and Short-Rest relinking sentences so it appears in Actions and explains when the linked item can change. Always set activation.action plus sheetDisplay abilitiesActions (utility Magic action), not combatActions.
+- **Necromancer Thrall Rush:** activation.onInitiative + sheetDisplay combatActions. Do not invent an Action/Bonus Action cost — it fires when Initiative is rolled.
+- **Necromancer Overcharged Thralls:** on_creature_death_trigger with creatureFilter ally (thralls you control, including released). Restore Charnel Touch equal to Necromancer level is play-time; do not emit a spendable uses pool on this feature.
+- **Necromancer Death Knight Extra Attack:** extraAttackCount 1 plus power_rider reminding that one attack can be replaced with an action cantrip. Combat Research already carries Charnel Touch-as-Bonus-Action via power_rider.
 - **Necromancer critical spellcasting:** attack_roll_modifiers must use attackTarget \"spell\" (never \"all\") and criticalHitMinimum 19, improving to 18 at level 14, so weapon attacks do not inherit the spell-only critical range.
 - **Necromancer Improved Thralls:** immunities belong to the thralls, not the player character. Preserve them as companion rules text; do not emit player condition_immunity or damage_immunity mechanics.
 - **Necromancer Lichdom:** emit damage_immunity for Necrotic and Poison plus condition_immunity for Exhaustion and Poisoned, and vision Truesight 120. Preserve Undead creature type, turn immunity, and Spirit Jar revival as narrative rules unless a dedicated mechanic exists.
@@ -1165,7 +1184,7 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Necromancer subclass resource menus:** Vampiric Transformation, Charnel Aura, Domination Spells, Spell-Stitching, Quick Stitch, and Self-Stitches use resource_ability_menu with classResourceKey "charnel_touch" and structured menuOptions [{ name, description, resourceCost }]. Per-use forms/stitches are NOT build-time isChoice/choices selections.
 - **Necromancer Pharaoh Channel Divinity:** two shared uses; Short Rest restores one and Long Rest restores all; 15 Charnel Touch restores one. Ankh of Radiance and Scarab of Judgement spend the same useShareKey, not independent pools.
 - **Necromancer conditional forms:** Umbral Form must declare new_toggles key "umbral_form_active"; gate its Grappled/Prone immunities and equal-to-walk Climb Speed with requiresSheetToggle. Never borrow another class's same-named Umbral Form resistance preset. Whirlwind of Sand immunities only exist during its movement and must not aggregate as permanent character immunities.
-- **Dancer:** Dances = spendable uses (short rest amount: 1 + long rest all); Dance Die = die-size special resource (dieSidesByLevel), not a depleting pool. Momentum (Acrobat) = at_level combat tracker (cap 1→3 at 14), subclass_name Acrobat — not a long-rest pool and not type special. Unarmored Defense = 10 + DEX + CHA (wording may be "10 plus your Dexterity and Charisma modifiers"). Grand Finale is an Attack-action rider while Dance is active — not mechanics kind action / activation.action. Deadly D4s is optional 2d4 damage replacement for 1d4/1d6/Unarmed (and optional Dervish Firearms 2d4→3d4) — do NOT emit weapon_damage_die_override (that rewrites NdX→Nd4, which is wrong). Dance Styles: stub feature + choices.optionsSource class_upgrades + resourceKey dance_styles_known; put style bodies only in import_proposals.custom_abilities (ability_role upgrade), not duplicated as choices.options prose.
+- **Dancer:** Dances = spendable uses from Dancer 2 (short rest amount: 1 + long rest all; first atLevelTable row must be level 2); Dance Die = die-size special resource (dieSidesByLevel from 2), not a depleting pool. Momentum (Acrobat) = at_level combat tracker (cap 1→3 at 14), subclass_name Acrobat — not a long-rest pool and not type special. Unarmored Defense = 10 + DEX + CHA (wording may be "10 plus your Dexterity and Charisma modifiers"). Grand Finale is an Attack-action rider while Dance is active — not mechanics kind action / activation.action. Deadly D4s is optional 2d4 damage replacement for 1d4/1d6/Unarmed. Dervish Firearms is optional 3d4 only for Firearm weapons that already deal 2d4 — do NOT emit weapon_damage_die_override (that rewrites NdX→Nd4, which is wrong). Dervish Fighting (and similar optional weapon riders) should emit weapon_sheet_badge (badgeLabel, whenDamageDice [1d4, 1d6], includeUnarmed) so matching weapons show a named info badge. Dance Styles: stub feature + choices.optionsSource class_upgrades + resourceKey dance_styles_known; put style bodies only in import_proposals.custom_abilities (ability_role upgrade), not duplicated as choices.options prose.
 - **Craftsman:** Masterwork Bonus = special Class Cap (not spendable). Thunderlords Charge Points = spendable multiply_level pool (long rest) with subclass_name \"Thunderlords' Guild\" (subclass-gated). Do not model "uses equal to Masterwork Bonus" as spending masterwork_bonus — enrichment creates a separate at_level tracker. Masterwork weapon/armor live math uses sheet toggles masterwork_weapon_active / masterwork_armor_active.
 - **Dancer Momentum:** subclass-gated class_resources.momentum with subclass_name "Acrobat" (or the Momentum archetype); uses.type at_level with atLevelTable [{level:3,count:1},{level:14,count:3}] and no recharges (combat tracker). Spend phrases on the Momentum feature.
 - **Warmage:** Base class is INT cantrips only (classes[].spellcasting ability Intelligence, no caster_progression). Tricks / Tricks Known = special choice count + class_knacks; Cantrip Bonus Dice = special rider for Warmage Edge; Arcane Surge = spendable uses (2→3; short regain 1 / long all; Initiative restore 1 at L20). Cantrip spellChoiceGrants must be incremental. House of Bishops → subclass third caster (prepared Wizard list). House of Kings maneuvers are auto-granted — not Tricks picks.

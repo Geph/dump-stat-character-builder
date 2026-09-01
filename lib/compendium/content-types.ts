@@ -80,56 +80,57 @@ export function compendiumListHref(tab: CompendiumContentType): string {
 
 export function getCompendiumItemIcon(
   tab: CompendiumContentType,
-  item: Record<string, unknown>,
+  item: object,
 ): string {
-  const icon = typeof item.icon === "string" ? item.icon.trim() : ""
+  const record = item as Record<string, unknown>
+  const icon = typeof record.icon === "string" ? record.icon.trim() : ""
   // `gunshot` was stamped on Gunslinger content, but the SVG is not shipped.
   // Treat it as unset so name / class defaults can fill in.
   if (icon && icon !== "gunshot") return icon
   if (tab === "classes") {
-    const classIcon = defaultClassIconForName(String(item.name ?? ""))
+    const classIcon = defaultClassIconForName(String(record.name ?? ""))
     if (classIcon) return classIcon
   }
   if (tab === "subclasses") {
     const className =
-      (typeof item.class_name === "string" && item.class_name) ||
-      (typeof item.parent_class_name === "string" && item.parent_class_name) ||
+      (typeof record.class_name === "string" && record.class_name) ||
+      (typeof record.parent_class_name === "string" && record.parent_class_name) ||
       ""
-    const subclassIcon = defaultSubclassIconForName(String(item.name ?? ""), className)
+    const subclassIcon = defaultSubclassIconForName(String(record.name ?? ""), className)
     if (subclassIcon) return subclassIcon
   }
   if (tab === "feats") {
-    const featIcon = SRD_FEAT_ICONS_BY_NAME[String(item.name ?? "").trim()]
+    const featIcon = SRD_FEAT_ICONS_BY_NAME[String(record.name ?? "").trim()]
     if (featIcon) return featIcon
   }
   if (tab === "species") {
-    const speciesIcon = SRD_SPECIES_ICONS_BY_NAME[String(item.name ?? "").trim()]
+    const speciesIcon = SRD_SPECIES_ICONS_BY_NAME[String(record.name ?? "").trim()]
     if (speciesIcon) return speciesIcon
   }
   if (tab === "backgrounds") {
-    const backgroundIcon = SRD_BACKGROUND_ICONS_BY_NAME[String(item.name ?? "").trim()]
+    const backgroundIcon = SRD_BACKGROUND_ICONS_BY_NAME[String(record.name ?? "").trim()]
     if (backgroundIcon) return backgroundIcon
   }
   if (tab === "creatures") {
-    const creatureIcon = defaultCreatureIconForItem(item)
+    const creatureIcon = defaultCreatureIconForItem(record)
     if (creatureIcon) return creatureIcon
   }
   if (tab === "abilities") {
-    const abilityIcon = defaultAbilityIconForItem({ ...item, icon: icon || undefined })
+    const abilityIcon = defaultAbilityIconForItem({ ...record, icon: icon || undefined })
     if (abilityIcon) return abilityIcon
   }
   if (
     (tab === "equipment" || tab === "magic_items") &&
-    item.category === "Weapon"
+    record.category === "Weapon"
   ) {
-    const name = String(item.name ?? "").trim()
+    const name = String(record.name ?? "").trim()
     if (name) return weaponIconSlug(name)
   }
   if (
     (tab === "equipment" || tab === "magic_items") &&
-    item.category === "Armor"
+    record.category === "Armor"
   ) {
-    const armorIcon = SRD_ARMOR_ICONS_BY_NAME[String(item.name ?? "")]
+    const armorIcon = SRD_ARMOR_ICONS_BY_NAME[String(record.name ?? "")]
     if (armorIcon) return armorIcon
   }
   return COMPENDIUM_DEFAULT_ICONS[tab]

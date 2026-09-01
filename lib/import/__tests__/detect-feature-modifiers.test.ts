@@ -34,6 +34,25 @@ describe("detectFeatureModifiers", () => {
     assert?: (detections: ReturnType<typeof detectFeatureModifiers>) => void
   }> = [
     {
+      label: "constrained skill pool (Centaur Natural Affinity)",
+      text: "Proficiency in one of Animal Handling, Medicine, Nature, or Survival.",
+      ruleId: "proficiency.skills.constrained_choice",
+      assert: (detections) => {
+        const char = detections[0]?.instance.characteristics?.[0]
+        expect(char?.type).toBe("skills")
+        if (char?.type === "skills") {
+          expect(char.allowAnySkill).toBe(false)
+          expect(char.choiceCount).toBe(1)
+          expect(char.entries?.map((entry) => entry.skill).sort()).toEqual([
+            "Animal Handling",
+            "Medicine",
+            "Nature",
+            "Survival",
+          ])
+        }
+      },
+    },
+    {
       label: "skill proficiency list",
       text: "You gain proficiency in Stealth and Perception.",
       ruleId: "proficiency.skills.list",
@@ -373,6 +392,27 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "choose one named benefits menu",
+      text:
+        "Once per turn when you reduce an enemy to 0 Hit Points, choose one of the following benefits.\n\nAssault. As a Bonus Action, you can move up to 15 feet and make a melee attack.\n\nBreak Spells. The creature's spells and ongoing effects end.\n\nShatter Morale. Nearby allies of the creature have the Frightened condition.",
+      ruleId: "menu.choose_one_named_benefits",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "menu.choose_one_named_benefits")?.instance
+            .characteristics?.[0],
+          "resource_ability_menu",
+        )
+        expect(char?.waiveResourceCost).toBe(true)
+        expect(char?.options?.map((o: { name: string }) => o.name)).toEqual([
+          "Assault",
+          "Break Spells",
+          "Shatter Morale",
+        ])
+        expect(char?.options?.[0]).toMatchObject({ name: "Assault", actionKind: "bonus" })
+        expect(char?.options?.[1]?.actionKind).toBeUndefined()
+      },
+    },
+    {
       label: "turn start heal below half hp",
       text:
         "If you begin your turn with less than half of your hit points remaining, but at least 1 hit point, you regain hit points equal to 5 + your Constitution modifier.",
@@ -672,6 +712,38 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "improved feature replaces the prior one",
+      text: "Your Sacrificial Strike improves. When you use this feature, you can choose to take 10 Radiant damage, and the target takes an extra 20 Radiant damage.",
+      ruleId: "feature.replace_improved",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "feature.replace_improved")?.instance
+          .characteristics?.[0]
+        expect(char?.type).toBe("replace_feature")
+        if (char?.type === "replace_feature") {
+          expect(char.replacedFeatureNames).toEqual(["Sacrificial Strike"])
+        }
+      },
+    },
+    {
+      label: "regain one resource die on initiative or a critical hit",
+      text:
+        "When you roll initiative or score a critical hit, you regain one expended Risk Die.",
+      ruleId: "resource.refresh_one_on_initiative_or_crit",
+      assert: (detections) => {
+        const effect = detections.find(
+          (d) => d.ruleId === "resource.refresh_one_on_initiative_or_crit",
+        )?.instance.activation?.effects?.[0]
+        expect(effect).toMatchObject({
+          kind: "class_resource",
+          classResourceKey: "risk_dice",
+          classResourceChange: "increase",
+          classResourceAmount: 1,
+          resourceRefreshOnInitiative: true,
+          resourceRefreshOnCriticalHit: true,
+        })
+      },
+    },
+    {
       label: "named species cantrip without the word cantrip",
       text: "Level 1: Speed increases to 35 ft.; know Druidcraft.",
       ruleId: "spell.know_named",
@@ -696,6 +768,7 @@ describe("detectFeatureModifiers", () => {
     "As a bonus action, you can dash.",
     "Your spellcasting ability is Intelligence.",
     "You can cast one of the level 1+ spells that you have prepared from your Circle Spells feature without expending a spell slot, and you must finish a Long Rest before you do so again.",
+    "When you roll initiative, you regain all expended Battle Dice.",
   ]
 
   it.each(negativeCases)("does not invent modifiers from: %s", (text) => {

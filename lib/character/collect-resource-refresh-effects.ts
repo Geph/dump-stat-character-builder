@@ -13,6 +13,7 @@ export type ResourceRefreshEffect = {
   classLevel: number
   onRest?: "short_rest" | "long_rest" | "short_or_long_rest" | null
   onInitiative?: boolean
+  onCriticalHit?: boolean
   oncePerLongRest?: boolean
   /** Restore this many uses (Dire Gambit). */
   restoreAmount?: number | null
@@ -53,37 +54,57 @@ function scanFeatureList(
     if ((feature.level ?? 1) > ctx.classLevel) continue
     for (const instance of readLinkedModifiers(feature, catalog)) {
       for (const effect of instance.activation?.effects ?? []) {
-        const refresh = refreshEffectFromFeatureEffect(effect, feature.name, ctx)
+        const refresh = refreshEffectFromFeatureEffect(effect, feature.name, feature.description, ctx)
         if (refresh) into.push(refresh)
       }
     }
   }
 }
 
+function featureTextMentionsCriticalHit(description: string | null | undefined): boolean {
+  return /\bcritical hits?\b/i.test(description ?? "")
+}
+
 function refreshEffectFromFeatureEffect(
   effect: FeatureEffect,
   featureName: string,
+  featureDescription: string | null | undefined,
   ctx: { classId: string; classLevel: number },
 ): ResourceRefreshEffect | null {
   if (effect.kind !== "class_resource") return null
   const resourceKey = remapResourceKey(effect.classResourceKey ?? "")
   if (!resourceKey) return null
   const onInitiative = effect.resourceRefreshOnInitiative === true
+  const onCriticalHit =
+    effect.resourceRefreshOnCriticalHit === true ||
+    (onInitiative && featureTextMentionsCriticalHit(featureDescription))
   const onRest = effect.resourceRefreshOnRest ?? null
-  if (!onInitiative && !onRest) return null
+  if (!onInitiative && !onCriticalHit && !onRest) return null
 
+  const explicitFull = effect.resourceRefreshFormula === "full"
   const formula: ResourceRefreshEffect["formula"] =
     effect.resourceRefreshFormula === "half_level_down"
       ? "half_level_down"
       : effect.resourceRefreshFormula === "half_level"
         ? "half_level_up"
-        : effect.classResourceChange === "reset" &&
-            effect.classResourceAmount == null &&
-            effect.resourceRefreshCap == null
+        : explicitFull
           ? "full"
-          : effect.resourceRefreshFormula === "full"
+          : effect.classResourceChange === "reset" &&
+              effect.classResourceAmount == null &&
+              effect.resourceRefreshCap == null &&
+              !onInitiative &&
+              !onCriticalHit
             ? "full"
             : null
+
+  const restoreAmount =
+    effect.resourceRefreshCap == null && effect.classResourceAmount != null
+      ? effect.classResourceAmount
+      : effect.resourceRefreshCap == null &&
+          (onInitiative || onCriticalHit) &&
+          !explicitFull
+        ? 1
+        : null
 
   return {
     id: `${ctx.classId}:${featureName}:${effect.id ?? resourceKey}`,
@@ -93,11 +114,9 @@ function refreshEffectFromFeatureEffect(
     classLevel: ctx.classLevel,
     onRest,
     onInitiative,
+    onCriticalHit,
     oncePerLongRest: effect.resourceRefreshOncePerLongRest === true,
-    restoreAmount:
-      effect.resourceRefreshCap == null && effect.classResourceAmount != null
-        ? effect.classResourceAmount
-        : null,
+    restoreAmount,
     restoreAmountConfig: effect.classResourceAmountConfig ?? null,
     fillUntilRemaining: effect.resourceRefreshCap ?? null,
     formula,
@@ -175,7 +194,7 @@ export function applyFeatureResourceRefresh(params: {
   resourceEntries: { id: string; uses: UsesConfig; classLevel: number }[]
   resolveContext: ResolveUsesContext
   effects: ResourceRefreshEffect[]
-  trigger: "initiative" | "short_rest" | "long_rest"
+  trigger: "initiative" | "critical_hit" | "short_rest" | "long_rest"
   rechargeCapsByResourceId?: Record<string, number>
 }): {
   usedResourcesById: Record<string, number>
@@ -186,6 +205,7 @@ export function applyFeatureResourceRefresh(params: {
 
   const applicable = params.effects.filter((effect) => {
     if (params.trigger === "initiative") return effect.onInitiative === true
+    if (params.trigger === "critical_hit") return effect.onCriticalHit === true
     return matchesRest(effect.onRest, params.trigger)
   })
 

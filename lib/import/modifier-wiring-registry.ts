@@ -41,6 +41,7 @@ export const AI_MECHANIC_KINDS = [
   "saving_throw_alternate_ability",
   "forced_save_ability_remap",
   "weapon_ability_override",
+  "weapon_sheet_badge",
   "weapon_damage_die_override",
   "turn_start_resource_restore",
   "turn_start_bonus_grant",
@@ -60,6 +61,7 @@ export const AI_MECHANIC_KINDS = [
   "modify_custom_ability",
   "feature_choice_count_bonus",
   "power_rider",
+  "replace_feature",
   "failed_roll_trigger",
   "d20_test_reaction",
   "special_attack",
@@ -79,6 +81,8 @@ export const AI_MECHANICS_NARRATIVE_CATALOG_SUFFIXES = new Set([
   "on_cast_spell_trigger",
   // Free casts come from "without a spell slot" phrasing; there is no cast_spell mechanics kind.
   "cast_spell",
+  // Feature-gated pool refresh (Initiative / crit) — not a top-level mechanics[].kind.
+  "class_resource",
   "*",
 ])
 
@@ -111,6 +115,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "You are proficient in Athletics",
     ],
     mechanicsKind: "skills",
+  },
+  {
+    ruleId: "proficiency.skills.constrained_choice",
+    trigger: "description",
+    catalog: "cat_char_skills",
+    examples: [
+      "Proficiency in one of Animal Handling, Medicine, Nature, or Survival",
+      "choose two of Athletics, Acrobatics, or Stealth",
+    ],
+    mechanicsKind: "skills",
+    notes: "Constrained pool: set choiceCount and the allowed skill list; allowAnySkill false.",
   },
   {
     ruleId: "proficiency.skills.choice",
@@ -347,6 +362,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes: "waiveResourceCost: true, appliesOnRollKinds, appliesOnAbilities, menu options",
   },
   {
+    ruleId: "menu.choose_one_named_benefits",
+    trigger: "description",
+    catalog: "cat_char_resource_ability_menu",
+    examples: [
+      "Once per turn when you reduce an enemy to 0 Hit Points, choose one of the following benefits.",
+    ],
+    mechanicsKind: "resource_ability_menu",
+    notes:
+      "waiveResourceCost: true. Parse Name. Description options. Set actionKind on an option when only that pick spends an Action / Bonus Action / Reaction (do not classify the whole feature from one option).",
+  },
+  {
     ruleId: "resource.expend_psi_points",
     trigger: "description",
     catalog: "cat_char_uses",
@@ -391,6 +417,15 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ],
     notes: "Generalized turn-start restore for Psi Dice / Focus / Sorcery Points",
     mechanicsKind: "turn_start_resource_restore",
+  },
+  {
+    ruleId: "resource.refresh_one_on_initiative_or_crit",
+    trigger: "description",
+    catalog: "cat_fx_class_resource",
+    examples: [
+      "regain one expended Risk Die when you roll initiative or score a critical hit",
+    ],
+    notes: "Do not also set rechargeOnInitiative on the pool — the feature restores one die.",
   },
   {
     ruleId: "technique.on_hit_once_per_turn",
@@ -1344,6 +1379,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     notes:
       "Rider talents — alert overlay on related sheet actions. Prefer parentPowerNames + parentMenuOptionNames when the source names a menu option (Block / Challenge / Grasp).",
   },
+  {
+    ruleId: "feature.replace_improved",
+    trigger: "description",
+    catalog: "cat_char_replace_feature",
+    examples: [
+      "Your Sacrificial Strike improves. When you use this feature, you can choose to take 10 Radiant damage",
+    ],
+    mechanicsKind: "replace_feature",
+    notes:
+      "Functional replacement of a prior feature. Use for Improved / Greater upgrades that change cost or economy, not number-only scaling.",
+  },
 ]
 
 /** Feature-name rules — must cover every FEATURE_NAME_MODIFIER_RULES id. */
@@ -1470,7 +1516,7 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Include all nine subclasses: Deadeye, Gun Tank, Gun-Ko Master, High Roller, Musketeer, Pistolero, Spellslinger, Trick Shot, White Hat. Do not omit Pistolero.",
       "Do NOT paste Captain/Vagabond Battle Die maneuvers (Bolster, Born Leader, Blinding Attack, …) into a Gunslinger-only batch — eligible_classes must include Gunslinger for shared rows (Dodge Roll, Eagle Eye, Skirmish).",
       "PDF page breaks scramble Spellslinger / Pistolero / White Hat / Trick Shot blocks — verify each feature against its subclass header before emitting.",
-      "Dire Gambit: regain 1 Risk Die on Initiative via a feature-gated class_resource refresh (resourceRefreshOnInitiative + classResourceAmount 1). Do not put rechargeOnInitiative on the Risk Dice pool from the level table or from Dire Gambit itself.",
+      "Dire Gambit: regain 1 Risk Die on Initiative and on a Critical Hit via a feature-gated class_resource refresh (resourceRefreshOnInitiative + resourceRefreshOnCriticalHit + classResourceAmount 1 / classResourceChange increase). Do not put rechargeOnInitiative on the Risk Dice pool from the level table or from Dire Gambit itself.",
       "risk_dice uses.dieSidesByLevel: d8→d10→d12 from the Risk Dice column (in addition to atLevelTable counts).",
       "Quick Draw / initiative features: preserve \"Advantage on Initiative rolls\" wording.",
       "Fighting Style milestone: name + \"You gain a Fighting Style feat of your choice\" in description.",
@@ -1484,10 +1530,11 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Set spellcasting.ability to Wisdom when the Spellcasting feature says so, but omit caster_progression / slots — Hit Point Spellcasting is not normal slots.",
       "Keep the Hit Point Spellcasting table (1st 5 / 2nd 10 / 3rd 20 / 4th 30 / 5th 45). The sheet spends current HP on cast (bypasses Temporary Hit Points). Optionally set spellcasting.hit_point_cost_by_level; enrichment injects the Martyr table on attach.",
       "Sacrifice grants two named benefits with different action economies — emit Sacrificial Strike and Sacrificial Skill as separate features[] rows at the same level (do not keep them as one Sacrifice blob). Sacrificial Strike is a Bonus Action: after a melee/unarmed hit, extra 10 Radiant to the target (spendHitPoints 5). Sacrificial Skill is a Passive failed_roll_trigger on any failed D20 Test: bonusFixed 5, spendResourceKey hit_points amount 10, refundResourceOnStillFailed (no damage if the test still fails).",
-      "Improved Sacrificial Strike (\"Your Sacrificial Strike improves… you can choose to take 10… extra 20\"): power_rider on that feature, parentPowerNames [\"Sacrificial Strike\"], selectable true, spendHitPoints 10. Do not emit a second combat action. Keep the choose-to-take sentence. The later \"first time each turn without a Bonus Action\" upgrade is a separate notice, not this rider.",
+      "Improved Sacrificial Strike (\"Your Sacrificial Strike improves… you can choose to take 10… extra 20\"): this is a functional replacement, not a rider. Emit replace_feature replacedFeatureNames [\"Sacrificial Strike\"] on the Improved feature, keep it as its own Bonus Action (spendHitPoints 10, extra 20 Radiant). Do not emit power_rider. Keep the choose-to-take sentence and the later \"first time each turn without a Bonus Action\" sentence on the SAME feature (firstUseNoAction / firstUseNoActionFromLevel 17). Do not emit a leftover 17-only row that only says the first use is free.",
       "Undying: Passive once per Long Rest when dropping to 0 HP (onDropToZeroHp — not a Reaction). Keep \"immediately use your Miraculous Healing (no action required)\"; enrichment sets alsoActivateFeatureNames so the sheet offers a button to fire Miraculous Healing after Undying.",
       "Miraculous Healing: Bonus Action heal_self with healMode hit_dice (class HD + CON per die) and spendHitDice. Dice scale 1/2/3/4 at Martyr 1/5/11/17.",
       "Burden of … Spells features: keep HTML spell tables in description.",
+      "Choose-one benefit lists (Kingslayer: Assault / Break Spells / Shatter Morale): resource_ability_menu with waiveResourceCost and menuOptions [{ name, description, actionKind }]. Assault is actionKind bonus. Do not treat the parent as a Bonus Action just because one option spends one.",
     ],
   },
   {
@@ -1509,13 +1556,14 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Charnel Touch pool: class_resources.charnel_touch with uses { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. NEVER emit type \"multiply_level\" as the uses.type — multiply_level is only atLevelMode.",
       "Thralls + CR Total columns → special caps (thralls, thrall_cr_total). Fractions like 1/4 are valid CR Total values. Do NOT wire Thralls as optionsSource class_upgrades / resourceKey thralls (that is a control cap, not a pick catalog).",
       "Import thrall creatures[] with the class; Thralls feature → grant_creature with creatureChoiceOptions (Skeleton, Spirit, Zombie, Bone Beast, Gorger, Deadnaught, Bloodlurk).",
+      "Dead Space is a non-combat Magic action (activation.action + sheetDisplay abilitiesActions) with the linked-item choice, 12-corpse uses, and player_note. Thrall Rush is onInitiative + combatActions, not an Attack/Bonus Action. Overcharged Thralls is on_creature_death_trigger (ally/thrall) that restores charnel_touch equal to Necromancer level.",
       "Deadnaught: category companion with HP/HD scaling from Necromancer level; keep Necromantic Bond (level 7 exclusive thrall) and Multiattack scaling in the stat block.",
       "Full caster: set classes[].spellcasting { ability: \"Intelligence\", caster_progression: \"full\" } (Alternate Necromancers may swap ability — keep INT unless the extract chooses Resurrectionist/Ghoul).",
       "Lichdom immunities: mechanics kind damage_immunity (not damage_resistance) for Necrotic/Poison; condition_immunity for Exhaustion/Poisoned; vision truesight 120.",
       "Charnel-spend early refreshes (Lazarus Bolt 20 points, Pharaoh Channel Divinity 15 points): uses + alternateRefresh { spendResourceKey: \"charnel_touch\", spendAmount: N, actionCost: \"none\" }.",
       "Reanimator Spell-Stitching: keep as subclass feature isChoice options (stitch list + Charnel costs in option text) — do not invent import_proposals.custom_abilities for stitches.",
       "Subclass spell tables: keep HTML tables; alwaysPrepared spells_known with unlocksAtClassLevel. Fix obvious copy-paste table titles (e.g. Reaper mislabeled Pharaoh).",
-      "Homebrew Necromancer-only spells may be stubbed in spells[]; full write-ups belong in a Spells pass.",
+      "Keep spell_list on the class from the official Spell / School / Special tables. Persist stamps those names onto matching catalog rows even when existing spells are linked/skipped, and unions class tags if a later import overwrites the write-up. Do not dump the shared magehandpress-spells catalog into the class JSON. Homebrew-only rows may be stubbed in spells[]; full write-ups belong in a Spells pass.",
     ],
   },
   {
@@ -1556,7 +1604,7 @@ export const HOMEBREW_WIRING_PATTERNS = [
   {
     source: "Dancer / performance classes",
     guidance: [
-      "Dances column → class_resources.dances (spendable uses; short rest regain 1, long rest all).",
+      "Dances column → class_resources.dances (spendable uses starting at Dancer 2; short rest regain 1, long rest all). Do not emit a level-1 Dances row.",
       "Dance Die column → class_resources.dance_die (die size only — special, not a depleting pool).",
       "Dance feature: Bonus Action; limitedUses class_resource dances; Graceful Dodge lives ON Dance (resource_ability_menu on dance_die) — do not invent a separate Graceful Dodge feature row unless the source lists one.",
       "While Dance is active players enable the while_dancing sheet toggle for style riders.",
@@ -1566,7 +1614,9 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Multi-target Extra Attack (Three/Four/Five-Target): keep the distinct feature name; do not emit extra_attack for those — enrichment attaches a power_rider reminder.",
       "Grand Finale is an Attack-action rider while Dance is active (not its own Action). Alternate refresh: uses + alternateRefresh spendResourceKey dances amount 2.",
       "Graceful Dodge / \"add your Dance Die to your AC\": resource_ability_menu on dance_die (auto-detected from AC + Dance Die phrasing when present).",
-      "Deadly D4s: optional 2d4 for 1d4/1d6/Unarmed (plus optional Dervish Firearms 2d4→3d4) — do NOT emit weapon_damage_die_override. Keep rules text; enrichment adds a power_rider reminder.",
+      "Deadly D4s: optional 2d4 for 1d4/1d6/Unarmed. Dervish Firearms: optional 3d4 only on Firearm weapons that already deal 2d4 — do NOT emit weapon_damage_die_override. Keep rules text; enrichment adds a power_rider reminder.",
+      "Dervish Fighting (and similar optional weapon riders): emit weapon_sheet_badge with badgeLabel, whenDamageDice [1d4, 1d6], includeUnarmed true so matching Combat weapons show a named info badge. Enrichment attaches this if omitted.",
+      "Extra Finesse: weapon_ability_override treatAsFinesse + whenDamageDice [1d4, 1d6] (not a named-weapon list).",
       "Momentum tokens: class_resources.momentum with subclass_name Acrobat; uses.type at_level [{level:3,count:1},{level:14,count:3}] with no recharges (combat tracker). Do not invent Momentum for every Dancer.",
       "Unarmored Defense: 10 + DEX + CHA (accept \"10 plus your Dexterity and Charisma modifiers\").",
       "Parry and Riposte: reaction uses = DEX mod; short rest amount 1 + long rest all.",
@@ -1796,16 +1846,17 @@ function formatMechanicsCheatsheet(): string {
     "- turn_start_trigger: general turn-start effect (heal, grant temp HP via nested text, etc.). Optional hpBelowFraction 0.5, restoreResourceKey/Amount, grantResourceKey/Amount, blockedByConditions. Prefer the narrow kinds below when the effect is ONLY a pool refill or ephemeral bonus grant.",
     "- turn_start_resource_restore: restoreResourceKey \"psionic_energy_dice\"; restoreResourceAmount 1 — refills a spent pool toward its cap (narrow case of turn_start_trigger)",
     "- turn_start_bonus_grant: grantResourceKey \"psi_points\"; grantAmount 2; expiresEndOfTurn true; usageRestriction \"…\" — ephemeral bonus units that do NOT refill the main pool; optional grantAmountByLevel [{ level, amount }]",
-    "- resource_ability_menu: classResourceKey (or resourceKey) for the pool; waiveResourceCost true when options can be used free. Prefer structured menuOptions [{ name, description, resourceCost, hitDiceCost?, unlocksAtLevel? }] when choices have different costs; menuAbilityNames [\"Feat of Strength\", \"Heroic Fortitude\"] remains valid for same-cost/name-only menus.",
+    "- resource_ability_menu: classResourceKey (or resourceKey) for the pool; waiveResourceCost true when options can be used free. Prefer structured menuOptions [{ name, description, resourceCost, hitDiceCost?, unlocksAtLevel?, actionKind? }] when choices have different costs or action economies; menuAbilityNames [\"Feat of Strength\", \"Heroic Fortitude\"] remains valid for same-cost/name-only menus. When the feature says \"choose one of the following\" and only some picks spend an Action / Bonus Action / Reaction, put actionKind on those options — do not mark the whole feature as that economy.",
     "- extra_attack: extraAttackCount is the number of EXTRA attacks beyond the first (1 = attack twice; 2 = attack three times). Preserve special replacement rules such as casting a cantrip in place of one attack in narrative text.",
-    "- power_rider: parentPowerNames [\"Guardian Tactics\", \"Survive\", \"Interrupt\", \"Bombs\", \"Sacrificial Strike\"] — sheet alert on those actions. When the rider only applies to one menu option, also set parentMenuOptionNames [\"Block\"] | [\"Challenge\"] | [\"Grasp\"]. For Alchemist Bomb modes set appliesToAttackVariants [\"attack\"] (regular formulas such as Painkiller Bomb) or [\"primed\"] (\"When you prime a Bomb…\", e.g. Timed Demolition) and selectable true when the rider is an optional add-on. Optional alertSummary for the badge text. For \"Your X improves. When you use this feature, you can choose to take N…\" upgrades, emit power_rider on the improvement feature (not a second action card): parentPowerNames [\"Sacrificial Strike\"], selectable true, spendHitPoints 10 when the choice replaces the parent HP cost.",
+    "- power_rider: parentPowerNames [\"Guardian Tactics\", \"Survive\", \"Interrupt\", \"Bombs\"] — sheet alert on those actions. When the rider only applies to one menu option, also set parentMenuOptionNames [\"Block\"] | [\"Challenge\"] | [\"Grasp\"]. For Alchemist Bomb modes set appliesToAttackVariants [\"attack\"] (regular formulas such as Painkiller Bomb) or [\"primed\"] (\"When you prime a Bomb…\", e.g. Timed Demolition) and selectable true when the rider is an optional add-on. Optional alertSummary for the badge text. Do not use power_rider for \"Your X improves\" upgrades that change costs or action economy — those are replace_feature.",
+    "- replace_feature: replacedFeatureNames [\"Sacrificial Strike\"] — hide the named prior feature and use THIS feature as the sheet action. Use when an Improved / Greater / Superior feature changes how the original works (new cost, new action economy, first use free), not when it only scales a number (put amountByLevel / dieByLevel on the original). Pair with the improved feature's own activation. firstUseNoAction + firstUseNoActionFromLevel 17 for \"the first time you use this on each of your turns, you can do so without taking a Bonus Action\".",
     "- grant_custom_ability: abilityNames [\"Alchemy of Poison\", \"Telepathy\", \"Laughing Gas Bomb\"] — unlock a named custom ability / formula / discovery / discipline already in the batch (or seeded). Prefer this over leaving subclass formula grants unwired.",
     "- failed_roll_trigger: rollKind attack|ability|skill|save; failedTriggerOn fail|success; targetScope self|allied_creature|target_creature; optional rangeFeet, useReaction, spendResourceKey/spendResourceAmount. For a flat bonus (Guided Strike +10) set bonusFixed 10 — nested as check_roll_modifier. Prefer this over inventing a one-off reaction when the feature adds to a missed/failed (or successful) roll.",
     "- d20_test_reaction: modifierMode add|subtract; rollKinds [\"ability\",\"skill\",\"attack\",\"save\"]; targetScope; optional rangeFeet and useReaction; dieSource fixed|ability_modifier with fixedDie \"1d4\" or dieAbility. Despite the schema name, set useReaction false when the source says \"whenever\" and does not spend a Reaction.",
     "- special_attack: attackProfile melee|ranged|emanation|force_save; damageDice \"2d6\" (or bonusDice); damageType/damageTypes; optional saveAbility + saveHalfDamage, areaShape cone|line|sphere|…, areaLengthFeet, rangeFeet, attackName, targetMode single|multi|area. Use for Breath Weapon / Bile Blast / Radiance-style activatable attacks that are not weapon Attack action riders. Alchemist Bombs are Dump Stat–preset (attack + explode variants); do not invent a separate attack_roll_modifiers mechanic for Intelligent Explosions INT damage — leave that for the Bomb Explode label / enrichment.",
     "- hit_dice_restore: regain expended Hit Point Dice when you finish a rest (Divine Respite). hitDiceRestoreAmount 3; optional hitDiceRestoreByLevel [{ level: 13, amount: 6 }, { level: 17, amount: 10 }]; restoreOnRest short_rest (default) or long_rest. Always pair with uses usesFixed 1 / usesRecharge long_rest when the feature is once per Long Rest. Put the scaling sentence on the SAME feature that grants the restore — do not emit leftover features that only say \"the number increases to N\". This is Hit Point Dice (the HD tracker), not current HP.",
     "- Drop to 0 HP / drop to 1 HP instead (Relentless Endurance, Undying, Survive): this is a Passive trigger, not a Reaction, unless the text spends a Reaction. Keep the \"When you are reduced to 0 Hit Points\" sentence. If you can immediately use another named feature at no action cost, keep that sentence verbatim (\"immediately use your Miraculous Healing\") so the sheet can offer a button for it.",
-    "- Downtime / rest activities: if the text says you spend or take 10 minutes (or another minute cost) — not merely that an effect lasts for 10 minutes — emit a non-combat Abilities action (sheetDisplay abilitiesActions, not combatActions) and treat it as a Short Rest activity. Do not file those on the Combat tab. The same is true of \"When you finish a Short Rest, you can …\" choice features such as Divine Respite / Arcane Recovery — abilitiesActions, not combatActions.",
+    "- Downtime / rest activities: if the text says you spend or take 10 minutes (or another minute cost) — not merely that an effect lasts for 10 minutes — emit a non-combat Abilities action (sheetDisplay abilitiesActions, not combatActions) and treat it as a Short Rest activity. Do not file those on the Combat tab. \"When you finish a Short Rest, you can …\" choice features such as Divine Respite / Arcane Recovery belong on rest overlays (sheetDisplay restDialogues), not abilitiesActions or combatActions.",
     "- Alchemist: emit a custom_abilities Bomb proposal (ability_role alchemist_bomb) plus bomb_formula upgrades; Potion Brewing should keep the Potions table in description (HTML table with \"Alchemist Level N\" section headers is fine) and is a non-combat Abilities action / short-rest activity (spend/take 10 minutes) — set sheetDisplay abilitiesActions, not combatActions. Potion Mixologist is a Bonus Action on the Combat tab (sheetDisplay combatActions). Do not tag damage_roll_modifiers for Prime Bomb without classResourceKey reagents — enrichment owns Prime Bomb linear scaling on the Bomb ability. Reagents / Potions unlock rows / Experimentalist are structural shells. Recipe / downtime features (Alchemical Resurrection) and reaction stubs (Toxic Recompense, Beguiling Perfume, Counter-Discharge) are enrichment-activated — keep activation prose in description; do not leave them as empty unwired shells.",
     "- temporary_hit_points: amount N (fixed) OR amountDice \"1d12\" OR amountScaling character_level|class_resource_die|ability_modifier|proficiency. For amountScaling \"character_level\" (\"three times your level\"), put the per-level multiplier in amount (amount: 3), NOT amountMultiplier — amountMultiplier is ONLY for doubling/tripling a class_resource_die roll (\"twice the number rolled on your Bardic Inspiration die\": amountScaling class_resource_die, classResourceKey bardic_inspiration, amountMultiplier 2). For ability_modifier scaling, pair with ability. For proficiency (\"temporary hit points equal to your proficiency bonus\"), use amountScaling proficiency (optional amount/amountMultiplier for N×PB). thpTrigger on_activation|turn_start|on_use|on_hit (field name is thpTrigger, not trigger); thpTarget self|chosen_creature_in_range|allies_in_range (field name is thpTarget, not target; rangeFeet when not self) — self and ally/chosen targets wire with healTarget self|choose_ally on on_activation/on_use; turn_start/on_hit stay unwired. targetCount { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } when creature count scales that way; expiresOnTriggerEnd true when THP ends with the gating state",
     "- uses: usesFixed 2, usesRecharge short_rest|long_rest|both|until_item_consumed|on_resource_reactivation; OR usesAbility WIS; OR usesProficiency true when uses equal Proficiency Bonus (Lucky). ALWAYS wire the base usesFixed/usesRecharge from \"Once you use this… until you finish a [rest]\" even when the next sentence adds an alternate early refresh — alternateRefresh is additive, never a reason to omit the base wire. until_item_consumed = resource locked until a crafted/summoned item from this ability is spent or destroyed. on_resource_reactivation + gatingResourceKey \"rage\" = once per (re)activation of that resource/state (Fanatical Focus). alternateRefresh: { spendResourceKey, spendAmount, actionCost } for resource spends OR { spendSpellSlotMinLevel: 3, actionCost } for \"expend a level 3+ spell slot\".",
@@ -1818,7 +1869,8 @@ function formatMechanicsCheatsheet(): string {
     "- skill_check_alternate_ability: alternateAbility strength|…; alternateSkills [\"Insight\"]; optional requiresSheetToggle",
     "- saving_throw_alternate_ability: alternateAbility intelligence; alternateSaves [\"Wisdom\"]",
     "- forced_save_ability_remap: fromSaveAbility WIS|any; toSaveAbility INT; forcedSaveScope your_features|your_spells|all",
-    "- weapon_ability_override: alternateAbility charisma|dexterity; weaponAbilityAppliesTo both|attack|damage; weaponAbilityScope all|melee|ranged|finesse|specific; weaponNames optional. Examples: (1) Charisma for all weapon attacks while transformed; (2) Dexterity instead of Strength for Unarmed Strikes only → alternateAbility \"dexterity\", weaponAbilityAppliesTo \"attack\", weaponAbilityScope \"specific\", weaponNames [\"Unarmed Strike\"]",
+    "- weapon_ability_override: alternateAbility charisma|dexterity; weaponAbilityAppliesTo both|attack|damage; weaponAbilityScope all|melee|ranged|finesse|specific; weaponNames optional; treatAsFinesse + whenDamageDice [\"1d4\",\"1d6\"] for Extra Finesse–style grants. Examples: (1) Charisma for all weapon attacks while transformed; (2) Dexterity instead of Strength for Unarmed Strikes only → alternateAbility \"dexterity\", weaponAbilityAppliesTo \"attack\", weaponAbilityScope \"specific\", weaponNames [\"Unarmed Strike\"]",
+    "- weapon_sheet_badge: badgeLabel + badgeDescription; whenDamageDice [\"1d4\",\"1d6\"]; includeUnarmed; requireFirearm. Named info badge on matching Combat weapons for optional riders (Dervish Fighting / Deadly D4s). Prefer this whenever an ability should appear as a notification on the weapons it applies to — not a die rewrite.",
     "- weapon_damage_die_override: dieSides N rewrites NdX → Nd(sides) on equipped weapons — rare; never for Dancer Deadly D4s (that is optional 2d4 replacement, not a die rewrite). Not a flat damage_roll_modifiers bonus.",
     "- weapon_reach_modifier: reachBonusFeet 10; omit weaponPropertyFilter for \"your Unarmed Strike gains reach\" (defaults to applying to Unarmed Strikes); set weaponPropertyFilter [\"Heavy\", \"Versatile\"] instead when only some melee weapons (not Unarmed Strikes) gain the reach",
     "- Extra Weapon Mastery properties are review-only until the sheet supports adding a second property to a weapon. Preserve the prose and do not emit extra_weapon_mastery or masteryProperties.",

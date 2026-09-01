@@ -16,6 +16,7 @@ describe("common modifiers import hints", () => {
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Gunslinger")
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Weapon Mastery")
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("defensive.evasion")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("resourceRefreshOnCriticalHit")
   })
 
   it("includes modifier guidance in BYO extraction prompt", () => {

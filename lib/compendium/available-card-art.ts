@@ -61,7 +61,7 @@ function existsOnDisk(repoRelative: string): boolean {
 /**
  * Whether a default `/images/compendium/…` portrait should be assigned or shown.
  * Git-bundled SRD / Kibbles seed art (and already-shipped species portraits) is always available.
- * Setting-book backgrounds and other local-only art apply when the PNG is on this install
+ * Kibbles, setting-book, and other local-only art apply when the PNG is on this install
  * (optimize manifest, live disk listing, or a file check on the server).
  */
 export function isDefaultCardArtAvailable(url: string | null | undefined): boolean {

@@ -197,6 +197,8 @@ export type DerivedCharacter = {
   resistances: string[]
   immunities: string[]
   conditionImmunities: string[]
+  /** Feature / item names that grant each listed condition immunity. */
+  conditionImmunitySources: Record<string, string[]>
   /** Passive movement rules (Halfling Nimbleness, Naturally Stealthy, Spider Climb, …). */
   movementEffects: import("@/lib/compendium/characteristic-modifiers").AggregatedCharacteristics["movementEffects"]
   /** Extra-turn rules (Thief's Reflexes, etc) — informational; no turn-order simulation exists. */
@@ -210,9 +212,10 @@ export type DerivedCharacter = {
   featureChoiceCountBonuses: import("@/lib/compendium/characteristic-modifiers").FeatureChoiceCountBonusCharacteristic[]
   featureChoiceOptionGrants: import("@/lib/compendium/characteristic-modifiers").FeatureChoiceOptionGrantCharacteristic[]
   powerRiders: import("@/lib/compendium/characteristic-modifiers").PowerRiderCharacteristic[]
+  weaponAbilityOverrides: import("@/lib/compendium/characteristic-modifiers").WeaponAbilityOverrideCharacteristic[]
   equippedWeaponAttack: WeaponAttackDerived | null
   equippedOffHandWeaponAttack: WeaponAttackDerived | null
-  /** Synthetic Unarmed Strike when the character has a free hand. */
+  /** Synthetic Unarmed Strike — always available on the Combat tab. */
   unarmedStrikeWeapon: import("@/lib/types").Equipment | null
   unarmedStrikeAttack: WeaponAttackDerived | null
   attunementSlots: number

@@ -343,6 +343,25 @@ describe("aiMechanicsToDetections", () => {
     expect(effect?.healFixed).toBe(5)
   })
 
+  it("builds replace_feature from AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "replace_feature",
+          replacedFeatureNames: ["Sacrificial Strike"],
+          sourcePhrase: "Your Sacrificial Strike improves",
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Improved Sacrificial Strike" },
+    )
+    expect(detections[0]?.ruleId).toBe("ai.replace_feature")
+    const char = detections[0]?.instance.characteristics?.[0]
+    expect(char?.type).toBe("replace_feature")
+    if (char?.type === "replace_feature") {
+      expect(char.replacedFeatureNames).toEqual(["Sacrificial Strike"])
+    }
+  })
+
   it("builds hit_dice_restore from AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [
@@ -980,6 +999,34 @@ describe("aiMechanicsToDetections", () => {
     }
   })
 
+  it("wires a free choose-one menu without a class resource key", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "resource_ability_menu",
+          waiveResourceCost: true,
+          menuOptions: [
+            { name: "Assault", description: "Move and attack.", actionKind: "bonus" },
+            { name: "Break Spells", description: "End the creature's spells." },
+          ],
+        },
+      ],
+      {
+        contentKind: "subclass_feature",
+        sourceName: "Burden of Revolution",
+        featureName: "Kingslayer",
+      },
+    )
+    expect(detections[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "resource_ability_menu",
+      waiveResourceCost: true,
+      options: [
+        { name: "Assault", actionKind: "bonus" },
+        { name: "Break Spells" },
+      ],
+    })
+  })
+
   it("preserves structured resource-menu costs and descriptions", () => {
     const detections = aiMechanicsToDetections(
       [
@@ -997,6 +1044,12 @@ describe("aiMechanicsToDetections", () => {
               description: "Transform into mist.",
               resourceCost: 15,
             },
+            {
+              name: "Assault",
+              description: "Move and attack.",
+              resourceCost: 0,
+              actionKind: "bonus",
+            },
           ],
         },
       ],
@@ -1012,6 +1065,7 @@ describe("aiMechanicsToDetections", () => {
       options: [
         { name: "Bat", description: "Transform into a bat.", resourceCost: 15 },
         { name: "Mist", description: "Transform into mist.", resourceCost: 15 },
+        { name: "Assault", description: "Move and attack.", resourceCost: 0, actionKind: "bonus" },
       ],
     })
   })

@@ -23,7 +23,7 @@ These hold in every chat, including after a restart.
 ### 1. Never commit copyrighted book text or unapproved art
 
 - Do not add Player’s Handbook, setting-book, or other non-SRD **prose** to `lib/srd/`, the Seed button data, or tracked GitHub JSON.
-- Do not `git add` PHB / setting portraits, other unlicensed card art, or `public/images/compendium/local-available-card-art.json`. Public GitHub art is SRD + explicitly allowed packs (Kibbles Tasty, Mage Hand Press) only.
+- Do not `git add` PHB / setting portraits, Kibbles Tasty card art, other unlicensed card art, or `public/images/compendium/local-available-card-art.json`. Public GitHub art is SRD + Mage Hand Press (and already-shipped species / SRD subclass portraits). Kibbles art stays local; import assigns it when the PNG is present. Do not rewrite git history to remove leftover Kibbles files.
 - Mechanical wiring (enrichment presets, name-keyed modifier attachments) is allowed **without** bundling book text.
 - Import tools assume the **user** owns or may use the source. Agents must not copy copyrighted extracts into the repo.
 - Human-facing detail: [CONTRIBUTING.md](CONTRIBUTING.md#what-not-to-commit), [docs/repository-overview.md](docs/repository-overview.md#copyright-and-licensing).
@@ -62,7 +62,7 @@ A one-off sheet patch for a single named feature, with no catalog / JSON / promp
 | Hosted DB | `lib/db/`, `mysql/` | Client-side MySQL |
 | Static persistence | `lib/data/` | Assuming MySQL in static builds |
 | Card / hero art masters | `scripts/*-card-sources/`, `scripts/page-bg-sources/` (gitignored) | Committing PHB / setting PNGs |
-| Optimized public art | `public/images/…` only when licensed/allowed to ship | `local-available-card-art.json` |
+| Optimized public art | `public/images/…` only when licensed/allowed to ship (SRD / MHP) | Kibbles, PHB, `local-available-card-art.json` |
 
 Deeper folder “why”: [docs/repository-overview.md](docs/repository-overview.md).
 
@@ -82,3 +82,13 @@ Deeper folder “why”: [docs/repository-overview.md](docs/repository-overview.
 - Always-on and file-scoped agent rules live in `.cursor/rules/`. They repeat the session invariants; do not weaken them.
 - Prefer editing product code over adding new markdown docs the user did not request.
 - `tsconfig.json` / `next-env.d.ts` may be rewritten by `next:dev`; do not commit accidental churn from a concurrent dev server unless it is an intentional fix.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

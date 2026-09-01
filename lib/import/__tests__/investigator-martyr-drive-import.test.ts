@@ -140,22 +140,26 @@ describe.skipIf(!hasMartyr)("Martyr Drive import wiring", () => {
     expect(foe?.sheetDisplay).toMatchObject({ combatActions: false, featuresTab: true })
   })
 
-  it("wires Improved Sacrificial Strike as a selectable Sacrificial Strike rider", () => {
+  it("wires Improved Sacrificial Strike as a replacement for Sacrificial Strike", () => {
     const content = enrich("magehandpress-martyr-class")
-    const improved = content.classes?.[0]?.features?.find(
-      (f) => f.name === "Improved Sacrificial Strike",
-    ) as Feature | undefined
-    expect(improved?.sheetDisplay?.combatActions).toBe(false)
-    const rider = improved?.linkedModifiers
-      ?.flatMap((instance) => instance.characteristics ?? [])
-      .find((char) => char.type === "power_rider") as
-      | { parentPowerNames?: string[]; selectable?: boolean; spendHitPoints?: number }
+    const features = (content.classes?.[0]?.features ?? []) as Feature[]
+    expect(features.some((feature) => /bonus action free/i.test(feature.name))).toBe(false)
+    const improved = features.find((f) => f.name === "Improved Sacrificial Strike") as
+      | Feature
       | undefined
-    expect(rider).toMatchObject({
-      parentPowerNames: ["Sacrificial Strike"],
-      selectable: true,
+    expect(improved?.sheetDisplay?.combatActions).toBe(true)
+    expect(improved?.activation).toMatchObject({
+      bonusAction: true,
       spendHitPoints: 10,
+      firstUseNoAction: true,
+      firstUseNoActionFromLevel: 17,
     })
+    const replace = improved?.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "replace_feature") as
+      | { replacedFeatureNames?: string[] }
+      | undefined
+    expect(replace?.replacedFeatureNames).toEqual(["Sacrificial Strike"])
   })
 
   it("wires Divine Respite as a short-rest Hit Point Dice restore", () => {
@@ -173,8 +177,9 @@ describe.skipIf(!hasMartyr)("Martyr Drive import wiring", () => {
     expect(restore?.amountByLevel?.some((row) => row.level === 13 && row.fixed === 6)).toBe(true)
     expect(restore?.amountByLevel?.some((row) => row.level === 17 && row.fixed === 10)).toBe(true)
     expect(respiteRows[0]?.sheetDisplay).toMatchObject({
-      abilitiesActions: true,
+      abilitiesActions: false,
       combatActions: false,
+      restDialogues: true,
     })
   })
 

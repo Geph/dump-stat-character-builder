@@ -91,6 +91,7 @@ export type LevelUpChoiceStep =
       extraPrepared: number
       maxSpellLevel: number
       preparedCaster: boolean
+      spellList?: string[] | null
     }
   | {
       kind: "modifier_choice"
@@ -450,6 +451,7 @@ export function buildLevelUpPlan(params: {
       extraPrepared,
       maxSpellLevel,
       preparedCaster,
+      spellList: cls.spell_list,
     })
   }
 
@@ -530,6 +532,7 @@ export function spellsEligibleForLevelUp(
   className: string,
   maxSpellLevel: number,
   alreadyKnownIds: string[],
+  classSpellList?: readonly string[] | null,
 ): Spell[] {
   const known = new Set(alreadyKnownIds)
   return spells.filter((spell) => {
@@ -537,6 +540,6 @@ export function spellsEligibleForLevelUp(
     if ((spell.level ?? 0) > maxSpellLevel) return false
     const lists = spell.classes ?? []
     if (!lists.length) return true
-    return spellMatchesClassName(spell, className)
+    return spellMatchesClassName(spell, className, classSpellList)
   })
 }

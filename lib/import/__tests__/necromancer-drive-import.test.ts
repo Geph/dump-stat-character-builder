@@ -40,6 +40,61 @@ describe("Necromancer import sanitizer (synthetic)", () => {
       atLevelTable: [{ level: 1, count: 5 }],
     })
   })
+
+  it("pins official Necromancer list names onto spell_list", () => {
+    const next = sanitizeNecromancerImportContent({
+      classes: [
+        {
+          name: "Necromancer",
+          description: "",
+          hit_die: 6,
+          primary_ability: ["Intelligence"],
+          features: [],
+          spell_list: ["Spark of Life"],
+        },
+      ],
+    })
+    expect(next.classes?.[0]?.spell_list).toEqual(
+      expect.arrayContaining(["Spark of Life", "Acid Splash", "Chill Touch", "Mage Armor"]),
+    )
+  })
+
+  it("strips Spellcasting spellChoiceGrants when progression already lists cantrips/prepared", () => {
+    const next = sanitizeNecromancerImportContent({
+      classes: [
+        {
+          name: "Necromancer",
+          description: "",
+          hit_die: 6,
+          primary_ability: ["Intelligence"],
+          spellcasting: {
+            ability: "Intelligence",
+            caster_progression: "full",
+            prepared: true,
+            progression: [{ level: 1, cantrips: 3, prepared: 4, max_spell_level: 1 }],
+          },
+          features: [
+            {
+              level: 1,
+              name: "Spellcasting",
+              description: "You know three Necromancer cantrips of your choice.",
+              mechanics: [
+                {
+                  kind: "spells_known",
+                  spellChoiceGrants: [
+                    { level: 0, count: 3 },
+                    { level: 1, count: 4 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+    const feature = next.classes?.[0]?.features?.find((row) => row.name === "Spellcasting")
+    expect(feature?.mechanics ?? []).toEqual([])
+  })
 })
 
 describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
@@ -89,6 +144,16 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
     expect(String(spellcastingFeature?.description ?? "").toLowerCase()).not.toContain(
       "pasted class table",
     )
+  })
+
+  it("stamps official list names onto spells[] so SRD rows get a Necromancer tag", () => {
+    const content = enrich()
+    const tagged = (name: string) =>
+      content.spells?.find((spell) => spell.name?.toLowerCase() === name.toLowerCase())
+    expect(tagged("Acid Splash")?.classes).toEqual(expect.arrayContaining(["Necromancer"]))
+    expect(tagged("Chill Touch")?.classes).toEqual(expect.arrayContaining(["Necromancer"]))
+    expect(tagged("Mage Armor")?.classes).toEqual(expect.arrayContaining(["Necromancer"]))
+    expect(tagged("Exhume")?.classes).toEqual(expect.arrayContaining(["Necromancer"]))
   })
 
   it("wires Charnel Touch, Dark Arcana, Undying Servitude, and Lichdom immunities", () => {
@@ -230,7 +295,6 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
     expect(
       review.filter((row) => row.status === "structural").map((row) => row.featureName),
     ).toEqual([
-      "Overcharged Thralls",
       "Holy Symbol",
       "Mock Divinity",
       "Bloated Thralls",

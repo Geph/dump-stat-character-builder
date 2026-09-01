@@ -152,4 +152,10 @@ Optional: `IMPORT_AI_MODEL` to override the default. Restart the server after ch
 
 Without any provider key, seed, Dump Stat JSON, Foundry JSON, BYO clipboard import, and manual compendium edits still work — only **server AI extraction** on PDF upload or Clipboard **Import with server AI** returns a configuration error.
 
+## Card art on import
+
+Import review fills optional `/images/compendium/…` URLs when the PNG is **on this machine** (bundled SRD art, or a local file after `pnpm images:optimize`). Missing files stay blank so you can paste a URL.
+
+**Kibbles Tasty** portraits are local-only and are not part of Seed Example Content. Drop masters under `scripts/*-card-sources/kibbles/`, optimize, then re-import (or use Seed Example Content) — Inventor, Occultist, Psion, Warden, Kibbles species/backgrounds, and Kibbles spells pick up art when those files exist.
+
 Maintainer playbook for Drive extracts: [homebrew-import-review.md](homebrew-import-review.md).

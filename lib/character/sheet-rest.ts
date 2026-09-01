@@ -24,6 +24,50 @@ import {
   type ResourceRefreshEffect,
 } from "@/lib/character/collect-resource-refresh-effects"
 
+export type RestHitDiceRestoreActivity = {
+  actionId: string
+  trackingKey: string
+  name: string
+  amount: number
+  classId?: string | null
+  used: number
+  max: number | null
+}
+
+/** Choice features that restore expended Hit Point Dice after a rest (Divine Respite). */
+export function collectRestHitDiceRestoreActivities(params: {
+  rest: RestType
+  sheetActions: SheetActionEntry[]
+  usedActionUsesById: Record<string, number>
+  resolveContext: ResolveUsesContext
+}): RestHitDiceRestoreActivity[] {
+  const activities: RestHitDiceRestoreActivity[] = []
+  const seen = new Set<string>()
+  for (const action of params.sheetActions) {
+    if (action.showOnRestDialogues === false) continue
+    const restore = action.restoreHitDiceOnUse
+    if (!restore || restore.amount <= 0) continue
+    const restoreOn = restore.restoreOn ?? "short_rest"
+    if (restoreOn !== params.rest) continue
+    const trackingKey = resolveActionUsesTrackingKey(action)
+    if (seen.has(trackingKey)) continue
+    seen.add(trackingKey)
+    const max = action.limitedUses
+      ? resolveUsesAtLevel(action.limitedUses, action.classLevel, params.resolveContext)
+      : null
+    activities.push({
+      actionId: action.id,
+      trackingKey,
+      name: action.name,
+      amount: restore.amount,
+      classId: action.classId,
+      used: params.usedActionUsesById[trackingKey] ?? 0,
+      max: max != null && max > 0 ? max : null,
+    })
+  }
+  return activities
+}
+
 export function shouldResetSpellSlotsOnRest(table: SpellSlotTable, rest: RestType): boolean {
   if (rest === "long_rest") return true
   return table.type === "pact"
@@ -85,14 +129,20 @@ export function applyUsesRest(
   return capsConsumed ? { used, rechargeCapsUsed: capsUsed } : { used }
 }
 
+function entryMatchesResourceKey(entryId: string, resourceKey: string): boolean {
+  return entryId === resourceKey || entryId.endsWith(`_${resourceKey}`)
+}
+
 export function applyInitiativeResourceRecharge(
   usedResourcesById: Record<string, number>,
   resourceEntries: { id: string; uses: UsesConfig; classLevel: number }[],
   resolveContext: ResolveUsesContext,
+  skipResourceKeys: readonly string[] = [],
 ): Record<string, number> {
   const next = { ...usedResourcesById }
   for (const entry of resourceEntries) {
     if (!hasInitiativeRecharge(entry.uses)) continue
+    if (skipResourceKeys.some((key) => entryMatchesResourceKey(entry.id, key))) continue
     const max = resolveUsesAtLevel(entry.uses, entry.classLevel, resolveContext)
     if (max == null || max <= 0) continue
     const current = next[entry.id] ?? 0
@@ -326,10 +376,14 @@ export function applySheetRest(params: ApplySheetRestParams): SheetRestResult {
   if (rest === "short_rest" || rest === "long_rest") {
     const seenActivities = new Set<string>()
     for (const action of sheetActions) {
+      if (action.showOnRestDialogues === false) continue
       const isActivity =
+        action.showOnRestDialogues === true ||
         isShortRestActivityText(action.name, action.description) ||
         (rest === "long_rest" && isLongRestActivityText(action.name, action.description))
       if (!isActivity) continue
+      // Hit-dice restore is a Use button on the rest overlay, not a static notice.
+      if (action.restoreHitDiceOnUse) continue
       const key = action.name.trim().toLowerCase()
       if (seenActivities.has(key)) continue
       seenActivities.add(key)

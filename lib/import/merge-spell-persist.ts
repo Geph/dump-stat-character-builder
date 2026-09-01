@@ -1,4 +1,9 @@
-import { spellNameMatchKeys } from "@/lib/import/class-spell-lists"
+import {
+  collectClassSpellLists,
+  spellNameMatchKeys,
+  stampClassSpellListsOntoSpellRows,
+  unionSpellClassNames,
+} from "@/lib/import/class-spell-lists"
 
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
@@ -19,13 +24,7 @@ function firstFilled(...values: unknown[]): unknown {
 }
 
 function unionClasses(existing: unknown, incoming: unknown): string[] {
-  const merged = new Set<string>()
-  for (const name of [...asStringArray(existing), ...asStringArray(incoming)]) {
-    const key = name.toLowerCase()
-    if ([...merged].some((have) => have.toLowerCase() === key)) continue
-    merged.add(name)
-  }
-  return [...merged]
+  return unionSpellClassNames(asStringArray(existing), asStringArray(incoming))
 }
 
 /**
@@ -71,4 +70,31 @@ export function mergeIncomingSpellsWithExisting(
       .find((entry): entry is Record<string, unknown> => Boolean(entry))
     return prev ? mergeSpellRowForPersist(prev, row) : row
   })
+}
+
+/**
+ * Catalog patches for linked/skipped existing spells, plus incoming rows after
+ * merge + class-list stamps. Call on every class or spell persist.
+ */
+export function spellRowsToUpsertForClassLists(params: {
+  existingSpells: Record<string, unknown>[]
+  existingClasses?: Record<string, unknown>[]
+  incomingClasses?: Record<string, unknown>[]
+  incomingSpells?: Record<string, unknown>[]
+}): { catalogPatches: Record<string, unknown>[]; incoming: Record<string, unknown>[] } {
+  const lists = collectClassSpellLists([
+    ...(params.existingClasses ?? []),
+    ...(params.incomingClasses ?? []),
+  ])
+  const incomingMerged = params.incomingSpells?.length
+    ? mergeIncomingSpellsWithExisting(params.incomingSpells, params.existingSpells)
+    : []
+  const incomingKeys = new Set(
+    incomingMerged.flatMap((row) => spellNameMatchKeys(String(row.name ?? ""))),
+  )
+  const catalogPatches = stampClassSpellListsOntoSpellRows(params.existingSpells, lists).changed.filter(
+    (row) => !spellNameMatchKeys(String(row.name ?? "")).some((key) => incomingKeys.has(key)),
+  )
+  const incoming = stampClassSpellListsOntoSpellRows(incomingMerged, lists).all
+  return { catalogPatches, incoming }
 }

@@ -9,11 +9,15 @@ export type ResolveUsesContext = {
 function tierCount(table: { level: number; count: number }[], characterLevel: number): number {
   if (!table.length) return 0
   const sorted = [...table].sort((a, b) => a.level - b.level)
-  let count = sorted[0]?.count ?? 0
+  let count = 0
+  let reached = false
   for (const row of sorted) {
-    if (characterLevel >= row.level) count = row.count
+    if (characterLevel >= row.level) {
+      count = row.count
+      reached = true
+    }
   }
-  return count
+  return reached ? count : 0
 }
 
 /** Tier-table lookup shared by class resources and feature choice counts. */

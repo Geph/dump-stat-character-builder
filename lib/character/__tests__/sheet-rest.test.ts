@@ -4,6 +4,7 @@ import {
   applyMinimumResourceRemaining,
   applySheetRest,
   applyUsesRest,
+  collectRestHitDiceRestoreActivities,
   shouldResetSpellSlotsOnRest,
 } from "@/lib/character/sheet-rest"
 import { applyFeatureResourceRefresh } from "@/lib/character/collect-resource-refresh-effects"
@@ -349,6 +350,67 @@ describe("applySheetRest", () => {
     expect(result.summary).toContain("Available: Potion Brewing")
   })
 
+  it("collects Divine Respite as an activatable short-rest Hit Dice restore", () => {
+    const respite = {
+      id: "martyr:9:Divine Respite",
+      name: "Divine Respite",
+      sourceLabel: "Martyr",
+      kinds: ["action" as const],
+      category: "utility" as const,
+      limitedUses: { type: "fixed" as const, fixedAmount: 1, recharges: [{ rest: "long_rest" as const }] },
+      classLevel: 12,
+      classId: "cls_martyr",
+      description:
+        "When you finish a Short Rest, you can choose to regain up to 3 expended Hit Point Dice.",
+      restoreHitDiceOnUse: { amount: 3, restoreOn: "short_rest" as const },
+    }
+    const short = collectRestHitDiceRestoreActivities({
+      rest: "short_rest",
+      sheetActions: [respite],
+      usedActionUsesById: {},
+      resolveContext,
+    })
+    expect(short).toEqual([
+      expect.objectContaining({
+        name: "Divine Respite",
+        amount: 3,
+        used: 0,
+        max: 1,
+      }),
+    ])
+    expect(
+      collectRestHitDiceRestoreActivities({
+        rest: "long_rest",
+        sheetActions: [respite],
+        usedActionUsesById: {},
+        resolveContext,
+      }),
+    ).toEqual([])
+
+    const listed = applySheetRest({
+      rest: "short_rest",
+      maxHp: 20,
+      activeConditions: [],
+      usedSpellSlotsByKey: {},
+      spellSlotTables: [],
+      usedResourcesById: {},
+      resourceEntries: [],
+      usedActionUsesById: {},
+      sheetActions: [respite],
+      resolveContext,
+    })
+    expect(listed.summary).not.toContain("Available: Divine Respite")
+
+    expect(
+      collectRestHitDiceRestoreActivities({
+        rest: "short_rest",
+        sheetActions: [{ ...respite, showOnRestDialogues: false }],
+        usedActionUsesById: {},
+        resolveContext,
+      }),
+    ).toEqual([])
+  })
+
   it("lists a Long Rest crafting activity as available, but only after a long rest", () => {
     const magazine = {
       id: "craftsman:6:Magazine",
@@ -482,5 +544,23 @@ describe("applyInitiativeResourceRecharge", () => {
     )
     expect(next.exploit_dice).toBe(0)
     expect(next.rage).toBe(2)
+  })
+
+  it("skips pool initiative recharge for keys owned by a feature-gated restore", () => {
+    const entries: ResourceTrackerEntry[] = [
+      {
+        id: "gunslinger_risk_dice",
+        name: "Risk Dice",
+        classLevel: 15,
+        uses: { type: "fixed", fixedAmount: 5, rechargeOnInitiative: true },
+      },
+    ]
+    const next = applyInitiativeResourceRecharge(
+      { gunslinger_risk_dice: 4 },
+      entries,
+      resolveContext,
+      ["risk_dice"],
+    )
+    expect(next.gunslinger_risk_dice).toBe(4)
   })
 })

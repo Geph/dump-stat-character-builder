@@ -3,6 +3,7 @@ import { readLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import type { UsesCharacteristic } from "@/lib/compendium/characteristic-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
+import { resolveAttachedClassIcon } from "@/lib/compendium/class-icons-defaults"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 
 function slugLabel(label: string): string {
@@ -71,6 +72,7 @@ export function collectFeatureUsesResources(
               classDetails.length > 1 ? `${label} (${className})` : label,
             uses: usesChar.uses,
             classLevel: entry.row.level,
+            icon: resolveAttachedClassIcon(entry.class),
           })
         }
       }

@@ -64,3 +64,15 @@ export function defaultClassIconForName(name: string): string | null {
 
   return null
 }
+
+/** Icon for a class-attached sheet card or resource: stored class icon, else the name default. */
+export function resolveAttachedClassIcon(
+  cls?: { name?: string | null; icon?: string | null } | null,
+  subclass?: { name?: string | null; icon?: string | null } | null,
+): string | null {
+  const fromSubclass = subclass?.icon?.trim()
+  if (fromSubclass) return fromSubclass
+  const fromClass = cls?.icon?.trim()
+  if (fromClass) return fromClass
+  return defaultClassIconForName(cls?.name ?? "")
+}

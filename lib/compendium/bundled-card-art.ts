@@ -1,10 +1,11 @@
 /**
- * Card art that may be committed / pushed: SRD, Kibbles Tasty, Mage Hand Press,
- * plus all species portraits (original graphics). Keep in sync with
+ * Card art that may be committed / pushed: SRD (and Mage Hand Press when allowed),
+ * plus original species portraits already on GitHub. Keep in sync with
  * `scripts/bundled-card-art.mjs` (optimizer / gitignore source of truth).
+ *
+ * Kibbles Tasty art is local-only — import assigns it when the PNG is present.
+ * Do not add new Kibbles files. Leftover copies may remain in git history.
  */
-
-const BUNDLED_SUBCLASS_CLASS_FOLDERS = new Set(["inventor", "occultist", "psion", "warden"])
 
 const BUNDLED_CLASS_FILES = new Set([
   "barbarian.png",
@@ -12,27 +13,83 @@ const BUNDLED_CLASS_FILES = new Set([
   "cleric.png",
   "druid.png",
   "fighter.png",
-  "inventor.png",
   "monk.png",
-  "occultist.png",
   "paladin.png",
-  "psion.png",
   "ranger.png",
   "rogue.png",
   "sorcerer.png",
-  "warden-kibbles.png",
   "warlock.png",
   "wizard.png",
 ])
 
 const BUNDLED_BACKGROUND_FILES = new Set([
   "acolyte.png",
-  "apothecary.png",
   "criminal.png",
-  "engineer.png",
   "sage.png",
   "soldier.png",
-  "tinker.png",
+])
+
+/** Already-shipped original species portraits. New slugs stay local-only. */
+const BUNDLED_SPECIES_FILES = new Set([
+  "aarakocra.png",
+  "aasimar-2022.png",
+  "aasimar-eberron.png",
+  "aasimar.png",
+  "air-genasi.png",
+  "astral-elf.png",
+  "autognome.png",
+  "boggarts.png",
+  "bugbear.png",
+  "centaur.png",
+  "changeling-2022.png",
+  "changeling.png",
+  "deep-gnome.png",
+  "dhakaani-ghaaldar.png",
+  "dhakaani-golindar.png",
+  "dhakaani-guuldar.png",
+  "dhampir.png",
+  "dragonborn.png",
+  "duergar.png",
+  "dwarf.png",
+  "earth-genasi.png",
+  "eladrin.png",
+  "elf.png",
+  "fairy.png",
+  "firbolg.png",
+  "fire-genasi.png",
+  "flamekin.png",
+  "giff.png",
+  "githyanki.png",
+  "githzerai.png",
+  "gnoll.png",
+  "gnome.png",
+  "goblin-2022.png",
+  "goliath.png",
+  "hadozee.png",
+  "halfling.png",
+  "hexblood.png",
+  "human.png",
+  "jhorguntaal.png",
+  "kalamer-landwalker-merfolk.png",
+  "kalashtar.png",
+  "khoravar.png",
+  "kithkin.png",
+  "lorwyn-changeling.png",
+  "lorwyn-elf.png",
+  "lorwyn-fairy.png",
+  "lupin.png",
+  "orc.png",
+  "plasmoid.png",
+  "reborn.png",
+  "rimekin.png",
+  "ruinbound.png",
+  "sahuagin.png",
+  "shifter.png",
+  "tabaxi.png",
+  "thri-kreen.png",
+  "tiefling.png",
+  "warforged.png",
+  "water-genasi.png",
 ])
 
 const BUNDLED_SUBCLASS_FILES = new Set([
@@ -49,6 +106,55 @@ const BUNDLED_SUBCLASS_FILES = new Set([
   "sorcerer/draconic-sorcery.png",
   "warlock/fiend-patron.png",
   "wizard/evoker.png",
+])
+
+/** SRD cantrips already on GitHub. Kibbles spells stay local-only. */
+const BUNDLED_SPELL_FILES = new Set([
+  "acid-splash.png",
+  "blade-ward.png",
+  "booming-blade.png",
+  "chill-touch.png",
+  "control-flames.png",
+  "create-bonfire.png",
+  "dancing-lights.png",
+  "druidcraft.png",
+  "eldritch-blast.png",
+  "elementalism.png",
+  "fire-bolt.png",
+  "friends.png",
+  "frostbite.png",
+  "green-flame-blade.png",
+  "guidance.png",
+  "gust.png",
+  "infestation.png",
+  "light.png",
+  "lightning-lure.png",
+  "mage-hand.png",
+  "magic-stone.png",
+  "mending.png",
+  "message.png",
+  "mind-sliver.png",
+  "minor-illusion.png",
+  "mold-earth.png",
+  "poison-spray.png",
+  "prestidigitation.png",
+  "primal-savagery.png",
+  "produce-flame.png",
+  "ray-of-frost.png",
+  "resistance.png",
+  "sacred-flame.png",
+  "shape-water.png",
+  "shillelagh.png",
+  "shocking-grasp.png",
+  "sorcerous-burst.png",
+  "spare-the-dying.png",
+  "starry-wisp.png",
+  "sword-burst.png",
+  "thaumaturgy.png",
+  "toll-the-dead.png",
+  "true-strike.png",
+  "vicious-mockery.png",
+  "word-of-radiance.png",
 ])
 
 export function normalizeRepoPath(value: unknown): string {
@@ -69,15 +175,11 @@ export function isBundledPublicCardArtPath(repoRelative: string): boolean {
   if (classes) return BUNDLED_CLASS_FILES.has(classes[1]!)
   const backgrounds = n.match(/^public\/images\/compendium\/backgrounds\/([^/]+)$/)
   if (backgrounds) return BUNDLED_BACKGROUND_FILES.has(backgrounds[1]!)
-  // All species portraits are original / safe to ship (not copyrighted book scans).
-  if (n.startsWith("public/images/compendium/species/") && n.endsWith(".png")) return true
+  const species = n.match(/^public\/images\/compendium\/species\/([^/]+)$/)
+  if (species) return BUNDLED_SPECIES_FILES.has(species[1]!)
   const subclass = n.match(/^public\/images\/compendium\/subclasses\/(.+)$/)
-  if (subclass) {
-    const rest = subclass[1]!
-    const classFolder = rest.split("/")[0]
-    if (BUNDLED_SUBCLASS_CLASS_FOLDERS.has(classFolder!)) return rest.includes("/")
-    return BUNDLED_SUBCLASS_FILES.has(rest)
-  }
-  if (n.startsWith("public/images/compendium/spells/") && n.endsWith(".png")) return true
+  if (subclass) return BUNDLED_SUBCLASS_FILES.has(subclass[1]!)
+  const spells = n.match(/^public\/images\/compendium\/spells\/([^/]+)$/)
+  if (spells) return BUNDLED_SPELL_FILES.has(spells[1]!)
   return false
 }

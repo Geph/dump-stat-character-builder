@@ -85,6 +85,11 @@ type MultiSelectChoicesProps = {
    */
   showOptionInfo?: boolean
   /**
+   * When true, show a short description under named mechanical options
+   * (not skills, tools, or languages).
+   */
+  showOptionSummaries?: boolean
+  /**
    * When set, info buttons call this instead of the built-in text overlay
    * (e.g. open the compendium spell detail page).
    */
@@ -160,6 +165,7 @@ export function MultiSelectChoices({
   lockedLabel = "Granted",
   showSkillInfo = false,
   showOptionInfo = false,
+  showOptionSummaries = false,
   onOptionInfo,
   layout = "default",
   allowCustom = false,
@@ -325,8 +331,12 @@ export function MultiSelectChoices({
       : null
 
   const gridClass = compact
-    ? "grid grid-cols-1 sm:grid-cols-3 gap-1.5"
-    : "grid grid-cols-1 sm:grid-cols-3 gap-2"
+    ? showOptionSummaries
+      ? "grid grid-cols-1 sm:grid-cols-2 gap-1.5"
+      : "grid grid-cols-1 sm:grid-cols-3 gap-1.5"
+    : showOptionSummaries
+      ? "grid grid-cols-1 sm:grid-cols-2 gap-2"
+      : "grid grid-cols-1 sm:grid-cols-3 gap-2"
 
   const renderOption = (option: ChoiceOption) => {
     const locked = isLockedName(option.name)
@@ -334,7 +344,11 @@ export function MultiSelectChoices({
     const isTakenElsewhere = !isSelected && isUnavailableName(option.name)
     const isDisabled =
       locked || isTakenElsewhere || (!isSelected && freeSelected.length >= maxCount)
-    const canShowInfo = showInfoButtons
+    const summary =
+      showOptionSummaries && !optionKind(option.name)
+        ? stripFeatureHintHtml(option.description ?? "")
+        : ""
+    const canShowInfo = showInfoButtons && Boolean(optionInfoText(option, showSkillInfoButtons))
     const iconSlug = showSkillIcons ? skillIconSlug(option.name, skillIconByName) : null
     const prereq = option.prerequisite?.trim() || null
 
@@ -369,6 +383,15 @@ export function MultiSelectChoices({
               {option.name}
             </p>
           </div>
+          {summary ? (
+            <p
+              className={`text-muted-foreground mt-0.5 leading-snug line-clamp-2 ${
+                compact ? "text-[11px]" : "text-xs"
+              }`}
+            >
+              {summary}
+            </p>
+          ) : null}
           {prereq ? (
             <p className={`text-muted-foreground mt-0.5 ${compact ? "text-[11px]" : "text-xs"}`}>
               Prereq: {prereq}

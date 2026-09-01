@@ -64,7 +64,7 @@ Changes that affect SRD / 5E rules accuracy (class features, species traits, spe
 Please keep copyrighted and personal working files out of the public tree:
 
 - **Rulebook text** — Do not add Player’s Handbook, setting-book, or other non-SRD prose to `lib/srd/`, Seed data, or tracked GitHub JSON. Mechanical wiring without book text is fine.
-- **Card art** — Only ship art you are allowed to distribute. GitHub-eligible optimized art comes from licensed/allowed source folders (for example `SRD/` under the card-source drop directories). Player’s Handbook and other setting-book portraits stay on your machine after `pnpm images:optimize`; do not `git add` those PNGs or `public/images/compendium/local-available-card-art.json`.
+- **Card art** — Only ship art you are allowed to distribute. GitHub-eligible optimized art comes from licensed/allowed source folders (for example `SRD/` under the card-source drop directories). **Kibbles Tasty**, Player’s Handbook, and other setting-book portraits stay on your machine after `pnpm images:optimize`; do not `git add` those PNGs or `public/images/compendium/local-available-card-art.json`. Import still picks up local Kibbles files when they exist.
 - **Custom content folders** — If you add your own uniquely named art or import folders under `scripts/` or `public/images/compendium/`, leave them uncommitted; the app can still use them locally.
 - **Secrets** — Never commit `.env`, `.env.local`, API keys, or database passwords.
 - **Scratch files** — Skip local prompts, audit dumps, and temporary scripts unless the PR is deliberately adding a maintained tool.

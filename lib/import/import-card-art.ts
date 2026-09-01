@@ -98,7 +98,7 @@ export function defaultImportCardArtUrl(
     case "backgrounds":
       return defaultBackgroundCardImageUrl(trimmed, availability)
     case "spells":
-      return defaultSpellCardImageUrl(trimmed)
+      return defaultSpellCardImageUrl(trimmed, availability)
     case "equipment":
     case "abilities":
       return null

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { collectSaveFeatureBadges } from "@/lib/character/save-feature-badges"
 import { blockedWhenConditionLimitation } from "@/lib/compendium/modifier-limitations"
-import { buildEvasionModifier } from "@/lib/compendium/shared-feature-modifier-builders"
 import type { Feature } from "@/lib/types"
 
 describe("collectSaveFeatureBadges", () => {
@@ -12,13 +11,33 @@ describe("collectSaveFeatureBadges", () => {
         name: "Evasion",
         description:
           "When you're subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw and only half damage if you fail.",
-        linkedModifiers: [buildEvasionModifier()],
+        linkedModifiers: [
+          {
+            instanceId: "modinst_evasion",
+            catalogRefId: "cat_fx_damage_reduction",
+            activation: {
+              effects: [
+                {
+                  id: "mod_evasion",
+                  kind: "damage_reduction",
+                  mitigation: "reduction",
+                  defensiveSaveScope: true,
+                  checkCategory: "save",
+                  checkAbility: "Dexterity",
+                  defensiveSaveSuccess: "none",
+                  limitations: [blockedWhenConditionLimitation("Incapacitated")],
+                },
+              ],
+            },
+          },
+        ],
       } as Feature,
     ]
     const badges = collectSaveFeatureBadges(features)
-    expect(badges.dexterity.map((b) => b.label)).toEqual(["Evasion"])
-    expect(badges.strength).toEqual([])
-    expect(badges.dexterity[0]?.description).toMatch(/Dexterity saving throw/i)
+    expect(badges.byAbility.dexterity.map((b) => b.label)).toEqual(["Evasion"])
+    expect(badges.byAbility.strength).toEqual([])
+    expect(badges.allSaves).toEqual([])
+    expect(badges.byAbility.dexterity[0]?.description).toMatch(/Dexterity saving throw/i)
   })
 
   it("places Danger Sense on Dexterity and respects Incapacitated", () => {
@@ -47,13 +66,13 @@ describe("collectSaveFeatureBadges", () => {
         ],
       } as Feature,
     ]
-    expect(collectSaveFeatureBadges(features).dexterity.map((b) => b.label)).toEqual(["Danger Sense"])
+    expect(collectSaveFeatureBadges(features).byAbility.dexterity.map((b) => b.label)).toEqual(["Danger Sense"])
     expect(
-      collectSaveFeatureBadges(features, { activeConditions: ["Incapacitated"] }).dexterity,
+      collectSaveFeatureBadges(features, { activeConditions: ["Incapacitated"] }).byAbility.dexterity,
     ).toEqual([])
   })
 
-  it("places all-save advantages such as Spell Resistance on every save", () => {
+  it("places all-save advantages such as Spell Resistance on the section title, not each save", () => {
     const features: Feature[] = [
       {
         level: 10,
@@ -79,9 +98,42 @@ describe("collectSaveFeatureBadges", () => {
       } as Feature,
     ]
     const badges = collectSaveFeatureBadges(features)
+    expect(badges.allSaves.map((b) => b.label)).toEqual(["Spell Resistance"])
+    expect(badges.allSaves[0]?.ability).toBe("all")
     for (const ability of ["strength", "dexterity", "wisdom", "charisma"] as const) {
-      expect(badges[ability].map((b) => b.label)).toEqual(["Spell Resistance"])
+      expect(badges.byAbility[ability]).toEqual([])
     }
+  })
+
+  it("places Fey Ancestry on the section title instead of repeating it on every save", () => {
+    const features: Feature[] = [
+      {
+        name: "Fey Ancestry",
+        description: "You have Advantage on saving throws to avoid or end the Charmed condition.",
+        linkedModifiers: [
+          {
+            instanceId: "modinst_fey_ancestry_charmed",
+            catalogRefId: "cat_fx_check_roll_modifier",
+            activation: {
+              effects: [
+                {
+                  id: "mod_fey_ancestry_charmed",
+                  kind: "check_roll_modifier",
+                  checkCategory: "save",
+                  checkAbility: null,
+                  checkRollMode: "advantage",
+                  checkConditionTypes: ["Charmed"],
+                },
+              ],
+            },
+          },
+        ],
+      } as Feature,
+    ]
+    const badges = collectSaveFeatureBadges(features)
+    expect(badges.allSaves.map((b) => b.label)).toEqual(["Fey Ancestry"])
+    expect(badges.byAbility.wisdom).toEqual([])
+    expect(badges.byAbility.charisma).toEqual([])
   })
 
   it("splits multi-ability species traits across the matching saves", () => {
@@ -123,9 +175,10 @@ describe("collectSaveFeatureBadges", () => {
       } as Feature,
     ]
     const badges = collectSaveFeatureBadges(features)
-    expect(badges.intelligence.map((b) => b.label)).toEqual(["Gnomish Cunning"])
-    expect(badges.wisdom.map((b) => b.label)).toEqual(["Gnomish Cunning"])
-    expect(badges.charisma.map((b) => b.label)).toEqual(["Gnomish Cunning"])
-    expect(badges.dexterity).toEqual([])
+    expect(badges.byAbility.intelligence.map((b) => b.label)).toEqual(["Gnomish Cunning"])
+    expect(badges.byAbility.wisdom.map((b) => b.label)).toEqual(["Gnomish Cunning"])
+    expect(badges.byAbility.charisma.map((b) => b.label)).toEqual(["Gnomish Cunning"])
+    expect(badges.byAbility.dexterity).toEqual([])
+    expect(badges.allSaves).toEqual([])
   })
 })

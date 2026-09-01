@@ -107,8 +107,10 @@ describe("Gunslinger enrichment", () => {
     ).find((effect) => effect.resourceRefreshOnInitiative)
     expect(direRefresh).toMatchObject({
       classResourceKey: "risk_dice",
+      classResourceChange: "increase",
       classResourceAmount: 1,
       resourceRefreshOnInitiative: true,
+      resourceRefreshOnCriticalHit: true,
     })
 
     const names = enriched.import_proposals?.custom_abilities?.map((a) => a.name) ?? []
@@ -158,6 +160,55 @@ describe("Gunslinger enrichment", () => {
           bonusDiceUsesWeaponDamageType: true,
         },
       ],
+    })
+  })
+
+  it("replaces a stale full-reset Dire Gambit with a 1-die initiative and crit restore", () => {
+    const enriched = applyImportEnrichmentPresets({
+      classes: [
+        {
+          name: "Gunslinger",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Dexterity"],
+          features: [
+            {
+              level: 15,
+              name: "Dire Gambit",
+              description: "Regain one Risk Die.",
+              linkedModifiers: [
+                {
+                  instanceId: "stale_dire",
+                  catalogRefId: "cat_fx_class_resource",
+                  activation: {
+                    effects: [
+                      {
+                        id: "mod_dire_gambit_init",
+                        kind: "class_resource",
+                        classResourceKey: "risk_dice",
+                        classResourceChange: "reset",
+                        resourceRefreshOnInitiative: true,
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+
+    const dire = enriched.classes?.[0]?.features?.find((f) => f.name === "Dire Gambit") as Feature
+    const refreshes = (dire.linkedModifiers ?? []).flatMap(
+      (mod) => mod.activation?.effects ?? [],
+    ).filter((effect) => effect.kind === "class_resource")
+    expect(refreshes).toHaveLength(1)
+    expect(refreshes[0]).toMatchObject({
+      classResourceChange: "increase",
+      classResourceAmount: 1,
+      resourceRefreshOnInitiative: true,
+      resourceRefreshOnCriticalHit: true,
     })
   })
 

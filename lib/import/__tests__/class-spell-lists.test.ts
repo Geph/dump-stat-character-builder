@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { applyClassSpellListsToImport, spellNameMatchKeys } from "@/lib/import/class-spell-lists"
+import {
+  applyClassSpellListsToImport,
+  spellNameMatchKeys,
+  stampClassSpellListsOntoSpellRows,
+} from "@/lib/import/class-spell-lists"
 
 describe("spellNameMatchKeys", () => {
   it("treats Disk/Disc and a leading possessive as the same spell", () => {
@@ -27,7 +31,7 @@ describe("applyClassSpellListsToImport", () => {
       ],
     })
 
-    expect(next.classes?.[0]).not.toHaveProperty("spell_list")
+    expect(next.classes?.[0]?.spell_list).toEqual(["Alarm", "Detect Magic", "Conjure Cover"])
     expect(next.spells?.find((spell) => spell.name === "Conjure Cover")?.classes).toEqual([
       "Investigator",
     ])
@@ -51,5 +55,34 @@ describe("applyClassSpellListsToImport", () => {
     )
     expect(floating).toHaveLength(1)
     expect(floating[0]?.classes).toEqual(["Investigator", "Wizard"])
+  })
+})
+
+describe("stampClassSpellListsOntoSpellRows", () => {
+  it("unions a class tag onto existing catalog rows without rewriting prose", () => {
+    const existing = [
+      {
+        id: "srd-acid",
+        name: "Acid Splash",
+        description: "SRD write-up",
+        classes: ["Sorcerer", "Wizard"],
+      },
+      {
+        id: "srd-fireball",
+        name: "Fireball",
+        description: "A bright streak",
+        classes: ["Wizard"],
+      },
+    ]
+    const { changed, all } = stampClassSpellListsOntoSpellRows(existing, [
+      { className: "Artificer", names: ["Acid Splash", "Alarm"] },
+    ])
+    expect(changed).toHaveLength(1)
+    expect(changed[0]).toMatchObject({
+      id: "srd-acid",
+      description: "SRD write-up",
+      classes: ["Artificer", "Sorcerer", "Wizard"],
+    })
+    expect(all[1]?.classes).toEqual(["Wizard"])
   })
 })

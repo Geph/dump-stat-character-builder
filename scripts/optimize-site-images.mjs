@@ -186,7 +186,7 @@ function discoverCardSlugs(sourcesDir) {
 /**
  * Origin folders + Title Case names (`PHB/Artisan.png`, `Air Genasi.png`, `Dragonborn (1).png`).
  * Output is always a flat slug — origin folders are organization only.
- * Bundled origins (SRD / kibbles) win over PHB / MotM / extra when slugs collide.
+ * Bundled origins (SRD / Mage Hand Press) win over Kibbles / PHB / MotM / extra when slugs collide.
  */
 function discoverFlatCardSlugs(sourcesDir) {
   if (!fs.existsSync(sourcesDir)) return []
@@ -213,7 +213,7 @@ function discoverFlatCardSlugs(sourcesDir) {
 
 /**
  * Origin folders + `Class Remainder.png` (`PHB/Bard Dance.png` → bard/college-of-dance).
- * Prefer SRD / kibbles over `extra/` when the same subclass slug appears in both.
+ * Prefer SRD / Mage Hand Press over Kibbles / `extra/` when the same subclass slug appears in both.
  */
 function discoverSubclassCardSlugs(sourcesDir) {
   if (!fs.existsSync(sourcesDir)) return []

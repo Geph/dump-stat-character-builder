@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS classes (
   features JSON,
   new_toggles JSON,
   class_resources JSON,
+  spell_list JSON,
   spellcasting JSON,
   special_ability JSON,
   prefer_same_source_replacements TINYINT(1) NOT NULL DEFAULT 0,
@@ -402,3 +403,5 @@ CREATE TABLE IF NOT EXISTS character_snapshots (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_character_snapshots_token (token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Incremental ALTERs (including classes.spell_list) live in lib/db/schema-migrations.mjs.

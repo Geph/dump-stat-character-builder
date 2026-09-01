@@ -82,7 +82,10 @@ import {
   ownedEquipmentQuantity,
   setOwnedEquipmentQuantity,
 } from "@/lib/character/equipment-quantities"
-import { characterHasTwoWeaponFighting } from "@/lib/compendium/two-weapon-fighting"
+import {
+  characterHasTwoWeaponFighting,
+  defaultOffHandIncludesAbilityMod,
+} from "@/lib/compendium/two-weapon-fighting"
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 import { partitionToolProficiencies } from "@/lib/compendium/partition-tool-proficiencies"
 import {
@@ -164,6 +167,11 @@ import { SheetActionsPanel } from "@/components/character-sheet/sheet-actions-pa
 import { SheetNonCombatStandardActions } from "@/components/character-sheet/sheet-non-combat-standard-actions"
 import { useDisplayNonCombatActions } from "@/components/settings/use-display-non-combat-actions"
 import { SheetEquippedWeaponsPanel } from "@/components/character-sheet/sheet-equipped-weapons-panel"
+import {
+  abilityModsFromScores,
+  fallbackWeaponAttackDerived,
+} from "@/lib/character/equipped-weapon-attack"
+import { buildUnarmedStrikeEquipment } from "@/lib/character/unarmed-strike"
 import { SheetActionEconomyTracker } from "@/components/character-sheet/sheet-action-economy-tracker"
 import { SheetStandardActionButtons } from "@/components/character-sheet/sheet-standard-action-buttons"
 import { SheetSectionHeading } from "@/components/character-sheet/sheet-section-heading"
@@ -177,6 +185,7 @@ import {
 import { DEFAULT_TEMPLATE_CLASS_NAMES } from "@/lib/character/pdf-sheet/template-matching"
 import { SheetRollHistoryProvider } from "@/components/character-sheet/sheet-roll-history-context"
 import { ManualRollTrigger } from "@/components/character-sheet/manual-roll-trigger"
+import { resolveAttachedClassIcon } from "@/lib/compendium/class-icons-defaults"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import { collectClassResourceSpendKeys } from "@/lib/compendium/class-resource-display"
 import { isClassResourceUnlockedForSubclasses } from "@/lib/compendium/subclass-gated-class-resources"
@@ -235,8 +244,15 @@ import {
   getExhaustionEffectSummary,
 } from "@/lib/srd/exhaustion-effects"
 import { BLOODIED_DESCRIPTION, isBloodied } from "@/lib/character/bloodied"
+import {
+  formatConditionImmunityNote,
+  sourcesForConditionImmunity,
+} from "@/lib/character/condition-immunity"
 import { buildIncomingAttackNotes } from "@/lib/character/incoming-attack-notes"
-import { collectSaveFeatureBadges } from "@/lib/character/save-feature-badges"
+import {
+  collectSaveFeatureBadges,
+  type SaveFeatureBadge,
+} from "@/lib/character/save-feature-badges"
 import {
   buildSheetPlayStateFromSheet,
   loadSheetSessionState,
@@ -316,11 +332,13 @@ import {
   applySheetRest,
   applyInitiativeResourceRecharge,
   applyMinimumResourceRemaining,
+  collectRestHitDiceRestoreActivities,
   pactSlotRestoreCount,
   restoreExpendedSpellSlots,
   restoreSpellSlotsByCombinedLevel,
   charnelTouchRestoreFromSlot,
   spendLowestAvailableSpellSlot,
+  type RestHitDiceRestoreActivity,
 } from "@/lib/character/sheet-rest"
 import {
   applyFeatureResourceRefresh,
@@ -509,6 +527,27 @@ function CollapsibleDetailField({
 /** Sheet-only display title — ASI features read as Feat or ASI. */
 function sheetFeatureDisplayName(name: string): string {
   return /^ability score improvement$/i.test(name.trim()) ? "Feat or ASI" : name
+}
+
+function SaveFeatureBadgePills({ badges }: { badges: SaveFeatureBadge[] }) {
+  if (!badges.length) return null
+  return (
+    <span className="flex flex-wrap gap-1 font-medium normal-case tracking-normal">
+      {badges.map((badge) => (
+        <span
+          key={badge.id}
+          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${weaponModifierBadgeClass("feature")}`}
+        >
+          {badge.label}
+          <ConditionInfoTip
+            description={badge.description}
+            source={badge.sourceLabel}
+            ariaLabel={`${badge.label} save feature`}
+          />
+        </span>
+      ))}
+    </span>
+  )
 }
 
 const HEROIC_INSPIRATION_TIP =
@@ -710,6 +749,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [portraitZoomOpen, setPortraitZoomOpen] = useState(false)
   const [bannerRestOpen, setBannerRestOpen] = useState(false)
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null)
+  const [spellCastEconomyOverride, setSpellCastEconomyOverride] = useState<ActionEconomyKind | null>(null)
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
   const [equipmentSearchQuery, setEquipmentSearchQuery] = useState("")
   const [characterGold, setCharacterGold] = useState(0)
@@ -731,6 +771,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [usedActionUsesById, setUsedActionUsesById] = useState<Record<string, number>>({})
   const [primedBombUsedThisTurn, setPrimedBombUsedThisTurn] = useState(false)
   const [actionEconomySpent, setActionEconomySpent] = useState<ActionEconomySpent>(emptyActionEconomySpent)
+  const [firstUseNoActionUsedById, setFirstUseNoActionUsedById] = useState<Record<string, boolean>>({})
   const [attackRollsUsed, setAttackRollsUsed] = useState(0)
   const [usedHitDiceByClassId, setUsedHitDiceByClassId] = useState<Record<string, number>>({})
   const [shortRestHitDiceOpen, setShortRestHitDiceOpen] = useState(false)
@@ -1875,6 +1916,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const resetActionEconomy = useCallback(() => {
     setActionEconomySpent(emptyActionEconomySpent())
     setAttackRollsUsed(0)
+    setFirstUseNoActionUsedById({})
   }, [])
 
   const recordWeaponAttack = useCallback(() => {
@@ -2101,6 +2143,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               : resource.name,
           uses: resource.uses,
           classLevel: entry.row.level,
+          icon: resolveAttachedClassIcon(entry.class),
         })
       }
     }
@@ -2503,6 +2546,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         customAbilities: sheetCustomAbilities,
         feats: [...characterFeats, ...(originFeat ? [originFeat] : [])],
         featureChoicePicks,
+        modifierPlayerPicks: character?.modifier_player_picks ?? {},
       }),
     [
       classDetails,
@@ -2512,6 +2556,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       characterFeats,
       originFeat,
       featureChoicePicks,
+      character?.modifier_player_picks,
     ],
   )
 
@@ -2561,14 +2606,27 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         })
       }
     }
-    if (equippedWeapon && derived?.equippedWeaponAttack) {
+    const abilityMods = derived?.abilityMods ?? abilityModsFromScores(character ?? {})
+    const proficiencyBonus = derived?.proficiencyBonus ?? 2
+    const weaponProficiencies = derived?.weaponProficiencies ?? []
+    const overrides = derived?.weaponAbilityOverrides ?? []
+    const mainAttack =
+      derived?.equippedWeaponAttack ??
+      (equippedWeapon
+        ? fallbackWeaponAttackDerived(equippedWeapon, {
+            abilityMods,
+            proficiencyBonus,
+            weaponProficiencies,
+            overrides,
+          })
+        : null)
+    if (equippedWeapon && mainAttack) {
       cards.push({
         weapon: equippedWeapon,
-        attack: derived.equippedWeaponAttack,
+        attack: mainAttack,
         hand: "main" as const,
-        defaultIncludeAbilityModifier:
-          derived.equippedWeaponAttack.includesAbilityModifierOnDamage,
-        abilityModifier: derived.equippedWeaponAttack.damageAbilityMod,
+        defaultIncludeAbilityModifier: mainAttack.includesAbilityModifierOnDamage,
+        abilityModifier: mainAttack.damageAbilityMod,
         quantity: ownedEquipmentQuantity(
           character?.equipment_ids ?? [],
           character?.equipment_quantities,
@@ -2576,14 +2634,35 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         ),
       })
     }
-    if (equippedOffHandWeapon && derived?.equippedOffHandWeaponAttack) {
-      const abilityMod = derived.equippedOffHandWeaponAttack.damageAbilityMod
+    const offHandPreview = equippedOffHandWeapon
+      ? fallbackWeaponAttackDerived(equippedOffHandWeapon, {
+          abilityMods,
+          proficiencyBonus,
+          weaponProficiencies,
+          overrides,
+        })
+      : null
+    const offHandAttack =
+      derived?.equippedOffHandWeaponAttack ??
+      (equippedOffHandWeapon
+        ? fallbackWeaponAttackDerived(equippedOffHandWeapon, {
+            abilityMods,
+            proficiencyBonus,
+            weaponProficiencies,
+            overrides,
+            includeAbilityModifier: defaultOffHandIncludesAbilityMod(
+              offHandPreview?.damageAbilityMod ?? 0,
+              hasTwoWeaponFighting,
+            ),
+          })
+        : null)
+    if (equippedOffHandWeapon && offHandAttack) {
+      const abilityMod = offHandAttack.damageAbilityMod
       cards.push({
         weapon: equippedOffHandWeapon,
-        attack: derived.equippedOffHandWeaponAttack,
+        attack: offHandAttack,
         hand: "off" as const,
-        defaultIncludeAbilityModifier:
-          derived.equippedOffHandWeaponAttack.includesAbilityModifierOnDamage,
+        defaultIncludeAbilityModifier: offHandAttack.includesAbilityModifierOnDamage,
         abilityModifier: abilityMod,
         quantity: ownedEquipmentQuantity(
           character?.equipment_ids ?? [],
@@ -2592,13 +2671,30 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         ),
       })
     }
-    if (derived?.unarmedStrikeWeapon && derived.unarmedStrikeAttack) {
+    const unarmedWeapon =
+      derived?.unarmedStrikeWeapon ??
+      buildUnarmedStrikeEquipment({
+        die: null,
+        emptyHanded: !equippedWeapon && !equippedOffHandWeapon,
+        damageType: null,
+        ability: null,
+        characterLevel: derived?.totalLevel ?? 1,
+      })
+    const unarmedAttack =
+      derived?.unarmedStrikeAttack ??
+      fallbackWeaponAttackDerived(unarmedWeapon, {
+        abilityMods,
+        proficiencyBonus,
+        weaponProficiencies,
+        overrides,
+      })
+    if (unarmedWeapon && unarmedAttack) {
       cards.push({
-        weapon: derived.unarmedStrikeWeapon,
-        attack: derived.unarmedStrikeAttack,
+        weapon: unarmedWeapon,
+        attack: unarmedAttack,
         hand: "main" as const,
         defaultIncludeAbilityModifier: true,
-        abilityModifier: derived.unarmedStrikeAttack.damageAbilityMod,
+        abilityModifier: unarmedAttack.damageAbilityMod,
       })
     }
     return cards
@@ -2614,6 +2710,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     derived?.abilityMods,
     derived?.proficiencyBonus,
     derived,
+    character,
     characterFeats,
     originFeat,
     activeSheetToggleIds,
@@ -2698,6 +2795,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         asiAllocations: normalizeAsiAllocationsMap(character?.asi_allocations),
         featIds: character?.feat_ids ?? characterFeats.map((feat) => feat.id),
         choiceLabelByPickId,
+        modifierPlayerPicks: character?.modifier_player_picks ?? {},
       }),
     [
       classDetails,
@@ -2712,6 +2810,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       featureChoicePicks,
       choiceLabelByPickId,
       speciesTraitPicks,
+      character?.modifier_player_picks,
     ],
   )
 
@@ -2769,14 +2868,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const combatActions = useMemo(
     () => [
-      ...sheetActions.filter((action) => action.category !== "utility"),
+      ...sheetActions.filter((action) => action.showOnCombatTab ?? action.category !== "utility"),
       ...pinnedSheetActions.filter((action) => action.category === "combat"),
     ],
     [sheetActions, pinnedSheetActions],
   )
   const utilityActions = useMemo(
     () => [
-      ...sheetActions.filter((action) => action.category === "utility"),
+      ...sheetActions.filter((action) => action.showOnAbilitiesTab ?? action.category === "utility"),
       ...pinnedSheetActions.filter((action) => action.category === "utility"),
     ],
     [sheetActions, pinnedSheetActions],
@@ -2798,11 +2897,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   ])
 
   const effectiveScores = derived?.abilityScores ?? null
+  const conditionImmunitySources = derived?.conditionImmunitySources ?? {}
 
   const toggleCondition = (conditionName: string) => {
-    setActiveConditions((prev) =>
-      prev.includes(conditionName) ? prev.filter((c) => c !== conditionName) : [...prev, conditionName],
-    )
+    setActiveConditions((prev) => {
+      if (prev.includes(conditionName)) return prev.filter((c) => c !== conditionName)
+      if (sourcesForConditionImmunity(conditionImmunitySources, conditionName).length) return prev
+      return [...prev, conditionName]
+    })
   }
 
   const applyConcentration = useCallback((conditionName: string) => {
@@ -2839,6 +2941,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       usedResourcesById,
       spendableResourceEntries,
       usesResolveContext,
+      resourceRefreshEffects
+        .filter((effect) => effect.onInitiative)
+        .map((effect) => effect.resourceKey),
     )
     const refreshed = applyFeatureResourceRefresh({
       usedResourcesById: afterPool,
@@ -2872,6 +2977,25 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     spendableResourceEntries,
     usesResolveContext,
     philosophersStoneReagentEntry,
+    resourceRefreshEffects,
+    rechargeCapsByResourceId,
+  ])
+
+  const handleAttackCriticalHit = useCallback(() => {
+    const refreshed = applyFeatureResourceRefresh({
+      usedResourcesById,
+      resourceEntries: spendableResourceEntries,
+      resolveContext: usesResolveContext,
+      effects: resourceRefreshEffects,
+      trigger: "critical_hit",
+      rechargeCapsByResourceId,
+    })
+    setUsedResourcesById(refreshed.usedResourcesById)
+    setRechargeCapsByResourceId(refreshed.rechargeCapsByResourceId)
+  }, [
+    usedResourcesById,
+    spendableResourceEntries,
+    usesResolveContext,
     resourceRefreshEffects,
     rechargeCapsByResourceId,
   ])
@@ -3045,6 +3169,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     setPrimedBombUsedThisTurn(false)
     setActionEconomySpent(emptyActionEconomySpent())
     setAttackRollsUsed(0)
+    setFirstUseNoActionUsedById({})
     // Full Awakening lasts until the start of your next turn.
     setActiveSheetToggleIds((prev) =>
       prev.includes("full_awakening_active")
@@ -3061,7 +3186,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         incapacitated: isIncapacitatedByConditions(activeConditions),
       })
       applyRampageDieState(advanced.state)
-      if (advanced.exhaustionGained > 0) {
+      if (
+        advanced.exhaustionGained > 0 &&
+        !sourcesForConditionImmunity(conditionImmunitySources, "Exhaustion").length
+      ) {
         setExhaustionLevel((level) => clampExhaustionLevel(level + advanced.exhaustionGained))
       }
     }
@@ -3235,6 +3363,22 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       return recovered
     },
     [classDetails, usedHitDiceByClassId],
+  )
+
+  const handleRestHitDiceRestore = useCallback(
+    (activity: RestHitDiceRestoreActivity) => {
+      const recovered = handleRestoreHitDice(activity.amount, activity.classId)
+      setUsedActionUsesById((prev) => ({
+        ...prev,
+        [activity.trackingKey]: (prev[activity.trackingKey] ?? 0) + 1,
+      }))
+      const line =
+        recovered > 0
+          ? `${activity.name}: regained ${recovered} Hit Point Dice (up to ${activity.amount})`
+          : `${activity.name}: no expended Hit Point Dice to regain`
+      setRestOverlay((prev) => (prev ? { ...prev, summary: [...prev.summary, line] } : prev))
+    },
+    [handleRestoreHitDice],
   )
 
   const handleRestoreSpellSlotsByCombinedLevel = useCallback(
@@ -3701,11 +3845,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       for (const name of remove) next.delete(name)
       for (const name of add) {
         const trimmed = name.trim()
-        if (trimmed) next.add(trimmed)
+        if (!trimmed) continue
+        if (sourcesForConditionImmunity(conditionImmunitySources, trimmed).length) continue
+        next.add(trimmed)
       }
       return [...next]
     })
-  }, [])
+  }, [conditionImmunitySources])
 
   const addDurationReminderFromAction = useCallback((label: string) => {
     setDurationReminders((prev) => [...prev, createDurationReminder(label)])
@@ -4151,6 +4297,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             currentHp,
             classResourceDieSides,
           },
+          criticalHitMinimum: 20,
+          onAttackCriticalHit: handleAttackCriticalHit,
         }}
       >
     <div className="min-h-screen bg-background flex flex-col">
@@ -4391,7 +4539,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         />
                         <div
                           ref={conditionMenuRef}
-                          className="fixed w-56 bg-card border border-border rounded-lg shadow-xl z-[100] max-h-80 overflow-y-auto overscroll-contain"
+                          className="fixed w-72 bg-card border border-border rounded-lg shadow-xl z-[100] max-h-80 overflow-y-auto overscroll-contain"
                           style={{ top: conditionMenuPos.top, left: conditionMenuPos.left }}
                         >
                           <label className="flex min-h-11 items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-sm">
@@ -4410,29 +4558,64 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                             <span className="flex-1 min-w-0">Concentrating</span>
                             <ConditionInfoTip description={CONCENTRATION_CONDITION_DESCRIPTION} />
                           </label>
-                          {SHEET_SELECTABLE_CONDITIONS.map((condition) => (
+                          {SHEET_SELECTABLE_CONDITIONS.map((condition) => {
+                            const immunitySources = sourcesForConditionImmunity(
+                              conditionImmunitySources,
+                              condition.name,
+                            )
+                            const immune = immunitySources.length > 0
+                            const active = activeConditions.includes(condition.name)
+                            return (
                             <label
                               key={condition.name}
-                              className="flex min-h-11 items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-sm"
+                              className={`flex min-h-11 items-center gap-2 px-3 py-2 text-sm ${
+                                immune && !active
+                                  ? "cursor-not-allowed opacity-50"
+                                  : "hover:bg-muted cursor-pointer"
+                              }`}
                             >
                               <input
                                 type="checkbox"
-                                checked={activeConditions.includes(condition.name)}
+                                checked={active}
+                                disabled={immune && !active}
                                 onChange={() => toggleCondition(condition.name)}
                                 className="h-4 w-4 rounded accent-destructive shrink-0"
                               />
-                              <span className="flex-1 min-w-0">{condition.name}</span>
+                              <span className="flex-1 min-w-0">
+                                <span className="block">{condition.name}</span>
+                                {immune ? (
+                                  <span className="block text-[10px] leading-snug text-muted-foreground">
+                                    {formatConditionImmunityNote(immunitySources)}
+                                  </span>
+                                ) : null}
+                              </span>
                               <ConditionInfoTip description={condition.description} />
                             </label>
-                          ))}
+                            )
+                          })}
                           <div className="border-t border-border px-3 py-2.5">
+                            {(() => {
+                              const exhaustionSources = sourcesForConditionImmunity(
+                                conditionImmunitySources,
+                                "Exhaustion",
+                              )
+                              const exhaustionImmune = exhaustionSources.length > 0
+                              return (
+                                <>
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="text-sm font-medium flex-1 min-w-0">Exhaustion</span>
+                              <span className="text-sm font-medium flex-1 min-w-0">
+                                Exhaustion
+                                {exhaustionImmune ? (
+                                  <span className="mt-0.5 block text-[10px] font-normal leading-snug text-muted-foreground">
+                                    {formatConditionImmunityNote(exhaustionSources)}
+                                  </span>
+                                ) : null}
+                              </span>
                               {EXHAUSTION_CONDITION ? (
                                 <ConditionInfoTip description={EXHAUSTION_CONDITION.description} />
                               ) : null}
                             </div>
-                            <div className="flex flex-wrap gap-1">
+                            <div className={`flex flex-wrap gap-1 ${exhaustionImmune ? "opacity-50" : ""}`}>
                               {EXHAUSTION_LEVELS.map((level) => {
                                 const selected = exhaustionLevel === level
                                 return (
@@ -4440,19 +4623,30 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                     key={level}
                                     type="button"
                                     aria-pressed={selected}
-                                    title={getExhaustionEffectSummary(level)}
-                                    onClick={() => setExhaustionLevel(clampExhaustionLevel(level))}
+                                    disabled={exhaustionImmune && level > 0}
+                                    title={
+                                      exhaustionImmune
+                                        ? formatConditionImmunityNote(exhaustionSources)
+                                        : getExhaustionEffectSummary(level)
+                                    }
+                                    onClick={() => {
+                                      if (exhaustionImmune && level > 0) return
+                                      setExhaustionLevel(clampExhaustionLevel(level))
+                                    }}
                                     className={`inline-flex h-9 min-w-9 items-center justify-center rounded-md border px-2 text-sm font-bold tabular-nums transition-colors ${
                                       selected
                                         ? "border-amber-500/60 bg-amber-500/20 text-amber-900 dark:text-amber-200"
                                         : "border-border bg-background text-muted-foreground hover:bg-muted"
-                                    }`}
+                                    } disabled:cursor-not-allowed`}
                                   >
                                     {level}
                                   </button>
                                 )
                               })}
                             </div>
+                                </>
+                              )
+                            })()}
                           </div>
                         </div>
                       </>
@@ -5347,6 +5541,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     onSpawnIllusionToken={spawnIllusionToken}
                     onGrantMutationDie={grantMutationDieFromAction}
                     onMarkEconomy={markActionEconomy}
+                    firstUseNoActionUsedById={firstUseNoActionUsedById}
+                    onFirstUseNoActionUsed={(actionId) =>
+                      setFirstUseNoActionUsedById((prev) => ({ ...prev, [actionId]: true }))
+                    }
                     characterId={character.id}
                     onApplySelfHeal={applySelfHeal}
                     onSetCurrentHp={setCurrentHp}
@@ -5361,6 +5559,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       hasBalanceOfPowerMechanic ? bankIntoBalanceOfPower : undefined
                     }
                     allyCandidates={allyCandidates}
+                    knownSpells={spells}
+                    onCastSpellChoice={(spell, choice) => {
+                      setSpellCastEconomyOverride(choice.economyKind ?? "reaction")
+                      setSelectedSpell(spell)
+                    }}
                     healContext={healContext}
                     onRestorePactSlots={handleRestorePactSlots}
                     onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
@@ -5591,6 +5794,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         onSpawnIllusionToken={spawnIllusionToken}
                         onGrantMutationDie={grantMutationDieFromAction}
                         onMarkEconomy={markActionEconomy}
+                        firstUseNoActionUsedById={firstUseNoActionUsedById}
+                        onFirstUseNoActionUsed={(actionId) =>
+                          setFirstUseNoActionUsedById((prev) => ({ ...prev, [actionId]: true }))
+                        }
                         characterId={character.id}
                         onApplySelfHeal={applySelfHeal}
                         onSetCurrentHp={setCurrentHp}
@@ -5605,6 +5812,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           hasBalanceOfPowerMechanic ? bankIntoBalanceOfPower : undefined
                         }
                         allyCandidates={allyCandidates}
+                        knownSpells={spells}
+                        onCastSpellChoice={(spell, choice) => {
+                          setSpellCastEconomyOverride(choice.economyKind ?? "reaction")
+                          setSelectedSpell(spell)
+                        }}
                         healContext={healContext}
                         singleColumn
                         groupLayout="responsive-grid"
@@ -5630,6 +5842,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                       total: attacksPerAction,
                                     }}
                                     onDamageRoll={markRampageDamageDealtThisTurn}
+                                    powerRiders={derived?.powerRiders ?? []}
+                                    weaponAbilityOverrides={derived?.weaponAbilityOverrides ?? []}
                                     hideHeading
                                     activeSheetToggleIds={activeSheetToggleIds}
                                     onToggleMounted={(weaponId) =>
@@ -5714,7 +5928,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
                 <div className="space-y-3 min-w-0">
                 <div id="sheet-saves" className={`${SHEET_COMBAT_PANEL.savingThrows} rounded-xl p-3 border border-border`}>
-                  <SheetSectionHeading icon={ShieldCheck}>Saving Throws</SheetSectionHeading>
+                  <SheetSectionHeading icon={ShieldCheck} className="flex-wrap">
+                    Saving Throws
+                    <SaveFeatureBadgePills badges={saveFeatureBadges.allSaves} />
+                  </SheetSectionHeading>
                   <div className="flex flex-col gap-2">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-1.5 min-w-0">
                       {(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"] as const).map(
@@ -5726,7 +5943,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           const mod =
                             derivedSave?.bonus ??
                             abilityMods[abilityKey] + (isProficient ? proficiencyBonus : 0)
-                          const saveBadges = saveFeatureBadges[abilityKey] ?? []
+                          const saveBadges = saveFeatureBadges.byAbility[abilityKey] ?? []
                           return (
                             <div
                               key={ability}
@@ -5741,23 +5958,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                     ? ` (${ABILITY_LABELS[derivedSave.governingAbility]})`
                                     : ""}
                                 </span>
-                                {saveBadges.length ? (
-                                  <div className="flex flex-wrap gap-1">
-                                    {saveBadges.map((badge) => (
-                                      <span
-                                        key={badge.id}
-                                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${weaponModifierBadgeClass("feature")}`}
-                                      >
-                                        {badge.label}
-                                        <ConditionInfoTip
-                                          description={badge.description}
-                                          source={badge.sourceLabel}
-                                          ariaLabel={`${badge.label} save feature`}
-                                        />
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : null}
+                                <SaveFeatureBadgePills badges={saveBadges} />
                               </div>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <span className="font-bold tabular-nums">{formatMod(mod)}</span>
@@ -6502,6 +6703,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 [classId]: (prev[classId] ?? 0) + count,
               }))
             }
+            hitDiceRestoreActivities={collectRestHitDiceRestoreActivities({
+              rest: restOverlay.rest,
+              sheetActions,
+              usedActionUsesById,
+              resolveContext: usesResolveContext,
+            })}
+            expendedHitDice={hitDicePool.reduce((sum, entry) => sum + entry.spent, 0)}
+            onUseHitDiceRestore={handleRestHitDiceRestore}
             weaponMasteryChoices={
               restOverlay.rest === "long_rest" ? longRestWeaponMasteryChoices : []
             }
@@ -6548,7 +6757,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             spell={selectedSpell}
             spellAttackMod={selectedSpellAttackMod}
             activeConcentration={getActiveConcentration(activeConditions)}
-            onClose={() => setSelectedSpell(null)}
+            onClose={() => {
+              setSelectedSpell(null)
+              setSpellCastEconomyOverride(null)
+            }}
             psiLimit={psiLimit}
             castCost={spellCastCost}
             metamagicOptions={metamagicOptions}
@@ -6557,13 +6769,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             empoweredRerollCap={Math.max(1, abilityMods.charisma ?? 0)}
             onCast={(result) => {
               markActionEconomy(
-                actionEconomyKindFromCastingTime(selectedSpell.casting_time, {
-                  quickened: selectedMetamagicIds.some((id) => {
-                    const option = metamagicOptions.find((row) => row.id === id)
-                    return option?.effectHint === "quicken"
+                spellCastEconomyOverride ??
+                  actionEconomyKindFromCastingTime(selectedSpell.casting_time, {
+                    quickened: selectedMetamagicIds.some((id) => {
+                      const option = metamagicOptions.find((row) => row.id === id)
+                      return option?.effectHint === "quicken"
+                    }),
                   }),
-                }),
               )
+              setSpellCastEconomyOverride(null)
               if (result.concentrationApplied) {
                 applyConcentration(result.concentrationApplied)
               }

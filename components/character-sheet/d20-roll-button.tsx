@@ -223,6 +223,13 @@ export function D20RollButton({
       natural: rolled.natural,
       naturals: rolled.naturals,
     })
+    const critFloor = rollCtx.criticalHitMinimum ?? 20
+    if (
+      (rollContext?.kind === "attack" || rollContext?.kind === "spell_attack") &&
+      rolled.natural >= critFloor
+    ) {
+      rollCtx.onAttackCriticalHit?.()
+    }
     onRoll?.()
   }
 

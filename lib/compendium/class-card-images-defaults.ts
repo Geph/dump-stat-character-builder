@@ -8,7 +8,8 @@ const classCardImage = (slug: string) => withBasePath(`/images/compendium/classe
 
 /**
  * Default card art for classes — files live under public/images/compendium/classes/.
- * Includes SRD / 2024 PHB plus Artificer, KibblesTasty Inventor / Occultist / Psion / Warden.
+ * SRD names always resolve when bundled. Kibbles Inventor / Occultist / Psion / Warden
+ * (and Artificer) assign only when the PNG is present locally.
  */
 export const SRD_CLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Artificer: classCardImage("artificer"),

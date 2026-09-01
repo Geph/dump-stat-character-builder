@@ -172,6 +172,7 @@ export const GUNSLINGER_PRESETS: EnrichmentPreset[] = [
     operations: [
       {
         op: "attachNamedPreset",
+        replaceEffectKinds: ["class_resource"],
         preset: {
           kind: "fx_instance",
           idKey: "dire_gambit_init",
@@ -181,17 +182,18 @@ export const GUNSLINGER_PRESETS: EnrichmentPreset[] = [
               id: "mod_dire_gambit_init",
               kind: "class_resource",
               classResourceKey: "risk_dice",
-              classResourceChange: "reset",
+              classResourceChange: "increase",
               resourceRefreshOnInitiative: true,
+              resourceRefreshOnCriticalHit: true,
               classResourceAmount: 1,
-              label: "Regain 1 Risk Die on Initiative",
+              label: "Regain 1 Risk Die on Initiative or a Critical Hit",
             },
           ],
         },
       },
       {
         op: "appendDescription",
-        text: "Dump Stat restores 1 Risk Die when you roll Initiative once this feature is unlocked (not from the pool table). Critical Hit restores remain play-time.",
+        text: "Dump Stat restores 1 Risk Die when you roll Initiative or score a Critical Hit (not a full pool refill from the level table).",
       },
     ],
   },

@@ -69,6 +69,10 @@ type ModifierPlayerChoicePanelProps = {
    * (level-up uses this; the character builder keeps the default).
    */
   showSkillInfo?: boolean
+  /** Background origin text such as "Magic Initiate (Cleric)" — locks that list. */
+  magicInitiateFeatGranted?: string | null
+  /** Source keys for Magic Initiate takes not present in `slots`. */
+  magicInitiateSourceKeys?: string[]
 }
 
 function SpellGrantPicker({
@@ -290,6 +294,8 @@ export function ModifierPlayerChoicePanel({
   knownLanguages = [],
   existingExpertiseSkills = [],
   showSkillInfo = true,
+  magicInitiateFeatGranted = null,
+  magicInitiateSourceKeys = [],
 }: ModifierPlayerChoicePanelProps) {
   const relevant = modifierPlayerChoiceSlotsForSource(slots, sourceKey)
     .filter((slot) => {
@@ -306,14 +312,17 @@ export function ModifierPlayerChoicePanel({
       if (!isMagicInitiateSourceLabel(slot.sourceLabel)) continue
       const selected = picks[slot.slotKey] ?? []
       if (!selected.length) continue
-      const taken = takenMagicInitiateSpellLists(slots, picks, slot.slotKey)
+      const taken = takenMagicInitiateSpellLists(slots, picks, slot.slotKey, {
+        featGranted: magicInitiateFeatGranted,
+        additionalSourceKeys: magicInitiateSourceKeys,
+      })
       const next = selected.filter((name) => {
         const list = normalizeMagicInitiateSpellList(name)
         return list ? !taken.has(list.toLowerCase()) : true
       })
       if (next.length !== selected.length) onChange(slot.slotKey, next)
     }
-  }, [relevant, picks, onChange, slots])
+  }, [relevant, picks, onChange, slots, magicInitiateFeatGranted, magicInitiateSourceKeys])
 
   if (relevant.length === 0) return null
 
@@ -338,7 +347,10 @@ export function ModifierPlayerChoicePanel({
 
         const miSpellListUnavailable =
           slot.kind === "spell_list_class" && isMagicInitiateSourceLabel(slot.sourceLabel)
-            ? unavailableMagicInitiateSpellListNames(slots, picks, slot.slotKey)
+            ? unavailableMagicInitiateSpellListNames(slots, picks, slot.slotKey, {
+                featGranted: magicInitiateFeatGranted,
+                additionalSourceKeys: magicInitiateSourceKeys,
+              })
             : []
         const miAbilityUnavailable =
           slot.kind === "spellcasting_ability" && isMagicInitiateSourceLabel(slot.sourceLabel)

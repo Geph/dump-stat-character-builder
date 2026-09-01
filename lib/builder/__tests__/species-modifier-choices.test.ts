@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { collectSpeciesModifierPlayerChoiceSlots } from "@/lib/builder/modifier-player-choices"
+import {
+  applyModifierPlayerPicks,
+  collectSpeciesModifierPlayerChoiceSlots,
+  speciesTraitSourceKey,
+} from "@/lib/builder/modifier-player-choices"
 import { isFeatEligibleForCategories, type FeatSlotContext } from "@/lib/builder/feat-selection"
 import { buildDefaultModifierCatalog } from "@/lib/compendium/modifier-catalog"
 import { enrichSrdSpeciesRow } from "@/lib/compendium/enrich-srd-species"
+import { enrichCustomSpeciesRow } from "@/lib/compendium/enrich-custom-species"
 import { SRD_SOURCE } from "@/lib/srd/source"
 import bundledSpecies from "@/lib/srd/seed-data/species.json"
 import type { Feat, Species } from "@/lib/types"
@@ -281,5 +286,53 @@ describe("isFeatEligibleForCategories — Origin slots", () => {
         hasFightingStyleAccess: true,
       }),
     ).toBe(true)
+  })
+})
+
+describe("MOTM species player choices", () => {
+  it("surfaces Centaur Natural Affinity as a constrained skill slot", () => {
+    const enriched = enrichCustomSpeciesRow({
+      id: "species_centaur",
+      name: "Centaur",
+      source: "motm",
+      traits: [{ name: "Natural Affinity", description: "" }],
+    }) as unknown as Species
+    const slots = collectSpeciesModifierPlayerChoiceSlots(enriched, {}, catalog)
+    const skillSlot = slots.find((s) => s.kind === "skill")
+    expect(skillSlot).toBeDefined()
+    expect(skillSlot?.maxCount).toBe(1)
+    expect(skillSlot?.options?.map((o) => o.name).sort()).toEqual([
+      "Animal Handling",
+      "Medicine",
+      "Nature",
+      "Survival",
+    ])
+  })
+
+  it("applies a Natural Affinity pick without granting the rest of the pool", () => {
+    const enriched = enrichCustomSpeciesRow({
+      id: "species_centaur",
+      name: "Centaur",
+      source: "motm",
+      traits: [{ name: "Natural Affinity", description: "" }],
+    }) as unknown as Species
+    const slots = collectSpeciesModifierPlayerChoiceSlots(enriched, {}, catalog)
+    const skillSlot = slots.find((s) => s.kind === "skill")
+    expect(skillSlot).toBeDefined()
+    const sourceKey = speciesTraitSourceKey(enriched.id, 0)
+    const chars = (enriched.traits?.[0]?.linkedModifiers ?? []).flatMap(
+      (instance) => instance.characteristics ?? [],
+    )
+    const unresolved = applyModifierPlayerPicks(chars, sourceKey, {})
+    expect(unresolved.find((mod) => mod.type === "skills")?.choiceCount).toBe(1)
+
+    const picked = applyModifierPlayerPicks(chars, sourceKey, {
+      [skillSlot!.slotKey]: ["Survival"],
+    })
+    const skills = picked.find((mod) => mod.type === "skills")
+    expect(skills?.type).toBe("skills")
+    if (skills?.type !== "skills") throw new Error("Expected skills characteristic")
+    expect(skills.choiceCount).toBe(0)
+    expect(skills.entries?.map((entry) => entry.skill)).toEqual(["Survival"])
   })
 })

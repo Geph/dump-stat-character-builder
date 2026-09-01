@@ -168,36 +168,50 @@ export function FeatPickGallery({
       >
         {displayFeats.map((feat) => {
           const isSelected = feat.id === selectedId
-          const canShowInfo = Boolean(onShowDetails && feat.description?.trim())
+          const canShowInfo = Boolean(onShowDetails)
           const meta = featMetaParts(feat, cinematic)
 
           if (!cinematic) {
             return (
-              <button
-                key={feat.id}
-                type="button"
-                onClick={() => onSelect(isSelected ? null : feat.id)}
-                className={cn(
-                  "w-full rounded-lg border-2 px-2.5 py-1.5 text-left transition-all",
-                  isSelected
-                    ? selectedClassName
-                    : "border-border bg-card hover:border-secondary/50",
-                )}
-              >
-                <p className="text-xs font-semibold text-foreground">{feat.name}</p>
-                {meta.length > 0 ? (
-                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
-                    {meta.map((part) => (
-                      <span
-                        key={part}
-                        className={part === "Repeatable" ? "text-primary" : undefined}
-                      >
-                        {part}
-                      </span>
-                    ))}
-                  </div>
+              <div key={feat.id} className="flex min-w-0 items-stretch gap-1">
+                <button
+                  type="button"
+                  onClick={() => onSelect(isSelected ? null : feat.id)}
+                  className={cn(
+                    "min-w-0 flex-1 rounded-lg border-2 px-2.5 py-1.5 text-left transition-all",
+                    isSelected
+                      ? selectedClassName
+                      : "border-border bg-card hover:border-secondary/50",
+                  )}
+                >
+                  <p className="text-xs font-semibold text-foreground">{feat.name}</p>
+                  {meta.length > 0 ? (
+                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                      {meta.map((part) => (
+                        <span
+                          key={part}
+                          className={part === "Repeatable" ? "text-primary" : undefined}
+                        >
+                          {part}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </button>
+                {canShowInfo ? (
+                  <button
+                    type="button"
+                    aria-label={`About ${feat.name}`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onShowDetails?.(feat)
+                    }}
+                    className="inline-flex shrink-0 items-center justify-center self-stretch rounded-md border border-border bg-card px-1.5 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
                 ) : null}
-              </button>
+              </div>
             )
           }
 

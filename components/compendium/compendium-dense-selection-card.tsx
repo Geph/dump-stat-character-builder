@@ -20,6 +20,8 @@ type CompendiumDenseSelectionCardProps = {
   badge?: ReactNode
   accentColor?: CompendiumThemeColorId | null
   onSelect?: () => void
+  /** When set without onSelect, the whole card opens the detail overlay. */
+  onLearnMore?: () => void
   className?: string
 }
 
@@ -34,6 +36,7 @@ export function CompendiumDenseSelectionCard({
   badge,
   accentColor = null,
   onSelect,
+  onLearnMore,
   className,
 }: CompendiumDenseSelectionCardProps) {
   const accent = compendiumAccentColorStyles(accentColor)
@@ -41,17 +44,19 @@ export function CompendiumDenseSelectionCard({
     selectionVariant === "secondary"
       ? "border-secondary bg-secondary/10 ring-1 ring-secondary/30"
       : "border-primary bg-primary/10 ring-1 ring-primary/30"
+  const activate = onSelect ?? onLearnMore
 
   return (
     <div
-      role={onSelect ? "button" : undefined}
-      tabIndex={onSelect && !disabled ? 0 : undefined}
-      onClick={disabled ? undefined : onSelect}
+      role={activate ? "button" : undefined}
+      tabIndex={activate && !disabled ? 0 : undefined}
+      aria-label={onLearnMore && !onSelect ? `View ${name} details` : undefined}
+      onClick={disabled ? undefined : activate}
       onKeyDown={(e) => {
-        if (!onSelect || disabled) return
+        if (!activate || disabled) return
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault()
-          onSelect()
+          activate()
         }
       }}
       className={cn(

@@ -793,7 +793,11 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
         { kind: "check_advantage", checkCategory: "save", checkAbility: "Constitution" },
         {},
       ),
-      castSpellFx("war_caster_reactive", { castSpellCastingTime: "action" }, { reaction: true }),
+      castSpellFx(
+        "war_caster_reactive",
+        { castSpellCastingTime: "action", label: "Reactive Spell" },
+        { reaction: true },
+      ),
       spellHealing("war_caster_somatic", {
         label: "Somatic Components: cast with weapons or Shield in hands",
       }),

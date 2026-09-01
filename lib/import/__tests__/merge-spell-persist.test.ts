@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { mergeIncomingSpellsWithExisting } from "@/lib/import/merge-spell-persist"
+import {
+  mergeIncomingSpellsWithExisting,
+  spellRowsToUpsertForClassLists,
+} from "@/lib/import/merge-spell-persist"
 
 describe("mergeIncomingSpellsWithExisting", () => {
   it("unions class tags and keeps the richer SRD write-up", () => {
@@ -23,7 +26,7 @@ describe("mergeIncomingSpellsWithExisting", () => {
     const [merged] = mergeIncomingSpellsWithExisting(incoming, existing)
     expect(merged.id).toBe("srd-alarm")
     expect(merged.description).toBe("Set a magical alarm.")
-    expect(merged.classes).toEqual(["Wizard", "Ranger", "Investigator"])
+    expect(merged.classes).toEqual(["Investigator", "Ranger", "Wizard"])
   })
 
   it("leaves unmatched incoming spells unchanged", () => {
@@ -45,6 +48,31 @@ describe("mergeIncomingSpellsWithExisting", () => {
     expect(merged.id).toBe("srd-disk")
     expect(merged.name).toBe("Tenser's Floating Disk")
     expect(merged.description).toBe("A floating disc of force.")
-    expect(merged.classes).toEqual(["Wizard", "Investigator"])
+    expect(merged.classes).toEqual(["Investigator", "Wizard"])
+  })
+})
+
+describe("spellRowsToUpsertForClassLists", () => {
+  it("patches linked catalog rows from the class spell_list", () => {
+    const { catalogPatches, incoming } = spellRowsToUpsertForClassLists({
+      existingSpells: [
+        {
+          id: "srd-alarm",
+          name: "Alarm",
+          description: "Set a magical alarm.",
+          classes: ["Wizard", "Ranger"],
+        },
+      ],
+      incomingClasses: [{ name: "Inventor", spell_list: ["Alarm", "Grease"] }],
+      incomingSpells: [],
+    })
+    expect(incoming).toEqual([])
+    expect(catalogPatches).toEqual([
+      expect.objectContaining({
+        id: "srd-alarm",
+        description: "Set a magical alarm.",
+        classes: ["Inventor", "Ranger", "Wizard"],
+      }),
+    ])
   })
 })

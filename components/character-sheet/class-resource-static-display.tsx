@@ -1,5 +1,6 @@
 "use client"
 
+import { GameIcon } from "@/components/game-icon-picker"
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import {
   deriveClassResourceDisplay,
@@ -15,6 +16,7 @@ export type StaticResourceEntry = {
   name: string
   resource: ClassResource
   classLevel: number
+  icon?: string | null
 }
 
 type ClassResourceStaticDisplayProps = {
@@ -66,6 +68,9 @@ export function ClassResourceStaticDisplay({
                   key={entry.id}
                   className="inline-flex items-center gap-2 rounded-lg border border-border/70 bg-muted/25 px-2.5 py-1.5"
                 >
+                  {entry.icon ? (
+                    <GameIcon name={entry.icon} className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  ) : null}
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {entry.name}
                   </span>
@@ -112,6 +117,7 @@ export function partitionResourceTrackerEntries(
         name: entry.name,
         resource,
         classLevel: entry.classLevel,
+        icon: entry.icon,
       })
     }
   }
