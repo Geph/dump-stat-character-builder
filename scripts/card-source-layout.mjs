@@ -59,6 +59,7 @@ export function parseSpellCardSourceBase(base) {
 }
 
 const CLASS_PREFIXES = [
+  "Alchemist",
   "Artificer",
   "Inventor",
   "Occultist",
@@ -79,8 +80,23 @@ const CLASS_PREFIXES = [
   "Necromancer",
 ].sort((a, b) => b.length - a.length)
 
+/** Unprefixed drop names (Mage Hand Press Alchemist) → parent class. */
+const UNPREFIXED_SUBCLASS_CLASS = {
+  Amorist: "Alchemist",
+  Apothecary: "Alchemist",
+  "Dynamo Engineer": "Alchemist",
+  Mutagenist: "Alchemist",
+  "Ooze Rancher": "Alchemist",
+  "Slime Rancher": "Alchemist",
+  Venomsmith: "Alchemist",
+  Xenoalchemist: "Alchemist",
+}
+
 /** Short filename remainder → official display name, keyed by class. */
 const SUBCLASS_SHORT_TO_DISPLAY = {
+  Alchemist: {
+    "Slime Rancher": "Ooze Rancher",
+  },
   Barbarian: {
     Berserker: "Path of the Berserker",
     "Wild Heart": "Path of the Wild Heart",
@@ -197,6 +213,15 @@ export function subclassItemSlug(displayName) {
   return kebabSlug(displayName)
 }
 
+function impliedClassForUnprefixedSubclass(trimmed) {
+  const exact = UNPREFIXED_SUBCLASS_CLASS[trimmed]
+  if (exact) return exact
+  const key = Object.keys(UNPREFIXED_SUBCLASS_CLASS).find(
+    (name) => name.toLowerCase() === trimmed.toLowerCase(),
+  )
+  return key ? UNPREFIXED_SUBCLASS_CLASS[key] : null
+}
+
 export function parseSubclassSourceBasename(basename) {
   const trimmed = String(basename ?? "").trim()
   if (!trimmed) return null
@@ -206,7 +231,11 @@ export function parseSubclassSourceBasename(basename) {
       trimmed.startsWith(`${name} `) ||
       trimmed.toLowerCase().startsWith(`${name.toLowerCase()} `),
   )
-  if (!prefix) return null
+  if (!prefix) {
+    const impliedClass = impliedClassForUnprefixedSubclass(trimmed)
+    if (impliedClass) return parseSubclassSourceBasename(`${impliedClass} ${trimmed}`)
+    return null
+  }
   const remainder = trimmed.slice(prefix.length).trim()
   if (!remainder) return null
   const display =

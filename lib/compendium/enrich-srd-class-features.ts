@@ -5205,7 +5205,18 @@ const SRD_CLASS_FEATURE_MODIFIER_PRESETS: Record<string, ClassFeatureModifierPre
     ],
   },
   "*::Keeper of History": [
-    skillChoice(2, "History and Performance (Expertise if already proficient)", true),
+    charInstance("modinst_keeper_of_history", FEAT_MODIFIER_CATALOG.skills, [
+      {
+        id: modId("keeper_of_history"),
+        type: "skills",
+        entries: [
+          { skill: "History", expertise: false },
+          { skill: "Performance", expertise: false },
+        ],
+        expertiseIfProficient: true,
+        label: "History and Performance (Expertise if already proficient)",
+      },
+    ]),
   ],
   "*::Commanding Voice": {
     linkedModifiers: [

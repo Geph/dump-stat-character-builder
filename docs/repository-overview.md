@@ -208,10 +208,10 @@ Optional **Seed Example Content** packs, kept separate from SRD seed. See `lib/s
 | `scripts/build-srd-seed.mjs` (via `pnpm srd:build`) | Download CC-BY SRD markdown → `lib/srd/seed-data/` |
 | `scripts/homebrew-import-ops.ts` | Audit / merge Drive import JSON |
 | `scripts/build-example-seed-packs.ts` | Rebuild publisher example packs from local Drive JSON |
-| `scripts/*-card-sources/` | Full-resolution card art drop folders (**gitignored** except README). `pnpm images:optimize` writes `public/images/compendium/`; only SRD / Mage Hand Press outputs are committed. Kibbles art stays local |
+| `scripts/*-card-sources/` | Full-resolution card art drop folders (**gitignored** except README). `pnpm images:optimize` writes `public/images/compendium/`; only SRD outputs are committed. Mage Hand Press and Kibbles art stay local |
 | `scripts/page-bg-sources/` | Theme / marketing image sources (gitignored); outputs under `public/images/` |
 | `public/icons/` | game-icons.net SVGs + `manifest.json` |
-| `public/images/compendium/` | Optimized card defaults. GitHub has SRD + Mage Hand Press (and leftover historical Kibbles files). New Kibbles / setting portraits stay local |
+| `public/images/compendium/` | Optimized card defaults. GitHub has SRD (and leftover historical files). New Mage Hand Press / Kibbles / setting portraits stay local |
 
 ---
 
@@ -277,7 +277,7 @@ Enrichment packs under `lib/import/enrichment-presets/packs/` are Dump Stat wiri
 
 - **Custom art the user attaches** (upload or URL) stays on that user’s data. Image-only import updates `card_image_url` and does not rewrite rules.
 - **Full-resolution drop folders** (`scripts/*-card-sources/`, `scripts/page-bg-sources/`) are gitignored.
-- **Optimized card art on GitHub** is limited to **SRD** and **Mage Hand Press** (plus already-shipped species / SRD subclass portraits). **Kibbles Tasty** art is local-only: it is not part of Seed Example Content. Import review and persist attach `/images/compendium/…` when the PNG exists on this machine. Leftover Kibbles files may remain in git history — do not add new ones or rewrite history to remove them. PHB / Eberron / Ravenloft / Faerûn / other setting portraits still optimize locally (`pnpm images:optimize`) and stay gitignored. See the README “Local card art” section.
+- **Optimized card art on GitHub** is limited to **SRD** (plus already-shipped species / SRD subclass portraits). **Mage Hand Press** and **Kibbles Tasty** art are local-only: they are not part of Seed Example Content. Import review and persist attach `/images/compendium/…` when the PNG exists on this machine. Leftover files may remain in git history — do not add new ones or rewrite history to remove them. PHB / Eberron / Ravenloft / Faerûn / other setting portraits still optimize locally (`pnpm images:optimize`) and stay gitignored. See the README “Local card art” section.
 - **Leftover remote WotC dumpstat hosts** (`/dumpstat/wotc/…`) are treated as old defaults and replaced or cleared (`lib/compendium/card-image.ts`). User-hosted paths such as `/dumpstat/images/…` are kept.
 - Bundled `/images/compendium/…` portraits that *are* committed are **local UI defaults**, not SRD rules text. Users can attach their own licensed art on import.
 

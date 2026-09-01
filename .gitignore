@@ -54,7 +54,7 @@ scripts/spell-card-sources/*
 !scripts/spell-card-sources/.gitkeep
 
 # Non-bundled origin folders (PHB, settings books, extras) — never commit, even if
-# someone later un-ignores the drop folders above. Keep SRD / magehandpress.
+# someone later un-ignores the drop folders above. Keep SRD origins only.
 scripts/**/PHB/
 scripts/**/phb/
 scripts/**/WotC/

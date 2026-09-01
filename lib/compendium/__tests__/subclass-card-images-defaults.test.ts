@@ -269,6 +269,27 @@ describe("subclass card images", () => {
     )
   })
 
+  it("maps Mage Hand Press Alchemist art locally, including Slime Rancher → Ooze Rancher", () => {
+    expectDefaultSubclassCardImage(
+      "Amorist",
+      "Alchemist",
+      /\/images\/compendium\/subclasses\/alchemist\/amorist\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Ooze Rancher",
+      "Alchemist",
+      /\/images\/compendium\/subclasses\/alchemist\/ooze-rancher\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Slime Rancher",
+      "Alchemist",
+      /\/images\/compendium\/subclasses\/alchemist\/ooze-rancher\.png$/,
+    )
+    expect(
+      isBundledPublicCardArtPath("public/images/compendium/subclasses/alchemist/ooze-rancher.png"),
+    ).toBe(false)
+  })
+
   it("applies named card art on non-SRD imports (Inventor / Psion / Occultist / Warden)", () => {
     const gadgetsmith = enrichSrdSubclassRow(
       { name: "Gadgetsmith", source: "KibblesTasty Inventor", features: [] },

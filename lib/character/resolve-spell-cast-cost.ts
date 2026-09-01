@@ -17,7 +17,10 @@ import {
 } from "@/lib/builder/catalog-feat-options"
 import { abilityGrantsMetamagicFeat, isManipulateMagicAbility } from "@/lib/compendium/enrich-manipulate-magic"
 import { METAMAGIC_OPTIONS_CATALOG_ID } from "@/lib/compendium/system-option-catalogs"
+import { inferMetamagicEffectHint, type MetamagicEffectHint } from "@/lib/character/spell-cast-mutations"
 import type { CustomAbility, DndClass, Feat } from "@/lib/types"
+
+export type { MetamagicEffectHint }
 
 export type MetamagicCastOption = {
   id: string
@@ -26,8 +29,8 @@ export type MetamagicCastOption = {
   cost: number
   /** Hit Point Dice spent when this option is used (Mortal Metamagic). */
   hitDiceCost?: number
-  /** Sheet helper after cast (Empowered Spell damage rerolls). */
-  effectHint?: "empowered_reroll" | "quicken" | null
+  /** Sheet helper after cast (Empowered Spell damage rerolls, Distant range, …). */
+  effectHint?: MetamagicEffectHint
   /** Hedge Mage Manipulate Magic: never spends sorcery points. */
   costSource?: "sorcery_points" | "manipulate_magic"
   /** Extra spell slot to spend when the free ≤3 SP use does not apply. */
@@ -112,6 +115,7 @@ export function metamagicOptionsFromFeats(
       id: feat.id,
       name: feat.name,
       cost: parseMetamagicCost(null, feat.description, spellLevel),
+      effectHint: inferMetamagicEffectHint(feat.name),
     }))
 }
 
@@ -131,6 +135,7 @@ export function metamagicOptionsFromCustomAbilities(
       id: ability.id,
       name: ability.name,
       cost: parseMetamagicCost(null, ability.description, spellLevel),
+      effectHint: inferMetamagicEffectHint(ability.name),
     })
   }
   return options
@@ -182,6 +187,7 @@ export function metamagicOptionsForCharacter(params: {
       cost: fromRite ? 0 : originalCost,
       costSource: fromRite ? "manipulate_magic" : undefined,
       extraSpellSlotLevel: fromRite && originalCost > 3 ? originalCost : undefined,
+      effectHint: inferMetamagicEffectHint(entry.name),
     })
     seen.add(pickId)
   }
@@ -245,11 +251,7 @@ export function mortalMetamagicOptionsFromFeatures(
             name,
             cost: 0,
             hitDiceCost,
-            effectHint: /empowered/i.test(name)
-              ? "empowered_reroll"
-              : /quickened/i.test(name)
-                ? "quicken"
-                : null,
+            effectHint: inferMetamagicEffectHint(name),
           })
         }
       }

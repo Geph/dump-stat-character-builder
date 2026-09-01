@@ -1,10 +1,11 @@
 /**
- * Card art that may be committed / pushed: SRD (and Mage Hand Press when allowed),
- * plus original species portraits already on GitHub. Keep in sync with
- * `scripts/bundled-card-art.mjs` (optimizer / gitignore source of truth).
+ * Card art that may be committed / pushed: SRD only, plus original species
+ * portraits already on GitHub. Keep in sync with `scripts/bundled-card-art.mjs`
+ * (optimizer / gitignore source of truth).
  *
- * Kibbles Tasty art is local-only — import assigns it when the PNG is present.
- * Do not add new Kibbles files. Leftover copies may remain in git history.
+ * Mage Hand Press and Kibbles Tasty art are local-only — import assigns them
+ * when the PNG is present. Do not add new local portraits. Leftover copies
+ * may remain in git history.
  */
 
 const BUNDLED_CLASS_FILES = new Set([

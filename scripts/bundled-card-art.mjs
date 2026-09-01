@@ -1,17 +1,13 @@
 /**
- * Card art that may be committed / pushed: SRD (and Mage Hand Press when allowed),
- * plus original species portraits already on GitHub. New local portraits
- * (Kibbles, PHB, settings) optimize locally and stay gitignored.
- * Do not `git add` new Kibbles files; leftover copies may remain in git history.
+ * Card art that may be committed / pushed: SRD only, plus original species
+ * portraits already on GitHub. Mage Hand Press, Kibbles, PHB, and setting
+ * portraits optimize locally and stay gitignored.
+ * Do not `git add` new local portraits; leftover copies may remain in git history.
  */
 
 const BUNDLED_CARD_SOURCE_ORIGINS = new Set([
   "srd",
   "srd cantrips",
-  "magehandpress",
-  "mage-hand-press",
-  "mage hand press",
-  "mhp",
 ])
 
 const BUNDLED_CLASS_FILES = new Set([

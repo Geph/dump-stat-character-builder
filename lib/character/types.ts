@@ -204,6 +204,7 @@ export type DerivedCharacter = {
   /** Extra-turn rules (Thief's Reflexes, etc) — informational; no turn-order simulation exists. */
   extraTurns: import("@/lib/compendium/characteristic-modifiers").ExtraTurnCharacteristic[]
   healingReceivedModifiers: import("@/lib/compendium/characteristic-modifiers").HealingReceivedModifierCharacteristic[]
+  spellHealingModifiers: import("@/lib/compendium/characteristic-modifiers").SpellHealingModifierCharacteristic[]
   grantedCustomAbilityNames: string[]
   /** Items unlocked features put in the bag (Investigator Trinkets), by name. */
   grantedEquipment: import("@/lib/compendium/characteristic-modifiers").GrantedEquipmentEntry[]

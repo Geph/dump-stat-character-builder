@@ -5,6 +5,12 @@ import { expandLegacyLimitations, type LimitationSource } from "@/lib/compendium
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import {
+  danceStyleToggleIdForName,
+  defaultDancerDanceStyleToggleIds,
+  isDanceStyleChoiceFeature,
+  isSubclassDanceStyleFeature,
+} from "@/lib/character/dancer-dance-styles"
+import {
   getSheetToggleDefinition,
   sheetToggleIdActivatedByAction,
   type SheetToggleDefinition,
@@ -76,6 +82,13 @@ function collectFromFeatureLike(
     classResourceKey: classResourceKeyFromRow(record),
   })
   if (activated) ids.add(activated)
+  if (isDanceStyleChoiceFeature({ name, choices: record.choices as Feature["choices"] })) {
+    for (const id of defaultDancerDanceStyleToggleIds()) ids.add(id)
+  }
+  if (isSubclassDanceStyleFeature({ name })) {
+    const styleId = danceStyleToggleIdForName(name)
+    if (styleId) ids.add(styleId)
+  }
   const linked = readLinkedModifiers(row as Parameters<typeof readLinkedModifiers>[0], catalog)
   collectFromCharacteristics(
     characteristicsFromLinkedModifiers(catalog, linked, null),

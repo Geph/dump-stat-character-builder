@@ -1114,6 +1114,7 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     movementEffects: aggregatedCharacteristics.movementEffects,
     extraTurns: aggregatedCharacteristics.extraTurns,
     healingReceivedModifiers: aggregatedCharacteristics.healingReceivedModifiers,
+    spellHealingModifiers: aggregatedCharacteristics.spellHealingModifiers,
     grantedCustomAbilityNames: aggregatedCharacteristics.grantedCustomAbilityNames,
     grantedEquipment: aggregatedCharacteristics.grantedEquipment,
     customAbilityModifications: aggregatedCharacteristics.customAbilityModifications,

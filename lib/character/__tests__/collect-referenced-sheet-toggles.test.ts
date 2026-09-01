@@ -88,6 +88,38 @@ describe("collectReferencedSheetToggleIds", () => {
     expect(ids.has("while_dancing")).toBe(true)
   })
 
+  it("includes default Dance Style toggles from the Dance Styles picker", () => {
+    const ids = collectReferencedSheetToggleIds({
+      features: [
+        {
+          level: 2,
+          name: "Dance Styles",
+          description: "When you begin your Dance, choose a Dance Style.",
+          isChoice: true,
+          choices: {
+            category: "Dance Style",
+            count: 1,
+            resourceKey: "dance_styles_known",
+            optionsSource: "class_upgrades",
+            options: [],
+          },
+        } as Feature,
+        {
+          level: 3,
+          name: "Enthralling Movement [Dance Style]",
+          description: "",
+        } as Feature,
+      ],
+      feats: [],
+      catalog: [],
+    })
+    expect(ids.has("dance_style_agile_movement")).toBe(true)
+    expect(ids.has("dance_style_elegant_form")).toBe(true)
+    expect(ids.has("dance_style_retaliatory_swipe")).toBe(true)
+    expect(ids.has("dance_style_spinning_shot")).toBe(true)
+    expect(ids.has("dance_style_enthralling_movement")).toBe(true)
+  })
+
   it("includes first_turn_of_combat from an incoming-attack FeatureEffect", () => {
     const ids = collectReferencedSheetToggleIds({
       features: [

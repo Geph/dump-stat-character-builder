@@ -4,8 +4,11 @@ import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-s
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import {
   enrichWeaponMasteryFeature,
+  formatWeaponMasteryChoiceLabel,
   isWeaponMasteryFeature,
+  masteryNameFromOptionDescription,
   parseWeaponMasteryCountFromDescription,
+  weaponMasteryLabelForOption,
   weaponMasteryOptionsForClass,
 } from "@/lib/compendium/weapon-mastery-choice"
 import type { Equipment, Feature } from "@/lib/types"
@@ -22,6 +25,19 @@ describe("weapon mastery choices", () => {
         "use the mastery properties of three kinds of Simple or Martial weapons",
       ),
     ).toBe(3)
+  })
+
+  it("formats rest-picker labels as Weapon (mastery)", () => {
+    expect(formatWeaponMasteryChoiceLabel("Longsword", "Sap")).toBe("Longsword (Sap)")
+    expect(formatWeaponMasteryChoiceLabel("Longsword", null)).toBe("Longsword")
+    expect(masteryNameFromOptionDescription("Sap — If you hit a creature")).toBe("Sap")
+    expect(masteryNameFromOptionDescription("If you hit a creature, it has Disadvantage.")).toBeNull()
+
+    const options = weaponMasteryOptionsForClass("Fighter")
+    const longsword = options.find((option) => option.name === "Longsword")
+    expect(longsword).toBeDefined()
+    expect(weaponMasteryLabelForOption(longsword!)).toBe("Longsword (Sap)")
+    expect(weaponMasteryLabelForOption({ name: "Greataxe" })).toBe("Greataxe (Cleave)")
   })
 
   it("offers melee weapon options for Barbarian", () => {

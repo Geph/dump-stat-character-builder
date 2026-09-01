@@ -1198,9 +1198,10 @@ export interface OnCastSpellTriggerCharacteristic extends CharacteristicModifier
 
 /**
  * Authored (e.g. Life Domain's Disciple of Life) and aggregated into
- * `AggregatedCharacteristics.spellHealingModifiers`, but not yet consumed anywhere — the app has
- * no "resolve a healing spell" calculator to apply the bonus to. See
- * docs/modifier-vs-feature-effect.md ("Known gaps") before wiring a consumer.
+ * `AggregatedCharacteristics.spellHealingModifiers`. Applied by
+ * `applySpellHealingModifiers` when a heal amount and spell level are known
+ * (feature heals with a slot level, or a parsed healing-spell overlay apply).
+ * `Spell` still has no structured healing field — this is not a full spell HP engine.
  */
 export interface SpellHealingModifierCharacteristic extends CharacteristicModifierBase {
   type: "spell_healing_modifier"

@@ -19,6 +19,7 @@ import {
   type SheetActionMenuOption,
   type SheetActionTalentAlert,
 } from "@/lib/character/sheet-actions"
+import { formatActionSpendLabel } from "@/lib/character/action-spend-label"
 import { formatSheetActionUseBonusLines } from "@/lib/character/action-use-bonuses"
 import {
   isResourceDieBonusConfig,
@@ -28,6 +29,7 @@ import {
 import { grantsExtraWeaponAttack } from "@/lib/character/weapon-attack-actions"
 import { talentAlertAppliesToVariant } from "@/lib/character/alchemist-bomb-sheet"
 import {
+  END_WEAPON_MORPH_TOGGLE_ID,
   getSheetToggleDefinition,
   guardianTacticsToggleIdForOption,
   sheetToggleIdActivatedByAction,
@@ -118,6 +120,8 @@ type SheetActionsPanelProps = {
   onRefundHitPoints?: (amount: number) => void
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
   onActivateSheetToggle?: (toggleId: string, note?: string) => void
+  /** Flip a reminder-owned sheet toggle (e.g. first turn of combat). */
+  onToggleSheetToggle?: (toggleId: string) => void
   /** Spawn a Projected Self / Imaginary Ally play-state token. */
   onSpawnIllusionToken?: (kind: IllusionTokenKind) => void
   /** Grant a Flesh Warp Mutation Die (Perfected / Muscular from selected augments). */
@@ -340,7 +344,7 @@ function formatSheetActionCostMeta(
     const mult = amount > 1 ? `${amount} × ` : ""
     return `up to ${mult}${ability} mod ${resourceName}`
   }
-  return `${amount} ${resourceName}`
+  return formatActionSpendLabel(amount, resourceName, entry.name)
 }
 
 function dieSides(dieType: string): number {
@@ -787,6 +791,7 @@ function ActionDetailOverlay({
   onSpendHitPoints,
   onRefundHitPoints,
   onActivateSheetToggle,
+  onToggleSheetToggle,
   onSpawnIllusionToken,
   onGrantMutationDie,
   onMarkEconomy,
@@ -823,6 +828,7 @@ function ActionDetailOverlay({
   initialEconomyKind = null,
   knownSpells = [],
   onCastSpellChoice,
+  siblingActions = [],
 }: {
   action: SheetActionEntry
   usage: ActionUsage | null
@@ -836,6 +842,7 @@ function ActionDetailOverlay({
   onRefundHitPoints?: (amount: number) => void
   /** Activate a sheet toggle when a menu option is used (e.g. Guardian Tactics Block). */
   onActivateSheetToggle?: (toggleId: string, note?: string) => void
+  onToggleSheetToggle?: (toggleId: string) => void
   onSpawnIllusionToken?: (kind: IllusionTokenKind) => void
   onGrantMutationDie?: (opts: {
     autoApplyStrength: boolean
@@ -881,9 +888,18 @@ function ActionDetailOverlay({
   initialEconomyKind?: ActionEconomyKind | null
   knownSpells?: Spell[]
   onCastSpellChoice?: (spell: Spell, choice: SheetCastSpellChoice) => void
+  siblingActions?: SheetActionEntry[]
 }) {
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
-  const [step, setStep] = useState<"detail" | "roll" | "target" | "spell" | "style">("detail")
+  const [step, setStep] = useState<"detail" | "roll" | "target" | "spell" | "style" | "active">(
+    "detail",
+  )
+  const [stanceConfirmation, setStanceConfirmation] = useState<{
+    title: string
+    duration?: string | null
+    modes: { name: string; description?: string | null }[]
+    unlocked: { name: string; description?: string | null }[]
+  } | null>(null)
   const [selectedActivationNames, setSelectedActivationNames] = useState<string[]>([])
   const [useFeedback, setUseFeedback] = useState<string | null>(null)
   const [parentUsedThisOpen, setParentUsedThisOpen] = useState(false)
@@ -969,6 +985,13 @@ function ActionDetailOverlay({
     !requiredToggleId || Boolean(rollCtx.activeSheetToggles?.has(requiredToggleId))
   const requiredToggleLabel = requiredToggleId
     ? getSheetToggleDefinition(requiredToggleId)?.label ?? requiredToggleId.replace(/_/g, " ")
+    : null
+  const reminderToggleId = action.activatesSheetToggle?.trim() || null
+  const reminderToggleActive = reminderToggleId
+    ? Boolean(rollCtx.activeSheetToggles?.has(reminderToggleId))
+    : false
+  const reminderToggleLabel = reminderToggleId
+    ? getSheetToggleDefinition(reminderToggleId)?.label ?? reminderToggleId.replace(/_/g, " ")
     : null
   const selectedOption = menuOptions.find((option) => option.name === selectedMenuOption)
   const showEconomyPicker = economyChoices.length > 1 && menuOptions.length === 0
@@ -1105,8 +1128,13 @@ function ActionDetailOverlay({
     if (option?.actionKind) extras.push(ACTION_KIND_LABELS[option.actionKind])
     else if (showEconomyPicker) extras.push(ACTION_KIND_LABELS[selectedEconomyKind])
     if (usage && action.classResourceKey) {
-      if (optionResource < 0) extras.push(`refund ${Math.abs(optionResource)} ${usage.resourceName ?? "resource"}`)
-      else if (optionResource > 0) extras.push(`${optionResource} ${usage.resourceName ?? "resource"}`)
+      const spend = formatActionSpendLabel(
+        optionResource,
+        usage.resourceName ?? "resource",
+        action.name,
+      )
+      if (optionResource < 0) extras.push(`refund ${spend}`)
+      else if (optionResource > 0) extras.push(spend)
     }
     if (empower && empowerApplied > 0) {
       extras.push(`+${empowerResourceCost} ${empowerPool?.resourceName ?? "resource"}`)
@@ -1120,6 +1148,7 @@ function ActionDetailOverlay({
   useEffect(() => {
     setAugmentSelections([])
     setStep("detail")
+    setStanceConfirmation(null)
     setSelectedActivationNames([])
     setUseFeedback(null)
     setParentUsedThisOpen(false)
@@ -1338,18 +1367,65 @@ function ActionDetailOverlay({
       morphToggleId ??
       (option ? guardianTacticsToggleIdForOption(option.name) : null) ??
       sheetToggleIdActivatedByAction(action)
+    const activatedToggleIds: string[] = []
     if (toggleId && onActivateSheetToggle) {
       const styleNote = pickedStyles.length ? pickedStyles.join(" + ") : undefined
       onActivateSheetToggle(toggleId, styleNote)
-      parts.push(toggleId === "__end_weapon_morph__" ? "Morph ended" : "Toggle on")
+      parts.push(toggleId === END_WEAPON_MORPH_TOGGLE_ID ? "Morph ended" : "Toggle on")
+      if (toggleId !== END_WEAPON_MORPH_TOGGLE_ID) activatedToggleIds.push(toggleId)
       for (const styleName of pickedStyles) {
-        const styleToggle = stylePicks?.options.find((option) => option.name === styleName)
+        const styleToggle = stylePicks?.options.find((entry) => entry.name === styleName)
           ?.sheetToggleId
         if (styleToggle && styleToggle !== toggleId) {
           onActivateSheetToggle(styleToggle)
+          activatedToggleIds.push(styleToggle)
         }
       }
       if (styleNote) parts.push(styleNote)
+      if (option && !pickedStyles.length) {
+        const optionToggle =
+          weaponMorphToggleIdForOption(option.name) ??
+          guardianTacticsToggleIdForOption(option.name)
+        if (optionToggle && optionToggle !== END_WEAPON_MORPH_TOGGLE_ID) {
+          activatedToggleIds.push(optionToggle)
+        }
+      }
+    }
+
+    const showStanceActive = () => {
+      if (!activatedToggleIds.length) {
+        setStep("detail")
+        return
+      }
+      const parentLabel =
+        getSheetToggleDefinition(activatedToggleIds[0] ?? "")?.label ?? action.name
+      const modes = pickedStyles.length
+        ? pickedStyles.map((name) => {
+            const pick = stylePicks?.options.find((entry) => entry.name === name)
+            return { name, description: pick?.description ?? null }
+          })
+        : option
+          ? [{ name: option.name, description: option.description ?? null }]
+          : []
+      const unlockedIds = new Set(activatedToggleIds)
+      const unlocked = siblingActions
+        .filter(
+          (entry) =>
+            entry.id !== action.id &&
+            entry.requiresSheetToggle &&
+            unlockedIds.has(entry.requiresSheetToggle),
+        )
+        .map((entry) => ({
+          name: entry.name,
+          description: entry.description ?? null,
+        }))
+      setStanceConfirmation({
+        title: parentLabel,
+        duration: action.duration ?? null,
+        modes,
+        unlocked,
+      })
+      setStep("active")
     }
 
     const actionName = action.name.trim().toLowerCase()
@@ -1454,7 +1530,7 @@ function ActionDetailOverlay({
         setStep("roll")
         return
       }
-      setStep("detail")
+      showStanceActive()
       return
     }
 
@@ -1464,7 +1540,7 @@ function ActionDetailOverlay({
     }
 
     setUseFeedback(parts.join(" · ") || "Used!")
-    setStep("detail")
+    showStanceActive()
   }
 
   const handleAlsoActivate = (
@@ -1833,6 +1909,56 @@ function ActionDetailOverlay({
                 ))}
               </div>
             )}
+          </div>
+        ) : step === "active" && stanceConfirmation ? (
+          <div className="p-4 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-primary">Now active</p>
+            <h3 className="text-lg font-black text-foreground">{stanceConfirmation.title}</h3>
+            {stanceConfirmation.duration ? (
+              <p className="text-sm text-muted-foreground">Lasts {stanceConfirmation.duration}</p>
+            ) : null}
+            {stanceConfirmation.modes.map((mode) => (
+              <div
+                key={mode.name}
+                className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2"
+              >
+                <div className="text-sm font-bold text-foreground">{mode.name}</div>
+                {mode.description ? (
+                  <p className="mt-1 text-sm leading-snug text-muted-foreground">
+                    {mode.description}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+            {stanceConfirmation.unlocked.length ? (
+              <div className="space-y-1.5">
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Now on your sheet
+                </p>
+                <ul className="list-disc space-y-1 pl-4">
+                  {stanceConfirmation.unlocked.map((entry) => (
+                    <li key={entry.name} className="text-sm leading-snug text-foreground">
+                      {entry.name}
+                      {entry.description ? (
+                        <span className="block text-xs text-muted-foreground">
+                          {entry.description}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {useFeedback ? (
+              <p className="text-xs text-muted-foreground">{useFeedback}</p>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full rounded-lg border border-border bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            >
+              Done
+            </button>
           </div>
         ) : step === "style" && action.activationPicks ? (
           <div className="p-4 space-y-3">
@@ -2554,6 +2680,24 @@ function ActionDetailOverlay({
                 )
               })}
             </div>
+            ) : action.reminderOnly && reminderToggleId && onToggleSheetToggle ? (
+            <div className="sticky bottom-0 space-y-2 border-t border-border bg-card/95 p-4 backdrop-blur-sm">
+              <button
+                type="button"
+                aria-pressed={reminderToggleActive}
+                onClick={() => onToggleSheetToggle(reminderToggleId)}
+                className={cn(
+                  "w-full rounded-xl px-4 py-3 text-sm font-bold transition-colors",
+                  reminderToggleActive
+                    ? "border border-destructive/40 bg-destructive/15 text-destructive hover:bg-destructive/20"
+                    : "bg-primary px-4 py-3 text-primary-foreground hover:bg-primary/90",
+                )}
+              >
+                {reminderToggleActive
+                  ? `End ${reminderToggleLabel}`
+                  : `Enable ${reminderToggleLabel}`}
+              </button>
+            </div>
             ) : null}
           </>
         )}
@@ -2577,6 +2721,7 @@ export function SheetActionsPanel({
   onSpendHitPoints,
   onRefundHitPoints,
   onActivateSheetToggle,
+  onToggleSheetToggle,
   onSpawnIllusionToken,
   onGrantMutationDie,
   onMarkEconomy,
@@ -2802,6 +2947,12 @@ export function SheetActionsPanel({
   const triggeredEntries: SheetActionEntry[] = []
   const weaponAttackEntries: SheetActionEntry[] = []
   for (const entry of actions) {
+    if (
+      entry.requiresSheetToggle &&
+      !rollCtx.activeSheetToggles?.has(entry.requiresSheetToggle)
+    ) {
+      continue
+    }
     if (entry.trigger) {
       if (!triggeredEntries.some((existing) => existing.id === entry.id)) {
         triggeredEntries.push(entry)
@@ -2890,6 +3041,10 @@ export function SheetActionsPanel({
       .filter(Boolean)
       .join(" · ")
     const showOwnUses = Boolean(usage && !usesClassResource)
+    const reminderToggleOn = Boolean(
+      entry.activatesSheetToggle &&
+        rollCtx.activeSheetToggles?.has(entry.activatesSheetToggle),
+    )
 
     return (
       <div
@@ -2926,6 +3081,7 @@ export function SheetActionsPanel({
         className={cn(
           "relative flex min-w-0 flex-col gap-1 rounded border px-2.5 py-1.5",
           usesClassResource ? SHEET_ACTION_CARD.classResource : SHEET_ACTION_CARD.default,
+          reminderToggleOn && "border-destructive/40 bg-destructive/10",
           interactive &&
             (usesClassResource
               ? cn("cursor-pointer transition-colors", SHEET_ACTION_CARD.classResourceHover)
@@ -3218,6 +3374,7 @@ export function SheetActionsPanel({
           <ActionDetailOverlay
             key="action-detail"
             action={openAction}
+            siblingActions={actions}
             usage={usageFor(openAction)}
             psiLimit={psiLimit}
             availablePsiPoints={availablePsiPoints}
@@ -3228,6 +3385,7 @@ export function SheetActionsPanel({
             onSpendHitPoints={onSpendHitPoints}
             onRefundHitPoints={onRefundHitPoints}
             onActivateSheetToggle={onActivateSheetToggle}
+            onToggleSheetToggle={onToggleSheetToggle}
             onSpawnIllusionToken={onSpawnIllusionToken}
             onGrantMutationDie={onGrantMutationDie}
             onMarkEconomy={onMarkEconomy}

@@ -21,6 +21,16 @@ import type {
   MetamagicCastOption,
   ResolvedSpellCastCost,
 } from "@/lib/character/resolve-spell-cast-cost"
+import { applySpellDisplayMutations } from "@/lib/character/spell-cast-mutations"
+import {
+  applySpellHealingModifiers,
+  formatSpellHealingNotes,
+  looksLikeHealingSpell,
+  parseSpellHealingExpression,
+  shouldMaximizeHealingDice,
+} from "@/lib/character/apply-heal-modifiers"
+import { rollDice } from "@/lib/dice/roll-die"
+import type { SpellHealingModifierCharacteristic } from "@/lib/compendium/characteristic-modifiers"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { formatD20RollSummary, rollD20WithMode } from "@/lib/dice/d20-roll"
 import { useSheetRollContext } from "@/components/character-sheet/sheet-roll-context"
@@ -67,6 +77,9 @@ type SpellDetailOverlayProps = {
   createdSlotLevel?: number | null
   maxCreatedSlotLevel?: number | null
   onCreatedSlotLevelChange?: (level: number) => void
+  spellcastingMod?: number
+  spellHealingModifiers?: SpellHealingModifierCharacteristic[]
+  onApplySelfHeal?: (amount: number) => void
 }
 
 export function SpellDetailOverlay({
@@ -88,6 +101,9 @@ export function SpellDetailOverlay({
   createdSlotLevel = null,
   maxCreatedSlotLevel = null,
   onCreatedSlotLevelChange,
+  spellcastingMod = 0,
+  spellHealingModifiers = [],
+  onApplySelfHeal,
 }: SpellDetailOverlayProps) {
   const [castFeedback, setCastFeedback] = useState<string | null>(null)
   const [concentrationWarningOpen, setConcentrationWarningOpen] = useState(false)
@@ -116,6 +132,21 @@ export function SpellDetailOverlay({
     (row) => row.effectHint === "empowered_reroll",
   )
   const hasQuickened = selectedMetamagicOptions.some((row) => row.effectHint === "quicken")
+  const effectiveSpellLevel = createdSlotLevel ?? slotLevel ?? spell.level
+  const mutatedDisplay = applySpellDisplayMutations(
+    {
+      range: spell.range,
+      duration: spell.duration,
+      components: spell.components,
+    },
+    selectedMetamagicOptions.map((row) => row.effectHint ?? null),
+  )
+  const healingNotes = looksLikeHealingSpell(spell.description)
+    ? formatSpellHealingNotes(spellHealingModifiers, effectiveSpellLevel)
+    : []
+  const parsedHealing = looksLikeHealingSpell(spell.description)
+    ? parseSpellHealingExpression(spell.description)
+    : null
   const freeCastTrackingKey = freeCast?.trackingKey
   const freeCastRemaining = freeCast?.remaining ?? 0
   const freeCastAvailable = freeCastRemaining > 0
@@ -233,6 +264,9 @@ export function SpellDetailOverlay({
     if (hasQuickened) {
       feedbackParts.push("Quickened: Bonus Action this cast")
     }
+    if (mutatedDisplay.notes.length) {
+      feedbackParts.push(...mutatedDisplay.notes)
+    }
     if (hasEmpowered) {
       feedbackParts.push("Empowered: reroll damage dice below")
       setShowEmpoweredReroll(true)
@@ -299,22 +333,40 @@ export function SpellDetailOverlay({
                 <dd className="text-foreground">{spell.casting_time}</dd>
               </>
             )}
-            {spell.range && (
+            {(mutatedDisplay.range || spell.range) && (
               <>
                 <dt className="text-muted-foreground">Range</dt>
-                <dd className="text-foreground">{spell.range}</dd>
+                <dd className="text-foreground">
+                  {mutatedDisplay.range ?? spell.range}
+                  {mutatedDisplay.range && mutatedDisplay.range !== spell.range ? (
+                    <span className="block text-[11px] text-muted-foreground">was {spell.range}</span>
+                  ) : null}
+                </dd>
               </>
             )}
-            {spell.duration && (
+            {(mutatedDisplay.duration || spell.duration) && (
               <>
                 <dt className="text-muted-foreground">Duration</dt>
-                <dd className="text-foreground">{spell.duration}</dd>
+                <dd className="text-foreground">
+                  {mutatedDisplay.duration ?? spell.duration}
+                  {mutatedDisplay.duration && mutatedDisplay.duration !== spell.duration ? (
+                    <span className="block text-[11px] text-muted-foreground">was {spell.duration}</span>
+                  ) : null}
+                </dd>
               </>
             )}
-            {spell.components?.length ? (
+            {mutatedDisplay.targetsNote ? (
+              <>
+                <dt className="text-muted-foreground">Targets</dt>
+                <dd className="text-foreground">{mutatedDisplay.targetsNote}</dd>
+              </>
+            ) : null}
+            {(mutatedDisplay.components ?? spell.components)?.length ? (
               <>
                 <dt className="text-muted-foreground">Components</dt>
-                <dd className="text-foreground">{spell.components.join(", ")}</dd>
+                <dd className="text-foreground">
+                  {(mutatedDisplay.components ?? spell.components)!.join(", ")}
+                </dd>
               </>
             ) : null}
             {spell.material && (
@@ -341,6 +393,47 @@ export function SpellDetailOverlay({
               />
             </div>
           )}
+
+          {healingNotes.length || parsedHealing ? (
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 space-y-1">
+              {healingNotes.map((note) => (
+                <p key={note} className="text-xs text-muted-foreground">
+                  {note}
+                </p>
+              ))}
+              {parsedHealing && onApplySelfHeal ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const maximize = shouldMaximizeHealingDice(spellHealingModifiers)
+                    const dice = maximize
+                      ? parsedHealing.diceCount * parsedHealing.dieSides
+                      : rollDice(parsedHealing.diceCount, parsedHealing.dieSides)
+                    const ability = parsedHealing.plusSpellcastingMod ? spellcastingMod : 0
+                    const rolled = dice + ability + parsedHealing.flatBonus
+                    const applied = applySpellHealingModifiers(
+                      Math.max(0, rolled),
+                      spellHealingModifiers,
+                      { spellLevel: effectiveSpellLevel },
+                    )
+                    onApplySelfHeal(applied.amount)
+                    setCastFeedback(
+                      [
+                        `Applied ${applied.amount} HP to self`,
+                        maximize ? "dice maximized" : `${parsedHealing.diceCount}d${parsedHealing.dieSides}`,
+                        ...applied.notes,
+                      ]
+                        .filter(Boolean)
+                        .join(" · "),
+                    )
+                  }}
+                  className="mt-1 text-xs font-semibold text-primary hover:underline"
+                >
+                  Apply parsed heal to self
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {psionicAugments ? (
             <PsionicAugmentPicker

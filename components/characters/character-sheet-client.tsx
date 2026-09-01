@@ -47,6 +47,7 @@ import {
   downloadCharacterExport,
 } from "@/lib/character/character-export-format"
 import { collectPartyAllyCandidates } from "@/lib/character/party-ally-candidates"
+import { applyIncomingHeal } from "@/lib/character/apply-heal-modifiers"
 import {
   normalizePartyCharacterIds,
   normalizePartyRow,
@@ -218,7 +219,10 @@ import {
   resetGrantedSpellFreeCasts,
 } from "@/lib/character/free-cast-spells"
 import { featureChoiceKey } from "@/lib/builder/choices"
-import { isWeaponMasteryFeature } from "@/lib/compendium/weapon-mastery-choice"
+import {
+  isWeaponMasteryFeature,
+  weaponMasteryLabelForOption,
+} from "@/lib/compendium/weapon-mastery-choice"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
 import { collectSelectedCustomAbilityNames } from "@/lib/builder/picked-custom-abilities"
 import { normalizeAsiAllocationsMap } from "@/lib/character/level-up-feat"
@@ -282,6 +286,7 @@ import {
 } from "@/lib/compendium/sheet-toggle-registry"
 import {
   createMutationDieGrant,
+  shouldResetFleshWarpOnLongRest,
   stepMutationDie,
   type MutationDieGrant,
 } from "@/lib/character/mutation-die"
@@ -337,6 +342,8 @@ import { SheetRestButtons } from "@/components/character-sheet/sheet-rest-button
 import { SheetRestChooser } from "@/components/character-sheet/sheet-rest-chooser"
 import { BannerStatusMenu } from "@/components/character-sheet/banner-status-menu"
 import { SheetRestOverlay } from "@/components/character-sheet/sheet-rest-overlay"
+import { SheetToggleEffectsOverlay } from "@/components/character-sheet/sheet-toggle-effects-overlay"
+import { collectActiveSheetToggleEffects } from "@/lib/character/collect-active-toggle-effects"
 import {
   applySheetRest,
   applyInitiativeResourceRecharge,
@@ -684,14 +691,17 @@ function RestSwappableChoiceControl({
         </p>
         {picks.length ? (
           <div className="flex flex-wrap gap-1.5">
-            {picks.map((pick) => (
-              <span
-                key={pick}
-                className="inline-flex rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-foreground"
-              >
-                {pick}
-              </span>
-            ))}
+            {picks.map((pick) => {
+              const option = choices.options?.find((entry) => entry.name === pick)
+              return (
+                <span
+                  key={pick}
+                  className="inline-flex rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-foreground"
+                >
+                  {weaponMasteryLabelForOption(option ?? { name: pick })}
+                </span>
+              )
+            })}
           </div>
         ) : (
           <p className="text-[11px] text-muted-foreground">None chosen yet.</p>
@@ -758,6 +768,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [exhaustionLevel, setExhaustionLevel] = useState(0)
   const [activeSheetToggleIds, setActiveSheetToggleIds] = useState<string[]>([])
   const [sheetToggleNotes, setSheetToggleNotes] = useState<Record<string, string>>({})
+  const [toggleEffectsFocusId, setToggleEffectsFocusId] = useState<string | null>(null)
   const [sessionHydrated, setSessionHydrated] = useState(false)
   const [acFormulaPick, setAcFormulaPick] = useState<string | null>(null)
   const [conditionDropdownOpen, setConditionDropdownOpen] = useState(false)
@@ -1827,6 +1838,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     () =>
       sheetToggleDefinitions.filter(
         (toggle) =>
+          !toggle.hideFromBanner &&
           toggle.id !== "below_half_hp" &&
           toggle.id !== "quarry_marked" &&
           !toggle.id.startsWith("weapon_morph_") &&
@@ -2057,34 +2069,50 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         : inactiveSheetToggleLabel(toggle.label)
       const RagingIcon = active ? Angry : Smile
       const toggleButton = (
-        <button
-          key={toggle.id}
-          type="button"
-          aria-pressed={active}
-          title={toggle.hint}
-          onClick={() => toggleSheetToggle(toggle.id)}
-          className={`min-h-11 w-full shrink-0 whitespace-nowrap rounded-lg border px-3 text-sm font-semibold transition-colors sm:w-auto ${
-            active
-              ? isInnateSorceryToggle
-                ? "border-violet-500/40 bg-violet-500/15 text-violet-800 dark:text-violet-200"
-                : SHEET_BANNER_BUTTON.toggleActive
-              : SHEET_BANNER_BUTTON.toggleIdle
-          }`}
-        >
-          {isRagingToggle ? (
-            <span className="inline-flex items-center gap-1.5">
-              <RagingIcon className="h-4 w-4 shrink-0" aria-hidden />
-              {label}
-            </span>
-          ) : isInnateSorceryToggle ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
-              {label}
-            </span>
-          ) : (
-            label
-          )}
-        </button>
+        <div key={toggle.id} className="relative inline-flex min-h-11 w-full sm:w-auto">
+          <button
+            type="button"
+            aria-pressed={active}
+            title={toggle.hint}
+            onClick={() => toggleSheetToggle(toggle.id)}
+            className={`min-h-11 w-full shrink-0 whitespace-nowrap rounded-lg border px-3 text-sm font-semibold transition-colors ${
+              active ? "pr-10" : ""
+            } ${
+              active
+                ? isInnateSorceryToggle
+                  ? "border-violet-500/40 bg-violet-500/15 text-violet-800 dark:text-violet-200"
+                  : SHEET_BANNER_BUTTON.toggleActive
+                : SHEET_BANNER_BUTTON.toggleIdle
+            }`}
+          >
+            {isRagingToggle ? (
+              <span className="inline-flex items-center gap-1.5">
+                <RagingIcon className="h-4 w-4 shrink-0" aria-hidden />
+                {label}
+              </span>
+            ) : isInnateSorceryToggle ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
+                {label}
+              </span>
+            ) : (
+              label
+            )}
+          </button>
+          {active ? (
+            <button
+              type="button"
+              className="absolute right-0.5 top-1/2 z-10 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-background/40 hover:text-foreground"
+              aria-label={`Current ${toggle.label} effects`}
+              onClick={(event) => {
+                event.stopPropagation()
+                setToggleEffectsFocusId(toggle.id)
+              }}
+            >
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
       )
       if (!toggle.noteLabel) {
         return toggleButton
@@ -2260,9 +2288,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         entries.push({
           id,
           name:
-            classDetails.length > 1 || resources.length > 1
-              ? `${resource.name} (${className})`
-              : resource.name,
+            classDetails.length > 1 ? `${resource.name} (${className})` : resource.name,
           uses: resource.uses,
           classLevel: entry.row.level,
           icon: resolveAttachedClassIcon(entry.class),
@@ -3025,6 +3051,47 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [sheetActions, pinnedSheetActions],
   )
 
+  const toggleEffectsSections = useMemo(() => {
+    if (!toggleEffectsFocusId || !activeSheetToggleIds.includes(toggleEffectsFocusId)) {
+      return []
+    }
+    const remainingByToggleId: Record<string, string | undefined> = {}
+    for (const reminder of durationReminders) {
+      if (reminder.sheetToggleId && reminder.remaining) {
+        remainingByToggleId[reminder.sheetToggleId] = reminder.remaining
+      }
+    }
+    return collectActiveSheetToggleEffects({
+      focusToggleId: toggleEffectsFocusId,
+      activeToggleIds: activeSheetToggleIds,
+      definitions: sheetToggleDefinitions,
+      classDetails,
+      customAbilities: sheetCustomAbilities,
+      extraFeatures: [
+        ...characterFeats,
+        ...(originFeat ? [originFeat] : []),
+        ...(character?.species?.traits ?? []),
+      ],
+      catalog: modifierCatalog,
+      sheetActions,
+      remainingByToggleId,
+      notesByToggleId: sheetToggleNotes,
+    })
+  }, [
+    toggleEffectsFocusId,
+    activeSheetToggleIds,
+    durationReminders,
+    sheetToggleDefinitions,
+    classDetails,
+    sheetCustomAbilities,
+    characterFeats,
+    originFeat,
+    character?.species?.traits,
+    modifierCatalog,
+    sheetActions,
+    sheetToggleNotes,
+  ])
+
   const canRollHitDiceOutsideShortRest = useMemo(() => {
     const featNames = [
       ...characterFeats.map((feat) => feat.name),
@@ -3431,14 +3498,22 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         }
         setUsedHitDiceByClassId(nextHitDice)
         setShortRestHitDiceOpen(false)
-        setFleshWarpAllyBenefitCounts({})
-        setMutationDie(null)
+        if (
+          shouldResetFleshWarpOnLongRest({
+            hasFleshWarpAction: sheetActions.some((action) => /^flesh warp$/i.test(action.name)),
+            mutationDie,
+            allyBenefitCounts: fleshWarpAllyBenefitCounts,
+          })
+        ) {
+          setFleshWarpAllyBenefitCounts({})
+          setMutationDie(null)
+          summary.push("Cleared Mutation Die and Flesh Warp ally benefit counts")
+        }
         if (recovered > 0) {
           summary.push(
             `Regained ${recovered} Hit Die${recovered === 1 ? "" : "ce"} (half your total, minimum 1)`,
           )
         }
-        summary.push("Cleared Mutation Die and Flesh Warp ally benefit counts")
       }
 
       setRestOverlay({ rest, summary })
@@ -3460,6 +3535,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       classDetails,
       usedHitDiceByClassId,
       resourceDieSidesByKey.rampage_die,
+      mutationDie,
+      fleshWarpAllyBenefitCounts,
     ],
   )
 
@@ -3974,9 +4051,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setTempHp((prev) => Math.max(prev, amount))
         return
       }
-      setCurrentHp((hp) => Math.min(sheetMaxHpForHeal, hp + amount))
+      const next = applyIncomingHeal(amount, derived?.healingReceivedModifiers ?? [], {
+        magical: true,
+      })
+      setCurrentHp((hp) => Math.min(sheetMaxHpForHeal, hp + next))
     },
-    [sheetMaxHpForHeal],
+    [derived?.healingReceivedModifiers, sheetMaxHpForHeal],
   )
 
   const applySelfInspiration = useCallback(() => {
@@ -5689,6 +5769,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     onSpendHitPoints={spendHitPointsForAction}
                     onRefundHitPoints={refundHitPointsForAction}
                     onActivateSheetToggle={activateSheetToggle}
+                    onToggleSheetToggle={toggleSheetToggle}
                     onSpawnIllusionToken={spawnIllusionToken}
                     onGrantMutationDie={grantMutationDieFromAction}
                     onMarkEconomy={markActionEconomy}
@@ -5943,6 +6024,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         onSpendHitPoints={spendHitPointsForAction}
                         onRefundHitPoints={refundHitPointsForAction}
                         onActivateSheetToggle={activateSheetToggle}
+                        onToggleSheetToggle={toggleSheetToggle}
                         onSpawnIllusionToken={spawnIllusionToken}
                         onGrantMutationDie={grantMutationDieFromAction}
                         onMarkEconomy={markActionEconomy}
@@ -6838,6 +6920,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             </motion.div>
           </motion.div>
         ) : null}
+        {toggleEffectsFocusId && toggleEffectsSections.length ? (
+          <SheetToggleEffectsOverlay
+            key="toggle-effects"
+            title={`${
+              sheetToggleDefinitions.find((entry) => entry.id === toggleEffectsFocusId)?.label ??
+              "Active"
+            } effects`}
+            sections={toggleEffectsSections}
+            onClose={() => setToggleEffectsFocusId(null)}
+          />
+        ) : null}
         {restOverlay ? (
           <SheetRestOverlay
             key="sheet-rest"
@@ -6866,6 +6959,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             weaponMasteryChoices={
               restOverlay.rest === "long_rest" ? longRestWeaponMasteryChoices : []
             }
+            weaponMasteryEquipment={equipment}
             onWeaponMasteryChange={(key, next) => void persistFeatureChoicePicks(key, next)}
             extraWeaponMasteryChoices={
               restOverlay.rest === "long_rest" ? extraWeaponMasteryRestChoices : []
@@ -6919,6 +7013,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             selectedMetamagicIds={selectedMetamagicIds}
             onMetamagicChange={setSelectedMetamagicIds}
             empoweredRerollCap={Math.max(1, abilityMods.charisma ?? 0)}
+            spellcastingMod={spellAbilityMod}
+            spellHealingModifiers={derived?.spellHealingModifiers ?? []}
+            onApplySelfHeal={(amount) => applySelfHeal(amount, "heal")}
             onCast={(result) => {
               markActionEconomy(
                 spellCastEconomyOverride ??

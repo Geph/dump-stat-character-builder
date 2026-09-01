@@ -834,7 +834,9 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                     hint={
                       current.slot.grantsExpertise
                         ? "Choose skills you are already proficient in. Your proficiency bonus is doubled for those checks."
-                        : undefined
+                        : current.slot.expertiseIfProficient
+                          ? "Choose a skill. If you are already proficient, you gain Expertise instead."
+                          : undefined
                     }
                     options={modifierChoiceOptions}
                     maxCount={current.required}

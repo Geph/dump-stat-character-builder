@@ -28,6 +28,7 @@ import {
   isExtraWeaponMasteryPickKey,
 } from "@/lib/character/weapon-mastery-picks"
 import { formatRollBonusSummary } from "@/lib/compendium/roll-bonus-config"
+import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { resolveSubclassUnlockLevel } from "@/lib/builder/choices"
 import type { CharacterBuildInputs } from "@/lib/character/types"
@@ -214,11 +215,18 @@ function collectAppliedModifiers(
   weapon: Equipment,
   mods: CharacteristicModifier[],
   classResourceDieSides: Record<string, number>,
+  activeSheetToggles?: ReadonlySet<string>,
 ): WeaponSheetAppliedModifier[] {
   const properties = getWeaponPropertyTags(weapon)
   const applied: WeaponSheetAppliedModifier[] = []
 
   for (const mod of mods) {
+    if (
+      activeSheetToggles &&
+      !modifierLimitationsMet(mod, { activeSheetToggles })
+    ) {
+      continue
+    }
     if (mod.type === "attack_roll_modifiers") {
       const attackMod = mod as AttackRollModifiersCharacteristic
       for (const entry of attackMod.entries ?? []) {
@@ -523,6 +531,11 @@ export function buildWeaponSheetContext(
     masteryActive,
     extraMasteries,
     extraMasterySlotCount,
-    appliedModifiers: collectAppliedModifiers(weapon, allMods, classResourceDieSides),
+    appliedModifiers: collectAppliedModifiers(
+      weapon,
+      allMods,
+      classResourceDieSides,
+      inputs.activeSheetToggles,
+    ),
   }
 }

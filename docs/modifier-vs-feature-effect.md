@@ -56,9 +56,9 @@ but because wiring them further needs a product decision this doc shouldn't make
   mode has no on/off toggle state to even know if it's currently active. Needs: a size-toggle
   mechanism plus deciding which derived stats should key off it.
 - **`spell_healing_modifier`** (`SpellHealingModifierCharacteristic`, e.g. Life Domain's Disciple
-  of Life) — the app has no "resolve a healing spell and apply HP" calculator anywhere for this
-  bonus to hook into. Needs: deciding whether/how spellcasting ever resolves numeric effects, or
-  whether this should just become an informational note (like `extra_turn` below) instead.
+  of Life) — cheap consumer lives in `apply-heal-modifiers.ts` (outgoing bonus + overlay notes +
+  parsed-heal apply). `Spell` still has no structured healing field, so this is not a full
+  "resolve this spell and apply HP" engine.
 
 `extra_turn` (Thief's Reflexes) was in the same "authored but unconsumed" state; it's now
 surfaced as a plain informational note on the sheet since the app has no turn/round simulation to

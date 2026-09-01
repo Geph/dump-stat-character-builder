@@ -105,9 +105,7 @@ function buildResourceTrackerEntries(classDetails: CharacterClassDetail[]): Reso
       entries.push({
         id: `${entry.row.class_id}_${resource.id}`,
         name:
-          classDetails.length > 1 || resources.length > 1
-            ? `${resource.name} (${className})`
-            : resource.name,
+          classDetails.length > 1 ? `${resource.name} (${className})` : resource.name,
         uses: resource.uses,
         classLevel: entry.row.level,
       })

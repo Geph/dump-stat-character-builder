@@ -404,6 +404,8 @@ export function ModifierPlayerChoicePanel({
             ? `Choose ${slot.maxCount} total (proficient skills or tools only)`
             : slot.grantsExpertise
               ? `Choose ${slot.maxCount} (Expertise — pick skills you're proficient in)`
+              : slot.expertiseIfProficient
+                ? `Choose ${slot.maxCount} (proficiency, or Expertise if you already have it)`
               : `Choose ${slot.maxCount}`
         const toolLayout =
           skillPickerLayout === "visual" ? "visual" : choiceLayout === "compact" ? "compact" : "default"
@@ -457,7 +459,7 @@ export function ModifierPlayerChoicePanel({
             }
             skillIconByName={isSkillKind ? skillIconByName : undefined}
             unavailableOptions={
-              slot.grantsExpertise
+              slot.grantsExpertise || slot.expertiseIfProficient
                 ? []
                 : isSkillKind
                   ? unavailableOptions

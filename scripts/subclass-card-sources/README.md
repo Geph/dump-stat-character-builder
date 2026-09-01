@@ -22,4 +22,4 @@ The optimizer expands short remainders (`Cleric Light` → `cleric/light-domain`
 
 Wire display names → class + slug in `lib/compendium/subclass-card-images-defaults.ts`.
 
-**GitHub ships generated SRD art plus Kibbles Tasty and Mage Hand Press subclass portraits.** Put those masters in `SRD/`, `kibbles/`, or `magehandpress/` (aliases: `mage-hand-press`, `mhp`). Other origin folders (`PHB/`, `eberron/`, `ravenloft/`, `faerun/`, …) still optimize into `public/images/` on your machine; those outputs are gitignored and must not be committed. See the README **[Local card art](../../README.md#local-card-art-optional)** section.
+**GitHub ships generated SRD subclass portraits only.** Put SRD masters in `SRD/`. Mage Hand Press, Kibbles, and other origin folders (`magehandpress/`, `kibbles/`, `PHB/`, `eberron/`, `ravenloft/`, `faerun/`, …) still optimize into `public/images/` on your machine; those outputs are gitignored and must not be committed. Unprefixed Mage Hand Press Alchemist names (`Amorist.png`, `Slime Rancher.png`) resolve to `alchemist/{slug}`. See the README **[Local card art](../../README.md#local-card-art-optional)** section.

@@ -55,7 +55,7 @@ describe("metamagicOptionsFromFeats", () => {
       } as unknown as Feat,
     ]
     expect(metamagicOptionsFromFeats(feats)).toEqual([
-      { id: "mm_twinned", name: "Twinned Spell", cost: 1 },
+      { id: "mm_twinned", name: "Twinned Spell", cost: 1, effectHint: "twinned" },
     ])
   })
 })

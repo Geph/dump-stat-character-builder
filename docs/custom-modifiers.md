@@ -135,52 +135,35 @@ numeric hook.
 | Gap | Status | Why it is not a new `mechanics[]` kind |
 | --- | --- | --- |
 | **`creature_size`** | Authored + aggregated; no derived consumer; untested | No size-toggle play state; reach / carry / space do not key off size |
-| **`spell_healing_modifier`** | Authored + aggregated; no calculator | No “resolve this healing spell and apply HP” path |
+| **`spell_healing_modifier`** | Calculator + overlay notes | `Spell` still has no structured healing field |
 | **`extra_turn`** | Informational note only | No turn / round simulation |
 | Mutable combat die (Rampage) | Play-state engine | Size changes in play, not by level |
 | Mutation Die / illusion tokens | Play-state engine | Ephemeral grants and battlefield objects |
 | Weapon Morph exclusive set | Play-state + derived toggles | Sheet owns `weapon_morph_*`; never `new_toggles` |
 | Banked decaying pools | Influence / Balance of Power | `accumulatedResources` + expiry, not a class resource row |
-| Per-cast spell mutations | Prose + existing sheet parse | Metamagic range/duration/targets — do not invent a cost schema |
+| Per-cast spell mutations | Cast-card `effectHint` annotations | Distant / Extended / Twinned / Subtle rewrite display strings only |
 | Conditional proficiency (“X, or Y if you already have X”) | Skills only, via `expertiseIfProficient` | No generic `conditionalUpgrade` for saves / tools / armor |
 | Full Wild Shape stat swap | Specialized `transform` | Not a generic size/stat modifier |
 | Opponent auto-resolution | Not modeled | Forced saves stay player-facing |
 
-### What is actually blocking the three open gaps (2026-09-01)
+### Cheap consumers shipped (2026-09-01)
 
-**Numeric spell healing.** The missing piece is not a consumer of
-`spellHealingModifiers` — it is that *nothing resolves a healing spell to a
-number*. `Spell` (`lib/types.ts`) carries `description` prose only: no dice, no
-target count. `resolveFeatureEffectHeal` works because a **FeatureEffect**
-authors `healMode` / `healDiceCount`; `SpellDetailOverlay.performCast` only
-rolls an attack, applies Concentration, and decrements slots. Note the sibling
-trap: `applyHealingReceivedModifiers` exists in
-`apply-characteristic-runtime.ts` and is **never called** — `applySelfHeal` adds
-the raw amount. So `healing_received_modifier` is not a working pattern to copy.
-Closing this needs structured healing on `Spell` (or a description parser) plus
-one shared “apply healing” funnel that both feature effects and spell casts go
-through. Until then `spell_healing_modifier` stays a reminder label.
+**Numeric spell healing.** `applySpellHealingModifiers` adds Disciple of Life
+(2 + slot level, 1st+) and Blessed Healer self-heal. `applySelfHeal` now runs
+`healing_received_modifier` (Magical Anathema). The spell overlay lists those
+notes and can apply a first-pass NdM parse from healing prose. `Spell` still
+has no structured healing field — this is not a full spell HP engine.
 
-**Per-cast spell mutations.** The cast pipeline already has the shape needed:
-`MetamagicCastOption.effectHint` is `"empowered_reroll" | "quicken" | null`, and
-`quicken` really does override action economy. Range / duration / target
-mutations are blocked on the same thing as above — `range` and `duration` are
-free-text strings, so there is nothing to mutate arithmetically. The cheap win
-if this is ever wanted is another `effectHint` that annotates the cast card
-(“Distant: double range”), **not** a cost schema. `byo-import-kit.ts` explicitly
-forbids emitting `mechanics[]` for this and `byo-prompt-guidance` tests it.
+**Per-cast spell mutations.** `effectHint` now includes `distant` / `extended` /
+`twinned` / `subtle`. `applySpellDisplayMutations` rewrites the cast-card
+range, duration, components, and a targets note. Do **not** invent a
+`mechanics[]` cost schema; `byo-import-kit.ts` still forbids it.
 
-**Conditional proficiency.** Already half-built. `SkillsCharacteristic.expertiseIfProficient`
-parks picks in `AggregatedCharacteristics.expertiseIfProficientSkills`, and
-`computeDerivedCharacter` resolves them after `mergeSkillProficiencies` — the
-deferred-bucket pattern, because `aggregateCharacteristics()` is single-pass and
-cannot see the merged proficiency set. Generalizing means adding parallel
-buckets for saves / tools / armor, not a two-pass aggregate. Two known bugs in
-the existing skill path: `expertiseIfProficient` does not set `grantsExpertise`
-on the builder slot, so Keen Mind / Observant pickers **hide** the skills the
-feat is meant to upgrade; and Bard’s Keeper of History is labelled as a
-conditional upgrade but wired with plain `grantExpertise`. Fix those before
-generalizing.
+**Conditional proficiency.** `expertiseIfProficient` is now copied onto the
+builder slot so Keen Mind / Observant pickers keep already-proficient skills
+visible. Keeper of History grants History and Performance through that flag
+instead of a Rogue-style expertise picker. Still no generic
+`conditionalUpgrade` for saves / tools / armor.
 
 Audit (2026-09-01): **no dead types**. “Unreachable” (applied but neither
 Compendium-authorable nor importable): `catalog_option`, `craftable_items`,

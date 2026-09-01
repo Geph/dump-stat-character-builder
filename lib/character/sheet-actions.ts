@@ -18,6 +18,10 @@ import {
   attachActivationPicksToActions,
   type SheetActivationPicks,
 } from "@/lib/character/activation-style-picks"
+import {
+  collectActivationModeReminderActions,
+  mergeActivationModeRidersIntoFeature,
+} from "@/lib/character/activation-mode-riders"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import { isHitPointsResourceKey } from "@/lib/character/hit-point-spend"
 import { resolveHitDiceHealCount } from "@/lib/character/resolve-feature-effect-heal"
@@ -171,6 +175,11 @@ export type SheetActionEntry = {
    * and has no Use button.
    */
   reminderOnly?: boolean
+  /**
+   * Incoming-attack / similar Passive reminder: the player flips this sheet toggle
+   * from the card instead of a banner chip.
+   */
+  activatesSheetToggle?: string | null
   /** Use is available only while this sheet toggle is on (e.g. while_dancing). */
   requiresSheetToggle?: string | null
   /** First use each turn does not mark Action / Bonus / Reaction spent. */
@@ -1230,6 +1239,7 @@ function collectIncomingAttackPassiveEntries(
       trigger: incomingAttackReminderTrigger(primary),
       category: "combat",
       reminderOnly: true,
+      activatesSheetToggle: toggleFromIncomingAttackEffect(primary),
       spendsEconomy: false,
       showOnCombatTab: true,
       showOnAbilitiesTab: false,
@@ -1770,7 +1780,11 @@ function pushFeatureActions(
   sourceIcon?: string | null,
 ) {
   const replacedNames = collectReplacedFeatureNames(features ?? [], levelCap)
-  for (const feature of features ?? []) {
+  for (const raw of features ?? []) {
+    const feature =
+      raw && typeof raw === "object" && "name" in raw
+        ? mergeActivationModeRidersIntoFeature(raw as Feature)
+        : raw
     if (featureIsReplaced(feature, replacedNames)) continue
     pushActivatableItemActions(
       actions,
@@ -2632,6 +2646,32 @@ export function collectSheetActions(params: {
       soleClassId,
       params.classDetails,
     )
+  }
+
+  const classFeatures = params.classDetails.flatMap((entry) => [
+    ...((entry.class?.features ?? []) as Feature[]),
+    ...((entry.subclass?.features ?? []) as Feature[]),
+  ])
+  const existingActionNames = new Set(actions.map((action) => action.name.trim().toLowerCase()))
+  for (const reminder of collectActivationModeReminderActions(classFeatures, existingActionNames)) {
+    actions.push({
+      id: `activation-mode:${reminder.requiresSheetToggle}:${reminder.name}`,
+      name: reminder.name,
+      sourceLabel: reminder.sourceLabel,
+      kinds: ["action"],
+      trigger: reminder.trigger,
+      category: "combat",
+      reminderOnly: true,
+      spendsEconomy: false,
+      showOnCombatTab: true,
+      showOnAbilitiesTab: false,
+      showOnRestDialogues: false,
+      limitedUses: null,
+      classLevel: Math.max(totalLevel, 1),
+      description: reminder.description,
+      classId: params.classDetails[0]?.row.class_id ?? null,
+      requiresSheetToggle: reminder.requiresSheetToggle,
+    })
   }
 
   const withRiders = attachTalentAlertsToActions(actions, [

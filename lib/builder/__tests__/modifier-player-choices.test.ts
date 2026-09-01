@@ -362,3 +362,28 @@ describe("class Spellcasting choice grants vs native progression", () => {
     expect(warmageSlots.some((slot) => slot.kind === "spell")).toBe(true)
   })
 })
+
+describe("expertiseIfProficient picker", () => {
+  it("keeps already-proficient skills visible for Keen Mind", () => {
+    const keen = enrichCustomFeatRow({
+      id: "keen-mind",
+      name: "Keen Mind",
+      description: "Choose one of Arcana, History, Investigation, Nature, or Religion.",
+      category: "General",
+    }) as unknown as Feat
+    const slots = collectModifierPlayerChoiceSlots({
+      featEntries: [{ featId: keen.id, choicePickKey: "feat:granted:keen-mind" }],
+      feats: [keen],
+      featChoicePicks: {},
+      catalog: [],
+    })
+    const slot = slots.find((row) => row.expertiseIfProficient)
+    expect(slot).toBeDefined()
+    const options = optionsForProficiencyGrantSlot(slot!, {
+      proficientSkills: ["Arcana", "History"],
+    })
+    expect(options.map((option) => option.name)).toEqual(
+      expect.arrayContaining(["Arcana", "History", "Investigation", "Nature", "Religion"]),
+    )
+  })
+})

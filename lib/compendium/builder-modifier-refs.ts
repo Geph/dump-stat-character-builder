@@ -32,6 +32,10 @@ import { resolveModifierRefIds, type ModifierCatalogEntry } from "@/lib/compendi
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { sanitizeCaptainSubclassFeatures } from "@/lib/compendium/captain-feature-wiring"
+import {
+  collectActivationModeRiderModifiers,
+  featureHasActivationModeRiders,
+} from "@/lib/character/activation-mode-riders"
 import { tagModifierSource } from "@/lib/character/tag-modifier-source"
 import {
   abilitySpecializationChoice,
@@ -533,6 +537,37 @@ export function collectBuilderModifierRefIds(params: {
     })
   })
 
+  const classFeaturesAtLevel: Feature[] = []
+  for (const entry of classLevels) {
+    const cls = classes.find((candidate) => candidate.id === entry.classId)
+    if (!cls) continue
+    for (const feature of cls.features ?? []) {
+      if (feature.level <= entry.level) classFeaturesAtLevel.push(feature)
+    }
+    const subclassId = subclassByClassId[entry.classId]
+    if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
+      const subclass = subclasses.find((candidate) => candidate.id === subclassId)
+      if (subclass) {
+        for (const feature of subclass.features ?? []) {
+          if (feature.level <= entry.level) classFeaturesAtLevel.push(feature)
+        }
+      }
+    }
+  }
+  const activationModeRiders = classFeaturesAtLevel.some(featureHasActivationModeRiders)
+    ? tagModifierSource(
+        collectActivationModeRiderModifiers(
+          classFeaturesAtLevel,
+          new Set(
+            [...classResolved, ...customAbilityMods, ...nestedTalentMods]
+              .map((mod) => mod.id)
+              .filter((id): id is string => Boolean(id)),
+          ),
+        ),
+        { sourceType: "class", source: "Activation mode", label: "Activation mode" },
+      )
+    : []
+
   return [
     ...speciesResolved,
     ...normalizeCharacteristics(classResolved, null),
@@ -545,5 +580,6 @@ export function collectBuilderModifierRefIds(params: {
     ...featMods,
     ...customAbilityMods,
     ...nestedTalentMods,
+    ...activationModeRiders,
   ]
 }

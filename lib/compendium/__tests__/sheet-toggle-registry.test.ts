@@ -24,7 +24,11 @@ describe("sheet-toggle-registry", () => {
 
   it("resolves optional psion toggles by id", () => {
     expect(getSheetToggleDefinition("in_combat_or_high_stakes")?.sourceType).toBe("class_feature")
-    expect(getSheetToggleDefinition("first_turn_of_combat")?.label).toBe("First turn of combat")
+    expect(getSheetToggleDefinition("first_turn_of_combat")).toMatchObject({
+      label: "First turn of combat",
+      defaultDuration: "1_round",
+      hideFromBanner: true,
+    })
     expect(getSheetToggleDefinition("while_concentrating")?.id).toBe("while_concentrating")
     expect(getSheetToggleDefinition("while_flying")?.id).toBe("while_flying")
     expect(getSheetToggleDefinition("while_dancing")?.label).toBe("Dancing")
@@ -63,6 +67,16 @@ describe("sheet-toggle-registry", () => {
 
   it("recognizes magic item toggle ids", () => {
     expect(isKnownSheetToggleId("magic_item:abc:power")).toBe(true)
+    expect(isKnownSheetToggleId("dance_style_enthralling_movement")).toBe(true)
+    expect(getSheetToggleDefinition("dance_style_enthralling_movement")).toMatchObject({
+      label: "Dance Style: Enthralling Movement",
+      exclusiveGroup: "dance_style",
+      hideFromBanner: true,
+    })
+    expect(getSheetToggleDefinition("dance_style_agile_movement")).toMatchObject({
+      label: "Dance Style: Agile Movement",
+      hideFromBanner: true,
+    })
     expect(getSheetToggleDefinition("magic_item:abc:power")?.sourceType).toBe("magic_item")
   })
 

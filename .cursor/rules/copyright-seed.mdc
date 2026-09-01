@@ -8,5 +8,5 @@ alwaysApply: false
 
 - `lib/srd/` is SRD 5.2.1 only. No PHB, Xanathar’s, or other product prose.
 - `lib/seed-packs/` ships only publisher-allowed examples (see that folder’s README). Do not add paid or disallowed pack text.
-- Commit optimized card art only from allowed origins (SRD, Mage Hand Press). Leave Kibbles, PHB/setting outputs, and `local-available-card-art.json` untracked. Import still attaches Kibbles art when the local PNG exists.
+- Commit optimized card art only from SRD origins. Leave Mage Hand Press, Kibbles, PHB/setting outputs, and `local-available-card-art.json` untracked. Import still attaches those portraits when the local PNG exists.
 - Name-keyed mechanical presets without book text are allowed.

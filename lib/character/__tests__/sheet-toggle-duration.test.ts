@@ -28,6 +28,17 @@ describe("sheet-toggle-duration", () => {
     expect(refreshed[0]?.id).toBe(first[0]?.id)
   })
 
+  it("upserts a 1-round First turn of combat reminder", () => {
+    const firstTurn = getSheetToggleDefinition("first_turn_of_combat")!
+    const rows = upsertToggleDurationReminder([], firstTurn)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      label: "First turn of combat",
+      remaining: "1 round",
+      sheetToggleId: "first_turn_of_combat",
+    })
+  })
+
   it("does not add a reminder for toggles without a default duration", () => {
     const raging = getSheetToggleDefinition("while_raging")!
     expect(upsertToggleDurationReminder([], raging)).toEqual([])

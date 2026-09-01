@@ -5,7 +5,8 @@ import { Flame, Moon, Sun, X } from "lucide-react"
 import { ShortRestHitDiceBox } from "@/components/character-sheet/short-rest-hit-dice-box"
 import type { HitDicePoolEntry } from "@/lib/character/hit-dice"
 import type { RestHitDiceRestoreActivity } from "@/lib/character/sheet-rest"
-import type { Feature, RestType } from "@/lib/types"
+import { weaponMasteryLabelForOption } from "@/lib/compendium/weapon-mastery-choice"
+import type { Equipment, Feature, RestType } from "@/lib/types"
 
 export type LongRestWeaponMasteryChoice = {
   key: string
@@ -34,6 +35,8 @@ type SheetRestOverlayProps = {
   /** Long rest — swap known Weapon Mastery weapon types. */
   weaponMasteryChoices?: LongRestWeaponMasteryChoice[]
   onWeaponMasteryChange?: (key: string, next: string[]) => void
+  /** Live equipment catalog — used to resolve mastery names when option descriptions are empty. */
+  weaponMasteryEquipment?: Equipment[]
   extraWeaponMasteryChoices?: {
     equipmentId: string
     weaponName: string
@@ -59,6 +62,7 @@ export function SheetRestOverlay({
   onUseHitDiceRestore,
   weaponMasteryChoices = [],
   onWeaponMasteryChange,
+  weaponMasteryEquipment = [],
   extraWeaponMasteryChoices = [],
   onExtraWeaponMasteryChange,
 }: SheetRestOverlayProps) {
@@ -221,7 +225,7 @@ export function SheetRestOverlay({
                       <option value="">Choose…</option>
                       {options.map((option) => (
                         <option key={option.name} value={option.name}>
-                          {option.name}
+                          {weaponMasteryLabelForOption(option, weaponMasteryEquipment)}
                         </option>
                       ))}
                     </select>

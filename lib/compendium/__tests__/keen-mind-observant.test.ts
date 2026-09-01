@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { applyFeatNamePreset } from "@/lib/compendium/apply-feat-name-preset"
 import { aggregateCharacteristics } from "@/lib/compendium/characteristic-modifiers"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
+import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 
 describe("Keen Mind / Observant common modifiers", () => {
@@ -110,5 +111,27 @@ describe("Keen Mind / Observant common modifiers", () => {
       kind: "standard_action",
       standardActionSearch: true,
     })
+  })
+})
+
+describe("Keeper of History", () => {
+  it("grants History and Performance with expertiseIfProficient, not a Rogue expertise picker", () => {
+    const feature = enrichClassFeatureWithModifierPresets("Bard", {
+      level: 3,
+      name: "Keeper of History",
+      description: "History and Performance.",
+    } as import("@/lib/types").Feature)
+    const skills = (feature.linkedModifiers ?? [])
+      .flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "skills")
+    expect(skills).toMatchObject({
+      type: "skills",
+      expertiseIfProficient: true,
+    })
+    expect(skills && "grantExpertise" in skills ? skills.grantExpertise : false).toBeFalsy()
+    if (skills?.type === "skills") {
+      expect(skills.entries.map((entry) => entry.skill).sort()).toEqual(["History", "Performance"])
+      expect(skills.choiceCount ?? 0).toBe(0)
+    }
   })
 })

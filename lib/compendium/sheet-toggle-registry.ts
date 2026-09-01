@@ -24,6 +24,11 @@ export type SheetToggleDefinition = {
   defaultDuration?: FeatureDurationKey
   /** Play-state conditions that automatically turn this toggle off. */
   endsWhen?: SheetToggleEndsWhen
+  /**
+   * Hide the banner chip. Duration reminders and Combat Passive notices own the UI
+   * (e.g. first turn of combat).
+   */
+  hideFromBanner?: boolean
 }
 
 export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
@@ -62,7 +67,13 @@ export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
 /** Feature-specific toggles resolvable by id but not shown on every character sheet. */
 export const OPTIONAL_SHEET_TOGGLES: SheetToggleDefinition[] = [
   { id: "in_combat_or_high_stakes", label: "In combat / high-stakes", sourceType: "class_feature" },
-  { id: "first_turn_of_combat", label: "First turn of combat", sourceType: "class_feature" },
+  {
+    id: "first_turn_of_combat",
+    label: "First turn of combat",
+    sourceType: "class_feature",
+    defaultDuration: "1_round",
+    hideFromBanner: true,
+  },
   { id: "while_concentrating", label: "Concentrating", sourceType: "class_feature" },
   { id: "while_flying", label: "Flying", sourceType: "class_feature" },
   { id: "physical_surge_active", label: "Physical Surge", sourceType: "class_feature" },
@@ -81,18 +92,49 @@ export const OPTIONAL_SHEET_TOGGLES: SheetToggleDefinition[] = [
     label: "Dance Style: Dueling Stance",
     sourceType: "class_feature",
     exclusiveGroup: "dance_style",
+    hideFromBanner: true,
   },
   {
     id: "dance_style_inspiring_chant",
     label: "Dance Style: Inspiring Chant",
     sourceType: "class_feature",
     exclusiveGroup: "dance_style",
+    hideFromBanner: true,
   },
   {
     id: "dance_style_pantomime",
     label: "Dance Style: Pantomime",
     sourceType: "class_feature",
     exclusiveGroup: "dance_style",
+    hideFromBanner: true,
+  },
+  {
+    id: "dance_style_agile_movement",
+    label: "Dance Style: Agile Movement",
+    sourceType: "class_feature",
+    exclusiveGroup: "dance_style",
+    hideFromBanner: true,
+  },
+  {
+    id: "dance_style_elegant_form",
+    label: "Dance Style: Elegant Form",
+    sourceType: "class_feature",
+    exclusiveGroup: "dance_style",
+    hideFromBanner: true,
+  },
+  {
+    id: "dance_style_retaliatory_swipe",
+    label: "Dance Style: Retaliatory Swipe",
+    sourceType: "class_feature",
+    exclusiveGroup: "dance_style",
+    hideFromBanner: true,
+  },
+  {
+    id: "dance_style_spinning_shot",
+    label: "Dance Style: Spinning Shot",
+    sourceType: "class_feature",
+    exclusiveGroup: "dance_style",
+    hideFromBanner: true,
   },
   // Heroes of Faerûn subclass transformation toggles
   { id: "bladesong_active", label: "Bladesong", sourceType: "class_feature" },
@@ -288,7 +330,12 @@ const optionalById = new Map(OPTIONAL_SHEET_TOGGLES.map((entry) => [entry.id, en
 export type SheetToggleKey = string
 
 export function isKnownSheetToggleId(id: string): boolean {
-  return builtinById.has(id) || optionalById.has(id) || id.startsWith("magic_item:")
+  return (
+    builtinById.has(id) ||
+    optionalById.has(id) ||
+    id.startsWith("magic_item:") ||
+    id.startsWith("dance_style_")
+  )
 }
 
 /** Idle banner copy — "Dance Style: Inspiring Chant" → "Dance Style: not activated". */
@@ -306,6 +353,19 @@ export function getSheetToggleDefinition(id: string): SheetToggleDefinition | nu
 
   const optional = optionalById.get(id)
   if (optional) return optional
+
+  if (id.startsWith("dance_style_")) {
+    const slug = id.slice("dance_style_".length).replace(/_/g, " ").trim()
+    if (!slug) return null
+    const name = slug.replace(/\b\w/g, (ch) => ch.toUpperCase())
+    return {
+      id,
+      label: `Dance Style: ${name}`,
+      sourceType: "class_feature",
+      exclusiveGroup: "dance_style",
+      hideFromBanner: true,
+    }
+  }
 
   if (id.startsWith("magic_item:")) {
     const parts = id.split(":")

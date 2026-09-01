@@ -72,6 +72,31 @@ describe("Dancer enrichment", () => {
     expect(styles?.choices?.resourceKey).toBe("dance_styles_known")
   })
 
+  it("wires default Dance Style riders onto the Dance Styles feature", () => {
+    const enriched = applyImportEnrichmentPresets({
+      classes: [
+        {
+          name: "Dancer",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Dexterity"],
+          features: [
+            {
+              level: 2,
+              name: "Dance Styles",
+              description: "When you begin your Dance, choose a Dance Style.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+    const styles = enriched.classes?.[0]?.features?.find((feature) => feature.name === "Dance Styles")
+    const chars = (styles?.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    expect(chars.some((char) => char.id === "char_agile_movement")).toBe(true)
+    expect(chars.some((char) => char.id === "mod_elegant_form")).toBe(true)
+    expect(chars.some((char) => char.id === "mod_spinning_shot")).toBe(true)
+  })
+
   it("wires Nimble Start, Fast Movement Heavy-armor gate, and Grand Finale", () => {
     const enriched = applyImportEnrichmentPresets({
       classes: [
@@ -209,6 +234,11 @@ describe("Dancer enrichment", () => {
     expect(elegantMenus.find((char) => char.type === "resource_ability_menu")).toMatchObject({
       appliesOnRollKinds: ["save", "ability"],
     })
+    expect(
+      elegantMenus
+        .find((char) => char.type === "resource_ability_menu")
+        ?.limitations?.some((lim) => lim.value === "dance_style_elegant_form"),
+    ).toBe(true)
 
     const spinning = enriched.import_proposals?.custom_abilities?.[1] as {
       ability_role?: string
@@ -245,6 +275,11 @@ describe("Dancer enrichment", () => {
       .flatMap((mod) => mod.characteristics ?? [])
       .find((char) => char.type === "movement_effects")
     expect(movement).toMatchObject({ moveWithoutOpportunityAttacks: true })
+    expect(
+      (movement as { limitations?: { value: string }[] })?.limitations?.some(
+        (lim) => lim.value === "dance_style_agile_movement",
+      ),
+    ).toBe(true)
   })
 
   it("marks Dancer Shift as an upgrade so it does not collide with mastery Shift", () => {

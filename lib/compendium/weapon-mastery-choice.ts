@@ -178,6 +178,37 @@ function optionDescription(
   return rules ? `${mastery} — ${rules}` : mastery
 }
 
+/** Head of a stored option description (`Sap — If you hit…`). */
+export function masteryNameFromOptionDescription(description?: string | null): string | null {
+  if (!description?.trim()) return null
+  const [head] = description.split("—")
+  const trimmed = head.trim()
+  if (!trimmed || trimmed.includes(".") || trimmed.length > 40) return null
+  return trimmed
+}
+
+export function formatWeaponMasteryChoiceLabel(
+  weaponName: string,
+  mastery?: string | null,
+): string {
+  const trimmed = mastery?.trim()
+  return trimmed ? `${weaponName} (${trimmed})` : weaponName
+}
+
+/** Dropdown / chip label: `Longsword (Sap)`. Falls back to seed or catalog mastery. */
+export function weaponMasteryLabelForOption(
+  option: Pick<FeatureChoiceOption, "name" | "description">,
+  equipmentCatalog: Equipment[] = [],
+): string {
+  const fromDescription = masteryNameFromOptionDescription(option.description)
+  if (fromDescription) return formatWeaponMasteryChoiceLabel(option.name, fromDescription)
+  const weapon = weaponByNameLookup(equipmentCatalog).get(option.name.trim().toLowerCase())
+  const mastery = weapon
+    ? weaponMasteryProperty(weapon) ?? getWeaponMastery(weapon as Equipment)
+    : null
+  return formatWeaponMasteryChoiceLabel(option.name, mastery)
+}
+
 function weaponMasteryOptionsFromList(
   weapons: Array<SeedWeapon | Equipment>,
   pool: WeaponMasteryPool,

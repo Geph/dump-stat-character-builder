@@ -55,6 +55,21 @@ describe("card source layout", () => {
       itemSlug: "warden",
       displayName: "Warden",
     })
+    expect(parseSubclassSourceBasename("Alchemist Amorist")).toMatchObject({
+      classSlug: "alchemist",
+      itemSlug: "amorist",
+      displayName: "Amorist",
+    })
+    expect(parseSubclassSourceBasename("Amorist")).toMatchObject({
+      classSlug: "alchemist",
+      itemSlug: "amorist",
+      displayName: "Amorist",
+    })
+    expect(parseSubclassSourceBasename("Slime Rancher")).toMatchObject({
+      classSlug: "alchemist",
+      itemSlug: "ooze-rancher",
+      displayName: "Ooze Rancher",
+    })
   })
 
   it("flattens Title Case, Drive copies, and typo aliases", () => {

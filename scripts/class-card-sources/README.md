@@ -4,7 +4,7 @@ Drop **full-resolution** class card art here, then run:
 pnpm images:optimize
 ```
 
-Sources are matched by slug basename. When the same slug appears in more than one origin folder, **SRD / kibbles / Mage Hand Press win over `extra/`** (so updated SRD portraits are not overwritten by older local extras).
+Sources are matched by slug basename. When the same slug appears in more than one origin folder, **SRD wins over Mage Hand Press / kibbles / `extra/`** (so updated SRD portraits are not overwritten by older local extras).
 
 | Output slug | Class |
 |-------------|-------|

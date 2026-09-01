@@ -75,6 +75,11 @@ export type ModifierPlayerChoiceSlot = {
    * picker must NOT hide skills already chosen elsewhere in the build.
    */
   grantsExpertise?: boolean
+  /**
+   * Keen Mind / Observant: the pick grants proficiency, or Expertise if the character
+   * already has that skill. The picker must show already-proficient options.
+   */
+  expertiseIfProficient?: boolean
   /** Tool proficiency pool — drives grouped accordion UI for artisans / musical picks. */
   toolChoicePool?: ToolChoicePool | null
 }
@@ -242,6 +247,7 @@ function slotsFromCharacteristic(
       maxCount: count,
       options,
       grantsExpertise: skillMod.grantExpertise ?? false,
+      expertiseIfProficient: skillMod.expertiseIfProficient ?? false,
     })
     return slots
   }
@@ -1194,7 +1200,7 @@ export function optionsForProficiencyGrantSlot(
     currentSelection?: string[]
   },
 ): { name: string; description?: string }[] {
-  if (slot.grantsExpertise) return slot.options ?? []
+  if (slot.grantsExpertise || slot.expertiseIfProficient) return slot.options ?? []
 
   const {
     proficientSkills,

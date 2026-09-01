@@ -1941,6 +1941,7 @@ describe("combat / utility tab classification", () => {
     expect(nimble).toMatchObject({
       trigger: "First round of combat",
       reminderOnly: true,
+      activatesSheetToggle: "first_turn_of_combat",
       spendsEconomy: false,
       category: "combat",
     })
@@ -2062,16 +2063,88 @@ describe("combat / utility tab classification", () => {
       title: "Choose a Dance Style",
       chooseCount: 1,
     })
-    expect(dance?.activationPicks?.options).toEqual([
-      {
-        name: "Shift",
-        description: "While Dancing, teleport 10 feet after an attack.",
-        sheetToggleId: null,
-      },
+    expect(dance?.activationPicks?.options.map((option) => option.name)).toEqual([
+      "Agile Movement",
+      "Elegant Form",
+      "Retaliatory Swipe",
+      "Spinning Shot",
+      "Shift",
     ])
+    expect(dance?.activationPicks?.options.find((option) => option.name === "Shift")).toEqual({
+      name: "Shift",
+      description: "While Dancing, teleport 10 feet after an attack.",
+      sheetToggleId: "dance_style_shift",
+    })
+    expect(
+      dance?.activationPicks?.options.find((option) => option.name === "Agile Movement"),
+    ).toMatchObject({
+      name: "Agile Movement",
+      sheetToggleId: "dance_style_agile_movement",
+    })
   })
 
-  it("does not use weapon mastery Shift text as a Dance Style description", () => {
+  it("lists default Dance Styles plus a subclass [Dance Style] even without builder picks", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 2,
+              name: "Dance",
+              description: "As a Bonus Action, expend a Dance to begin dancing.",
+              activation: { bonusAction: true },
+              sheetDisplay: { combatActions: true },
+              limitedUses: {
+                type: "class_resource",
+                classResourceKey: "dances",
+                classResourceAmount: 1,
+              },
+            } as Feature,
+            {
+              level: 2,
+              name: "Dance Styles",
+              description: "When you begin your Dance, choose a Dance Style.",
+              isChoice: true,
+              choices: {
+                category: "Dance Style",
+                count: 1,
+                resourceKey: "dance_styles_known",
+                optionsSource: "class_upgrades",
+                options: [],
+              },
+            } as Feature,
+          ],
+          3,
+          {
+            subclassFeatures: [
+              {
+                level: 3,
+                name: "Enthralling Movement [Dance Style]",
+                description: "Creatures that can see you may be charmed while you Dance.",
+              } as Feature,
+            ],
+          },
+        ),
+      ],
+      species: null,
+      featureChoicePicks: {},
+    })
+    const dance = actions.find((action) => action.name === "Dance")
+    expect(dance?.activationPicks?.options.map((option) => option.name)).toEqual([
+      "Agile Movement",
+      "Elegant Form",
+      "Retaliatory Swipe",
+      "Spinning Shot",
+      "Enthralling Movement",
+    ])
+    expect(
+      dance?.activationPicks?.options.find((option) => option.name === "Enthralling Movement"),
+    ).toMatchObject({
+      sheetToggleId: "dance_style_enthralling_movement",
+    })
+  })
+
+  it("omits a Dance Styles pick that only matches weapon mastery Shift", () => {
     const actions = collectSheetActions({
       classDetails: [
         classDetail(
@@ -2117,9 +2190,65 @@ describe("combat / utility tab classification", () => {
       ],
     })
     const dance = actions.find((action) => action.name === "Dance")
-    expect(dance?.activationPicks?.options).toEqual([
-      { name: "Shift", description: null, sheetToggleId: null },
+    expect(dance?.activationPicks?.options.map((option) => option.name)).toEqual([
+      "Agile Movement",
+      "Elegant Form",
+      "Retaliatory Swipe",
+      "Spinning Shot",
     ])
+    expect(dance?.activationPicks?.options.find((option) => option.name === "Shift")).toBeUndefined()
+  })
+
+  it("unlocks default Dance Style sheet options without imported custom abilities", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 2,
+              name: "Dance",
+              description: "As a Bonus Action, expend a Dance to begin dancing.",
+              activation: { bonusAction: true },
+              sheetDisplay: { combatActions: true },
+              limitedUses: {
+                type: "class_resource",
+                classResourceKey: "dances",
+                classResourceAmount: 1,
+              },
+            } as Feature,
+            {
+              level: 2,
+              name: "Dance Styles",
+              description: "When you begin your Dance, choose a Dance Style.",
+              isChoice: true,
+              choices: {
+                category: "Dance Style",
+                count: 1,
+                resourceKey: "dance_styles_known",
+                optionsSource: "class_upgrades",
+                options: [],
+              },
+            } as Feature,
+          ],
+          3,
+        ),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Graceful Dodge")).toMatchObject({
+      requiresSheetToggle: "while_dancing",
+      trigger: "While Dancing",
+    })
+    expect(actions.find((action) => action.name === "Elegant Form")).toMatchObject({
+      requiresSheetToggle: "dance_style_elegant_form",
+    })
+    expect(actions.find((action) => action.name === "Spinning Shot")).toMatchObject({
+      requiresSheetToggle: "dance_style_spinning_shot",
+    })
+    expect(actions.find((action) => action.name === "Retaliatory Swipe")).toMatchObject({
+      requiresSheetToggle: "dance_style_retaliatory_swipe",
+      reminderOnly: true,
+    })
   })
 
   it("copies Dance duration onto the sheet action from attachClassDetails", () => {

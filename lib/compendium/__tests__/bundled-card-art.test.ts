@@ -5,12 +5,13 @@ import {
 } from "../../../scripts/bundled-card-art.mjs"
 
 describe("bundled card art allowlist", () => {
-  it("allows SRD and Mage Hand Press origin folders, not Kibbles or setting books", () => {
+  it("allows SRD origin folders only, not Mage Hand Press, Kibbles, or setting books", () => {
     expect(isBundledCardSourceOrigin("SRD")).toBe(true)
     expect(isBundledCardSourceOrigin("srd cantrips")).toBe(true)
     expect(isBundledCardSourceOrigin("kibbles")).toBe(false)
-    expect(isBundledCardSourceOrigin("magehandpress")).toBe(true)
-    expect(isBundledCardSourceOrigin("mage-hand-press")).toBe(true)
+    expect(isBundledCardSourceOrigin("magehandpress")).toBe(false)
+    expect(isBundledCardSourceOrigin("mage-hand-press")).toBe(false)
+    expect(isBundledCardSourceOrigin("mhp")).toBe(false)
     expect(isBundledCardSourceOrigin("PHB")).toBe(false)
     expect(isBundledCardSourceOrigin("eberron")).toBe(false)
     expect(isBundledCardSourceOrigin("ravenloft")).toBe(false)
@@ -39,5 +40,11 @@ describe("bundled card art allowlist", () => {
     expect(isBundledPublicCardArtPath("public/images/compendium/backgrounds/noble.png")).toBe(false)
     expect(isBundledPublicCardArtPath("public/images/compendium/backgrounds/apothecary.png")).toBe(false)
     expect(isBundledPublicCardArtPath("public/images/compendium/backgrounds/acolyte.png")).toBe(true)
+    expect(
+      isBundledPublicCardArtPath("public/images/compendium/subclasses/alchemist/ooze-rancher.png"),
+    ).toBe(false)
+    expect(
+      isBundledPublicCardArtPath("public/images/compendium/subclasses/alchemist/amorist.png"),
+    ).toBe(false)
   })
 })

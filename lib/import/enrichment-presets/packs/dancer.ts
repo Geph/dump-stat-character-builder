@@ -1,3 +1,4 @@
+import { defaultDanceStyleCharacteristicModifiers } from "@/lib/character/dancer-dance-styles"
 import type { EnrichmentPreset } from "@/lib/import/enrichment-presets/types"
 import { effectCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { modId } from "@/lib/compendium/modifier-instance-builders"
@@ -69,6 +70,24 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
       {
         op: "attachNamedPreset",
         preset: GRACEFUL_DODGE_MENU,
+      },
+    ],
+  },
+  {
+    id: "dancer.class.dance_styles",
+    pack: "dancer",
+    target: "class_feature",
+    match: { className: /dancer/i, name: /^dance styles?$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "default_dance_styles",
+          catalogRefId: "cat_char_movement_effects",
+          characteristics: defaultDanceStyleCharacteristicModifiers(),
+        },
+        skipIfCharacteristicTypes: ["movement_effects", "resource_ability_menu", "weapon_sheet_badge"],
       },
     ],
   },
@@ -717,8 +736,8 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
               id: "char_agile_movement",
               type: "movement_effects",
               moveWithoutOpportunityAttacks: true,
-              label: "Agile Movement — no Opportunity Attacks (while Dancing)",
-              limitations: [requiresActiveToggleLimitation("while_dancing")],
+              label: "Agile Movement — no Opportunity Attacks (this Dance Style)",
+              limitations: [requiresActiveToggleLimitation("dance_style_agile_movement")],
             },
           ],
         },
@@ -726,7 +745,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
       },
       {
         op: "appendDescription",
-        text: "While Dancing: your movement doesn't provoke Opportunity Attacks.",
+        text: "Enable Dance Style: Agile Movement (and Dancing). Your movement doesn't provoke Opportunity Attacks.",
       },
     ],
   },
@@ -749,12 +768,12 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
               type: "resource_ability_menu",
               resourceKey: "dance_die",
               appliesOnRollKinds: ["save", "ability"],
-              appliesOnAbilities: ["Dexterity", "Charisma"],
+              limitations: [requiresActiveToggleLimitation("dance_style_elegant_form")],
               options: [
                 {
                   name: "Elegant Form",
                   description:
-                    "When you fail a DEX/CHA check or any save, add Dance Die (while Dancing).",
+                    "When you fail a Dexterity or Charisma check or any saving throw, add Dance Die.",
                   resourceCost: 0,
                   bonusConfig: {
                     mode: "die",
@@ -771,7 +790,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
       },
       {
         op: "appendDescription",
-        text: "Enable Dancing. Use the Elegant Form menu when you fail a DEX or CHA check or any saving throw.",
+        text: "Enable Dance Style: Elegant Form (and Dancing). Use the Elegant Form menu when you fail a DEX or CHA check or any saving throw.",
       },
     ],
   },
@@ -794,10 +813,11 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
               type: "resource_ability_menu",
               resourceKey: "dance_die",
               appliesOnRollKinds: ["attack"],
+              limitations: [requiresActiveToggleLimitation("dance_style_spinning_shot")],
               options: [
                 {
                   name: "Spinning Shot",
-                  description: "Add Dance Die to a ranged weapon attack roll (while Dancing).",
+                  description: "Add Dance Die to a ranged weapon attack roll (this Dance Style).",
                   resourceCost: 0,
                   bonusConfig: {
                     mode: "die",
@@ -823,9 +843,9 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
               id: "char_spinning_shot_badge",
               type: "weapon_sheet_badge",
               label: "Spinning Shot",
-              description: "Add Dance Die to a ranged weapon attack roll (while Dancing).",
+              description: "Add Dance Die to a ranged weapon attack roll (this Dance Style).",
               appliesTo: "ranged",
-              limitations: [requiresActiveToggleLimitation("while_dancing")],
+              limitations: [requiresActiveToggleLimitation("dance_style_spinning_shot")],
             },
           ],
         },
@@ -855,7 +875,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
       { op: "setAbilityRole", role: "upgrade" },
       {
         op: "appendDescription",
-        text: "While Dancing: when you take damage from a creature within 5 ft, that attacker takes damage equal to two Dance Dice (weapon or Unarmed type you choose).",
+        text: "Enable Dance Style: Retaliatory Swipe (and Dancing). When a creature within 5 feet hits you with a melee attack, it takes two Dance Dice of your held-weapon or Unarmed Strike damage.",
       },
     ],
   },

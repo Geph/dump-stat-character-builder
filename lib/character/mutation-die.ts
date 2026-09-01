@@ -67,4 +67,15 @@ export function normalizeAllyBenefitCounts(
   )
 }
 
+/** Long-rest reset / summary only for sheets that actually use Flesh Warp. */
+export function shouldResetFleshWarpOnLongRest(params: {
+  hasFleshWarpAction?: boolean
+  mutationDie?: MutationDieGrant | null
+  allyBenefitCounts?: Record<string, number>
+}): boolean {
+  if (params.hasFleshWarpAction) return true
+  if (params.mutationDie != null) return true
+  return Object.values(params.allyBenefitCounts ?? {}).some((count) => count > 0)
+}
+
 export { RAMPAGE_DIE_STEPS as MUTATION_DIE_STEPS }
