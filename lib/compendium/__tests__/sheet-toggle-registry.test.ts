@@ -134,4 +134,19 @@ describe("sheet-toggle-registry", () => {
     )
     expect(inactiveSheetToggleLabel("Raging")).toBe("Not raging")
   })
+
+  it("hides Magic Weapon / Elemental Weapon from the banner (Combat weapon UI owns them)", () => {
+    expect(getSheetToggleDefinition("magic_weapon_active")).toMatchObject({
+      hideFromBanner: true,
+      defaultDuration: "until_ended",
+    })
+    expect(getSheetToggleDefinition("elemental_weapon_active")).toMatchObject({
+      hideFromBanner: true,
+      defaultDuration: "until_ended",
+    })
+    expect(sheetToggleIdActivatedByAction({ name: "Magic Weapon" })).toBe("magic_weapon_active")
+    expect(sheetToggleIdActivatedByAction({ name: "Elemental Weapon" })).toBe(
+      "elemental_weapon_active",
+    )
+  })
 })

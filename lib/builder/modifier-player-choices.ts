@@ -37,6 +37,10 @@ import { mergeToolNameLists, toolNamesForPool, type ToolChoicePool } from "@/lib
 import { SRD_TOOL_NAMES, getAllSeedToolNames } from "@/lib/compendium/srd-tools"
 import { languageOptionsForPool } from "@/lib/compendium/srd-languages"
 import { resolveSpeciesTraitPicks } from "@/lib/builder/species-trait-picks"
+import {
+  filterSpellsByAllowedSchools,
+  spellSchoolsFromChoiceLabel,
+} from "@/lib/builder/spell-grant-filters"
 import { getSpellLimits } from "@/lib/builder/spell-limits"
 import type { CustomAbility, DndClass, Feat, Feature, Spell, Species, Subclass } from "@/lib/types"
 
@@ -63,6 +67,10 @@ export type ModifierPlayerChoiceSlot = {
   spellLevel?: number
   /** When true, `spellLevel` is an inclusive max (grimoire-style), not an exact match. */
   spellLevelIsMax?: boolean
+  /** Class level at which this grant unlocks (grimoire +2 tiers, etc.). */
+  unlocksAtClassLevel?: number
+  /** When set, only these magic schools may be chosen (Fey/Shadow Touched, etc.). */
+  allowedSchools?: string[]
   spellListClassNames?: string[]
   requiresSpellListPick?: boolean
   spellListSlotKey?: string
@@ -369,6 +377,7 @@ function slotsFromCharacteristic(
       if (grant.count <= 0) return
       if (grant.unlocksAtClassLevel != null && grant.unlocksAtClassLevel > (context?.classLevel ?? 99)) return
       const upToLevel = grant.upToLevel === true && grant.level > 0
+      const allowedSchools = spellSchoolsFromChoiceLabel(spellMod.label)
       slots.push({
         slotKey: modifierPlayerChoiceSlotKey(sourceKey, mod.id, "spell", index),
         sourceKey,
@@ -384,6 +393,8 @@ function slotsFromCharacteristic(
         maxCount: grant.count,
         spellLevel: grant.level,
         spellLevelIsMax: upToLevel || undefined,
+        unlocksAtClassLevel: grant.unlocksAtClassLevel,
+        allowedSchools: allowedSchools.length > 0 ? allowedSchools : undefined,
         spellListClassNames:
           grant.classNames ??
           spellMod.spellListClassOptions ??
@@ -959,21 +970,56 @@ export function spellOptionsForModifierSlot(
 
   const classSet = new Set(classNames.map((name) => name.toLowerCase()))
   const maxLevel = slot.spellLevel
-  return spells.filter((spell) => {
-    if (slot.spellLevelIsMax) {
-      // Grimoire-style: any leveled spell up to the Ritual Level cap (no cantrips).
-      if (spell.level < 1 || spell.level > maxLevel!) return false
-    } else if (spell.level !== maxLevel) {
-      return false
-    }
-    if (otherSlotSpellIds.has(spell.id) && !ownPicks.includes(spell.id)) return false
-    if (classSet.size === 0) return true
-    return classNames.some((className) => spellMatchesClassName(spell, className))
-  })
+  return filterSpellsByAllowedSchools(
+    spells.filter((spell) => {
+      if (slot.spellLevelIsMax) {
+        // Grimoire-style: any leveled spell up to the Ritual Level cap (no cantrips).
+        if (spell.level < 1 || spell.level > maxLevel!) return false
+      } else if (spell.level !== maxLevel) {
+        return false
+      }
+      if (otherSlotSpellIds.has(spell.id) && !ownPicks.includes(spell.id)) return false
+      if (classSet.size === 0) return true
+      return classNames.some((className) => spellMatchesClassName(spell, className))
+    }),
+    slot.allowedSchools,
+  )
 }
 
 export function isSpellRelatedModifierSlot(slot: ModifierPlayerChoiceSlot): boolean {
   return slot.kind === "spell" || slot.kind === "spell_list_class"
+}
+
+/**
+ * Slots to render for one level-up `modifier_choice` step.
+ * Bundles Magic Initiate-style grants that unlock together (same unlock level /
+ * both unset), but keeps grimoire tiers on separate screens so catch-up picks
+ * do not all stack in one panel.
+ */
+export function modifierPlayerChoiceSlotsForLevelUpStep(
+  current: ModifierPlayerChoiceSlot,
+  allStepsSlots: ModifierPlayerChoiceSlot[],
+): ModifierPlayerChoiceSlot[] {
+  const sameUnlock = (slot: ModifierPlayerChoiceSlot) =>
+    (slot.unlocksAtClassLevel ?? null) === (current.unlocksAtClassLevel ?? null)
+
+  const bundled = allStepsSlots.filter((slot) => {
+    if (slot.sourceKey !== current.sourceKey) return false
+    if (slot.slotKey === current.slotKey) return true
+    if (slot.kind === "spell_list_class" && current.spellListSlotKey === slot.slotKey) {
+      return true
+    }
+    if (slot.kind === "spellcasting_ability" && slot.modId === current.modId) {
+      return true
+    }
+    if (slot.kind === "spell" && current.kind === "spell" && slot.modId === current.modId) {
+      return sameUnlock(slot)
+    }
+    return false
+  })
+
+  if (bundled.some((slot) => slot.slotKey === current.slotKey)) return bundled
+  return [current, ...bundled.filter((slot) => slot.slotKey !== current.slotKey)]
 }
 
 export function spellModifierPlayerChoiceSlots(

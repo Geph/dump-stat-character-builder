@@ -277,24 +277,33 @@ export function buildDefaultModifierCatalog(): ModifierCatalogEntry[] {
           : groupMeta
             ? `${groupMeta.label} — ${option.label}`
             : option.label
+    const effect: import("@/lib/types").FeatureEffect = {
+      id: `fx_${option.value}`,
+      kind: option.value,
+      ...(option.value === "grant_inspiration" ? { healTarget: "self" as const, label: "Heroic Inspiration" } : {}),
+    }
     entries.push({
       id: catalogId("fx", option.value),
       name,
       group: ACTION_EFFECT_GROUP[option.group] ?? "Active abilities",
-      summary,
+      summary:
+        option.value === "grant_inspiration"
+          ? "Flip Heroic Inspiration on when this feature is used (self or chosen ally)"
+          : summary,
       activation: {
-        effects: [{ id: `fx_${option.value}`, kind: option.value }],
+        effects: [effect],
       },
     })
   }
 
   entries.push({
     id: catalogId("other", "gain_inspiration"),
-    name: "Gain Inspiration",
+    name: "Gain Inspiration (narrative)",
     group: "Other",
-    summary: "Narrative marker: gain Heroic Inspiration (no automatic sheet state change)",
+    summary:
+      "Narrative marker for rest/luck triggers — for sheet toggles use Grant Heroic Inspiration (cat_fx_grant_inspiration)",
     description:
-      "<p>The character gains Heroic Inspiration. Configure when inspiration is granted in the linked feature or trait description (e.g. after a long rest, or when rolling a natural 1 on a d20).</p>",
+      "<p>Marks that the character gains Heroic Inspiration from a narrative trigger (e.g. after a long rest, or when rolling a natural 1). For actionable grants that flip the sheet Inspiration toggle when a feature is used, attach <strong>Grant Heroic Inspiration</strong> instead and set the target to self or ally.</p>",
   })
 
   entries.push(buildWeaponMasteryCatalogEntry())

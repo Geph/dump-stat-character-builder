@@ -9,6 +9,7 @@ describe("sheet play-state resource die overrides", () => {
   it("defaults mutable resource die state to an empty map", () => {
     expect(defaultSheetPlayState().resourceDieSidesByKey).toEqual({})
     expect(defaultSheetPlayState().sheetToggleNotes).toEqual({})
+    expect(defaultSheetPlayState().sheetToggleWeaponIds).toEqual({})
     expect(defaultSheetPlayState().mutationDie).toBeNull()
     expect(defaultSheetPlayState().fleshWarpAllyBenefitCounts).toEqual({})
     expect(defaultSheetPlayState().illusionTokens).toEqual([])

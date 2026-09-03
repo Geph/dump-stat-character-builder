@@ -25,9 +25,7 @@ import {
   COMPENDIUM_TOGGLE_LABELS,
   contentTypeToTable,
   findCompendiumDependents,
-  findCompendiumDependentsForTargets,
   findDisabledCompendiumDependents,
-  groupCompendiumToggleTargets,
   isProtectedSystemCompendiumRow,
   setCompendiumItemsEnabled,
   type CompendiumToggleTarget,
@@ -323,7 +321,6 @@ export default function CompendiumPageClient() {
   const [classResourceFilterClassId, setClassResourceFilterClassId] = useState<string>("all")
   const [bulkToggleConfirm, setBulkToggleConfirm] = useState<{
     items: CompendiumToggleTarget[]
-    dependents: CompendiumToggleTarget[]
   } | null>(null)
   const [classNamesById, setClassNamesById] = useState<Record<string, string>>({})
   const [tabCounts, setTabCounts] = useState<Record<ContentType, number>>({
@@ -1147,19 +1144,10 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
       }))
   }, [activeTab, filteredContent])
 
-  const handleDisableDisplayed = async () => {
+  const handleDisableDisplayed = () => {
     if (displayedDisableTargets.length === 0) return
     setToggleError(null)
-    setToggleSaving(true)
-    try {
-      const db = createClient()
-      const dependents = await findCompendiumDependentsForTargets(db, displayedDisableTargets)
-      setBulkToggleConfirm({ items: displayedDisableTargets, dependents })
-    } catch (err) {
-      setToggleError(err instanceof Error ? err.message : "Failed to check related items")
-    } finally {
-      setToggleSaving(false)
-    }
+    setBulkToggleConfirm({ items: displayedDisableTargets })
   }
 
   const handleCopyItem = async (item: Record<string, unknown>) => {
@@ -1897,32 +1885,9 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                     : ` for ${resolveClassFilterName(classResourceFilterClassId, classNamesById) || "the selected class"}`
                   : ""}
                 {creatureTypeFilter !== "all" ? ` of type ${creatureTypeFilter}` : ""}
-                {searchQuery.trim() ? " that match your search" : ""}. Related entries
-                that depend on them can be disabled at the same time.
+                {searchQuery.trim() ? " that match your search" : ""}. Related
+                subclasses, resources, or other entries stay enabled.
               </p>
-              {bulkToggleConfirm.dependents.length > 0 ? (
-                <div className="max-h-56 overflow-y-auto space-y-3 mb-4 rounded-xl border border-border bg-muted/30 p-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                    Related items that will also be disabled
-                  </p>
-                  {groupCompendiumToggleTargets(bulkToggleConfirm.dependents).map((group) => (
-                    <div key={group.contentType}>
-                      <p className="text-sm font-semibold text-foreground">
-                        {group.label} · {group.names.length}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {group.names.length > 8
-                          ? `${group.names.slice(0, 8).join(", ")} +${group.names.length - 8} more`
-                          : group.names.join(", ")}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground mb-4">
-                  No related subclasses, resources, or other entries were found.
-                </p>
-              )}
               {toggleError && <p className="text-sm text-destructive mb-4">{toggleError}</p>}
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
@@ -1940,24 +1905,11 @@ const UNASSIGNED_SPELL_CLASS = "__unassigned__"
                   type="button"
                   onClick={() => void applyItemEnabled(bulkToggleConfirm.items, false).then(() => setBulkToggleConfirm(null))}
                   disabled={toggleSaving}
-                  className="flex-1 px-4 py-3 bg-muted text-foreground rounded-xl font-semibold hover:bg-muted/80 transition-colors disabled:opacity-50"
-                >
-                  {toggleSaving ? "Saving..." : "Only displayed items"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    void applyItemEnabled(
-                      [...bulkToggleConfirm.items, ...bulkToggleConfirm.dependents],
-                      false,
-                    ).then(() => setBulkToggleConfirm(null))
-                  }
-                  disabled={toggleSaving}
                   className="flex-1 px-4 py-3 rounded-xl font-semibold bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
                 >
                   {toggleSaving
                     ? "Saving..."
-                    : `Disable all (${bulkToggleConfirm.items.length + bulkToggleConfirm.dependents.length})`}
+                    : `Disable displayed (${bulkToggleConfirm.items.length})`}
                 </button>
               </div>
             </div>

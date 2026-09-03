@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest"
 
 import {
   classifySpellUsage,
+  filterSpellsByAllowedSchools,
   filterSpellsBySchool,
   filterSpellsByUsage,
+  spellSchoolsFromChoiceLabel,
   uniqueSpellSchools,
 } from "@/lib/builder/spell-grant-filters"
 
@@ -32,6 +34,39 @@ describe("filterSpellsBySchool", () => {
       "Alarm",
       "Ward",
     ])
+  })
+})
+
+describe("spellSchoolsFromChoiceLabel", () => {
+  it("parses Fey Touched / Shadow Touched style labels", () => {
+    expect(spellSchoolsFromChoiceLabel("Divination or Enchantment")).toEqual([
+      "Divination",
+      "Enchantment",
+    ])
+    expect(
+      spellSchoolsFromChoiceLabel("Fey Magic: choose level-1 Divination or Enchantment spell"),
+    ).toEqual(["Divination", "Enchantment"])
+    expect(
+      spellSchoolsFromChoiceLabel("Shadow Magic: choose level-1 Illusion or Necromancy spell"),
+    ).toEqual(["Illusion", "Necromancy"])
+  })
+
+  it("returns empty when the label is a class list, not a school filter", () => {
+    expect(spellSchoolsFromChoiceLabel("Investigator spell list")).toEqual([])
+    expect(spellSchoolsFromChoiceLabel("Magic Initiate spells")).toEqual([])
+  })
+})
+
+describe("filterSpellsByAllowedSchools", () => {
+  it("leaves the list intact when no allowlist is set", () => {
+    expect(filterSpellsByAllowedSchools(SPELLS, null)).toEqual(SPELLS)
+    expect(filterSpellsByAllowedSchools(SPELLS, [])).toEqual(SPELLS)
+  })
+
+  it("keeps only allowed schools", () => {
+    expect(
+      filterSpellsByAllowedSchools(SPELLS, ["Divination", "Enchantment"]).map((spell) => spell.name),
+    ).toEqual(["Animal Friendship"])
   })
 })
 

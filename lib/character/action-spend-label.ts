@@ -30,8 +30,9 @@ export function formatActionSpendLabel(
 ): string {
   const qty = Math.abs(amount)
   const bare = stripResourceClassQualifier(resourceName) || "resource"
+  const noun = nounForCount(bare, qty).toLowerCase()
   if (actionName && resourceMatchesActionName(bare, actionName)) {
-    return String(qty)
+    return `uses ${qty} ${noun}`
   }
   return `${qty} ${nounForCount(bare, qty)}`
 }

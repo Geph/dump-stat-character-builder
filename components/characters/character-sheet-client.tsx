@@ -47,6 +47,7 @@ import {
   downloadCharacterExport,
 } from "@/lib/character/character-export-format"
 import { collectPartyAllyCandidates } from "@/lib/character/party-ally-candidates"
+import { formatClassIdentityLabel } from "@/lib/character/class-identity-label"
 import { applyIncomingHeal } from "@/lib/character/apply-heal-modifiers"
 import {
   normalizePartyCharacterIds,
@@ -421,6 +422,14 @@ import {
   toggleIdsEndedByPlayState,
   upsertToggleDurationReminder,
 } from "@/lib/character/sheet-toggle-duration"
+import {
+  clearWeaponBindingsForToggles,
+  isWeaponSpellBuffToggleId,
+  weaponSpellBuffDefinition,
+  weaponSpellBuffToggleForActionName,
+  WEAPON_SPELL_BUFFS,
+} from "@/lib/character/weapon-spell-buff"
+import { WeaponSpellBuffPickerOverlay } from "@/components/character-sheet/weapon-spell-buff-picker-overlay"
 import type { SheetActionEntry } from "@/lib/character/sheet-actions"
 import { SiteFooter } from "@/components/site-footer"
 import { WILD_SHAPE_DIRECTIONS, WILD_SHAPE_GAME_STATISTICS } from "@/lib/character/srd-beast-forms"
@@ -768,6 +777,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [exhaustionLevel, setExhaustionLevel] = useState(0)
   const [activeSheetToggleIds, setActiveSheetToggleIds] = useState<string[]>([])
   const [sheetToggleNotes, setSheetToggleNotes] = useState<Record<string, string>>({})
+  const [sheetToggleWeaponIds, setSheetToggleWeaponIds] = useState<Record<string, string>>({})
+  const [weaponSpellBuffPicker, setWeaponSpellBuffPicker] = useState<{
+    toggleId: string
+    label: string
+    hint: string
+  } | null>(null)
   const [toggleEffectsFocusId, setToggleEffectsFocusId] = useState<string | null>(null)
   const [sessionHydrated, setSessionHydrated] = useState(false)
   const [acFormulaPick, setAcFormulaPick] = useState<string | null>(null)
@@ -910,6 +925,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setExhaustionLevel(playState.exhaustionLevel)
         setActiveSheetToggleIds(playState.activeSheetToggleIds)
         setSheetToggleNotes(playState.sheetToggleNotes)
+        setSheetToggleWeaponIds(playState.sheetToggleWeaponIds)
         setUsedResourcesById(playState.usedResourcesById)
         setUsedActionUsesById(playState.usedActionUsesById)
         setUsedSpellSlotsByKey(playState.usedSpellSlotsByKey)
@@ -1029,6 +1045,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         exhaustionLevel,
         activeSheetToggleIds,
         sheetToggleNotes,
+        sheetToggleWeaponIds,
         usedResourcesById,
         usedActionUsesById,
         usedSpellSlotsByKey,
@@ -1060,6 +1077,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     exhaustionLevel,
     activeSheetToggleIds,
     sheetToggleNotes,
+    sheetToggleWeaponIds,
     usedResourcesById,
     usedActionUsesById,
     usedSpellSlotsByKey,
@@ -1190,6 +1208,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       attunedItemIds,
       equipmentBaseSelections,
       activeSheetToggles: effectiveSheetToggles,
+      sheetToggleWeaponIds,
       activeConditions,
       skillAbilityOverrides: manualSkillAbilityEnabled ? skillAbilityOverrides : undefined,
     }
@@ -1210,6 +1229,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     attunedItemIds,
     equipmentBaseSelections,
     activeSheetToggleIds,
+    sheetToggleWeaponIds,
     activeConditions,
     exhaustionLevel,
     currentHp,
@@ -1895,6 +1915,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             delete cleared[toggleId]
             return cleared
           })
+          if (isWeaponSpellBuffToggleId(toggleId)) {
+            setSheetToggleWeaponIds((bindings) => clearWeaponBindingsForToggles(bindings, [toggleId]))
+          }
         }
         if (!nowActive && toggleId === "while_dancing") {
           return clearExclusiveSheetToggleGroup(next, "dance_style", sheetToggleDefinitions)
@@ -1960,6 +1983,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           }
           return changed ? copy : notes
         })
+        setSheetToggleWeaponIds((bindings) => clearWeaponBindingsForToggles(bindings, cleared))
       }
       return next
     })
@@ -1985,6 +2009,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     setDurationReminders((prev) =>
       ended.reduce((acc, id) => removeRemindersForToggle(acc, id), prev),
     )
+    setSheetToggleWeaponIds((bindings) => clearWeaponBindingsForToggles(bindings, ended))
     if (endedDancing) {
       setSheetToggleNotes((notes) => {
         if (!("while_dancing" in notes)) return notes
@@ -2863,6 +2888,66 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     originFeat,
     activeSheetToggleIds,
   ])
+
+  const bindWeaponSpellBuff = useCallback(
+    (toggleId: string, weaponId: string) => {
+      activateSheetToggle(toggleId)
+      setSheetToggleWeaponIds((prev) => ({ ...prev, [toggleId]: weaponId }))
+      const weaponName =
+        equipment.find((item) => item.id === weaponId)?.name ??
+        equippedWeaponCards.find((card) => card.weapon.id === weaponId)?.weapon.name
+      if (weaponName) {
+        setSheetToggleNotes((previous) => ({ ...previous, [toggleId]: weaponName }))
+      }
+    },
+    [activateSheetToggle, equipment, equippedWeaponCards],
+  )
+
+  const toggleWeaponSpellBuffOnWeapon = useCallback(
+    (toggleId: string, weaponId: string) => {
+      const currentlyOnThis =
+        activeSheetToggleIds.includes(toggleId) && sheetToggleWeaponIds[toggleId] === weaponId
+      if (currentlyOnThis) {
+        toggleSheetToggle(toggleId)
+        return
+      }
+      bindWeaponSpellBuff(toggleId, weaponId)
+    },
+    [activeSheetToggleIds, bindWeaponSpellBuff, sheetToggleWeaponIds, toggleSheetToggle],
+  )
+
+  const beginWeaponSpellBuffFromCast = useCallback(
+    (spellName: string) => {
+      const toggleId = weaponSpellBuffToggleForActionName(spellName)
+      if (!toggleId) return
+      const def = weaponSpellBuffDefinition(toggleId)
+      if (!def) return
+      const uniqueWeapons = new Map<string, (typeof equippedWeaponCards)[number]["weapon"]>()
+      for (const card of equippedWeaponCards) {
+        if (card.weapon.id === "unarmed-strike") continue
+        uniqueWeapons.set(card.weapon.id, card.weapon)
+      }
+      const weapons = [...uniqueWeapons.values()]
+      if (weapons.length === 1) {
+        bindWeaponSpellBuff(toggleId, weapons[0]!.id)
+        return
+      }
+      setWeaponSpellBuffPicker({
+        toggleId,
+        label: `Enchant a weapon — ${def.label}`,
+        hint: def.hint,
+      })
+    },
+    [bindWeaponSpellBuff, equippedWeaponCards],
+  )
+
+  const availableWeaponSpellBuffs = useMemo(() => {
+    const known = new Set(sheetToggleDefinitions.map((entry) => entry.id))
+    return WEAPON_SPELL_BUFFS.filter((buff) => known.has(buff.toggleId)).map((buff) => ({
+      toggleId: buff.toggleId,
+      label: buff.label,
+    }))
+  }, [sheetToggleDefinitions])
 
   // Tools the character is proficient with are surfaced automatically in the
   // equipment list, even if they were never explicitly purchased/added.
@@ -4084,14 +4169,31 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const shareClassLabel = useMemo(() => {
     if (classDetails.length) {
       return classDetails
-        .map((entry) => `${entry.class?.name ?? "Class"} Level ${entry.row.level}`)
+        .map((entry) =>
+          formatClassIdentityLabel({
+            className: entry.class?.name,
+            subclassName: entry.subclass?.name,
+            level: entry.row.level,
+            style: "share",
+          }),
+        )
         .join(" · ")
     }
     if (character?.classes?.name) {
-      return `${character.classes.name} Level ${character.level}`
+      return formatClassIdentityLabel({
+        className: character.classes.name,
+        subclassName: character.subclasses?.name,
+        level: character.level,
+        style: "share",
+      })
     }
     return "Adventurer"
-  }, [classDetails, character?.classes?.name, character?.level])
+  }, [
+    classDetails,
+    character?.classes?.name,
+    character?.subclasses?.name,
+    character?.level,
+  ])
 
   const createShareSnapshot = useCallback(async () => {
     if (!character) return
@@ -4275,6 +4377,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       character.classes?.armor_proficiencies,
       character.armor_proficiencies,
     )
+  const knownLanguages = derived?.languages ?? character.languages ?? []
   const spellcastingClass =
     classDetails.find((entry) => entry.class?.spellcasting)?.class ?? character.classes
   const spellcastingAbilityLabel =
@@ -4712,7 +4815,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           key={`${entry.row.class_id}-${entry.row.order}`}
                           className={SHEET_BANNER_BADGE.class}
                         >
-                          {entry.class?.name ?? "Class"} {entry.row.level}
+                          {formatClassIdentityLabel({
+                            className: entry.class?.name,
+                            subclassName: entry.subclass?.name,
+                            level: entry.row.level,
+                          })}
                         </span>
                       ))
                     : (
@@ -5524,7 +5631,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   {!weaponProficiencies.length &&
                   !armorProficiencies.length &&
                   !(character.tool_proficiencies ?? []).length &&
-                  !(character.languages ?? []).length &&
+                  !knownLanguages.length &&
                   !hasSenseNotes ? (
                     <span className="text-xs text-muted-foreground">None listed</span>
                   ) : (
@@ -5596,11 +5703,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           ) : null}
                         </div>
                       )}
-                      {(character.languages ?? []).length > 0 && (
+                      {knownLanguages.length > 0 && (
                         <div className="rounded-lg border border-border/70 bg-muted/30 p-2.5">
                           <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Languages</p>
                           <div className="flex flex-wrap gap-1.5">
-                            {(character.languages ?? []).map((item) => (
+                            {knownLanguages.map((item) => (
                               <span
                                 key={`lang-${item}`}
                                 className="px-2 py-0.5 bg-muted text-foreground rounded-full text-xs"
@@ -6078,11 +6185,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                     onDamageRoll={markRampageDamageDealtThisTurn}
                                     powerRiders={derived?.powerRiders ?? []}
                                     weaponAbilityOverrides={derived?.weaponAbilityOverrides ?? []}
+                                    abilityMods={derived?.abilityMods ?? null}
                                     hideHeading
                                     activeSheetToggleIds={activeSheetToggleIds}
+                                    sheetToggleWeaponIds={sheetToggleWeaponIds}
+                                    availableWeaponSpellBuffs={availableWeaponSpellBuffs}
                                     onToggleMounted={(weaponId) =>
                                       toggleSheetToggle(mountedWeaponToggleId(weaponId))
                                     }
+                                    onToggleWeaponSpellBuff={toggleWeaponSpellBuffOnWeapon}
                                   />
                                 ),
                               }
@@ -6997,6 +7108,25 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           currentGold={characterGold}
           onAddItem={(item, options) => void handleAddEquipmentFromCatalog(item, options)}
         />
+        <WeaponSpellBuffPickerOverlay
+          open={Boolean(weaponSpellBuffPicker)}
+          title={weaponSpellBuffPicker?.label ?? "Enchant a weapon"}
+          hint={weaponSpellBuffPicker?.hint}
+          weapons={(() => {
+            const unique = new Map<string, Equipment>()
+            for (const card of equippedWeaponCards) {
+              if (card.weapon.id === "unarmed-strike") continue
+              unique.set(card.weapon.id, card.weapon)
+            }
+            return [...unique.values()]
+          })()}
+          onPick={(weaponId) => {
+            if (!weaponSpellBuffPicker) return
+            bindWeaponSpellBuff(weaponSpellBuffPicker.toggleId, weaponId)
+            setWeaponSpellBuffPicker(null)
+          }}
+          onCancel={() => setWeaponSpellBuffPicker(null)}
+        />
         {selectedSpell ? (
           <SpellDetailOverlay
             key="spell-detail"
@@ -7030,6 +7160,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               if (result.concentrationApplied) {
                 applyConcentration(result.concentrationApplied)
               }
+              beginWeaponSpellBuffFromCast(selectedSpell.name)
               if ((result.hitDiceSpent ?? 0) > 0) {
                 spendHitDiceForAction(result.hitDiceSpent!)
               }

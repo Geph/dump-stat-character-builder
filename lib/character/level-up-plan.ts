@@ -120,6 +120,40 @@ function isAsiFeature(name: string): boolean {
   return /ability score improvement|feat or asi|^asi$/i.test(name.trim())
 }
 
+function isEpicBoonFeature(name: string): boolean {
+  return /epic boon/i.test(name.trim())
+}
+
+/** Level 19 class milestones are Epic Boon only (not General / ASI). */
+function featCategoriesForMilestoneLevel(level: number, categories?: string[]): string[] | undefined {
+  if (level === 19) return ["Epic Boon"]
+  return categories?.length ? categories : undefined
+}
+
+function featOrAsiStepTitle(level: number, featureName: string, categories?: string[]): string {
+  if (level === 19 || categories?.includes("Epic Boon")) return "Choose Epic Boon"
+  if (categories?.length === 1) return `Choose ${categories[0]}`
+  if (categories?.length) return `Choose ${categories.join(" or ")}`
+  return `Choose a feat (level ${level})`
+}
+
+function alreadyHasFeatMilestoneAtLevel(steps: LevelUpChoiceStep[], level: number): boolean {
+  return steps.some((step) => {
+    if (step.kind !== "feat_or_asi" || step.level !== level) return false
+    if (
+      isAsiFeature(step.featureName) ||
+      isEpicBoonFeature(step.featureName) ||
+      /^feat$/i.test(step.featureName.trim())
+    ) {
+      return true
+    }
+    const categories = step.featCategories ?? []
+    // Fighting Style / Metamagic grants must not suppress the General / Epic Boon milestone.
+    if (!categories.length) return true
+    return categories.some((category) => /^(general|epic boon)$/i.test(category.trim()))
+  })
+}
+
 function featuresGainedAtLevel(
   features: Feature[] | undefined,
   fromLevel: number,
@@ -269,13 +303,15 @@ export function buildLevelUpPlan(params: {
 
   for (const feature of [...classFeatures, ...subclassFeatures]) {
     if (!isAsiFeature(feature.name)) continue
+    const featCategories = featCategoriesForMilestoneLevel(feature.level)
     steps.push({
       kind: "feat_or_asi",
       id: `asi:${classId}:${feature.level}`,
-      title: `Choose a feat (level ${feature.level})`,
+      title: featOrAsiStepTitle(feature.level, feature.name, featCategories),
       classId,
       featureName: feature.name,
       level: feature.level,
+      ...(featCategories ? { featCategories } : {}),
     })
   }
 
@@ -284,15 +320,23 @@ export function buildLevelUpPlan(params: {
     if (isAsiFeature(feature.name)) continue
     const grants = grantFeatsFromFeature(feature, catalog)
     if (!grants.length) continue
-    const featCategories = [...new Set(grants.flatMap((grant) => grant.featCategories))]
+    const fromGrants = [...new Set(grants.flatMap((grant) => grant.featCategories))]
+    const featCategories = featCategoriesForMilestoneLevel(
+      feature.level,
+      isEpicBoonFeature(feature.name) ? ["Epic Boon"] : fromGrants,
+    )
     steps.push({
       kind: "feat_or_asi",
       id: `feat:${classId}:${feature.level}:${feature.name}`,
-      title: grants[0]?.label ? `Choose ${grants[0].label}` : `Choose a feat (${feature.name})`,
+      title: featOrAsiStepTitle(
+        feature.level,
+        feature.name,
+        featCategories ?? fromGrants,
+      ),
       classId,
       featureName: feature.name,
       level: feature.level,
-      featCategories,
+      ...(featCategories ? { featCategories } : {}),
     })
   }
 
@@ -411,17 +455,18 @@ export function buildLevelUpPlan(params: {
   }
 
   if (FEAT_MILESTONES.includes(toLevel as (typeof FEAT_MILESTONES)[number])) {
-    const alreadyHasAsiStep = steps.some(
-      (step) => step.kind === "feat_or_asi" && isAsiFeature(step.featureName),
-    )
-    if (!alreadyHasAsiStep) {
+    // Any feat_or_asi at this class level (ASI, Epic Boon, Fighting Style grant, …) counts —
+    // do not add a second General-feat step after an Epic Boon feature.
+    if (!alreadyHasFeatMilestoneAtLevel(steps, toLevel)) {
+      const featCategories = featCategoriesForMilestoneLevel(toLevel)
       steps.push({
         kind: "feat_or_asi",
         id: `asi:${classId}:${toLevel}`,
-        title: `Choose a feat (level ${toLevel})`,
+        title: featOrAsiStepTitle(toLevel, toLevel === 19 ? "Epic Boon" : "Feat", featCategories),
         classId,
-        featureName: "Feat",
+        featureName: toLevel === 19 ? "Epic Boon" : "Feat",
         level: toLevel,
+        ...(featCategories ? { featCategories } : {}),
       })
     }
   }

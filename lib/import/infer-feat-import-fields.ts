@@ -1,3 +1,5 @@
+import { extractPrerequisiteFromDescription } from "@/lib/builder/choice-prerequisite"
+
 type FeatImportLike = {
   name: string
   description?: string | null
@@ -17,6 +19,9 @@ export function inferFeatImportFields<T extends FeatImportLike>(feat: T): T {
   if (!prerequisite) {
     const inline = description.match(/\(Prerequisite:\s*([^)]+)\)/i)
     if (inline?.[1]) prerequisite = inline[1].trim()
+  }
+  if (!prerequisite) {
+    prerequisite = extractPrerequisiteFromDescription(description)
   }
 
   // Prefer explicit Dark Gift / Planar Pact headers over a wrong LLM category (e.g. Dark Gift → Planar Pact).

@@ -6,9 +6,11 @@ import {
   collectClassFeatureModifierPlayerChoiceSlots,
   collectModifierPlayerChoiceSlots,
   isSpellRelatedModifierSlot,
+  modifierPlayerChoiceSlotsForLevelUpStep,
   optionsForExpertiseSlot,
   optionsForProficiencyGrantSlot,
   spellModifierPlayerChoiceSlots,
+  spellOptionsForModifierSlot,
 } from "@/lib/builder/modifier-player-choices"
 import { buildDefaultModifierCatalog } from "@/lib/compendium/modifier-catalog"
 import { enrichCustomFeatRow } from "@/lib/compendium/enrich-custom-feats"
@@ -242,9 +244,95 @@ describe("feat spell grant player choices", () => {
       const spellSlots = spellModifierPlayerChoiceSlots(
         slots.filter((slot) => slot.sourceKey === sourceKey),
       )
-      expect(spellSlots.some((slot) => slot.kind === "spell" && slot.spellLevel === 1)).toBe(true)
+      const pick = spellSlots.find((slot) => slot.kind === "spell" && slot.spellLevel === 1)
+      expect(pick).toBeTruthy()
+      expect(pick?.allowedSchools).toEqual(
+        name === "Fey Touched"
+          ? ["Divination", "Enchantment"]
+          : ["Illusion", "Necromancy"],
+      )
       expect(spellSlots.every(isSpellRelatedModifierSlot)).toBe(true)
     }
+  })
+})
+
+describe("modifierPlayerChoiceSlotsForLevelUpStep", () => {
+  const base = {
+    sourceKey: "class:investigator:Ritualist",
+    sourceLabel: "Ritualist",
+    modId: "spells_known_grimoire",
+    kind: "spell" as const,
+    maxCount: 2,
+    spellLevelIsMax: true as const,
+    spellListClassNames: ["Investigator"],
+  }
+
+  it("keeps separate grimoire unlock tiers on different screens", () => {
+    const tier1 = {
+      ...base,
+      slotKey: `${base.sourceKey}::${base.modId}::spell:1`,
+      label: "Choose 2 spells (up to level 1)",
+      spellLevel: 1,
+      unlocksAtClassLevel: 2,
+    }
+    const tier2 = {
+      ...base,
+      slotKey: `${base.sourceKey}::${base.modId}::spell:2`,
+      label: "Choose 2 spells (up to level 2)",
+      spellLevel: 2,
+      unlocksAtClassLevel: 3,
+    }
+    expect(modifierPlayerChoiceSlotsForLevelUpStep(tier2, [tier1, tier2])).toEqual([tier2])
+  })
+
+  it("bundles Magic Initiate-style grants that unlock together", () => {
+    const cantrips = {
+      ...base,
+      sourceKey: "feat:granted:mi",
+      sourceLabel: "Magic Initiate",
+      modId: "magic_initiate_spells",
+      slotKey: "feat:granted:mi::magic_initiate_spells::spell:0",
+      label: "Choose 2 cantrips",
+      spellLevel: 0,
+      spellLevelIsMax: undefined,
+      maxCount: 2,
+    }
+    const leveled = {
+      ...cantrips,
+      slotKey: "feat:granted:mi::magic_initiate_spells::spell:1",
+      label: "Choose 1 level-1 spell",
+      spellLevel: 1,
+      maxCount: 1,
+    }
+    expect(modifierPlayerChoiceSlotsForLevelUpStep(cantrips, [cantrips, leveled])).toEqual([
+      cantrips,
+      leveled,
+    ])
+  })
+})
+
+describe("spellOptionsForModifierSlot school allowlist", () => {
+  it("limits Fey Touched picks to Divination or Enchantment", () => {
+    const slot = {
+      slotKey: "feat:fey::pick::spell:0",
+      sourceKey: "feat:fey",
+      sourceLabel: "Fey Touched",
+      modId: "pick",
+      kind: "spell" as const,
+      label: "Choose 1 level-1 spell",
+      maxCount: 1,
+      spellLevel: 1,
+      allowedSchools: ["Divination", "Enchantment"],
+    }
+    const spells = [
+      { id: "charm-person", name: "Charm Person", level: 1, school: "Enchantment", classes: ["Wizard"] },
+      { id: "detect-magic", name: "Detect Magic", level: 1, school: "Divination", classes: ["Wizard"] },
+      { id: "burning-hands", name: "Burning Hands", level: 1, school: "Evocation", classes: ["Wizard"] },
+    ]
+    expect(spellOptionsForModifierSlot(slot, spells as never, {}).map((row) => row.name)).toEqual([
+      "Charm Person",
+      "Detect Magic",
+    ])
   })
 })
 

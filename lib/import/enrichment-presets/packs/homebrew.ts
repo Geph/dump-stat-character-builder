@@ -68,7 +68,7 @@ export const INVESTIGATOR_PRESETS: EnrichmentPreset[] = [
       { op: "clearLimitedUses" },
       {
         op: "appendDescription",
-        text: "When matching trinket items are present in this import (recognized by name), Dump Stat wires them to spend from your shared Trinkets pool. Item text itself must come from your source — Dump Stat does not invent or store those entries.",
+        text: "Holy Trinkets are additional Trinket options that spend from the same Trinkets pool as subclass trinkets. Each named holy trinket becomes its own sheet button (and inventory item when listed in the feature prose). Dump Stat does not invent item text.",
       },
     ],
   },

@@ -1,5 +1,6 @@
 import type { ResourceTrackerEntry } from "@/components/character-sheet/resource-uses-tracker"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import { formatClassIdentityLabel } from "@/lib/character/class-identity-label"
 import { collectFeatureUsesResources } from "@/lib/character/collect-feature-uses-resources"
 import { buildInputsFromSavedCharacter, computeDerivedCharacter } from "@/lib/character/compute-derived"
 import type { DashboardHydratedCharacter, DashboardCharacterRecord } from "@/lib/character/hydrate-dashboard"
@@ -86,10 +87,24 @@ function buildClassDetailList(character: DashboardCharacterRecord): CharacterCla
 function buildClassLabel(classDetails: CharacterClassDetail[], character: DashboardCharacterRecord): string {
   if (classDetails.length) {
     return classDetails
-      .map((entry) => `${entry.class?.name ?? "Class"} Level ${entry.row.level}`)
+      .map((entry) =>
+        formatClassIdentityLabel({
+          className: entry.class?.name,
+          subclassName: entry.subclass?.name,
+          level: entry.row.level,
+          style: "share",
+        }),
+      )
       .join(" · ")
   }
-  if (character.classes?.name) return `${character.classes.name} Level ${character.level}`
+  if (character.classes?.name) {
+    return formatClassIdentityLabel({
+      className: character.classes.name,
+      subclassName: character.subclasses?.name,
+      level: character.level,
+      style: "share",
+    })
+  }
   return "Adventurer"
 }
 

@@ -6,8 +6,8 @@ import { applyBundledCardImage } from "@/lib/compendium/card-image"
 import { withFilledChoiceOptionDescriptions } from "@/lib/compendium/choice-option-description"
 import {
   lookupSrdSpeciesChoiceOptionPreset,
-  speciesRowHasLanguageGrant,
   stripRedundantTraitSpellcastingAbility,
+  withStandardSpeciesLanguages,
 } from "@/lib/compendium/enrich-srd-species"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
@@ -485,19 +485,6 @@ function sentryRest(label = "Sentry's Rest") {
     ),
     magicalSleepNoSleep(label),
   ]
-}
-
-function standardLanguages(): LinkedModifierInstance {
-  return charInstance("modinst_species_languages", "cat_char_languages", [
-    {
-      id: modId("species_languages"),
-      type: "languages",
-      values: ["Common"],
-      choiceCount: 2,
-      choicePool: "standard",
-      label: "Languages (Common + two of your choice)",
-    },
-  ])
 }
 
 function replaceFailedSaveOnCondition(
@@ -1541,9 +1528,6 @@ const SPECIES_SIZE_OPTIONS: Record<string, string[]> = {
   Warforged: ["Small", "Medium"],
 }
 
-/** Species that receive the SRD-style Common + 2 language choice when not already granted. */
-const SPECIES_WITH_STANDARD_LANGUAGES = new Set(["Aasimar"])
-
 export function speciesHasTraitPresetRegistry(speciesName: string): boolean {
   const aliases = speciesNameAliases(speciesName)
   return (
@@ -1730,32 +1714,12 @@ export function enrichCustomSpeciesRow(
     next = { ...next, size_options: sizeOptions }
   }
 
-  if (
-    (SPECIES_WITH_STANDARD_LANGUAGES.has(speciesName) ||
-      speciesNameAliases(speciesName).some((alias) => SPECIES_WITH_STANDARD_LANGUAGES.has(alias))) &&
-    !speciesRowHasLanguageGrant(next)
-  ) {
-    const existing = Array.isArray(next.linkedModifiers)
-      ? (next.linkedModifiers as LinkedModifierInstance[])
-      : Array.isArray(next.linked_modifiers)
-        ? (next.linked_modifiers as LinkedModifierInstance[])
-        : []
-    const synced = syncModifierRefs({ linkedModifiers: [...existing, standardLanguages()] })
-    next = {
-      ...next,
-      linked_modifiers: synced.linkedModifiers,
-      linkedModifiers: synced.linkedModifiers,
-      modifier_refs: synced.modifierRefs,
-      modifierRefs: synced.modifierRefs,
-    }
-  }
-
-  if (!traits.length) return withSpeciesCardImage(next)
+  if (!traits.length) return withSpeciesCardImage(withStandardSpeciesLanguages(next))
 
   const enrichedTraits = traits.map((trait) =>
     applyPresetToTrait(speciesName, trait, options?.preferExactPresets),
   )
-  return withSpeciesCardImage({ ...next, traits: enrichedTraits })
+  return withSpeciesCardImage(withStandardSpeciesLanguages({ ...next, traits: enrichedTraits }))
 }
 
 /** @deprecated Use enrichCustomSpeciesRow */

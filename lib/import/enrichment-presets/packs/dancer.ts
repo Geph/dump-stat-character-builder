@@ -270,7 +270,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
               type: "power_rider",
               parentPowerNames: ["Extra Attack", "Attack"],
               alertSummary:
-                "Multi-target Extra Attack: extra attacks only if each attack is against a different target (see feature name for count).",
+                "Extra attacks only if each attack is against a different target (see feature name for count).",
             },
           ],
         },
@@ -280,11 +280,77 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
     ],
   },
   {
+    id: "dancer.class.four_target_extra_attack_replace",
+    pack: "dancer",
+    target: "class_feature",
+    match: { className: /dancer/i, name: /^four-target extra attack$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["replace_feature"],
+        preset: {
+          kind: "char_instance",
+          idKey: "four_target_extra_attack_replace",
+          catalogRefId: "cat_char_replace_feature",
+          characteristics: [
+            {
+              id: "char_four_target_extra_attack_replace",
+              type: "replace_feature",
+              replacedFeatureNames: ["Three-Target Extra Attack"],
+              label: "Replaces Three-Target Extra Attack",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "dancer.class.five_target_extra_attack_replace",
+    pack: "dancer",
+    target: "class_feature",
+    match: { className: /dancer/i, name: /^five-target extra attack$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["replace_feature"],
+        preset: {
+          kind: "char_instance",
+          idKey: "five_target_extra_attack_replace",
+          catalogRefId: "cat_char_replace_feature",
+          characteristics: [
+            {
+              id: "char_five_target_extra_attack_replace",
+              type: "replace_feature",
+              replacedFeatureNames: ["Four-Target Extra Attack", "Three-Target Extra Attack"],
+              label: "Replaces prior multi-target Extra Attack",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
     id: "dancer.class.heroic_dance",
     pack: "dancer",
     target: "class_feature",
     match: { className: /dancer/i, name: /^heroic dance$/i },
     operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "heroic_dance_inspiration",
+          catalogRefId: effectCatalogRefId("grant_inspiration"),
+          effects: [
+            {
+              id: modId("heroic_dance_inspiration"),
+              kind: "grant_inspiration",
+              healTarget: "self",
+              label: "Heroic Inspiration",
+            },
+          ],
+        },
+      },
       {
         op: "attachNamedPreset",
         preset: {
@@ -302,6 +368,7 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
         },
         replaceCharacteristicTypes: ["power_rider"],
       },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
     ],
   },
   {
@@ -341,23 +408,24 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
         preset: {
           kind: "char_instance",
           idKey: "fierce_start",
-          catalogRefId: "cat_char_damage_roll_modifiers",
+          catalogRefId: "cat_char_power_rider",
           characteristics: [
             {
               id: "char_fierce_start",
-              type: "damage_roll_modifiers",
-              entries: [{ bonus: 0, target: "all" }],
-              label: "Fierce Start: +CHA to weapon/Unarmed damage (first round)",
-              limitations: [requiresActiveToggleLimitation("first_turn_of_combat")],
+              type: "power_rider",
+              parentPowerNames: ["Attack", "Unarmed Strike"],
+              alertSummary:
+                "Fierce Start: on the first round of combat, you can add your Charisma modifier to weapon or Unarmed Strike damage (Damage modifiers next to Deadly D4s on the weapon DMG menu).",
             },
           ],
         },
-        replaceCharacteristicTypes: ["damage_roll_modifiers"],
+        replaceCharacteristicTypes: ["power_rider", "damage_roll_modifiers"],
       },
       {
         op: "appendDescription",
-        text: "Enable First turn of combat on round 1. Add your Charisma modifier to weapon or Unarmed Strike damage that round (label reminder — flat +0 entry is a sheet anchor).",
+        text: "Fierce Start appears under Damage modifiers on weapon / Unarmed Strike DMG rolls (+CHA). Use it on the first round of combat.",
       },
+      { op: "setSheetDisplay", sheetDisplay: { featuresTab: true, combatActions: true } },
     ],
   },
   {
@@ -422,8 +490,26 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
         },
       },
       {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "grand_finale",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "char_grand_finale",
+              type: "power_rider",
+              parentPowerNames: ["Attack", "Unarmed Strike"],
+              alertSummary:
+                "Grand Finale: while active, weapon hits are criticals — pick Grand Finale on the weapon DMG menu to roll double damage dice (defaults to the highest die option).",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["power_rider"],
+      },
+      {
         op: "appendDescription",
-        text: "Attack-action rider while Dance is active (enable Dancing) — not its own Action. Not usable on the first round of combat. Hits crit until end of turn; two extra attacks as a Bonus Action; then Dance ends. Restore by spending 2 Dances.",
+        text: "Attack-action rider while Dance is active (enable Dancing) — not its own Action. Not usable on the first round of combat. Hits crit until end of turn; two extra attacks as a Bonus Action; then Dance ends. Restore by spending 2 Dances. Crit damage: choose Grand Finale under Damage dice on the weapon DMG menu (double dice).",
       },
     ],
   },
@@ -557,6 +643,117 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
         op: "appendDescription",
         text: "Bonus Action Dodge when you have moved 30+ feet this turn.",
       },
+    ],
+  },
+  {
+    id: "dancer.subclass.sociable_start",
+    pack: "dancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /dancer/i, name: /^sociable start$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { combatActions: true, abilitiesActions: false, featuresTab: true },
+      },
+    ],
+  },
+  {
+    id: "dancer.subclass.beguiling_charm",
+    pack: "dancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /dancer/i, name: /^beguiling charm$/i },
+    operations: [
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { combatActions: true, featuresTab: true },
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "beguiling_charm_menu",
+          catalogRefId: "cat_char_resource_ability_menu",
+          characteristics: [
+            {
+              id: "mod_beguiling_charm",
+              type: "resource_ability_menu",
+              resourceKey: "dance_die",
+              options: [
+                {
+                  name: "Bad Influence",
+                  description:
+                    "While Charmed: the target subtracts your Dance Die from INT, WIS, and CHA saving throws.",
+                  resourceCost: 0,
+                },
+                {
+                  name: "Friend of My Friends",
+                  description:
+                    "While Charmed: the target subtracts your Dance Die from all its attack rolls.",
+                  resourceCost: 0,
+                },
+              ],
+              label: "Beguiling Charm — pick while Charmed",
+            },
+          ],
+        },
+        skipIfCharacteristicTypes: ["resource_ability_menu"],
+      },
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "fx_instance",
+          idKey: "beguiling_charm_friend",
+          catalogRefId: effectCatalogRefId("modify_creature"),
+          effects: [
+            {
+              id: modId("beguiling_charm_friend"),
+              kind: "modify_creature",
+              rollTarget: "enemy",
+              creatureModifyMode: "roll",
+              checkCategory: "attack",
+              label: "Friend of My Friends — subtract Dance Die from attacks",
+              buffBonus: {
+                mode: "die",
+                dieScaling: "class_resource",
+                classResourceKey: "dance_die",
+              },
+            },
+          ],
+        },
+      },
+      {
+        op: "appendDescription",
+        text: "Combat Passive: when you Charm a creature, pick Bad Influence or Friend of My Friends for the duration of the Charmed condition.",
+      },
+    ],
+  },
+  {
+    id: "dancer.subclass.heartbreaker",
+    pack: "dancer",
+    target: "subclass_feature",
+    match: { subclassClassName: /dancer/i, name: /^heartbreaker$/i },
+    operations: [
+      {
+        op: "attachNamedPreset",
+        preset: {
+          kind: "char_instance",
+          idKey: "heartbreaker",
+          catalogRefId: "cat_char_power_rider",
+          characteristics: [
+            {
+              id: "char_heartbreaker",
+              type: "power_rider",
+              parentPowerNames: ["Dance", "Enthralling Movement"],
+              parentMenuOptionNames: ["Enthralling Movement"],
+              alertSummary:
+                "On Enthralling Movement save (success or fail): deal Psychic damage equal to two Dance Dice.",
+            },
+          ],
+        },
+        replaceCharacteristicTypes: ["power_rider"],
+      },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
     ],
   },
   {

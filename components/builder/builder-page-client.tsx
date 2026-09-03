@@ -2256,6 +2256,9 @@ export default function BuilderPageClient() {
           featGranted: effectiveBackgroundFeatGranted,
         }),
       ],
+      speciesCatalog: species.map((row) => ({ id: row.id, name: row.name })),
+      classCatalog: classes.map((row) => ({ id: row.id, name: row.name })),
+      backgroundCatalog: backgrounds.map((row) => ({ id: row.id, name: row.name })),
     }),
     [
       effectiveArmorProficiencies,
@@ -2263,6 +2266,9 @@ export default function BuilderPageClient() {
       modifierPlayerChoiceSlots,
       modifierPlayerPicks,
       effectiveBackgroundFeatGranted,
+      species,
+      classes,
+      backgrounds,
     ],
   )
 
@@ -4997,6 +5003,9 @@ export default function BuilderPageClient() {
                 ownedFeatIds={ownedFeatIds}
                 speciesId={character.species_id}
                 backgroundId={character.background_id}
+                speciesCatalog={featPrerequisiteStats.speciesCatalog}
+                classCatalog={featPrerequisiteStats.classCatalog}
+                backgroundCatalog={featPrerequisiteStats.backgroundCatalog}
                 preferredFeatSources={preferredFeatSources}
                 armorProficiencies={featPrerequisiteStats.armorProficiencies}
                 abilityScores={featPrerequisiteStats.abilityScores}

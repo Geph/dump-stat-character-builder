@@ -76,6 +76,79 @@ describe("buildLevelUpPlan", () => {
     })
     expect(plan?.steps.some((step) => step.kind === "feat_or_asi")).toBe(true)
   })
+
+  it("offers only Epic Boon at level 19 and does not add a second General feat step", () => {
+    const cls = {
+      id: "fighter",
+      name: "Fighter",
+      features: [
+        feature("Ability Score Improvement", 4),
+        feature("Epic Boon", 19, {
+          description:
+            "You gain an Epic Boon feat or another feat of your choice for which you qualify.",
+          linkedModifiers: [
+            {
+              instanceId: "epic",
+              catalogRefId: "cat_char_grant_feat",
+              characteristics: [
+                {
+                  id: "g",
+                  type: "grant_feat",
+                  featCategories: ["Epic Boon"],
+                  count: 1,
+                },
+              ],
+            },
+          ],
+        }),
+      ],
+    } as DndClass
+    const entry: CharacterClassDetail = {
+      row: { class_id: "fighter", level: 18, subclass_id: null, order: 0 },
+      class: cls,
+      subclass: null,
+    }
+    const plan = buildLevelUpPlan({
+      entry,
+      subclasses: [],
+      currentTotalLevel: 18,
+      featureChoicePicks: {},
+      modifierCatalog: FEAT_MODIFIER_PRESETS as never,
+    })
+    const featSteps = plan?.steps.filter((step) => step.kind === "feat_or_asi") ?? []
+    expect(featSteps).toHaveLength(1)
+    expect(featSteps[0]).toMatchObject({
+      level: 19,
+      featCategories: ["Epic Boon"],
+      title: "Choose Epic Boon",
+    })
+  })
+
+  it("forces Epic Boon categories when level 19 is an ASI feature name", () => {
+    const cls = {
+      id: "alt_monk",
+      name: "Alternate Monk",
+      features: [feature("Ability Score Improvement", 19)],
+    } as DndClass
+    const entry: CharacterClassDetail = {
+      row: { class_id: "alt_monk", level: 18, subclass_id: null, order: 0 },
+      class: cls,
+      subclass: null,
+    }
+    const plan = buildLevelUpPlan({
+      entry,
+      subclasses: [],
+      currentTotalLevel: 18,
+      featureChoicePicks: {},
+    })
+    const featSteps = plan?.steps.filter((step) => step.kind === "feat_or_asi") ?? []
+    expect(featSteps).toHaveLength(1)
+    expect(featSteps[0]).toMatchObject({
+      level: 19,
+      featCategories: ["Epic Boon"],
+      title: "Choose Epic Boon",
+    })
+  })
 })
 
 const FORMULAS_KEY = "alchemist:L2:Bomb Formulas"

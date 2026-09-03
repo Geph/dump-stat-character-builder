@@ -140,4 +140,40 @@ describe("feature sheet display", () => {
       restDialogues: true,
     })
   })
+
+  it("files first-round-of-combat openers on Combat even when stamped Abilities-only", () => {
+    const feature = {
+      level: 6,
+      name: "Sociable Start",
+      description:
+        "During the first round of combat, you can take the Influence action as a Bonus Action and have Advantage on ability checks you make using that action.",
+      activation: { bonusAction: true },
+      sheetDisplay: {
+        featuresTab: true,
+        abilitiesActions: true,
+        combatActions: false,
+      },
+    }
+    expect(resolveFeatureSheetDisplay(feature)).toEqual({
+      featuresTab: true,
+      abilitiesActions: false,
+      combatActions: true,
+      restDialogues: false,
+    })
+  })
+
+  it("routes non-action enemy combat impact to Combat tab", () => {
+    const feature = {
+      level: 10,
+      name: "Beguiling Charm",
+      description:
+        "When you give a creature the Charmed condition, you can choose an effect. Friend of My Friends. The target subtracts your Dance Die from all its attack rolls.",
+    }
+    expect(inferFeatureSheetDisplay(feature as unknown as import("@/lib/character/sheet-actions").ActivatableItem)).toEqual({
+      featuresTab: true,
+      abilitiesActions: false,
+      combatActions: true,
+      restDialogues: false,
+    })
+  })
 })

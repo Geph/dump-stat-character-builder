@@ -45,6 +45,8 @@ function className(content: JsonRecord): string {
   return String(asRecord(classes[0])?.name ?? "")
 }
 
+import { parseTrinketEntries } from "@/lib/import/enrichment-presets/packs/investigator"
+
 function ensureEquipmentFromHolyTrinkets(content: JsonRecord): void {
   const classes = content.classes
   if (!Array.isArray(classes) || !classes.length) return
@@ -53,23 +55,19 @@ function ensureEquipmentFromHolyTrinkets(content: JsonRecord): void {
   const holy = features.map(asRecord).find((f) => /^holy trinkets$/i.test(String(f?.name ?? "")))
   if (!holy) return
   const desc = String(holy.description ?? "")
+  const parsed = parseTrinketEntries(desc)
+  if (!parsed.length) return
   const equipment = Array.isArray(content.equipment) ? [...content.equipment] : []
   const existing = new Set(
     equipment.map((e) => String(asRecord(e)?.name ?? "").toLowerCase()).filter(Boolean),
   )
-  for (const name of ["Amulet of Warding", "Restorative Ankh", "Rune of Banishment"]) {
-    if (existing.has(name.toLowerCase())) continue
-    const re = new RegExp(
-      `<strong>${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.?</strong>\\s*([\\s\\S]*?)(?=<strong>|$)`,
-      "i",
-    )
-    const m = desc.match(re)
-    const body = (m?.[1] ?? name).replace(/<\/?p>/gi, "").trim()
+  for (const trinket of parsed) {
+    if (existing.has(trinket.name.toLowerCase())) continue
     equipment.push({
-      name,
+      name: trinket.name,
       category: "Adventuring Gear",
       subcategory: null,
-      description: `<p>${body}</p>`,
+      description: `<p>${trinket.description}</p>`,
       cost: null,
       weight: null,
       properties: null,

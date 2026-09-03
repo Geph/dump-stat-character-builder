@@ -1069,28 +1069,37 @@ function enrichSrdSpeciesRowCore(row: Record<string, unknown>): Record<string, u
     next = { ...next, size_options: sizeOptions }
   }
 
-  // Origin languages (Common + two of your choice) — every SRD species grants these.
-  // Only add when the species doesn't already carry a language grant of its own.
-  if (!speciesRowHasLanguageGrant(next)) {
-    const existing = Array.isArray(next.linkedModifiers)
-      ? (next.linkedModifiers as LinkedModifierInstance[])
-      : Array.isArray(next.linked_modifiers)
-        ? (next.linked_modifiers as LinkedModifierInstance[])
-        : []
-    const synced = syncModifierRefs({ linkedModifiers: [...existing, standardLanguages()] })
-    next = {
-      ...next,
-      linked_modifiers: synced.linkedModifiers,
-      linkedModifiers: synced.linkedModifiers,
-      modifier_refs: synced.modifierRefs,
-      modifierRefs: synced.modifierRefs,
-    }
-  }
-
-  if (!traits.length) return next
+  if (!traits.length) return withStandardSpeciesLanguages(next)
 
   const enrichedTraits = traits.map((trait) => applyPresetToTrait(speciesName, trait))
-  return { ...next, traits: enrichedTraits }
+  return withStandardSpeciesLanguages({ ...next, traits: enrichedTraits })
+}
+
+function walkSpeciesLanguageModifiers(
+  row: Record<string, unknown>,
+  predicate: (mod: CharacteristicModifier) => boolean,
+): boolean {
+  const matches = (instances: unknown) =>
+    Array.isArray(instances) &&
+    instances.some((inst) => {
+      if (!inst || typeof inst !== "object") return false
+      const linked = inst as LinkedModifierInstance
+      return (linked.characteristics ?? []).some(
+        (characteristic) => characteristic?.type === "languages" && predicate(characteristic),
+      )
+    })
+
+  if (matches(recordLinkedModifiers(row))) return true
+
+  const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
+  return traits.some((trait) => {
+    const traitRow = trait as unknown as Record<string, unknown>
+    if (matches(trait.linkedModifiers) || matches(traitRow.linked_modifiers)) return true
+    return (trait.choices?.options ?? []).some((option) => {
+      const optionRow = option as unknown as Record<string, unknown>
+      return matches(option.linkedModifiers) || matches(optionRow.linked_modifiers)
+    })
+  })
 }
 
 function linkedModifiersHaveLanguageGrant(instances: unknown): boolean {
@@ -1120,7 +1129,7 @@ export function speciesRowHasLanguageGrant(row: Record<string, unknown>): boolea
 
   const traits = Array.isArray(row.traits) ? (row.traits as Trait[]) : []
   return traits.some((trait) => {
-    const traitRow = trait as unknown as unknown as Record<string, unknown>
+    const traitRow = trait as unknown as Record<string, unknown>
     if (
       linkedModifiersHaveLanguageGrant(trait.linkedModifiers) ||
       linkedModifiersHaveLanguageGrant(traitRow.linked_modifiers)
@@ -1128,13 +1137,43 @@ export function speciesRowHasLanguageGrant(row: Record<string, unknown>): boolea
       return true
     }
     return (trait.choices?.options ?? []).some((option) => {
-      const optionRow = option as unknown as unknown as Record<string, unknown>
+      const optionRow = option as unknown as Record<string, unknown>
       return (
         linkedModifiersHaveLanguageGrant(option.linkedModifiers) ||
         linkedModifiersHaveLanguageGrant(optionRow.linked_modifiers)
       )
     })
   })
+}
+
+/** True when the species already offers a player language pick (not only a fixed list). */
+export function speciesRowHasLanguageChoice(row: Record<string, unknown>): boolean {
+  return walkSpeciesLanguageModifiers(
+    row,
+    (mod) => mod.type === "languages" && (mod.choiceCount ?? 0) > 0,
+  )
+}
+
+/**
+ * SRD origin languages: Common plus two from the Standard Languages table.
+ * Applied when the species text never offered a language choice (typical for MotM /
+ * older lineages that only listed Common or a fixed pair).
+ */
+export function withStandardSpeciesLanguages(row: Record<string, unknown>): Record<string, unknown> {
+  if (speciesRowHasLanguageChoice(row)) return row
+  const existing = Array.isArray(row.linkedModifiers)
+    ? (row.linkedModifiers as LinkedModifierInstance[])
+    : Array.isArray(row.linked_modifiers)
+      ? (row.linked_modifiers as LinkedModifierInstance[])
+      : []
+  const synced = syncModifierRefs({ linkedModifiers: [...existing, standardLanguages()] })
+  return {
+    ...row,
+    linked_modifiers: synced.linkedModifiers,
+    linkedModifiers: synced.linkedModifiers,
+    modifier_refs: synced.modifierRefs,
+    modifierRefs: synced.modifierRefs,
+  }
 }
 
 export function enrichSrdSpeciesList(rows: Record<string, unknown>[]): Record<string, unknown>[] {

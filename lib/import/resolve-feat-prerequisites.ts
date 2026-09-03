@@ -340,6 +340,123 @@ export function hasArmorTraining(
   })
 }
 
+export type FeatIdentityCatalogEntry = {
+  id: string
+  name: string
+}
+
+export type FeatIdentityCatalogs = {
+  feats?: FeatIdentityCatalogEntry[]
+  species?: FeatIdentityCatalogEntry[]
+  classes?: FeatIdentityCatalogEntry[]
+  backgrounds?: FeatIdentityCatalogEntry[]
+}
+
+type FeatIdentityMatch = {
+  kind: "feat" | "species" | "class" | "background"
+  id: string
+}
+
+function normalizeIdentityName(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/^(?:the|a|an)\s+/i, "")
+}
+
+function identityNamesMatch(entryName: string, required: string): boolean {
+  const entry = normalizeIdentityName(entryName)
+  const need = normalizeIdentityName(required)
+  if (!entry || !need) return false
+  if (entry === need) return true
+  const entryCore = entry.replace(/\s*\([^)]*\)\s*/g, " ").trim()
+  const needCore = need.replace(/\s*\([^)]*\)\s*/g, " ").trim()
+  if (entryCore && needCore && entryCore === needCore) return true
+  if (entry === needCore || need === entryCore) return true
+  return false
+}
+
+function findIdentityId(
+  catalog: FeatIdentityCatalogEntry[] | undefined,
+  required: string,
+): string | null {
+  if (!catalog?.length) return null
+  const match = catalog.find((entry) => identityNamesMatch(entry.name, required))
+  return match?.id ?? null
+}
+
+export function splitFeatPrerequisiteAlternatives(name: string): string[] {
+  return name
+    .split(/\s+or\s+/i)
+    .map((part) => part.trim().replace(/\.$/, ""))
+    .filter(Boolean)
+}
+
+/**
+ * Leftover freeform names (after level / armor / ability / campaign) that match a
+ * feat, species, class, or background. Unmatched phrases (e.g. "Fighting Style
+ * Feature") are ignored so we do not hide the feat.
+ */
+function impliedPrerequisiteFeatNames(
+  featName: string,
+  feats: FeatIdentityCatalogEntry[] | undefined,
+): string[] {
+  const match = featName.trim().match(/^(.*)\s+retraining$/i)
+  if (!match || !feats?.length) return []
+  const stem = match[1].trim()
+  const candidates = [`${stem} Training`, stem]
+  return feats
+    .filter((entry) => candidates.some((name) => identityNamesMatch(entry.name, name)))
+    .map((entry) => entry.name)
+}
+
+export function featIdentityPrerequisiteMet(
+  feat: Pick<Feat, "name" | "prerequisite" | "prerequisite_feat_ids">,
+  params: {
+    ownedFeatIds: string[]
+    speciesId: string | null
+    backgroundId: string | null
+    classIds: string[]
+    catalogs: FeatIdentityCatalogs
+  },
+): boolean {
+  const parsed = parseFeatPrerequisite(feat.prerequisite)
+  const groups = [
+    ...parsed.prerequisiteFeatNames,
+    ...impliedPrerequisiteFeatNames(feat.name, params.catalogs.feats),
+  ]
+    .map(splitFeatPrerequisiteAlternatives)
+    .filter((group) => group.length > 0)
+  if (!groups.length) return true
+
+  const catalogs = params.catalogs
+  const owned = new Set(params.ownedFeatIds)
+
+  for (const alternatives of groups) {
+    const classified = alternatives.flatMap((name): FeatIdentityMatch[] => {
+      const featId = findIdentityId(catalogs.feats, name)
+      if (featId) return [{ kind: "feat", id: featId }]
+      const speciesId = findIdentityId(catalogs.species, name)
+      if (speciesId) return [{ kind: "species", id: speciesId }]
+      const classId = findIdentityId(catalogs.classes, name)
+      if (classId) return [{ kind: "class", id: classId }]
+      const backgroundId = findIdentityId(catalogs.backgrounds, name)
+      if (backgroundId) return [{ kind: "background", id: backgroundId }]
+      return []
+    })
+    if (!classified.length) continue
+    const satisfied = classified.some((entry) => {
+      if (entry.kind === "feat") return owned.has(entry.id)
+      if (entry.kind === "species") return params.speciesId === entry.id
+      if (entry.kind === "class") return params.classIds.includes(entry.id)
+      return params.backgroundId === entry.id
+    })
+    if (!satisfied) return false
+  }
+  return true
+}
+
 export function meetsAbilityScorePrerequisite(
   scores: Partial<Record<AbilityScoreKey, number>> | null | undefined,
   requirement: AbilityScorePrerequisite,

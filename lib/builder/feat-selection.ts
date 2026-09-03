@@ -1,5 +1,6 @@
 import { slotUsesCatalogFeatPicks } from "@/lib/builder/catalog-feat-options"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
+import { isCompendiumItemEnabled } from "@/lib/compendium/compendium-enabled"
 import { MAGIC_INITIATE_SPELL_LISTS } from "@/lib/builder/magic-initiate"
 import {
   baseCompendiumLookupKey,
@@ -7,8 +8,10 @@ import {
 } from "@/lib/compendium/prefer-same-source"
 import {
   collectMechanicalFeatPrerequisiteRules,
+  featIdentityPrerequisiteMet,
   hasArmorTraining,
   meetsAbilityScorePrerequisite,
+  type FeatIdentityCatalogs,
 } from "@/lib/import/resolve-feat-prerequisites"
 import type { Feat } from "@/lib/types"
 
@@ -51,6 +54,10 @@ export type FeatSlotContext = {
    * already has a Fighting Style feature or owns a Fighting Style feat).
    */
   hasFightingStyleAccess?: boolean
+  /** Used to resolve freeform "Giff" / "Farling" / class-name prerequisites. */
+  speciesCatalog?: FeatIdentityCatalogs["species"]
+  classCatalog?: FeatIdentityCatalogs["classes"]
+  backgroundCatalog?: FeatIdentityCatalogs["backgrounds"]
 }
 
 export function buildOwnedFeatIds(params: {
@@ -130,6 +137,8 @@ export function isFeatEligibleForCategories(
   context: FeatSlotContext,
   alsoFeatNames: string[] = [],
 ): boolean {
+  if (!isCompendiumItemEnabled(feat)) return false
+
   const normalizedCategories = new Set(categories.map(normalizeFeatCategory))
   const category = normalizeFeatCategory(feat.category)
   const isOriginSlot = [...normalizedCategories].some((entry) => isOriginSelectableCategory(entry))
@@ -212,6 +221,23 @@ export function isFeatEligibleForCategories(
   }
   if (feat.prerequisite_feat_ids?.length) {
     if (!feat.prerequisite_feat_ids.every((id) => context.ownedFeatIds.includes(id))) return false
+  }
+
+  if (
+    !featIdentityPrerequisiteMet(feat, {
+      ownedFeatIds: context.ownedFeatIds,
+      speciesId: context.speciesId,
+      backgroundId: context.backgroundId,
+      classIds: context.classIds,
+      catalogs: {
+        feats: context.feats,
+        species: context.speciesCatalog,
+        classes: context.classCatalog,
+        backgrounds: context.backgroundCatalog,
+      },
+    })
+  ) {
+    return false
   }
 
   const mechanicalRules = collectMechanicalFeatPrerequisiteRules(feat)

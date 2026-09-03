@@ -1,3 +1,5 @@
+import { DEFAULT_SPELL_SCHOOL_NAMES } from "@/lib/compendium/schools-of-magic"
+
 /** How a spell is typically used in play, inferred from its description. */
 export const SPELL_USAGE_CATEGORIES = [
   { id: "attack_save", label: "Attack / saving throw" },
@@ -29,6 +31,26 @@ export function uniqueSpellSchools(spells: Array<{ school?: string | null }>): s
   return [...seen].sort((a, b) => a.localeCompare(b))
 }
 
+/**
+ * Parse school allowlists from a spells_known label / spellChoiceLabel
+ * (e.g. "Divination or Enchantment", "Fey Magic: choose level-1 Illusion or Necromancy spell").
+ * Uses the SRD school catalog so labels stay stable without localStorage.
+ */
+export function spellSchoolsFromChoiceLabel(
+  label: string | null | undefined,
+  knownSchools: readonly string[] = DEFAULT_SPELL_SCHOOL_NAMES,
+): string[] {
+  if (!label?.trim()) return []
+  const found: string[] = []
+  for (const school of knownSchools) {
+    const escaped = school.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    if (new RegExp(`\\b${escaped}\\b`, "i").test(label)) {
+      found.push(school)
+    }
+  }
+  return found
+}
+
 /** Narrow a grant list to one school, or return it unchanged for "all". */
 export function filterSpellsBySchool<T extends { school?: string | null }>(
   spells: readonly T[],
@@ -36,6 +58,20 @@ export function filterSpellsBySchool<T extends { school?: string | null }>(
 ): T[] {
   if (!schoolFilter || schoolFilter === "all") return [...spells]
   return spells.filter((spell) => spell.school?.trim() === schoolFilter)
+}
+
+/** Keep spells whose school is in the allowlist (empty allowlist = no restriction). */
+export function filterSpellsByAllowedSchools<T extends { school?: string | null }>(
+  spells: readonly T[],
+  allowedSchools: readonly string[] | null | undefined,
+): T[] {
+  if (!allowedSchools?.length) return [...spells]
+  const allowed = new Set(allowedSchools.map((school) => school.trim().toLowerCase()).filter(Boolean))
+  if (allowed.size === 0) return [...spells]
+  return spells.filter((spell) => {
+    const school = spell.school?.trim().toLowerCase()
+    return Boolean(school && allowed.has(school))
+  })
 }
 
 export function spellUsageCategoryLabel(id: SpellUsageCategoryId): string {

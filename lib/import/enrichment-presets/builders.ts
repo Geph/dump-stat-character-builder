@@ -5,7 +5,10 @@ import {
   innateSorceryPreset,
 } from "@/lib/compendium/enrich-srd-class-features"
 import { createModifierInstanceId, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
-import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
+import {
+  characteristicCatalogRefId,
+  effectCatalogRefId,
+} from "@/lib/compendium/modifier-catalog-refs"
 import { charInstance, fxInstance, modId, usesInstance } from "@/lib/compendium/modifier-instance-builders"
 import type { NamedModifierPreset } from "@/lib/import/enrichment-presets/types"
 import { prefixedResourceKey, slugClassPrefix } from "@/lib/import/third-party-resources"
@@ -141,6 +144,16 @@ function finisherModifiers(): LinkedModifierInstance[] {
         },
       ],
     }),
+    charInstance(createModifierInstanceId(), characteristicCatalogRefId("power_rider"), [
+      {
+        id: modId("finisher_power_rider"),
+        type: "power_rider",
+        parentPowerNames: ["Attack", "Unarmed Strike"],
+        label: "Finisher",
+        alertSummary:
+          "Finisher: once per turn vs a Bloodied target, add Finisher dice under Damage modifiers on the weapon DMG menu.",
+      },
+    ]),
   ]
 }
 
@@ -166,6 +179,16 @@ function improvedFinisherModifiers(): LinkedModifierInstance[] {
         },
       ],
     }),
+    charInstance(createModifierInstanceId(), characteristicCatalogRefId("power_rider"), [
+      {
+        id: modId("improved_finisher_power_rider"),
+        type: "power_rider",
+        parentPowerNames: ["Attack", "Unarmed Strike"],
+        label: "Improved Finisher",
+        alertSummary:
+          "Improved Finisher: once per turn on a hit, add Finisher dice under Damage modifiers on the weapon DMG menu.",
+      },
+    ]),
   ]
 }
 
@@ -314,7 +337,9 @@ export function resolveRemapTarget(to: string, className: string): string {
 
 export { enrichReagentResourceUses }
 
-function holyTrinketPoolSpend(label: string): LinkedModifierInstance {
+const MAGIC_WEAPON_TOGGLE = "magic_weapon_active"
+
+function trinketPoolSpend(label: string): LinkedModifierInstance {
   return usesInstance(
     createModifierInstanceId(),
     {
@@ -326,21 +351,73 @@ function holyTrinketPoolSpend(label: string): LinkedModifierInstance {
   )
 }
 
+function freeCastTrinketSpell(
+  instanceKey: string,
+  spellName: string,
+  opts?: { bonusAction?: boolean; action?: boolean },
+): LinkedModifierInstance {
+  return fxInstance(createModifierInstanceId(), effectCatalogRefId("cast_spell"), {
+    ...(opts?.bonusAction ? { bonusAction: true } : {}),
+    ...(opts?.action ? { action: true } : {}),
+    effects: [
+      {
+        id: modId(instanceKey),
+        kind: "cast_spell",
+        castSpellName: spellName,
+        castSpellWithoutSlot: true,
+        label: `${spellName} without a spell slot or components`,
+      },
+    ],
+  })
+}
+
+function magicWeaponBuffModifiers(label: string): LinkedModifierInstance[] {
+  return [
+    charInstance(createModifierInstanceId(), characteristicCatalogRefId("attack_roll_modifiers"), [
+      {
+        id: modId(`${label}_atk`),
+        type: "attack_roll_modifiers",
+        label: "Magic Weapon (+1 attack)",
+        requiresSheetToggle: MAGIC_WEAPON_TOGGLE,
+        entries: [{ bonus: 1, target: "all" }],
+      },
+    ]),
+    charInstance(createModifierInstanceId(), characteristicCatalogRefId("damage_roll_modifiers"), [
+      {
+        id: modId(`${label}_dmg`),
+        type: "damage_roll_modifiers",
+        label: "Magic Weapon (+1 damage)",
+        requiresSheetToggle: MAGIC_WEAPON_TOGGLE,
+        entries: [{ bonus: 1, target: "all" }],
+      },
+    ]),
+  ]
+}
+
 /**
- * Name → mechanical wiring for Investigator holy trinkets.
+ * Name → mechanical wiring for Investigator trinkets (subclass + holy).
  * Recognition only — never invents equipment rows or ships item prose.
- * When an import already includes these item names, attach pool spend + activations.
  */
 export type KnownEquipmentNameWiring = {
   magic_effects: LinkedModifierInstance[]
 }
 
 export function investigatorHolyTrinketWiringByName(): Record<string, KnownEquipmentNameWiring> {
+  const all = investigatorTrinketWiringByName()
+  return {
+    "amulet of warding": all["amulet of warding"]!,
+    "restorative ankh": all["restorative ankh"]!,
+    "rune of banishment": all["rune of banishment"]!,
+  }
+}
+
+export function investigatorTrinketWiringByName(): Record<string, KnownEquipmentNameWiring> {
+  const dragonTypes = ["Acid", "Cold", "Fire", "Force", "Lightning", "Poison", "Thunder"]
   return {
     "amulet of warding": {
       magic_effects: [
-        holyTrinketPoolSpend("Amulet of Warding"),
-        fxInstance("modinst_amulet_of_warding", "cat_fx_boost_ac", {
+        trinketPoolSpend("Amulet of Warding"),
+        fxInstance(createModifierInstanceId(), effectCatalogRefId("boost_ac"), {
           bonusAction: true,
           effects: [
             {
@@ -359,8 +436,8 @@ export function investigatorHolyTrinketWiringByName(): Record<string, KnownEquip
     },
     "restorative ankh": {
       magic_effects: [
-        holyTrinketPoolSpend("Restorative Ankh"),
-        fxInstance("modinst_restorative_ankh", "cat_fx_heal_self", {
+        trinketPoolSpend("Restorative Ankh"),
+        fxInstance(createModifierInstanceId(), effectCatalogRefId("heal_self"), {
           bonusAction: true,
           effects: [
             {
@@ -377,8 +454,8 @@ export function investigatorHolyTrinketWiringByName(): Record<string, KnownEquip
     },
     "rune of banishment": {
       magic_effects: [
-        holyTrinketPoolSpend("Rune of Banishment"),
-        fxInstance("modinst_rune_of_banishment", "cat_fx_force_save_control", {
+        trinketPoolSpend("Rune of Banishment"),
+        fxInstance(createModifierInstanceId(), effectCatalogRefId("force_save_control"), {
           bonusAction: true,
           effects: [
             {
@@ -391,12 +468,105 @@ export function investigatorHolyTrinketWiringByName(): Record<string, KnownEquip
         }),
       ],
     },
+    "consecrated whetstone": {
+      magic_effects: [
+        trinketPoolSpend("Consecrated Whetstone"),
+        freeCastTrinketSpell("consecrated_whetstone_cast", "Magic Weapon", { bonusAction: true }),
+        ...magicWeaponBuffModifiers("consecrated_whetstone"),
+      ],
+    },
+    "fogstone periapt": {
+      magic_effects: [
+        trinketPoolSpend("Fogstone Periapt"),
+        freeCastTrinketSpell("fogstone_periapt_cast", "Misty Step"),
+      ],
+    },
+    "glass medallion": {
+      magic_effects: [
+        trinketPoolSpend("Glass Medallion"),
+        freeCastTrinketSpell("glass_medallion_cast", "Invisibility", { bonusAction: true }),
+      ],
+    },
+    "skeleton's key": {
+      magic_effects: [
+        trinketPoolSpend("Skeleton's Key"),
+        freeCastTrinketSpell("skeletons_key_cast", "Knock", { bonusAction: true }),
+      ],
+    },
+    "cold iron pendant": {
+      magic_effects: [
+        trinketPoolSpend("Cold Iron Pendant"),
+        freeCastTrinketSpell("cold_iron_pendant_cast", "Detect Evil and Good"),
+      ],
+    },
+    "dead mist vial": {
+      magic_effects: [
+        trinketPoolSpend("Dead Mist Vial"),
+        freeCastTrinketSpell("dead_mist_vial_cast", "Fog Cloud"),
+      ],
+    },
+    "engraved lens": {
+      magic_effects: [
+        trinketPoolSpend("Engraved Lens"),
+        freeCastTrinketSpell("engraved_lens_cast", "Identify"),
+      ],
+    },
+    "gilded dragon scale": {
+      magic_effects: [
+        trinketPoolSpend("Gilded Dragon Scale"),
+        charInstance(
+          createModifierInstanceId(),
+          characteristicCatalogRefId("resource_ability_menu"),
+          [
+            {
+              id: modId("gilded_dragon_scale_menu"),
+              type: "resource_ability_menu",
+              resourceKey: TRINKETS_KEY,
+              waiveResourceCost: true,
+              label: "Gilded Dragon Scale",
+              options: dragonTypes.map((name) => ({
+                name,
+                description: `Gain Resistance to ${name} damage for 1 minute.`,
+              })),
+            },
+          ],
+        ),
+      ],
+    },
+    "mimic-tooth necklace": {
+      magic_effects: [
+        trinketPoolSpend("Mimic-Tooth Necklace"),
+        fxInstance(createModifierInstanceId(), effectCatalogRefId("extra_damage_on_hit"), {
+          bonusAction: true,
+          effects: [
+            {
+              id: modId("mimic_tooth_necklace"),
+              kind: "extra_damage_on_hit",
+              bonusDice: "2d8",
+              damageTypes: ["Acid"],
+              label: "Mimic-Tooth Necklace (2d8 Acid)",
+            },
+          ],
+        }),
+      ],
+    },
   }
+}
+
+function isTrinketUsesOnly(effect: LinkedModifierInstance): boolean {
+  const chars = effect.characteristics ?? []
+  if (!chars.length || effect.activation?.effects?.length) return false
+  return chars.every(
+    (char) =>
+      char.type === "uses" &&
+      char.uses?.type === "class_resource" &&
+      char.uses.classResourceKey === TRINKETS_KEY,
+  )
 }
 
 /** Apply known-name equipment wiring onto existing import rows only (no row creation). */
 export function applyKnownEquipmentNameWiring<T extends { name: string }>(rows: T[]): T[] {
-  const wiring = investigatorHolyTrinketWiringByName()
+  const wiring = investigatorTrinketWiringByName()
   return rows.map((row) => {
     const key = row.name.trim().toLowerCase()
     const match = wiring[key]
@@ -411,8 +581,13 @@ export function applyKnownEquipmentNameWiring<T extends { name: string }>(rows: 
           char.uses.classResourceKey === TRINKETS_KEY,
       ),
     )
-    if (hasTrinketSpend) return row
-    return { ...row, magic_effects: [...existing, ...match.magic_effects] }
+    const onlySpend = hasTrinketSpend && existing.every(isTrinketUsesOnly)
+    if (hasTrinketSpend && !onlySpend) return row
+    const additions = hasTrinketSpend
+      ? match.magic_effects.filter((effect) => !isTrinketUsesOnly(effect))
+      : match.magic_effects
+    if (!additions.length) return row
+    return { ...row, magic_effects: [...existing, ...additions] }
   })
 }
 

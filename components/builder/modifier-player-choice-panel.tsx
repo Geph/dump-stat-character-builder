@@ -92,22 +92,45 @@ function SpellGrantPicker({
   const availableSpells = spellOptionsForModifierSlot(slot, spells, picks)
   const selectedIds = picks[slot.slotKey] ?? []
   const [filter, setFilter] = useState("")
-  const [schoolFilter, setSchoolFilter] = useState("all")
+  const allowedSchoolsKey = (slot.allowedSchools ?? []).join("\0")
+  const [schoolFilter, setSchoolFilter] = useState(
+    () => (slot.allowedSchools?.length === 1 ? slot.allowedSchools[0]! : "all"),
+  )
   const [usageFilter, setUsageFilter] = useState("all")
   const [page, setPage] = useState(0)
   const pageSize = useFeatSpellGrantPickerPageSize()
 
-  const schoolOptions = useMemo(() => uniqueSpellSchools(availableSpells), [availableSpells])
+  const schoolOptions = useMemo(() => {
+    const fromAvailable = uniqueSpellSchools(availableSpells)
+    if (!allowedSchoolsKey) return fromAvailable
+    const allowed = new Set(
+      allowedSchoolsKey.split("\0").map((school) => school.trim().toLowerCase()),
+    )
+    return fromAvailable.filter((school) => allowed.has(school.toLowerCase()))
+  }, [availableSpells, allowedSchoolsKey])
+
+  useEffect(() => {
+    const restricted = allowedSchoolsKey ? allowedSchoolsKey.split("\0") : null
+    setFilter("")
+    setUsageFilter("all")
+    setSchoolFilter(restricted?.length === 1 ? restricted[0]! : "all")
+    setPage(0)
+  }, [slot.slotKey, allowedSchoolsKey])
 
   useEffect(() => {
     setPage(0)
   }, [filter, schoolFilter, usageFilter, listClass, slot.slotKey, pageSize])
 
   useEffect(() => {
+    const restricted = allowedSchoolsKey ? allowedSchoolsKey.split("\0") : null
+    if (restricted?.length === 1) {
+      setSchoolFilter(restricted[0]!)
+      return
+    }
     if (schoolFilter !== "all" && !schoolOptions.includes(schoolFilter)) {
       setSchoolFilter("all")
     }
-  }, [schoolFilter, schoolOptions])
+  }, [schoolFilter, schoolOptions, allowedSchoolsKey])
 
   if (slot.requiresSpellListPick && !listClass) {
     return (
@@ -117,6 +140,7 @@ function SpellGrantPicker({
     )
   }
 
+  const restrictedSchools = allowedSchoolsKey ? allowedSchoolsKey.split("\0") : null
   const schoolScoped = filterSpellsByUsage(
     filterSpellsBySchool(availableSpells, schoolFilter),
     usageFilter,
@@ -201,7 +225,11 @@ function SpellGrantPicker({
               className={cn(filterSelectClass, "max-w-[12rem]")}
               aria-label={`Filter ${slot.label} spells by school`}
             >
-              <option value="all">All schools</option>
+              {restrictedSchools?.length ? (
+                <option value="all">Allowed schools</option>
+              ) : (
+                <option value="all">All schools</option>
+              )}
               {schoolOptions.map((school) => (
                 <option key={school} value={school}>
                   {school}
@@ -209,6 +237,10 @@ function SpellGrantPicker({
               ))}
             </select>
           </div>
+        ) : schoolOptions.length === 1 ? (
+          <p className="text-xs text-muted-foreground shrink-0">
+            School: <span className="font-medium text-foreground">{schoolOptions[0]}</span>
+          </p>
         ) : null}
         <div className="flex shrink-0 items-center gap-2">
           <label className={filterLabelClass} htmlFor={`spell-use-${slot.slotKey}`}>

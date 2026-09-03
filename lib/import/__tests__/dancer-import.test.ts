@@ -112,6 +112,12 @@ describe("Dancer enrichment", () => {
               description: "Attacks against you during the first round of combat have Disadvantage.",
             },
             {
+              level: 15,
+              name: "Fierce Start",
+              description:
+                "Whenever you deal damage to a creature with a weapon or Unarmed Strike on the first round of combat, you can add your Charisma modifier to the damage roll.",
+            },
+            {
               level: 3,
               name: "Fast Movement",
               description: "Your Speed increases by 10 feet while you aren't wearing Heavy armor.",
@@ -134,6 +140,16 @@ describe("Dancer enrichment", () => {
     expect(incoming?.limitations?.some((lim) => lim.value === "first_turn_of_combat")).toBe(true)
     expect(nimble.sheetDisplay).toMatchObject({ combatActions: true, featuresTab: true })
 
+    const fierce = features.find((f) => f.name === "Fierce Start") as Feature
+    const fierceChars = (fierce.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
+    const fierceRider = fierceChars.find((char) => char.type === "power_rider")
+    expect(fierceRider).toMatchObject({
+      type: "power_rider",
+      parentPowerNames: ["Attack", "Unarmed Strike"],
+    })
+    expect(fierceRider?.limitations?.some((lim) => lim.value === "first_turn_of_combat")).toBeFalsy()
+    expect(fierceChars.some((char) => char.type === "damage_roll_modifiers")).toBe(false)
+
     const fast = features.find((f) => f.name === "Fast Movement") as Feature
     const speed = (fast.linkedModifiers ?? [])
       .flatMap((mod) => mod.characteristics ?? [])
@@ -148,6 +164,60 @@ describe("Dancer enrichment", () => {
     expect(finale.limitedUses?.restoreByResource).toMatchObject({
       resourceKey: "dances",
       resourceAmount: 2,
+    })
+    const finaleRider = (finale.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "power_rider")
+    expect(finaleRider).toMatchObject({
+      type: "power_rider",
+      parentPowerNames: ["Attack", "Unarmed Strike"],
+    })
+  })
+
+  it("wires higher multi-target Extra Attack tiers to replace lower ones", () => {
+    const enriched = applyImportEnrichmentPresets({
+      classes: [
+        {
+          name: "Dancer",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Dexterity"],
+          features: [
+            {
+              level: 5,
+              name: "Three-Target Extra Attack",
+              description: "Attack three times vs different targets.",
+            },
+            {
+              level: 11,
+              name: "Four-Target Extra Attack",
+              description: "Attack four times vs different targets.",
+            },
+            {
+              level: 17,
+              name: "Five-Target Extra Attack",
+              description: "Attack five times vs different targets.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+    const features = enriched.classes?.[0]?.features ?? []
+    const four = features.find((f) => f.name === "Four-Target Extra Attack") as Feature
+    const five = features.find((f) => f.name === "Five-Target Extra Attack") as Feature
+    const fourReplace = (four.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "replace_feature")
+    const fiveReplace = (five.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "replace_feature")
+    expect(fourReplace).toMatchObject({
+      type: "replace_feature",
+      replacedFeatureNames: ["Three-Target Extra Attack"],
+    })
+    expect(fiveReplace).toMatchObject({
+      type: "replace_feature",
+      replacedFeatureNames: ["Four-Target Extra Attack", "Three-Target Extra Attack"],
     })
   })
 
@@ -396,5 +466,130 @@ describe("Dancer enrichment", () => {
       .flatMap((mod) => mod.characteristics ?? [])
       .find((char) => char.type === "languages") as { choiceCount?: number } | undefined
     expect(langs?.choiceCount).toBe(2)
+  })
+
+  it("wires Courtesan Sociable Start as Combat Bonus Action", () => {
+    const enriched = applyImportEnrichmentPresets({
+      subclasses: [
+        {
+          name: "Courtesan",
+          class_name: "Dancer",
+          description: null,
+          features: [
+            {
+              level: 6,
+              name: "Sociable Start",
+              description:
+                "During the first round of combat, you can take the Influence action as a Bonus Action and have Advantage on ability checks you make using that action.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+    const sociable = enriched.subclasses?.[0]?.features?.[0] as Feature
+    expect(sociable.activation?.bonusAction).toBe(true)
+    expect(sociable.sheetDisplay).toMatchObject({
+      combatActions: true,
+      abilitiesActions: false,
+      featuresTab: true,
+    })
+  })
+
+  it("wires Courtesan Beguiling Charm as Combat Passive enemy impact", () => {
+    const enriched = applyImportEnrichmentPresets({
+      subclasses: [
+        {
+          name: "Courtesan",
+          class_name: "Dancer",
+          description: null,
+          features: [
+            {
+              level: 10,
+              name: "Beguiling Charm",
+              description:
+                "When you give a creature the Charmed condition, you can choose one of the following effects.\n\nBad Influence. The target subtracts your Dance Die from Intelligence, Wisdom, and Charisma saving throws.\n\nFriend of My Friends. The target subtracts your Dance Die from all its attack rolls.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+    const charm = enriched.subclasses?.[0]?.features?.[0] as Feature
+    expect(charm.sheetDisplay).toMatchObject({ combatActions: true, featuresTab: true })
+    const menu = (charm.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "resource_ability_menu")
+    expect(menu?.type).toBe("resource_ability_menu")
+    if (menu?.type === "resource_ability_menu") {
+      expect(menu.options?.map((option) => option.name)).toEqual([
+        "Bad Influence",
+        "Friend of My Friends",
+      ])
+    }
+    const enemyFx = (charm.linkedModifiers ?? [])
+      .flatMap((mod) => mod.activation?.effects ?? [])
+      .find((effect) => effect.kind === "modify_creature" && effect.rollTarget === "enemy")
+    expect(enemyFx).toBeTruthy()
+  })
+
+  it("wires Courtesan Heartbreaker as an Enthralling Movement Dance rider", () => {
+    const enriched = applyImportEnrichmentPresets({
+      subclasses: [
+        {
+          name: "Courtesan",
+          class_name: "Dancer",
+          description: null,
+          features: [
+            {
+              level: 14,
+              name: "Heartbreaker",
+              description:
+                "Whenever a creature succeeds or fails its saving throw against your Enthralling Movement, you can deal Psychic damage to the target equal to two rolls of your Dance Die.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+    const heartbreaker = enriched.subclasses?.[0]?.features?.[0] as Feature
+    const rider = (heartbreaker.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "power_rider")
+    expect(rider).toMatchObject({
+      type: "power_rider",
+      parentPowerNames: ["Dance", "Enthralling Movement"],
+      parentMenuOptionNames: ["Enthralling Movement"],
+    })
+    expect((rider as { alertSummary?: string })?.alertSummary).toMatch(/Psychic|Dance Die/i)
+  })
+
+  it("wires Heroic Dance as Inspiration grant riding Dance", () => {
+    const enriched = applyImportEnrichmentPresets({
+      classes: [
+        {
+          name: "Dancer",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Dexterity", "Charisma"],
+          features: [
+            {
+              level: 9,
+              name: "Heroic Dance",
+              description:
+                "When you begin your Dance, you can give yourself Heroic Inspiration if you don't have it.",
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+    const heroic = enriched.classes?.[0]?.features?.[0] as Feature
+    const effects = (heroic.linkedModifiers ?? []).flatMap(
+      (mod) => mod.activation?.effects ?? [],
+    )
+    expect(effects.some((effect) => effect.kind === "grant_inspiration" && effect.healTarget === "self")).toBe(
+      true,
+    )
+    const riders = (heroic.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .filter((char) => char.type === "power_rider")
+    expect(riders.some((char) => (char.parentPowerNames ?? []).includes("Dance"))).toBe(true)
   })
 })

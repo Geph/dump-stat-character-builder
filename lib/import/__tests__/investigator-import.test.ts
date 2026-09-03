@@ -246,7 +246,7 @@ describe("Investigator governing ability", () => {
 })
 
 describe("Investigator import integration", () => {
-  it("clears Holy Trinkets feature-level pool in favor of item activations", () => {
+  it("clears Holy Trinkets feature-level pool; named options own the spend", () => {
     const content = enrichImportContentModifiers({
       classes: [
         {
@@ -266,6 +266,7 @@ describe("Investigator import integration", () => {
     } as unknown as import("@/lib/import/content-schema").ImportContent)
     const holy = content.classes?.[0]?.features?.find((f) => f.name === "Holy Trinkets") as unknown as Feature | undefined
     expect(holy?.limitedUses).toBeUndefined()
+    // Lead-in only — no named trinkets in prose, so nothing is invented.
     expect(content.equipment ?? []).toEqual([])
   })
 })

@@ -51,6 +51,7 @@ export function buildSheetPlayStateFromSheet(params: {
   exhaustionLevel: number
   activeSheetToggleIds: SheetToggleKey[]
   sheetToggleNotes: CharacterSheetPlayState["sheetToggleNotes"]
+  sheetToggleWeaponIds?: CharacterSheetPlayState["sheetToggleWeaponIds"]
   usedResourcesById: Record<string, number>
   usedActionUsesById: Record<string, number>
   usedSpellSlotsByKey: Record<string, number[]>

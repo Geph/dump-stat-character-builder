@@ -55,6 +55,7 @@ export type EffectInputField =
   | "remoteViewing"
   | "checkRollTargets"
   | "damageLinkedHeal"
+  | "healTarget"
 
 export type ActionEffectOption = {
   value: string
@@ -156,6 +157,13 @@ export const ACTION_EFFECT_OPTIONS: ActionEffectOption[] = [
     group: "buff_debuff",
     hint: "Rolls, speed, movement, disadvantage, action restrictions (Cutting Words, Open Hand, Sentinel)",
     fields: ["modifyCreatureRoll", "checkCategory", "checkAbility", "checkSkills", "checkRollTargets"],
+  },
+  {
+    value: "grant_inspiration",
+    label: "Grant Heroic Inspiration",
+    group: "buff_debuff",
+    hint: "Toggle Heroic Inspiration on self or a chosen ally (e.g. Heroic Dance, Musician)",
+    fields: ["healTarget"],
   },
   { value: "force_save_control", label: "Force save / control", group: "buff_debuff" },
   {

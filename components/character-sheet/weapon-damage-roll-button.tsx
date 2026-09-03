@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Dices } from "lucide-react"
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 import {
@@ -14,8 +14,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
+  appendBonusDamageDice,
+  preferredWeaponDamageDiceId,
   swapDamageDice,
+  type WeaponDamageBonusOption,
   type WeaponDamageDiceOption,
+  type WeaponSpellBuffMenuOption,
 } from "@/lib/compendium/weapon-damage-roll"
 import type { DamageRollMode, ParsedDamageRoll } from "@/lib/dice/damage-roll"
 import {
@@ -29,6 +33,11 @@ type WeaponDamageRollButtonProps = {
   label?: string
   diceOptions?: WeaponDamageDiceOption[]
   defaultDiceId?: string
+  /** Optional flat bonuses (Fierce Start +CHA, etc.). */
+  bonusOptions?: WeaponDamageBonusOption[]
+  /** Magic Weapon / Elemental Weapon-style buffs bound to this weapon. */
+  spellBuffOptions?: WeaponSpellBuffMenuOption[]
+  onSpellBuffToggle?: (buffId: string, checked: boolean) => void
   showNoModToggle?: boolean
   defaultIncludeAbilityModifier?: boolean
   /** Ability mod used for this weapon; enables precise no-mod toggling. */
@@ -57,23 +66,51 @@ function resolveRollParsed(
   includeAbilityModifier: boolean,
   defaultIncludeAbilityModifier: boolean,
   abilityModifier: number | undefined,
+  extraFlatBonus: number,
+  extraDice: Array<{ dice: string; type?: string | null }>,
 ): ParsedDamageRoll | null {
   const selected =
     diceOptions.length > 0
       ? (diceOptions.find((option) => option.id === selectedDiceId) ?? diceOptions[0])
       : null
-  const diceExpression = selected ? swapDamageDice(expression, selected.dice) : expression
+  let diceExpression = selected ? swapDamageDice(expression, selected.dice) : expression
+  for (const part of extraDice) {
+    diceExpression = appendBonusDamageDice(diceExpression, part.dice, part.type)
+  }
   const parsed = parseDamageRoll(diceExpression)
   if (!parsed) return null
 
-  if (!showNoModToggle || abilityModifier == null) return parsed
+  let modifier = parsed.modifier
+  if (showNoModToggle && abilityModifier != null) {
+    const bakedAbility = abilityModInExpression(abilityModifier, defaultIncludeAbilityModifier)
+    const desiredAbility = abilityModInExpression(abilityModifier, includeAbilityModifier)
+    modifier += desiredAbility - bakedAbility
+  }
+  if (extraFlatBonus !== 0) modifier += extraFlatBonus
 
-  const bakedAbility = abilityModInExpression(abilityModifier, defaultIncludeAbilityModifier)
-  const desiredAbility = abilityModInExpression(abilityModifier, includeAbilityModifier)
-  const modifierDelta = desiredAbility - bakedAbility
-  if (modifierDelta === 0) return parsed
+  if (modifier === parsed.modifier) return parsed
+  return { ...parsed, modifier }
+}
 
-  return { ...parsed, modifier: parsed.modifier + modifierDelta }
+function formatExpressionWithModifier(diceExpression: string, modifier: number): string {
+  const withoutType = diceExpression.replace(/\s+[a-z][a-z\s]*$/i, "").trim()
+  const dicePart = withoutType.match(/^[\dd+\s]+/i)?.[0]?.trim() ?? ""
+  const typePart = diceExpression.match(/\s+([a-z][a-z\s]*)$/i)?.[1] ?? ""
+  const modSuffix =
+    modifier === 0 ? "" : modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`
+  return `${dicePart}${modSuffix}${typePart ? ` ${typePart}` : ""}`.trim()
+}
+
+function resolvePreferredDiceId(
+  diceOptions: WeaponDamageDiceOption[],
+  defaultDiceId?: string,
+): string {
+  return (
+    preferredWeaponDamageDiceId(diceOptions) ??
+    defaultDiceId ??
+    diceOptions[0]?.id ??
+    "default"
+  )
 }
 
 export function WeaponDamageRollButton({
@@ -81,6 +118,9 @@ export function WeaponDamageRollButton({
   label,
   diceOptions = [],
   defaultDiceId,
+  bonusOptions = [],
+  spellBuffOptions = [],
+  onSpellBuffToggle,
   showNoModToggle = false,
   defaultIncludeAbilityModifier = true,
   abilityModifier,
@@ -93,10 +133,44 @@ export function WeaponDamageRollButton({
   const history = useSheetRollHistory()
   const [total, setTotal] = useState<number | null>(null)
   const [rollMode, setRollMode] = useState<DamageRollMode>("normal")
-  const [selectedDiceId, setSelectedDiceId] = useState(
-    defaultDiceId ?? diceOptions[0]?.id ?? "default",
+  const preferredDiceId = useMemo(
+    () => resolvePreferredDiceId(diceOptions, defaultDiceId),
+    [diceOptions, defaultDiceId],
   )
+  const [selectedDiceId, setSelectedDiceId] = useState(preferredDiceId)
   const [includeAbilityModifier, setIncludeAbilityModifier] = useState(defaultIncludeAbilityModifier)
+  const [selectedBonusIds, setSelectedBonusIds] = useState<string[]>(() =>
+    bonusOptions.filter((option) => option.defaultSelected !== false).map((option) => option.id),
+  )
+
+  useEffect(() => {
+    setSelectedDiceId(preferredDiceId)
+  }, [preferredDiceId])
+
+  const bonusIdsKey = bonusOptions
+    .map((option) => `${option.id}:${option.defaultSelected === false ? "0" : "1"}`)
+    .join("|")
+  useEffect(() => {
+    setSelectedBonusIds(
+      bonusOptions.filter((option) => option.defaultSelected !== false).map((option) => option.id),
+    )
+  }, [bonusIdsKey])
+
+  const availableBonusIds = useMemo(
+    () => new Set(bonusOptions.map((option) => option.id)),
+    [bonusOptions],
+  )
+  const activeBonusIds = selectedBonusIds.filter((id) => availableBonusIds.has(id))
+  const activeBonuses = bonusOptions.filter((option) => activeBonusIds.includes(option.id))
+  const extraFlatBonus = activeBonuses.reduce((sum, option) => sum + option.bonus, 0)
+  const extraDice = activeBonuses
+    .map((option) => {
+      const dice = option.bonusDice?.trim()
+      if (!dice) return null
+      return { dice, type: option.bonusDiceType?.trim() || null }
+    })
+    .filter((part): part is { dice: string; type: string | null } => Boolean(part))
+  const extraDiceKey = JSON.stringify(extraDice)
 
   const rollParsed = useMemo(
     () =>
@@ -108,6 +182,8 @@ export function WeaponDamageRollButton({
         includeAbilityModifier,
         defaultIncludeAbilityModifier,
         abilityModifier,
+        extraFlatBonus,
+        JSON.parse(extraDiceKey) as { dice: string; type: string | null }[],
       ),
     [
       expression,
@@ -117,6 +193,8 @@ export function WeaponDamageRollButton({
       includeAbilityModifier,
       defaultIncludeAbilityModifier,
       abilityModifier,
+      extraFlatBonus,
+      extraDiceKey,
     ],
   )
 
@@ -125,21 +203,16 @@ export function WeaponDamageRollButton({
       diceOptions.length > 0
         ? (diceOptions.find((option) => option.id === selectedDiceId) ?? diceOptions[0])
         : null
-    const diceExpression = selected ? swapDamageDice(expression, selected.dice) : expression
-    if (!rollParsed || rollParsed.modifier === parseDamageRoll(diceExpression)?.modifier) {
+    let diceExpression = selected ? swapDamageDice(expression, selected.dice) : expression
+    for (const part of extraDice) {
+      diceExpression = appendBonusDamageDice(diceExpression, part.dice, part.type)
+    }
+    if (!rollParsed) return diceExpression
+    if (rollParsed.modifier === parseDamageRoll(diceExpression)?.modifier) {
       return diceExpression
     }
-    const withoutType = diceExpression.replace(/\s+[a-z][a-z\s]*$/i, "").trim()
-    const dicePart = withoutType.match(/^[\dd+\s]+/i)?.[0]?.trim() ?? ""
-    const typePart = diceExpression.match(/\s+([a-z][a-z\s]*)$/i)?.[1] ?? ""
-    const modSuffix =
-      rollParsed.modifier === 0
-        ? ""
-        : rollParsed.modifier > 0
-          ? ` + ${rollParsed.modifier}`
-          : ` - ${Math.abs(rollParsed.modifier)}`
-    return `${dicePart}${modSuffix}${typePart ? ` ${typePart}` : ""}`.trim()
-  }, [diceOptions, expression, rollParsed, selectedDiceId])
+    return formatExpressionWithModifier(diceExpression, rollParsed.modifier)
+  }, [diceOptions, expression, extraDice, rollParsed, selectedDiceId])
 
   if (!rollParsed) return null
 
@@ -152,10 +225,17 @@ export function WeaponDamageRollButton({
     const modeSuffix =
       result.mode === "advantage" ? " (adv)" : result.mode === "disadvantage" ? " (dis)" : ""
     const noModSuffix = showNoModToggle && !includeAbilityModifier ? " (no mod)" : ""
+    const bonusSuffix =
+      activeBonusIds.length > 0
+        ? ` (${bonusOptions
+            .filter((option) => activeBonusIds.includes(option.id))
+            .map((option) => option.label)
+            .join(", ")})`
+        : ""
     history?.logRoll({
       kind: "damage",
       label: label ?? `Damage (${activeExpression})`,
-      summary: `${formatDamageRollResult(result.rolls, result.modifier, result.total)}${modeSuffix}${noModSuffix}`,
+      summary: `${formatDamageRollResult(result.rolls, result.modifier, result.total)}${modeSuffix}${noModSuffix}${bonusSuffix}`,
     })
     onRoll?.()
   }
@@ -164,7 +244,9 @@ export function WeaponDamageRollButton({
   const optionsActive =
     Boolean(modeBadge) ||
     (showNoModToggle && !includeAbilityModifier) ||
-    selectedDiceId !== (defaultDiceId ?? diceOptions[0]?.id)
+    selectedDiceId !== preferredDiceId ||
+    activeBonusIds.length !==
+      bonusOptions.filter((option) => option.defaultSelected !== false).length
   const modeToggleClass = filled
     ? optionsActive
       ? "border-white/55 bg-black/15 text-white"
@@ -180,6 +262,13 @@ export function WeaponDamageRollButton({
         ? "sheet-fill-tile sheet-fill-hp h-6 min-w-[2.25rem] rounded px-1.5 text-xs"
         : "h-6 min-w-[2.25rem] px-1.5 rounded border border-border bg-muted/80 text-xs hover:bg-muted"
 
+  const toggleBonus = (id: string, checked: boolean) => {
+    setSelectedBonusIds((prev) => {
+      if (checked) return prev.includes(id) ? prev : [...prev, id]
+      return prev.filter((entry) => entry !== id)
+    })
+  }
+
   const optionsTrigger = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -193,7 +282,7 @@ export function WeaponDamageRollButton({
           {modeBadge ?? "···"}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
+      <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
           Roll options
         </DropdownMenuLabel>
@@ -221,6 +310,44 @@ export function WeaponDamageRollButton({
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
+          </>
+        ) : null}
+        {bonusOptions.length > 0 ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
+              Damage modifiers
+            </DropdownMenuLabel>
+            {bonusOptions.map((option) => (
+              <DropdownMenuCheckboxItem
+                key={option.id}
+                checked={activeBonusIds.includes(option.id)}
+                onCheckedChange={(checked) => toggleBonus(option.id, Boolean(checked))}
+                onSelect={(event) => event.preventDefault()}
+                title={option.title}
+              >
+                {option.label}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </>
+        ) : null}
+        {spellBuffOptions.length > 0 ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
+              Spell buffs
+            </DropdownMenuLabel>
+            {spellBuffOptions.map((option) => (
+              <DropdownMenuCheckboxItem
+                key={option.id}
+                checked={option.checked}
+                onCheckedChange={(checked) => onSpellBuffToggle?.(option.id, Boolean(checked))}
+                onSelect={(event) => event.preventDefault()}
+                title={option.title}
+              >
+                {option.label}
+              </DropdownMenuCheckboxItem>
+            ))}
           </>
         ) : null}
         {showNoModToggle ? (

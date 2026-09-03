@@ -74,6 +74,7 @@ function baseCharacter(overrides: Partial<Character> = {}): Character {
       exhaustionLevel: 0,
       activeSheetToggleIds: [],
       sheetToggleNotes: {},
+      sheetToggleWeaponIds: {},
       usedResourcesById: {},
       usedActionUsesById: {},
       usedSpellSlotsByKey: {},

@@ -18,6 +18,7 @@ import {
   normalizeDurationReminders,
   type DurationReminder,
 } from "@/lib/character/duration-reminders"
+import { normalizeSheetToggleWeaponIds } from "@/lib/character/weapon-spell-buff"
 import { normalizeSkillAbilityOverrides } from "@/lib/character/skill-ability-overrides"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 
@@ -38,6 +39,11 @@ export type CharacterSheetPlayState = {
   activeSheetToggleIds: SheetToggleKey[]
   /** Player-entered context for reminder toggles, keyed by toggle id (e.g. Mind Rider target). */
   sheetToggleNotes: Record<string, string>
+  /**
+   * Equipment id bound to a sheet toggle (Magic Weapon / Elemental Weapon).
+   * Bonuses apply only to that weapon while the toggle is on.
+   */
+  sheetToggleWeaponIds: Record<string, string>
   usedResourcesById: Record<string, number>
   usedActionUsesById: Record<string, number>
   usedSpellSlotsByKey: Record<string, number[]>
@@ -80,6 +86,7 @@ export function defaultSheetPlayState(): CharacterSheetPlayState {
     exhaustionLevel: 0,
     activeSheetToggleIds: [],
     sheetToggleNotes: {},
+    sheetToggleWeaponIds: {},
     usedResourcesById: {},
     usedActionUsesById: {},
     usedSpellSlotsByKey: {},
@@ -146,6 +153,7 @@ export function normalizeSheetPlayState(
       ? raw.activeSheetToggleIds.filter((entry): entry is string => typeof entry === "string")
       : base.activeSheetToggleIds,
     sheetToggleNotes: normalizeSheetToggleNotes(raw.sheetToggleNotes),
+    sheetToggleWeaponIds: normalizeSheetToggleWeaponIds(raw.sheetToggleWeaponIds),
     usedResourcesById:
       raw.usedResourcesById && typeof raw.usedResourcesById === "object"
         ? { ...raw.usedResourcesById }

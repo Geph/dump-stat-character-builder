@@ -197,7 +197,7 @@ export function formatWeaponMasteryChoiceLabel(
 
 /** Dropdown / chip label: `Longsword (Sap)`. Falls back to seed or catalog mastery. */
 export function weaponMasteryLabelForOption(
-  option: Pick<FeatureChoiceOption, "name" | "description">,
+  option: Pick<FeatureChoiceOption, "name"> & { description?: string | null },
   equipmentCatalog: Equipment[] = [],
 ): string {
   const fromDescription = masteryNameFromOptionDescription(option.description)

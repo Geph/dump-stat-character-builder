@@ -113,7 +113,7 @@ questions (merged character state vs per-use card).
 | Checks | `attack_roll_modifiers`, `initiative`, skill proficiencies | `check_roll_modifier` (bonus / adv / incoming-attack Disadvantage) |
 | Resources | `uses`, `resource_ability_menu` | `class_resource` spend/restore; feature `limitedUses` |
 | Custom abilities | `grant_custom_ability`, `modify_custom_ability` | `activate_custom_ability` |
-| Healing | `healing_received_modifier`, `spell_healing_modifier` | `heal_self`, `heal_from_pool`, `grant_temp_hp` |
+| Healing | `healing_received_modifier`, `spell_healing_modifier` | `heal_self`, `heal_from_pool`, `grant_temp_hp`, `grant_inspiration` (Heroic Inspiration toggle) |
 
 Legacy FeatureEffect aliases still **load**: `check_advantage`, `check_bonus`,
 `check_disadvantage`, `buff_ally_roll`, `debuff_enemy_roll`. They are excluded
@@ -126,6 +126,11 @@ singleton (`EXCLUDED_PASSIVE_CATALOG_TYPES`).
 Incoming-attack Disadvantage can appear as an AC note **and** as a Passive
 reminder. That overlap is intentional once `first_turn_of_combat` (or similar)
 is a referenced toggle.
+
+Non-action enemy combat impact (Charm/aura debuffs that subtract from attack
+rolls, damage, or saves; `modify_creature` with `rollTarget: "enemy"`) files as
+a **Combat Passive** reminder — stamp `sheetDisplay.combatActions` on import and
+do not invent an action economy just to get a sheet card.
 
 ## What the catalog still cannot own
 

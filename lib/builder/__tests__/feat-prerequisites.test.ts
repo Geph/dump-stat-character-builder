@@ -11,6 +11,7 @@ import {
   parseFeatPrerequisite,
   resolvePrerequisiteFeatIds,
 } from "@/lib/import/resolve-feat-prerequisites"
+import { inferFeatImportFields } from "@/lib/import/infer-feat-import-fields"
 import { parseBackgroundFeatGrantChoice, parseBackgroundFeatGrantChoiceCategory } from "@/lib/compendium/background-origin-feat"
 import { normalizeBackgroundRow } from "@/lib/compendium/normalize-backgrounds"
 import { getBackgroundFeatPickSlots } from "@/lib/builder/background-feat-options"
@@ -37,6 +38,18 @@ function feat(partial: Partial<Feat> & Pick<Feat, "id" | "name" | "category">): 
         ...partial,
   } as unknown as unknown as Feat
 }
+
+describe("inferFeatImportFields", () => {
+  it("scrapes Prerequisite lines out of feat descriptions", () => {
+    const inferred = inferFeatImportFields({
+      name: "Alien Weapon Training",
+      description: "<p><strong>Prerequisite:</strong> Farling</p><p>You train with an alien weapon.</p>",
+      prerequisite: null,
+      category: "Origin",
+    })
+    expect(inferred.prerequisite).toBe("Farling")
+  })
+})
 
 describe("parseFeatPrerequisite", () => {
   it("extracts level and prerequisite feat names", () => {
@@ -327,6 +340,113 @@ describe("armor training and ability score feat prerequisites", () => {
         ...baseContext,
         skipAbilityScorePrerequisites: true,
       }),
+    ).toBe(true)
+  })
+})
+
+describe("species and class identity prerequisites", () => {
+  const farling = { id: "sp-farling", name: "Farling" }
+  const duergar = { id: "sp-duergar", name: "Duergar" }
+  const giff = { id: "sp-giff", name: "Giff" }
+  const autognome = { id: "sp-autognome", name: "Autognome" }
+  const dancer = { id: "cls-dancer", name: "Dancer" }
+  const alienTraining = feat({
+    id: "alien-training",
+    name: "Alien Weapon Training",
+    category: "Origin",
+    level_requirement: 1,
+    prerequisite: "Farling",
+  })
+  const alienRetraining = feat({
+    id: "alien-retraining",
+    name: "Alien Weapon Retraining",
+    category: "General",
+    level_requirement: 4,
+    prerequisite: "Alien Weapon Training",
+  })
+  const aquatic = feat({
+    id: "aquatic",
+    name: "Aquatic Adaption",
+    category: "General",
+    level_requirement: 4,
+    prerequisite: "Giff or Autognome",
+  })
+  const fightingStyleFeature = feat({
+    id: "style-feat",
+    name: "Martial Flexibility",
+    category: "General",
+    level_requirement: 4,
+    prerequisite: "Fighting Style Feature",
+  })
+  const identityContext: FeatSlotContext = {
+    totalLevel: 4,
+    classIds: [dancer.id],
+    feats: [alienTraining, alienRetraining, aquatic, fightingStyleFeature],
+    ownedFeatIds: [],
+    speciesId: duergar.id,
+    backgroundId: null,
+    speciesCatalog: [farling, duergar, giff, autognome],
+    classCatalog: [dancer],
+  }
+
+  it("hides species-gated feats unless the character is that species", () => {
+    expect(isFeatEligibleForCategories(alienTraining, ["Origin"], 1, identityContext)).toBe(false)
+    expect(
+      isFeatEligibleForCategories(alienTraining, ["Origin"], 1, {
+        ...identityContext,
+        speciesId: farling.id,
+      }),
+    ).toBe(true)
+  })
+
+  it("honors OR species groups", () => {
+    expect(isFeatEligibleForCategories(aquatic, ["General"], 4, identityContext)).toBe(false)
+    expect(
+      isFeatEligibleForCategories(aquatic, ["General"], 4, {
+        ...identityContext,
+        speciesId: giff.id,
+      }),
+    ).toBe(true)
+  })
+
+  it("requires a named prerequisite feat even when ids were not persisted", () => {
+    expect(isFeatEligibleForCategories(alienRetraining, ["General"], 4, identityContext)).toBe(
+      false,
+    )
+    expect(
+      isFeatEligibleForCategories(alienRetraining, ["General"], 4, {
+        ...identityContext,
+        ownedFeatIds: [alienTraining.id],
+      }),
+    ).toBe(true)
+  })
+
+  it("treats an X Retraining feat as requiring X Training when no prerequisite was stored", () => {
+    const sidebarRetraining = feat({
+      id: "alien-retraining-sidebar",
+      name: "Alien Weapon Retraining",
+      category: "General",
+      level_requirement: 4,
+      prerequisite: null,
+    })
+    expect(
+      isFeatEligibleForCategories(sidebarRetraining, ["General"], 4, {
+        ...identityContext,
+        feats: [...identityContext.feats, sidebarRetraining],
+      }),
+    ).toBe(false)
+    expect(
+      isFeatEligibleForCategories(sidebarRetraining, ["General"], 4, {
+        ...identityContext,
+        feats: [...identityContext.feats, sidebarRetraining],
+        ownedFeatIds: [alienTraining.id],
+      }),
+    ).toBe(true)
+  })
+
+  it("does not hide feats whose leftover prerequisite is not a catalog identity", () => {
+    expect(
+      isFeatEligibleForCategories(fightingStyleFeature, ["General"], 4, identityContext),
     ).toBe(true)
   })
 })

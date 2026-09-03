@@ -343,6 +343,27 @@ describe("aiMechanicsToDetections", () => {
     expect(effect?.healFixed).toBe(5)
   })
 
+  it("wires grant_inspiration for self and ally targets", () => {
+    const selfGrant = aiMechanicsToDetections(
+      [{ kind: "grant_inspiration", inspirationTarget: "self" }],
+      { contentKind: "class_feature", sourceName: "Dancer", featureName: "Heroic Dance" },
+    )
+    expect(selfGrant[0]?.instance.catalogRefId).toBe("cat_fx_grant_inspiration")
+    expect(selfGrant[0]?.instance.activation?.effects?.[0]).toMatchObject({
+      kind: "grant_inspiration",
+      healTarget: "self",
+    })
+
+    const allyGrant = aiMechanicsToDetections(
+      [{ kind: "grant_inspiration", inspirationTarget: "ally" }],
+      { contentKind: "feat", sourceName: "Musician", featureName: "Musician" },
+    )
+    expect(allyGrant[0]?.instance.activation?.effects?.[0]).toMatchObject({
+      kind: "grant_inspiration",
+      healTarget: "choose_ally",
+    })
+  })
+
   it("builds replace_feature from AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [

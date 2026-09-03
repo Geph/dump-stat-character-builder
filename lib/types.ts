@@ -966,6 +966,8 @@ export interface Feat {
   card_image_url?: string | null
   source: string
   creator_url: string | null
+  /** When false, hidden from builder / level-up picks (compendium toggle). */
+  enabled?: boolean
   created_at: string
 }
 

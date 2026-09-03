@@ -330,13 +330,25 @@ describe("buildWeaponSheetContext", () => {
     } as CharacterBuildInputs
 
     const unarmedContext = buildWeaponSheetContext(unarmed, inputs, ["Simple weapons"])
-    expect(unarmedContext.appliedModifiers.some((entry) => entry.name === "On hit")).toBe(true)
+    expect(
+      unarmedContext.appliedModifiers.some((entry) =>
+        /Push 5 ft\. on bludgeoning hit/i.test(entry.name),
+      ),
+    ).toBe(true)
 
     const maceContext = buildWeaponSheetContext(mace, inputs, ["Simple weapons"])
-    expect(maceContext.appliedModifiers.some((entry) => entry.name === "On hit")).toBe(true)
+    expect(
+      maceContext.appliedModifiers.some((entry) =>
+        /Push 5 ft\. on bludgeoning hit/i.test(entry.name),
+      ),
+    ).toBe(true)
 
     const daggerContext = buildWeaponSheetContext(dagger, inputs, ["Simple weapons"])
-    expect(daggerContext.appliedModifiers.some((entry) => entry.name === "On hit")).toBe(false)
+    expect(
+      daggerContext.appliedModifiers.some((entry) =>
+        /Push 5 ft\. on bludgeoning hit|On hit/i.test(entry.name),
+      ),
+    ).toBe(false)
   })
 
   it("dedupes duplicate Critical Shot attack modifiers from the same source", () => {

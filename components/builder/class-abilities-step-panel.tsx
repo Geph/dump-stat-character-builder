@@ -80,6 +80,9 @@ type ClassAbilitiesStepProps = {
   ownedFeatIds: string[]
   speciesId: string | null
   backgroundId: string | null
+  speciesCatalog?: { id: string; name: string }[]
+  classCatalog?: { id: string; name: string }[]
+  backgroundCatalog?: { id: string; name: string }[]
   preferredFeatSources: string[]
   armorProficiencies?: string[]
   abilityScores?: Partial<Record<AbilityScoreKey, number>>
@@ -125,6 +128,9 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
     ownedFeatIds,
     speciesId,
     backgroundId,
+    speciesCatalog,
+    classCatalog,
+    backgroundCatalog,
     preferredFeatSources,
     armorProficiencies,
     abilityScores,
@@ -344,6 +350,9 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
               preferredSources: preferredFeatSources,
               armorProficiencies,
               abilityScores,
+              speciesCatalog,
+              classCatalog,
+              backgroundCatalog,
               takenMagicInitiateSpellLists: [
                 ...takenMagicInitiateSpellLists(
                   modifierPlayerChoiceSlots,

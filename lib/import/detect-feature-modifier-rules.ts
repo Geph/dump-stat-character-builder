@@ -1109,6 +1109,25 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
       buildIncomingAttackModifier(ctx, "incoming_first_round", "disadvantage", text),
   },
   {
+    id: "inspiration.heroic.self",
+    confidence: "high",
+    test: /(?:give yourself|you (?:can )?give yourself|you gain)\s+(?:heroic\s+)?inspiration\b/i,
+    build: (_match, ctx, text) => {
+      if (/bardic inspiration/i.test(text) && !/heroic inspiration/i.test(text)) return null
+      if (/\b(?:ally|allies|another creature|a creature|willing creature)\b/i.test(text)) return null
+      return fxInstance(newInstanceId(), effectCatalogRefId("grant_inspiration"), {
+        effects: [
+          {
+            id: modId(instanceKey(ctx, "grant_inspiration")),
+            kind: "grant_inspiration",
+            healTarget: "self",
+            label: "Heroic Inspiration",
+          },
+        ],
+      })
+    },
+  },
+  {
     id: "proficiency.skills.list",
     confidence: "high",
     test: /\b(?:gain|have|you are)\s+proficien(?:cy|t)\s+(?:with|in)\s+([^.;\n]+)/i,

@@ -239,6 +239,14 @@ describe("isFeatEligibleForCategories — Origin slots", () => {
     })).toBe(true)
   })
 
+  it("hides disabled feats from every milestone slot", () => {
+    const disabled = { ...originFeat, enabled: false } as Feat
+    expect(isFeatEligibleForCategories(disabled, ["Origin"], 1, ctx)).toBe(false)
+    expect(
+      isFeatEligibleForCategories(disabled, ["General"], 4, { ...ctx, totalLevel: 4 }),
+    ).toBe(false)
+  })
+
   it("excludes General feats from an Origin slot", () => {
     expect(isFeatEligibleForCategories(generalFeat, ["Origin"], 1, ctx)).toBe(false)
   })
@@ -290,6 +298,42 @@ describe("isFeatEligibleForCategories — Origin slots", () => {
 })
 
 describe("MOTM species player choices", () => {
+  it("grants Common + two language picks when the species never offered a language choice", () => {
+    const enriched = enrichCustomSpeciesRow({
+      id: "species_duergar",
+      name: "Duergar",
+      source: "motm",
+      traits: [
+        {
+          name: "Languages",
+          description: "You can speak, read, and write Common and Dwarvish.",
+        },
+        { name: "Duergar Magic", description: "" },
+      ],
+    }) as unknown as Species
+    const slots = collectSpeciesModifierPlayerChoiceSlots(enriched, {}, catalog)
+    const langSlots = slots.filter((slot) => slot.kind === "language")
+    expect(langSlots).toHaveLength(1)
+    expect(langSlots[0]?.maxCount).toBe(2)
+    expect(langSlots[0]?.label).toMatch(/Common/i)
+  })
+
+  it("does not add a second origin-language pick when the trait already chooses languages", () => {
+    const enriched = enrichCustomSpeciesRow({
+      id: "species_warforged",
+      name: "Warforged",
+      source: "eberron",
+      traits: [
+        {
+          name: "Languages",
+          description: "You know two languages of your choice.",
+        },
+      ],
+    }) as unknown as Species
+    const slots = collectSpeciesModifierPlayerChoiceSlots(enriched, {}, catalog)
+    expect(slots.filter((slot) => slot.kind === "language")).toHaveLength(1)
+  })
+
   it("surfaces Centaur Natural Affinity as a constrained skill slot", () => {
     const enriched = enrichCustomSpeciesRow({
       id: "species_centaur",

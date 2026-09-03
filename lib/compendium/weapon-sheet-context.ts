@@ -21,6 +21,7 @@ import {
   isWeaponProficient,
   weaponDamageDiceMatches,
 } from "@/lib/compendium/combat-stats"
+import { isWeaponBoundSpellBuffModifier } from "@/lib/character/weapon-spell-buff"
 import { describeWeaponMastery, weaponMasteryCatalogEntriesFromAbilities } from "@/lib/compendium/weapon-mastery"
 import {
   extraMasteriesForWeapon,
@@ -221,6 +222,7 @@ function collectAppliedModifiers(
   const applied: WeaponSheetAppliedModifier[] = []
 
   for (const mod of mods) {
+    if (isWeaponBoundSpellBuffModifier(mod)) continue
     if (
       activeSheetToggles &&
       !modifierLimitationsMet(mod, { activeSheetToggles })
@@ -294,9 +296,11 @@ function collectAppliedModifiers(
       if (trigger.triggerOn === "crit") bits.push("On a critical hit")
       else bits.push("On a hit")
       if (trigger.oncePerTurn) bits.push("once per turn")
+      if (trigger.onlyIfTargetBelowHalfHp) bits.push("Bloodied target")
+      const label = trigger.label?.trim()
       applied.push({
-        name: trigger.triggerOn === "crit" ? "Critical hit" : "On hit",
-        description: trigger.label?.trim() || bits.join(" · "),
+        name: label || (trigger.triggerOn === "crit" ? "Critical hit" : "On hit"),
+        description: label ? [label, ...bits].join(" · ") : bits.join(" · "),
         ...appliedModifierSource(mod),
       })
     }

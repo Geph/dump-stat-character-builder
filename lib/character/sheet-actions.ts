@@ -44,6 +44,7 @@ import {
   parseChooseOneNamedOptions,
 } from "@/lib/compendium/choose-one-named-options"
 import { formatFeatureDuration } from "@/lib/compendium/feature-duration"
+import { normalizeEffectKind } from "@/lib/compendium/class-feature-metadata"
 import { resolveFeatureSheetDisplay } from "@/lib/compendium/feature-sheet-display"
 import {
   collectReplacedFeatureNames,
@@ -306,7 +307,7 @@ const COMBAT_CHARACTERISTIC_TYPES = new Set<CharacteristicModifier["type"]>([
 ])
 
 const COMBAT_TEXT_RE =
-  /\b(?:attacks?|attacking|damage|weapons?|enem(?:y|ies)|foe|hostile|armou?r class|bloodied|initiative|smite|sneak attack|opportunity attack|hit points?|psi points?|psionic)\b/i
+  /\b(?:attacks?|attacking|damage|weapons?|enem(?:y|ies)|foe|hostile|armou?r class|bloodied|initiative|smite|sneak attack|opportunity attack|hit points?|psi points?|psionic|first (?:round|turn) of combat)\b/i
 
 /** Resource keys that always place a spend action on the Combat tab. */
 const COMBAT_CLASS_RESOURCE_KEYS = new Set<string>([
@@ -1253,6 +1254,188 @@ function collectIncomingAttackPassiveEntries(
   ]
 }
 
+/**
+ * Enemy-facing combat impact without an action economy (Charm attack/save subtracts,
+ * aura debuffs, etc.) — file as a Combat Passive reminder so the player sees it in play.
+ */
+const ENEMY_COMBAT_IMPACT_PROSE_RE =
+  /\b(?:the\s+)?(?:target|creature|enemy|it)\b[\s\S]{0,100}?\b(?:subtracts?|has\s+disadvantage|takes?\s+(?:extra\s+)?(?:\d|damage)|deals?\s+(?:extra\s+)?(?:\d|damage)|damage\s+rolls?)\b|\b(?:subtracts?|disadvantage)\b[\s\S]{0,80}?\b(?:its\s+)?(?:attack\s+rolls?|damage\s+rolls?|saving\s+throws?)\b/i
+
+function itemHasEnemyCombatImpactEffects(item: ActivatableItem): boolean {
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const effect of instance.activation?.effects ?? []) {
+      const kind = normalizeEffectKind(effect.kind)
+      if (kind === "modify_creature" && effect.rollTarget === "enemy") return true
+      if (kind === "debuff_enemy_roll") return true
+      if (
+        kind === "check_roll_modifier" &&
+        effect.checkRollMode === "disadvantage" &&
+        !effect.incomingAttackMode &&
+        (effect.checkCategory === "attack" ||
+          (effect.checkRollTargets ?? []).includes("attack") ||
+          (effect.checkRollTargets ?? []).includes("save"))
+      ) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+export function itemSignalsEnemyCombatImpact(item: ActivatableItem): boolean {
+  if (itemHasEnemyCombatImpactEffects(item)) return true
+  const text = `${item.name}\n${stripHtml(item.description ?? "")}`
+  return ENEMY_COMBAT_IMPACT_PROSE_RE.test(text)
+}
+
+function enemyCombatImpactTrigger(item: ActivatableItem): string {
+  const text = stripHtml(item.description ?? "").replace(/\s+/g, " ").trim()
+  const whenMatch = text.match(
+    /^when\s+you\s+[^.]{0,80}?(?:charmed|frightened|grappled|hit|miss|damage)/i,
+  )
+  if (whenMatch?.[0]) {
+    const head = whenMatch[0].replace(/\s+/g, " ").trim()
+    return head.length > 72 ? `${head.slice(0, 69)}…` : head
+  }
+  if (/charmed/i.test(text)) return "While a creature is Charmed"
+  if (/frightened/i.test(text)) return "While a creature is Frightened"
+  return "Combat reminder"
+}
+
+function collectEnemyCombatImpactPassiveEntries(
+  item: ActivatableItem,
+  opts: {
+    idPrefix: string
+    classId: string | null
+    classLevel: number
+    sourceLabel: string
+    sourceIcon?: string | null
+    parentHasExplicitEconomy: boolean
+    showOnCombatTab: boolean
+  },
+): SheetActionEntry[] {
+  if (opts.parentHasExplicitEconomy) return []
+  // Prefer the more specific Passive collectors when those wirings are present.
+  if (incomingAttackEffectsFromItem(item).length) return []
+  if (featureIsPowerRiderOnly(item)) return []
+  const signals = itemSignalsEnemyCombatImpact(item)
+  // BYO/enrichment may stamp combatActions for enemy-impact features even before
+  // modifiers land; still file a Passive so the card is not Features-tab-only.
+  if (!signals && !opts.showOnCombatTab) return []
+  if (!signals && opts.showOnCombatTab) {
+    // Avoid turning every combat-stamped non-action (e.g. dead narrative shells) into
+    // Passive unless the prose/modifiers also look like enemy combat impact.
+    return []
+  }
+  const menuOptions = resolveMenuOptions(item)
+  return [
+    {
+      id: `${opts.idPrefix}:${item.level ?? 1}:${item.name}:enemy-combat`,
+      name: item.name,
+      sourceLabel: opts.sourceLabel,
+      kinds: ["action"],
+      trigger: enemyCombatImpactTrigger(item),
+      category: "combat",
+      reminderOnly: true,
+      spendsEconomy: false,
+      showOnCombatTab: true,
+      showOnAbilitiesTab: false,
+      showOnRestDialogues: false,
+      limitedUses: null,
+      classLevel: opts.classLevel,
+      description: item.description ?? null,
+      classId: opts.classId,
+      sourceIcon: opts.sourceIcon,
+      menuOptions: menuOptions.length ? menuOptions : undefined,
+    },
+  ]
+}
+
+/** True when every characteristic is a power_rider (no other sheet-driving wiring). */
+function featureIsPowerRiderOnly(item: ActivatableItem): boolean {
+  const characteristics = (item.linkedModifiers ?? []).flatMap(
+    (instance) => instance.characteristics ?? [],
+  )
+  if (!characteristics.length) return false
+  if ((item.linkedModifiers ?? []).some((instance) => (instance.activation?.effects ?? []).length > 0)) {
+    return false
+  }
+  // replace_feature only hides prior features; it must not block the Passive rider card.
+  return characteristics.every(
+    (characteristic) =>
+      characteristic.type === "power_rider" || characteristic.type === "replace_feature",
+  ) && characteristics.some((characteristic) => characteristic.type === "power_rider")
+}
+
+function powerRiderPassiveTrigger(
+  item: ActivatableItem,
+  rider: { alertSummary?: string; parentPowerNames?: string[] },
+): string {
+  const parents = rider.parentPowerNames ?? []
+  if (
+    parents.some(
+      (name) => /^attack$/i.test(name.trim()) || /^extra attack$/i.test(name.trim()),
+    )
+  ) {
+    return "When you take the Attack action"
+  }
+  const summary = rider.alertSummary?.trim()
+  if (summary) {
+    const head = summary.split(":")[0]?.trim()
+    if (head) return head
+  }
+  return item.name.trim() || "Always on"
+}
+
+/**
+ * Combat-flagged features that only carry power_rider notes (e.g. Dancer Three-Target
+ * Extra Attack) need their own Passive reminder card — riders alone attach alerts to
+ * parents and never create a standalone entry.
+ */
+function collectPowerRiderPassiveEntries(
+  item: ActivatableItem,
+  opts: {
+    idPrefix: string
+    classId: string | null
+    classLevel: number
+    sourceLabel: string
+    sourceIcon?: string | null
+    parentHasExplicitEconomy: boolean
+    showOnCombatTab: boolean
+  },
+): SheetActionEntry[] {
+  if (opts.parentHasExplicitEconomy || !opts.showOnCombatTab) return []
+  if (!featureIsPowerRiderOnly(item)) return []
+  const riders = (item.linkedModifiers ?? []).flatMap((instance) =>
+    (instance.characteristics ?? []).filter(
+      (characteristic): characteristic is Extract<CharacteristicModifier, { type: "power_rider" }> =>
+        characteristic.type === "power_rider",
+    ),
+  )
+  if (!riders.length) return []
+  const primary = riders[0]
+  return [
+    {
+      id: `${opts.idPrefix}:${item.level ?? 1}:${item.name}:power-rider`,
+      name: item.name,
+      sourceLabel: opts.sourceLabel,
+      kinds: ["action"],
+      trigger: powerRiderPassiveTrigger(item, primary),
+      category: "combat",
+      reminderOnly: true,
+      spendsEconomy: false,
+      showOnCombatTab: true,
+      showOnAbilitiesTab: false,
+      showOnRestDialogues: false,
+      limitedUses: null,
+      classLevel: opts.classLevel,
+      description: primary.alertSummary?.trim() || item.description || null,
+      classId: opts.classId,
+      sourceIcon: opts.sourceIcon,
+    },
+  ]
+}
+
 type ActivatableItem = {
   name: string
   description?: string | null
@@ -1578,6 +1761,9 @@ function pushActivatableItemActions(
   sourceIcon?: string | null,
 ) {
   if ((feature.level ?? 1) > levelCap) return
+  // Investigator Trinkets / Holy Trinkets are pool documentation — individual trinket abilities
+  // (and holy items) spend `trinkets`. Never offer a bare "Use Trinkets" card that spends nothing.
+  if (/^(holy\s+)?trinkets$/i.test((feature.name ?? "").trim())) return
   const display = resolveFeatureSheetDisplay(feature as unknown as Feature)
   const movementExpansions = collectMovementOptionExpansions(feature)
   const suppressParent =
@@ -1692,6 +1878,34 @@ function pushActivatableItemActions(
     sourceLabel,
     sourceIcon,
     parentHasExplicitEconomy,
+  })) {
+    if (!actions.some((existing) => existing.id === entry.id || existing.name === entry.name)) {
+      actions.push(entry)
+    }
+  }
+
+  for (const entry of collectPowerRiderPassiveEntries(feature, {
+    idPrefix,
+    classId,
+    classLevel: levelCap,
+    sourceLabel,
+    sourceIcon,
+    parentHasExplicitEconomy,
+    showOnCombatTab: display.combatActions,
+  })) {
+    if (!actions.some((existing) => existing.id === entry.id || existing.name === entry.name)) {
+      actions.push(entry)
+    }
+  }
+
+  for (const entry of collectEnemyCombatImpactPassiveEntries(feature, {
+    idPrefix,
+    classId,
+    classLevel: levelCap,
+    sourceLabel,
+    sourceIcon,
+    parentHasExplicitEconomy,
+    showOnCombatTab: display.combatActions,
   })) {
     if (!actions.some((existing) => existing.id === entry.id || existing.name === entry.name)) {
       actions.push(entry)
@@ -1885,6 +2099,37 @@ function sourceIconForAbility(
   return owner ? resolveAttachedClassIcon(owner.class) : null
 }
 
+/** Prefer the class that owns the ability's class-resource spend (e.g. Investigator trinkets). */
+function resolveCustomAbilityOwnerClassId(
+  ability: CustomAbility,
+  classDetails: CharacterClassDetail[],
+  fallbackClassId: string | null,
+): string | null {
+  if (ability.attached_to_type === "class" && ability.attached_to_id) {
+    return ability.attached_to_id
+  }
+  if (ability.attached_to_type === "subclass" && ability.attached_to_id) {
+    const bySubclass = classDetails.find((entry) => entry.subclass?.id === ability.attached_to_id)
+    if (bySubclass) return bySubclass.row.class_id
+  }
+  const uses = ability.uses as UsesConfig | null | undefined
+  const resourceKey =
+    uses?.type === "class_resource" ? uses.classResourceKey?.trim() || null : null
+  if (resourceKey) {
+    const byResource = classDetails.find((entry) =>
+      classResourceKeysForClass(entry.class).includes(resourceKey),
+    )
+    if (byResource) return byResource.row.class_id
+  }
+  if (/investigator/i.test(ability.source ?? "") || /trinket/i.test(ability.description ?? "")) {
+    const investigator = classDetails.find((entry) =>
+      /investigator/i.test(entry.class?.name ?? ""),
+    )
+    if (investigator) return investigator.row.class_id
+  }
+  return fallbackClassId
+}
+
 function pushCustomAbilityActions(
   actions: SheetActionEntry[],
   abilities: CustomAbility[] | undefined,
@@ -1968,8 +2213,7 @@ function pushCustomAbilityActions(
 
     seenPowerNames.add(normalizePickName(ability.name))
     const healEffects = resolveHealEffects(item)
-    const ownerClassId =
-      ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId
+    const ownerClassId = resolveCustomAbilityOwnerClassId(ability, classDetails, classId)
     actions.push({
       id: `ability:${ability.id}`,
       name: ability.name,
@@ -2101,8 +2345,7 @@ function pushUpgradePassiveReminders(
     if (existingIds.has(ability.id)) continue
     if (existingNames.has(ability.name.trim().toLowerCase())) continue
 
-    const ownerClassId =
-      ability.attached_to_type === "class" ? (ability.attached_to_id ?? classId) : classId
+    const ownerClassId = resolveCustomAbilityOwnerClassId(ability, classDetails, classId)
     const sourceIcon = sourceIconForAbility(ability, classDetails, classId)
     actions.push({
       id: `ability:${ability.id}:passive`,
@@ -2433,7 +2676,10 @@ function attachTalentAlertsToActions(
         .map((name) => normalizePickName(name))
         .filter(Boolean)
       if (!menuFilters.length) return true
-      const actionMenus = (action.menuOptions ?? []).map((option) => normalizePickName(option.name))
+      const actionMenus = [
+        ...(action.menuOptions ?? []).map((option) => normalizePickName(option.name)),
+        ...(action.activationPicks?.options ?? []).map((option) => normalizePickName(option.name)),
+      ]
       return menuFilters.some((filter) =>
         actionMenus.some(
           (optionName) =>
@@ -2442,30 +2688,128 @@ function attachTalentAlertsToActions(
       )
     })
     if (!matched.length) return action
+    const relatedTalentAlerts = matched.map(
+      ({
+        name,
+        summary,
+        description,
+        sourceLabel,
+        parentMenuOptionNames,
+        appliesToAttackVariants,
+        selectable,
+        spendHitPoints,
+      }) => ({
+        name,
+        summary,
+        description,
+        sourceLabel,
+        parentMenuOptionNames,
+        appliesToAttackVariants,
+        selectable,
+        spendHitPoints,
+      }),
+    )
+    const activationPicks = action.activationPicks
+      ? {
+          ...action.activationPicks,
+          options: action.activationPicks.options.map((option) => {
+            const styleAlerts = relatedTalentAlerts.filter((alert) => {
+              const filters = (alert.parentMenuOptionNames ?? [])
+                .map((name) => normalizePickName(name))
+                .filter(Boolean)
+              if (!filters.length) return false
+              const optionName = normalizePickName(option.name)
+              return filters.some(
+                (filter) =>
+                  optionName === filter ||
+                  optionName.includes(filter) ||
+                  filter.includes(optionName),
+              )
+            })
+            if (!styleAlerts.length) return option
+            const riderNote = styleAlerts
+              .map((alert) => `${alert.name}: ${alert.summary}`)
+              .join(" ")
+            const existing = option.description?.trim() ?? ""
+            if (existing.includes(riderNote)) return option
+            return {
+              ...option,
+              description: existing ? `${existing}\n\n${riderNote}` : riderNote,
+            }
+          }),
+        }
+      : action.activationPicks
     return {
       ...action,
-      relatedTalentAlerts: matched.map(
-        ({
-          name,
-          summary,
-          description,
-          sourceLabel,
-          parentMenuOptionNames,
-          appliesToAttackVariants,
-          selectable,
-          spendHitPoints,
-        }) => ({
-          name,
-          summary,
-          description,
-          sourceLabel,
-          parentMenuOptionNames,
-          appliesToAttackVariants,
-          selectable,
-          spendHitPoints,
-        }),
-      ),
+      relatedTalentAlerts,
+      activationPicks,
     }
+  })
+}
+
+/**
+ * Merge targetable effects (heals, Inspiration, ally buffs) from power_rider features onto
+ * their parent sheet action so riders like Heroic Dance apply when Dance is used.
+ */
+function attachPowerRiderEffectsToActions(
+  actions: SheetActionEntry[],
+  classDetails: CharacterClassDetail[],
+): SheetActionEntry[] {
+  type RiderBundle = { parentNames: string[]; effects: FeatureEffect[] }
+  const bundles: RiderBundle[] = []
+
+  for (const detail of classDetails) {
+    const levelCap = detail.row.level
+    const features = [
+      ...((detail.class?.features ?? []) as ActivatableItem[]),
+      ...((detail.subclass?.features ?? []) as ActivatableItem[]),
+    ]
+    for (const feature of features) {
+      if ((feature.level ?? 1) > levelCap) continue
+      const parents = new Set<string>()
+      for (const instance of feature.linkedModifiers ?? []) {
+        for (const characteristic of instance.characteristics ?? []) {
+          if (characteristic.type !== "power_rider") continue
+          for (const parent of characteristic.parentPowerNames ?? []) {
+            if (parent.trim()) parents.add(parent)
+          }
+        }
+      }
+      if (!parents.size) continue
+      const effects = resolveHealEffects(feature)
+      if (!effects.length) continue
+      bundles.push({ parentNames: [...parents], effects })
+    }
+  }
+
+  if (!bundles.length) return actions
+
+  return actions.map((action) => {
+    const matched = bundles.filter((bundle) =>
+      bundle.parentNames.some((parent) => {
+        const p = normalizePickName(parent)
+        const n = normalizePickName(action.name)
+        return n === p || n.includes(p) || p.includes(n)
+      }),
+    )
+    if (!matched.length) return action
+    const seen = new Set(
+      (action.healEffects ?? []).map(
+        (effect) => effect.id || `${effect.kind}:${effect.label ?? ""}:${effect.healMode ?? ""}`,
+      ),
+    )
+    const merged = [...(action.healEffects ?? [])]
+    for (const bundle of matched) {
+      for (const effect of bundle.effects) {
+        const key = effect.id || `${effect.kind}:${effect.label ?? ""}:${effect.healMode ?? ""}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        merged.push(effect)
+      }
+    }
+    return merged.length === (action.healEffects?.length ?? 0)
+      ? action
+      : { ...action, healEffects: merged }
   })
 }
 
@@ -2674,21 +3018,26 @@ export function collectSheetActions(params: {
     })
   }
 
-  const withRiders = attachTalentAlertsToActions(actions, [
+  const talentAlerts = [
     ...collectTalentAlertsFromFeatures(params.classDetails),
     ...collectTalentAlertsFromCustomAbilities(params.customAbilities, featureChoicePicks),
-  ])
+  ]
+  const withStyles = attachActivationPicksToActions(attachAlsoActivateActions(actions), {
+    classDetails: params.classDetails,
+    featureChoicePicks,
+    customAbilities: params.customAbilities,
+  })
+  const withRiders = attachPowerRiderEffectsToActions(
+    attachTalentAlertsToActions(withStyles, talentAlerts),
+    params.classDetails,
+  )
 
   const fullRestoreLinkedNames = collectFullRestoreLinkedFeatureNames(
     unlockedFeatures(params.classDetails),
   )
 
   const seen = new Set<string>()
-  return attachActivationPicksToActions(attachAlsoActivateActions(withRiders), {
-    classDetails: params.classDetails,
-    featureChoicePicks,
-    customAbilities: params.customAbilities,
-  })
+  return withRiders
     .map((action) => {
       action = { ...action, icon: resolveSheetActionIcon(action), ...slotHooksFor(action) }
       if (

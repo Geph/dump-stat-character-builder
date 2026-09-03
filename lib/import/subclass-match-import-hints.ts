@@ -16,5 +16,5 @@ The user's compendium already has the class "${className}". Use that to format s
 - subclasses[].class_name must be exactly "${className}" (parent class already in the compendium — do not invent a variant spelling)
 - Use the source's own subclass name for subclasses[].name
 - Extract features from the source; keep HTML spell tables in feature descriptions when present
-- When the feature offers mutually exclusive subtype spell lists (land types, similar circles), emit isChoice + one option per subtype with that subtype's HTML spell table in the option description`
+- When the feature offers mutually exclusive subtype spell lists (land types, Thesis subjects like Corpus/Mentis/Mortis/Oculus, similar circles), emit isChoice + one option per subtype with that subtype's HTML spell table in the option description. Set swappableOnRest true only when the source swaps on a rest (Circle of the Land); for level-up-only swaps (Investigator Thesis) use swappableOnRest: false.`
 }

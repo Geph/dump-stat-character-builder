@@ -1424,4 +1424,17 @@ describe("detectFeatureModifiers by feature name", () => {
     })
     expect(fx?.limitations?.some((lim) => lim.value === "first_turn_of_combat")).toBe(true)
   })
+
+  it("wires self Heroic Inspiration grants", () => {
+    const detections = detectFeatureModifiers(
+      "When you begin your Dance, you can give yourself Heroic Inspiration if you don't have it.",
+      { ...baseCtx, featureName: "Heroic Dance" },
+    )
+    const fx = detections.find((entry) => entry.ruleId === "inspiration.heroic.self")
+      ?.instance.activation?.effects?.[0]
+    expect(fx).toMatchObject({
+      kind: "grant_inspiration",
+      healTarget: "self",
+    })
+  })
 })

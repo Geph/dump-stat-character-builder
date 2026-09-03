@@ -56,6 +56,7 @@ import {
 } from "@/lib/character/cast-spell-choice"
 import {
   collectTargetableEffects,
+  isHeroicInspirationEffect,
   type PartyEffectTarget,
 } from "@/lib/character/effect-target-policy"
 import type { Spell } from "@/lib/types"
@@ -1497,11 +1498,19 @@ function ActionDetailOverlay({
       return
     }
 
-    if (targetable.length && actionHealCtx && characterId && onApplySelfHeal) {
+    if (targetable.length && actionHealCtx && characterId) {
       const healParts = [...parts]
       const isPsionicPower = action.abilityRole === "psionic_power"
       let banked = 0
-      for (const { effect } of targetable) {
+      let appliedAny = false
+      for (const { effect, policy } of targetable) {
+        if (policy === "self" && isHeroicInspirationEffect(effect)) {
+          onApplySelfInspiration?.()
+          healParts.push("Heroic Inspiration")
+          appliedAny = true
+          continue
+        }
+        if (!onApplySelfHeal) continue
         const resolved = resolveFeatureEffectHeal(effect, actionHealCtx)
         let amount = resolved.amount
         if (amount <= 0) continue
@@ -1515,6 +1524,7 @@ function ActionDetailOverlay({
           healParts.push(`Perfected Enhancement (+${perfectedEnhancementBonus} PB)`)
         }
         onApplySelfHeal(amount, kind)
+        appliedAny = true
         if (isPsionicPower) banked += amount
         healParts.push(
           kind === "temp_hp"
@@ -1524,14 +1534,16 @@ function ActionDetailOverlay({
               : `Healed ${amount} HP`,
         )
       }
-      if (banked > 0 && onBankBalanceOfPower) onBankBalanceOfPower(banked)
-      setUseFeedback(healParts.join(" · ") || "Used!")
-      if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile)) {
-        setStep("roll")
+      if (appliedAny) {
+        if (banked > 0 && onBankBalanceOfPower) onBankBalanceOfPower(banked)
+        setUseFeedback(healParts.join(" · ") || "Used!")
+        if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile)) {
+          setStep("roll")
+          return
+        }
+        showStanceActive()
         return
       }
-      showStanceActive()
-      return
     }
 
     if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile)) {
@@ -1971,6 +1983,19 @@ function ActionDetailOverlay({
             <div className="grid gap-2 sm:grid-cols-2">
               {action.activationPicks.options.map((option) => {
                 const selected = selectedActivationNames.includes(option.name)
+                const styleAlerts = (action.relatedTalentAlerts ?? []).filter((alert) => {
+                  const filters = (alert.parentMenuOptionNames ?? [])
+                    .map((name) => name.trim().toLowerCase())
+                    .filter(Boolean)
+                  if (!filters.length) return false
+                  const optionName = option.name.trim().toLowerCase()
+                  return filters.some(
+                    (filter) =>
+                      optionName === filter ||
+                      optionName.includes(filter) ||
+                      filter.includes(optionName),
+                  )
+                })
                 return (
                   <button
                     key={option.name}
@@ -1995,8 +2020,20 @@ function ActionDetailOverlay({
                   >
                     <div className="font-semibold">{option.name}</div>
                     {option.description ? (
-                      <div className="mt-1 text-xs text-muted-foreground line-clamp-3">
+                      <div className="mt-1 text-xs text-muted-foreground line-clamp-4 whitespace-pre-line">
                         {option.description}
+                      </div>
+                    ) : null}
+                    {styleAlerts.length ? (
+                      <div className="mt-2 space-y-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5">
+                        {styleAlerts.map((alert) => (
+                          <p
+                            key={`${alert.name}:${alert.summary}`}
+                            className="text-[10px] leading-snug text-amber-900 dark:text-amber-200"
+                          >
+                            <span className="font-semibold">{alert.name}.</span> {alert.summary}
+                          </p>
+                        ))}
                       </div>
                     ) : null}
                   </button>
@@ -2864,7 +2901,9 @@ export function SheetActionsPanel({
 
   /** Resolve the spendable counter backing an action, if any. */
   const usageFor = (action: SheetActionEntry): ActionUsage | null => {
-    if (action.classResourceKey && action.classId && onResourceUsedChange) {
+    // Class-resource spends must hit the shared pool even when classId is missing
+    // (subclass-attached custom abilities, multiclass edge cases).
+    if (action.classResourceKey && onResourceUsedChange) {
       const pool = resolveResourcePool(action.classResourceKey, action.classId)
       if (pool) return pool
     }

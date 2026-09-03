@@ -62,6 +62,22 @@ export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
     label: "Masterwork armor",
     sourceType: "builtin",
   },
+  {
+    id: "magic_weapon_active",
+    label: "Magic Weapon",
+    sourceType: "builtin",
+    defaultDuration: "until_ended",
+    hideFromBanner: true,
+    hint: "Concentration, up to 1 hour. Pick a wielded weapon when casting; manage it from that weapon on the Combat tab. Clear the duration reminder when the spell ends.",
+  },
+  {
+    id: "elemental_weapon_active",
+    label: "Elemental Weapon",
+    sourceType: "builtin",
+    defaultDuration: "until_ended",
+    hideFromBanner: true,
+    hint: "Concentration. Pick a wielded weapon when casting; manage it from that weapon on the Combat tab.",
+  },
 ]
 
 /** Feature-specific toggles resolvable by id but not shown on every character sheet. */
@@ -289,6 +305,9 @@ const ACTION_NAME_ACTIVATES_TOGGLE: Record<string, string> = {
   "full awakening": "full_awakening_active",
   "mind rider": "mind_rider_active",
   dance: "while_dancing",
+  "consecrated whetstone": "magic_weapon_active",
+  "magic weapon": "magic_weapon_active",
+  "elemental weapon": "elemental_weapon_active",
 }
 
 const RESOURCE_KEY_ACTIVATES_TOGGLE: Record<string, string> = {

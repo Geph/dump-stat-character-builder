@@ -8,6 +8,7 @@ import { FeatModifierChoicePicker } from "@/components/builder/feat-modifier-cho
 import { ModifierPlayerChoicePanel } from "@/components/builder/modifier-player-choice-panel"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
+import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 import { createClient } from "@/lib/db/client"
 import {
   attachClassDetails,
@@ -54,6 +55,7 @@ import { getEffectiveBackgroundFeatGranted } from "@/lib/compendium/background-o
 import {
   clearModifierPicksForSource,
   collectModifierPlayerChoiceSlots,
+  modifierPlayerChoiceSlotsForLevelUpStep,
   optionsForExpertiseSlot,
   optionsForProficiencyGrantSlot,
   setModifierPlayerPickValue,
@@ -77,6 +79,7 @@ import { mergeAlchemistDiscoveryPicks } from "@/lib/compendium/alchemist-feature
 import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
+import { filterEnabled } from "@/lib/compendium/compendium-enabled"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { asCompendiumRows } from "@/lib/data/types"
@@ -106,6 +109,8 @@ type LevelUpWizardProps = {
   onComplete?: () => void
 }
 
+type IdentityCatalog = { id: string; name: string }
+
 type Loaded = {
   character: Character
   classDetails: CharacterClassDetail[]
@@ -116,6 +121,9 @@ type Loaded = {
   customAbilities: CustomAbility[]
   modifierCatalog: ModifierCatalogEntry[]
   species: Species | null
+  speciesCatalog: IdentityCatalog[]
+  classCatalog: IdentityCatalog[]
+  backgroundCatalog: IdentityCatalog[]
   featGranted: string | null
 }
 
@@ -183,7 +191,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         db.from("equipment").select("*"),
         db.from("custom_abilities").select("*"),
         db.from("species").select("*"),
-        db.from("backgrounds").select("id, feat_granted"),
+        db.from("backgrounds").select("id, name, feat_granted"),
         loadModifierCatalog(db),
       ])
       if (cancelled) return
@@ -196,40 +204,55 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       const enrichedClasses = enrichClassesList(
         asCompendiumRows(classes) as unknown as DndClass[],
       )
-      const classDetails = attachClassDetails(
-        classRows,
-        enrichedClasses,
-        asCompendiumRows(subclasses) as unknown as Subclass[],
-      )
+      const allSubclasses = asCompendiumRows(subclasses) as unknown as Subclass[]
+      const classDetails = attachClassDetails(classRows, enrichedClasses, allSubclasses)
+      const enabledSubclasses = filterEnabled(allSubclasses)
       const enrichedFeats = enrichFeatsList(
-        asCompendiumRows(feats) as unknown as Array<{
-          name: string
-          source?: string | null
-        }>,
+        filterEnabled(
+          asCompendiumRows(feats) as unknown as Array<{
+            name: string
+            source?: string | null
+            enabled?: boolean | number | null
+          }>,
+        ),
         modifierCatalog,
       )
       const enrichedSpecies = enrichSpeciesList(
         asCompendiumRows(speciesRows) as unknown as Species[],
       )
-      const background = asCompendiumRows<{ id: string; feat_granted: string | null }>(
-        backgrounds,
-      ).find((row) => row.id === char.background_id)
+      const backgroundRows = asCompendiumRows<{
+        id: string
+        name: string
+        feat_granted: string | null
+      }>(backgrounds)
+      const background = backgroundRows.find((row) => row.id === char.background_id)
       setLoaded({
         character: char,
         classDetails,
         subclasses: classDetails
           .flatMap((entry) => (entry.subclass ? [entry.subclass] : []))
           .concat(
-            (asCompendiumRows(subclasses) as unknown as Subclass[]).filter(
+            enabledSubclasses.filter(
               (sub) => !classDetails.some((entry) => entry.subclass?.id === sub.id),
             ),
           ),
         feats: enrichedFeats,
-        spells: asCompendiumRows(spells) as unknown as Spell[],
-        equipment: asCompendiumRows(equipment) as unknown as Equipment[],
-        customAbilities: asCompendiumRows(customAbilities) as unknown as CustomAbility[],
+        spells: filterEnabled(asCompendiumRows(spells) as unknown as Spell[]),
+        equipment: filterEnabled(asCompendiumRows(equipment) as unknown as Equipment[]),
+        customAbilities: filterEnabled(
+          asCompendiumRows(customAbilities) as unknown as CustomAbility[],
+        ),
         modifierCatalog,
         species: enrichedSpecies.find((row) => row.id === char.species_id) ?? null,
+        speciesCatalog: filterEnabled(enrichedSpecies).map((row) => ({
+          id: row.id,
+          name: row.name,
+        })),
+        classCatalog: filterEnabled(enrichedClasses).map((row) => ({
+          id: row.id,
+          name: row.name,
+        })),
+        backgroundCatalog: backgroundRows.map((row) => ({ id: row.id, name: row.name })),
         featGranted: getEffectiveBackgroundFeatGranted(
           background ?? null,
           char.feature_choice_picks ?? {},
@@ -278,6 +301,10 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
   const levelUpModifierSlots = wizardSteps.flatMap((step) =>
     step.kind === "modifier_choice" ? [step.slot] : [],
   )
+  const currentModifierPanelSlots = useMemo(() => {
+    if (current?.kind !== "modifier_choice") return []
+    return modifierPlayerChoiceSlotsForLevelUpStep(current.slot, levelUpModifierSlots)
+  }, [current, levelUpModifierSlots])
 
   const activeFeatStep = current?.kind === "feat_or_asi" ? current : null
   const featId = activeFeatStep ? featIdsByStep[activeFeatStep.id] ?? null : null
@@ -313,10 +340,12 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       feats: loaded.feats,
     })
     const categories =
-      activeFeatStep?.featCategories?.length
-        ? activeFeatStep.featCategories
-        : levelUpFeatCategories(hasFightingStyleAccess)
-    const milestoneLevel = plan?.toLevel ?? 1
+      activeFeatStep?.level === 19
+        ? ["Epic Boon"]
+        : activeFeatStep?.featCategories?.length
+          ? activeFeatStep.featCategories
+          : levelUpFeatCategories(hasFightingStyleAccess)
+    const milestoneLevel = activeFeatStep?.level ?? plan?.toLevel ?? 1
     return loaded.feats
       .filter((feat) =>
         isFeatEligibleForCategories(feat, categories, milestoneLevel, {
@@ -328,6 +357,9 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           backgroundId: loaded.character.background_id,
           hasFightingStyleAccess,
           takenMagicInitiateSpellLists: takenMagicInitiateLists,
+          speciesCatalog: loaded.speciesCatalog,
+          classCatalog: loaded.classCatalog,
+          backgroundCatalog: loaded.backgroundCatalog,
         }),
       )
       .slice()
@@ -339,6 +371,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       })
   }, [
     activeFeatStep?.featCategories,
+    activeFeatStep?.level,
     loaded,
     plan?.newTotalLevel,
     plan?.toLevel,
@@ -808,7 +841,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                   <ModifierPlayerChoicePanel
                     sourceKey={current.slot.sourceKey}
                     sourceLabel={current.slot.sourceLabel}
-                    slots={levelUpModifierSlots}
+                    slots={currentModifierPanelSlots}
                     picks={modifierPicks}
                     spells={loaded?.spells ?? []}
                     kinds={[current.slot.kind]}
@@ -816,13 +849,13 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                     magicInitiateFeatGranted={loaded?.featGranted}
                     magicInitiateSourceKeys={magicInitiateSourceKeys}
                     onChange={(slotKey, selected) => {
-                      const slot = levelUpModifierSlots.find((entry) => entry.slotKey === slotKey)
+                      const slot = currentModifierPanelSlots.find((entry) => entry.slotKey === slotKey)
                       if (!slot) return
                       setModifierPicks((prev) =>
                         setModifierPlayerPickValue(
                           prev,
                           slot,
-                          levelUpModifierSlots,
+                          currentModifierPanelSlots,
                           selected,
                         ),
                       )
@@ -854,12 +887,17 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
               {current?.kind === "feat_or_asi" ? (
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    {activeFeatStep?.featCategories?.length &&
-                    !activeFeatStep.featCategories.some((category) =>
-                      /general|ability score/i.test(category),
+                    {activeFeatStep?.level === 19 ||
+                    activeFeatStep?.featCategories?.some((category) =>
+                      /epic boon/i.test(category),
                     )
-                      ? `Choose ${activeFeatStep.featCategories.join(" or ")}.`
-                      : "Pick a feat. For ability score increases, choose the Ability Score Improvement feat (or a half-feat that grants +1) and allocate below — there is no separate ability-score step."}
+                      ? "Choose an Epic Boon. Each boon’s ability score increase (if any) is allocated below after you pick."
+                      : activeFeatStep?.featCategories?.length &&
+                          !activeFeatStep.featCategories.some((category) =>
+                            /general|ability score/i.test(category),
+                          )
+                        ? `Choose ${activeFeatStep.featCategories.join(" or ")}.`
+                        : "Pick a feat. For ability score increases, choose the Ability Score Improvement feat (or a half-feat that grants +1) and allocate below — there is no separate ability-score step."}
                   </p>
                   <select
                     value={featId ?? ""}
@@ -891,13 +929,32 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
                     }}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   >
-                    <option value="">Choose a feat…</option>
+                    <option value="">
+                      {activeFeatStep?.level === 19 ||
+                      activeFeatStep?.featCategories?.some((category) =>
+                        /epic boon/i.test(category),
+                      )
+                        ? "Choose Epic Boon…"
+                        : "Choose a feat…"}
+                    </option>
                     {eligibleFeats.map((feat) => (
                       <option key={feat.id} value={feat.id}>
                         {isAsiFeat(feat) ? `${feat.name} (+2 ability scores)` : feat.name}
                       </option>
                     ))}
                   </select>
+                  {selectedFeat?.description?.trim() ? (
+                    <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        {selectedFeat.name}
+                      </p>
+                      <ExpandableDescription
+                        text={selectedFeat.description}
+                        collapsedLines={4}
+                        className="text-muted-foreground"
+                      />
+                    </div>
+                  ) : null}
                   {featAsiPools.map((grant) => (
                     <AsiAllocator
                       key={grant.allocationKey}

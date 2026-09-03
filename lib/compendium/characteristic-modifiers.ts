@@ -367,6 +367,7 @@ import type {
   ModifierLimitation,
 } from "@/lib/compendium/modifier-limitations"
 import { modifierLimitationsMet } from "@/lib/compendium/modifier-limitations"
+import { isWeaponBoundSpellBuffModifier } from "@/lib/character/weapon-spell-buff"
 import { isUngatedSituationalSpeedGrant } from "@/lib/compendium/situational-speed-grant"
 
 export type { LimitationEvaluationContext, ModifierLimitation } from "@/lib/compendium/modifier-limitations"
@@ -2389,6 +2390,11 @@ export type AggregatedCharacteristics = {
   speedEqualToWalk: string[]
   attackRollModifiers: AggregatedRollModifier[]
   damageRollModifiers: AggregatedRollModifier[]
+  /**
+   * Active Magic Weapon / Elemental Weapon-style modifiers. Applied per bound
+   * equipment id in deriveWeaponAttack — not flattened onto every weapon.
+   */
+  weaponBoundSpellBuffModifiers: CharacteristicModifier[]
   weaponReachModifiers: WeaponReachModifierCharacteristic[]
   unarmedStrikeDie: UnarmedStrikeDie | null
   unarmedStrikeDieByLevel: import("@/lib/compendium/bonus-by-level").BonusByLevelEntry[]
@@ -2508,6 +2514,7 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   speedEqualToWalk: [],
   attackRollModifiers: [],
   damageRollModifiers: [],
+  weaponBoundSpellBuffModifiers: [],
   weaponReachModifiers: [],
   unarmedStrikeDie: null,
   unarmedStrikeEmptyHandedDie: null,
@@ -2889,6 +2896,12 @@ export function aggregateCharacteristics(
         result.weaponReachModifiers.push(mod)
         break
       case "attack_roll_modifiers":
+        // Weapon-bound spell buffs (Magic Weapon, …) apply per equipment id in
+        // deriveWeaponAttack — do not flatten onto every weapon.
+        if (isWeaponBoundSpellBuffModifier(mod)) {
+          result.weaponBoundSpellBuffModifiers.push(mod)
+          break
+        }
         result.attackRollModifiers.push(
           ...mod.entries.map((entry) => resolveRollEntryBonus(entry, classResourceCounts)),
         )
@@ -2906,6 +2919,10 @@ export function aggregateCharacteristics(
         }
         break
       case "damage_roll_modifiers":
+        if (isWeaponBoundSpellBuffModifier(mod)) {
+          result.weaponBoundSpellBuffModifiers.push(mod)
+          break
+        }
         result.damageRollModifiers.push(
           ...mod.entries.map((entry) => resolveRollEntryBonus(entry, classResourceCounts)),
         )

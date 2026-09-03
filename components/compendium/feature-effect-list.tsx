@@ -162,6 +162,10 @@ export function FeatureEffectList({
       defaults.buffMode = "bonus"
       defaults.buffBonus = defaultRollBonusConfig("die")
     }
+    if (kind === "grant_inspiration") {
+      defaults.healTarget = "self"
+      defaults.label = "Heroic Inspiration"
+    }
     if (kind === "movement_option") {
       defaults.movementDash = true
       defaults.movementDisengage = true
@@ -648,6 +652,26 @@ function EffectRow({
 
       {fields.includes("healAmount") && (
         <HealAmountEditor effect={effect} onChange={onChange} label={effect.kind === "grant_temp_hp" ? "Temporary HP amount" : "Healing amount"} />
+      )}
+
+      {fields.includes("healTarget") && (
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">
+            Inspiration target
+          </label>
+          <select
+            value={effect.healTarget ?? "self"}
+            onChange={(e) =>
+              onChange({
+                healTarget: e.target.value as "self" | "choose_ally",
+              })
+            }
+            className="w-full max-w-xs px-3 py-2 bg-card border border-border rounded-lg text-sm"
+          >
+            <option value="self">Self (toggle Inspiration on use)</option>
+            <option value="choose_ally">Choose ally</option>
+          </select>
+        </div>
       )}
 
       {fields.includes("damageLinkedHeal") && (

@@ -856,6 +856,26 @@ function buildFromMechanic(
     return buildTemporaryHitPointsEffect(mechanic, ctx, instanceId, matchedPhrase)
   }
 
+  if (mechanic.kind === "grant_inspiration") {
+    const target = mechanic.inspirationTarget ?? "self"
+    const healTarget = target === "ally" ? ("choose_ally" as const) : ("self" as const)
+    return {
+      ruleId: "ai.grant_inspiration",
+      confidence: aiConfidence(mechanic),
+      matchedPhrase,
+      instance: fxInstance(instanceId, effectCatalogRefId("grant_inspiration"), {
+        effects: [
+          {
+            id: modId(instanceKey(ctx, "grant_inspiration")),
+            kind: "grant_inspiration",
+            healTarget,
+            label: "Heroic Inspiration",
+          },
+        ],
+      }),
+    }
+  }
+
   if (mechanic.kind === "weapon_reach_modifier") {
     const reachBonusFeet = mechanic.reachBonusFeet
     if (reachBonusFeet == null || !(reachBonusFeet > 0)) return null

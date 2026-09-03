@@ -16,9 +16,9 @@ describe("stripResourceClassQualifier", () => {
 })
 
 describe("formatActionSpendLabel", () => {
-  it("omits a resource noun that is just the action name", () => {
-    expect(formatActionSpendLabel(1, "Dances (Dancer)", "Dance")).toBe("1")
-    expect(formatActionSpendLabel(2, "Dances", "Dance")).toBe("2")
+  it("names the matching resource when it would otherwise be only a number", () => {
+    expect(formatActionSpendLabel(1, "Dances (Dancer)", "Dance")).toBe("uses 1 dance")
+    expect(formatActionSpendLabel(2, "Dances", "Dance")).toBe("uses 2 dances")
   })
 
   it("singularizes a different resource name at count 1", () => {

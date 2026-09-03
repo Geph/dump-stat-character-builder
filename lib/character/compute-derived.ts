@@ -114,6 +114,7 @@ import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import { resolveSkillAbility } from "@/lib/character/skill-ability-overrides"
 import { collectGrantedSpellCastProfiles } from "@/lib/character/free-cast-spells"
+import { weaponSpellBuffRollBonuses } from "@/lib/character/weapon-spell-buff"
 
 const SKILL_ROWS: { name: string; ability: AbilityScoreKey }[] = [
   { name: "Acrobatics", ability: "dexterity" },
@@ -147,6 +148,8 @@ function buildWeaponAttackDerived(
     includeAbilityModifier?: boolean
     characterLevel?: number
     stepDamageDice?: boolean
+    activeSheetToggles?: ReadonlySet<string>
+    sheetToggleWeaponIds?: Record<string, string>
   },
 ): WeaponAttackDerived | null {
   const unarmed = isUnarmedStrikeWeapon(weapon)
@@ -161,12 +164,12 @@ function buildWeaponAttackDerived(
   if (!base) return null
 
   const weaponProps = getWeaponPropertyTags(weapon)
-  const modifierBonus = sumAttackRollModifiers(params.aggregatedCharacteristics, {
+  let modifierBonus = sumAttackRollModifiers(params.aggregatedCharacteristics, {
     subcategory: weapon.subcategory ?? "",
     properties: weaponProps,
     unarmed,
   })
-  const damageBonus =
+  let damageBonus =
     sumDamageRollModifiers(params.aggregatedCharacteristics, {
       subcategory: weapon.subcategory ?? "",
       properties: weaponProps,
@@ -174,10 +177,23 @@ function buildWeaponAttackDerived(
       unarmed,
     }) + params.featureDamageBonus
 
+  const spellBuff = weaponSpellBuffRollBonuses({
+    mods: params.aggregatedCharacteristics.weaponBoundSpellBuffModifiers,
+    weaponId: weapon.id,
+    activeToggleIds: params.activeSheetToggles,
+    bindings: params.sheetToggleWeaponIds,
+  })
+  modifierBonus += spellBuff.attack
+  damageBonus += spellBuff.damage
+
   const attackBonus = base.attackBonus + modifierBonus
   const attackBreakdown = [...base.attackBreakdown]
   if (modifierBonus !== 0) {
-    attackBreakdown.push({ label: "Bonuses", value: modifierBonus })
+    const label =
+      spellBuff.labels.length && modifierBonus === spellBuff.attack
+        ? spellBuff.labels.join(" / ")
+        : "Bonuses"
+    attackBreakdown.push({ label, value: modifierBonus })
   }
 
   const parsed = parseWeaponDamageDice(getWeaponDamageText(weapon)).oneHanded
@@ -962,6 +978,8 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     aggregatedCharacteristics,
     featureDamageBonus,
     characterLevel: totalLevel,
+    activeSheetToggles: inputs.activeSheetToggles,
+    sheetToggleWeaponIds: inputs.sheetToggleWeaponIds,
   }
 
   const mainMounted =

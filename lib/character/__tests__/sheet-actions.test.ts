@@ -1358,6 +1358,69 @@ describe("collectSheetActions", () => {
     const song = actions.find((action) => action.name === "Encouraging Song")
     expect(song?.healEffects?.some((effect) => effect.kind === "grant_inspiration")).toBe(true)
   })
+
+  it("merges Heroic Dance Inspiration onto the Dance action", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 2,
+              name: "Dance",
+              description: "Bonus Action: begin a Dance.",
+              activation: { bonusAction: true },
+              limitedUses: { type: "class_resource", classResourceKey: "dances" },
+            } as Feature,
+            {
+              level: 9,
+              name: "Heroic Dance",
+              description:
+                "When you begin your Dance, you can give yourself Heroic Inspiration if you don't have it.",
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_heroic_dance_insp",
+                  catalogRefId: "cat_fx_grant_inspiration",
+                  activation: {
+                    effects: [
+                      {
+                        id: "fx_heroic_dance_inspiration",
+                        kind: "grant_inspiration",
+                        healTarget: "self",
+                        label: "Heroic Inspiration",
+                      },
+                    ],
+                  },
+                },
+                {
+                  instanceId: "modinst_heroic_dance",
+                  catalogRefId: "cat_char_power_rider",
+                  characteristics: [
+                    {
+                      id: "char_heroic_dance",
+                      type: "power_rider",
+                      parentPowerNames: ["Dance"],
+                      alertSummary: "When you begin Dance: gain Heroic Inspiration if you don't have it.",
+                    },
+                  ],
+                },
+              ],
+            } as Feature,
+          ],
+          9,
+        ),
+      ],
+      species: null,
+    })
+    const dance = actions.find((action) => action.name === "Dance")
+    expect(
+      dance?.healEffects?.some(
+        (effect) => effect.kind === "grant_inspiration" && effect.healTarget === "self",
+      ),
+    ).toBe(true)
+    expect(dance?.relatedTalentAlerts?.some((alert) => /Heroic Dance|Heroic Inspiration/i.test(alert.name + alert.summary))).toBe(
+      true,
+    )
+  })
 })
 
 describe("triggered activations", () => {
@@ -1738,6 +1801,103 @@ describe("combat / utility tab classification", () => {
     expect(actions.find((action) => action.name === "Magnum Opus")?.category).toBe("utility")
   })
 
+  it("files Sociable Start on Combat from first-round opening text", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 6,
+              name: "Sociable Start",
+              description:
+                "During the first round of combat, you can take the Influence action as a Bonus Action and have Advantage on ability checks you make using that action.",
+              activation: { bonusAction: true },
+              sheetDisplay: {
+                featuresTab: true,
+                abilitiesActions: true,
+                combatActions: false,
+              },
+            } as Feature,
+          ],
+          6,
+        ),
+      ],
+      species: null,
+    })
+    const sociable = actions.find((action) => action.name === "Sociable Start")
+    expect(sociable?.category).toBe("combat")
+    expect(sociable?.showOnCombatTab).toBe(true)
+    expect(sociable?.showOnAbilitiesTab).toBe(false)
+    expect(sociable?.kinds).toContain("bonus")
+  })
+
+  it("files Beguiling Charm as a Combat Passive for enemy attack/save impact", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 10,
+              name: "Beguiling Charm",
+              description:
+                "When you give a creature the Charmed condition, you can choose one of the following effects for the creature while it has the condition.\n\nBad Influence. The target subtracts your Dance Die from Intelligence, Wisdom, and Charisma saving throws it makes.\n\nFriend of My Friends. The target subtracts your Dance Die from all its attack rolls.",
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_beguiling",
+                  catalogRefId: "cat_fx_modify_creature",
+                  activation: {
+                    effects: [
+                      {
+                        id: "fx_friend",
+                        kind: "modify_creature",
+                        rollTarget: "enemy",
+                        creatureModifyMode: "roll",
+                        checkCategory: "attack",
+                        label: "Friend of My Friends",
+                      },
+                    ],
+                  },
+                },
+                {
+                  instanceId: "modinst_beguiling_menu",
+                  catalogRefId: "cat_char_resource_ability_menu",
+                  characteristics: [
+                    {
+                      id: "mod_beguiling_menu",
+                      type: "resource_ability_menu",
+                      resourceKey: "dance_die",
+                      options: [
+                        { name: "Bad Influence", description: "Subtract Dance Die from mental saves.", resourceCost: 0 },
+                        {
+                          name: "Friend of My Friends",
+                          description: "Subtract Dance Die from attack rolls.",
+                          resourceCost: 0,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            } as Feature,
+          ],
+          10,
+        ),
+      ],
+      species: null,
+    })
+    const charm = actions.find((action) => action.name === "Beguiling Charm")
+    expect(charm).toMatchObject({
+      category: "combat",
+      reminderOnly: true,
+      spendsEconomy: false,
+      showOnCombatTab: true,
+    })
+    expect(charm?.menuOptions?.map((option) => option.name)).toEqual([
+      "Bad Influence",
+      "Friend of My Friends",
+    ])
+  })
+
   it("lets action-or-bonus powers list both economies", () => {
     expect(
       flexibleEconomyKindsFromText("You can use this as an action or a bonus action."),
@@ -1947,6 +2107,117 @@ describe("combat / utility tab classification", () => {
     })
   })
 
+  it("files a combat-flagged power_rider-only Extra Attack variant as a Passive reminder", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 5,
+              name: "Extra Attack",
+              description: "You can attack twice whenever you take the Attack action.",
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_extra",
+                  catalogRefId: "cat_fx_extra_attack",
+                  activation: {
+                    effects: [{ id: "mod_extra", kind: "extra_attack", extraAttackCount: 1 }],
+                  },
+                },
+              ],
+            } as unknown as Feature,
+            {
+              level: 5,
+              name: "Three-Target Extra Attack",
+              description:
+                "When you take the Attack action on your turn, you can attack three times if all of your attacks are against different targets.",
+              sheetDisplay: { combatActions: true, featuresTab: true },
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_three_target",
+                  catalogRefId: "cat_char_power_rider",
+                  characteristics: [
+                    {
+                      id: "char_multi_target",
+                      type: "power_rider",
+                      parentPowerNames: ["Extra Attack", "Attack"],
+                      alertSummary:
+                        "Extra attacks only if each attack is against a different target (see feature name for count).",
+                    },
+                  ],
+                },
+              ],
+            } as unknown as Feature,
+          ],
+          6,
+        ),
+      ],
+      species: null,
+    })
+    const threeTarget = actions.find((action) => action.name === "Three-Target Extra Attack")
+    expect(threeTarget).toMatchObject({
+      reminderOnly: true,
+      trigger: "When you take the Attack action",
+      category: "combat",
+      showOnCombatTab: true,
+      spendsEconomy: false,
+    })
+  })
+
+  it("keeps only the highest multi-target Extra Attack Passive on the sheet", () => {
+    const multiTargetRider = (name: string, replaces?: string[]) =>
+      ({
+        level: name.startsWith("Three") ? 5 : name.startsWith("Four") ? 11 : 17,
+        name,
+        description: `Attack ${name.split("-")[0].toLowerCase()} times vs different targets.`,
+        sheetDisplay: { combatActions: true, featuresTab: true },
+        linkedModifiers: [
+          {
+            instanceId: `modinst_${name}`,
+            catalogRefId: "cat_char_power_rider",
+            characteristics: [
+              {
+                id: `char_${name}`,
+                type: "power_rider",
+                parentPowerNames: ["Extra Attack", "Attack"],
+                alertSummary: "Extra attacks only if each attack is against a different target.",
+              },
+              ...(replaces?.length
+                ? [
+                    {
+                      id: `char_replace_${name}`,
+                      type: "replace_feature" as const,
+                      replacedFeatureNames: replaces,
+                    },
+                  ]
+                : []),
+            ],
+          },
+        ],
+      }) as unknown as Feature
+
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            multiTargetRider("Three-Target Extra Attack"),
+            multiTargetRider("Four-Target Extra Attack", ["Three-Target Extra Attack"]),
+            multiTargetRider("Five-Target Extra Attack", [
+              "Four-Target Extra Attack",
+              "Three-Target Extra Attack",
+            ]),
+          ],
+          17,
+        ),
+      ],
+      species: null,
+    })
+    const names = actions.map((action) => action.name)
+    expect(names).toContain("Five-Target Extra Attack")
+    expect(names).not.toContain("Four-Target Extra Attack")
+    expect(names).not.toContain("Three-Target Extra Attack")
+  })
+
   it("splits a resource-die menu off a bonus-action parent onto Passive", () => {
     const actions = collectSheetActions({
       classDetails: [
@@ -2142,6 +2413,83 @@ describe("combat / utility tab classification", () => {
     ).toMatchObject({
       sheetToggleId: "dance_style_enthralling_movement",
     })
+  })
+
+  it("notes Heartbreaker on the Enthralling Movement Dance Style pick", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 2,
+              name: "Dance",
+              description: "As a Bonus Action, expend a Dance to begin dancing.",
+              activation: { bonusAction: true },
+              sheetDisplay: { combatActions: true },
+              limitedUses: {
+                type: "class_resource",
+                classResourceKey: "dances",
+                classResourceAmount: 1,
+              },
+            } as Feature,
+            {
+              level: 2,
+              name: "Dance Styles",
+              description: "When you begin your Dance, choose a Dance Style.",
+              isChoice: true,
+              choices: {
+                category: "Dance Style",
+                count: 1,
+                resourceKey: "dance_styles_known",
+                optionsSource: "class_upgrades",
+                options: [],
+              },
+            } as Feature,
+          ],
+          14,
+          {
+            subclassFeatures: [
+              {
+                level: 3,
+                name: "Enthralling Movement [Dance Style]",
+                description: "Creatures that can see you may be charmed while you Dance.",
+              } as Feature,
+              {
+                level: 14,
+                name: "Heartbreaker",
+                description:
+                  "Whenever a creature succeeds or fails its saving throw against your Enthralling Movement, you can deal Psychic damage equal to two rolls of your Dance Die.",
+                linkedModifiers: [
+                  {
+                    instanceId: "modinst_heartbreaker",
+                    catalogRefId: "cat_char_power_rider",
+                    characteristics: [
+                      {
+                        id: "char_heartbreaker",
+                        type: "power_rider",
+                        parentPowerNames: ["Dance", "Enthralling Movement"],
+                        parentMenuOptionNames: ["Enthralling Movement"],
+                        alertSummary:
+                          "On Enthralling Movement save (success or fail): deal Psychic damage equal to two Dance Dice.",
+                      },
+                    ],
+                  },
+                ],
+              } as Feature,
+            ],
+          },
+        ),
+      ],
+      species: null,
+      featureChoicePicks: {},
+    })
+    const dance = actions.find((action) => action.name === "Dance")
+    expect(dance?.relatedTalentAlerts?.some((alert) => alert.name === "Heartbreaker")).toBe(true)
+    const enthralling = dance?.activationPicks?.options.find(
+      (option) => option.name === "Enthralling Movement",
+    )
+    expect(enthralling?.description).toMatch(/Heartbreaker/i)
+    expect(enthralling?.description).toMatch(/two Dance Dice/i)
   })
 
   it("omits a Dance Styles pick that only matches weapon mastery Shift", () => {

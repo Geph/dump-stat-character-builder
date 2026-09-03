@@ -118,11 +118,21 @@ describe("Investigator class import wiring", () => {
     expect(finisher?.uses.dieType).toBe("d8")
   })
 
-  it("links Holy Trinkets to descriptive text; pool spend is on magic items", () => {
+  it("links Holy Trinkets to named buttons that share the Trinkets pool", () => {
     const content = enrichImportContentModifiers(loadInvestigatorFixture())
-    const holy = content.classes?.[0]?.features?.find((f) => f.name === "Holy Trinkets") as unknown as import("@/lib/types").Feature | undefined
+    const holy = content.classes?.[0]?.features?.find((f) => f.name === "Holy Trinkets") as
+      | (Feature & { limitedUses?: unknown })
+      | undefined
     expect(holy?.limitedUses).toBeUndefined()
-    expect(content.equipment ?? []).toEqual([])
+    const abilities = content.import_proposals?.custom_abilities ?? []
+    const amulet = abilities.find((a) => a.name === "Amulet of Warding")
+    expect(amulet).toBeTruthy()
+    expect((amulet as { uses?: { classResourceKey?: string } } | undefined)?.uses?.classResourceKey).toBe(
+      "trinkets",
+    )
+    expect((content.equipment ?? []).map((e) => e.name)).toEqual(
+      expect.arrayContaining(["Amulet of Warding", "Restorative Ankh", "Rune of Banishment"]),
+    )
   })
 
   it("detects trinket spend phrasing", () => {

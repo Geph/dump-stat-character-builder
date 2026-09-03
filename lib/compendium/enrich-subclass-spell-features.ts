@@ -100,6 +100,7 @@ function spellEntriesFromTableDescription(
   description: string,
   spellCatalog: { id: string; name: string; source?: string | null }[],
   preferredSource?: string | null,
+  opts?: { castAsRitual?: boolean },
 ): SpellsKnownEntry[] {
   const parsed = parseSubclassSpellTable(description)
   if (!parsed || parsed.ambiguousMultiTable || !parsed.rows.length) return []
@@ -117,10 +118,22 @@ function spellEntriesFromTableDescription(
         prepared: true,
         alwaysPrepared: true,
         unlocksAtClassLevel: tableRow.unlocksAtClassLevel,
+        ...(opts?.castAsRitual ? { castAsRitual: true } : {}),
       })
     }
   }
   return spellEntries
+}
+
+/** Parent prose that makes choice-table spells Rituals (Investigator Thesis, etc.). */
+export function featureTreatsChoiceSpellsAsRituals(feature: Feature): boolean {
+  const text = `${feature.name ?? ""} ${feature.description ?? ""}`
+  return (
+    /\britual\s+tag\b/i.test(text) ||
+    /\bhave the Ritual tag\b/i.test(text) ||
+    /\btreat(?:\s+\w+){0,6}\s+ritual\b/i.test(text) ||
+    /\bcast as(?:\s+a)?\s+rituals?\b/i.test(text)
+  )
 }
 
 /**
@@ -128,7 +141,7 @@ function spellEntriesFromTableDescription(
  * real spell lists live on the chosen options (e.g. Circle of the Land land types).
  */
 function clearEmptyFeatureSpellsKnownPlaceholder(feature: Feature): Feature {
-  if (!feature.choices?.swappableOnRest) return feature
+  if (!feature.choices?.options?.length) return feature
   const linked = feature.linkedModifiers ?? []
   if (!linked.length) return feature
 
@@ -146,7 +159,7 @@ function clearEmptyFeatureSpellsKnownPlaceholder(feature: Feature): Feature {
 
 /**
  * Wire spells_known onto feature choice options whose descriptions embed a spell table
- * (Circle of the Land land types, and similar rest-swappable subtype lists).
+ * (Circle of the Land land types, Investigator Thesis subjects, and similar subtype lists).
  */
 export function enrichSubclassChoiceOptionSpells(
   feature: Feature,
@@ -156,6 +169,7 @@ export function enrichSubclassChoiceOptionSpells(
   const choices = feature.choices
   if (!choices?.options?.length || !spellCatalog.length) return feature
 
+  const castAsRitual = featureTreatsChoiceSpellsAsRituals(feature)
   let wiredAny = false
   const options = choices.options.map((option) => {
     const description = option.description ?? ""
@@ -165,6 +179,7 @@ export function enrichSubclassChoiceOptionSpells(
       description,
       spellCatalog,
       preferredSource,
+      { castAsRitual },
     )
     if (!spellEntries.length) return option
 

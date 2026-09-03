@@ -18,7 +18,9 @@ import {
   describeWeaponRange,
 } from "@/lib/compendium/weapon-property-reference"
 import { buildWeaponSheetContext } from "@/lib/compendium/weapon-sheet-context"
+import type { AbilityMods } from "@/lib/compendium/combat-stats"
 import {
+  optionalWeaponDamageBonuses,
   optionalWeaponDamageReplacements,
   weaponDamageDiceOptions,
 } from "@/lib/compendium/weapon-damage-roll"
@@ -28,6 +30,7 @@ import type {
 } from "@/lib/compendium/characteristic-modifiers"
 import { weaponModifierBadgeClass } from "@/lib/character/sheet-status-colors"
 import { canMountWeapon, isWeaponMounted } from "@/lib/character/mounted-weapon"
+import { isWeaponSpellBuffActiveOnWeapon } from "@/lib/character/weapon-spell-buff"
 import { Switch } from "@/components/ui/switch"
 import type { WeaponAttackDerived } from "@/lib/character/types"
 import type { Equipment } from "@/lib/types"
@@ -67,9 +70,14 @@ type SheetEquippedWeaponsPanelProps = {
   onDamageRoll?: () => void
   hideHeading?: boolean
   activeSheetToggleIds?: readonly string[]
+  sheetToggleWeaponIds?: Record<string, string>
+  /** Weapon-bound spell buffs the character can place on a wielded weapon. */
+  availableWeaponSpellBuffs?: readonly { toggleId: string; label: string }[]
   onToggleMounted?: (weaponId: string) => void
+  onToggleWeaponSpellBuff?: (toggleId: string, weaponId: string) => void
   powerRiders?: readonly PowerRiderCharacteristic[]
   weaponAbilityOverrides?: readonly WeaponAbilityOverrideCharacteristic[]
+  abilityMods?: AbilityMods | null
 }
 
 function WeaponAttackCard({
@@ -90,9 +98,13 @@ function WeaponAttackCard({
   attackPips,
   onDamageRoll,
   activeSheetToggleIds,
+  sheetToggleWeaponIds,
+  availableWeaponSpellBuffs,
   onToggleMounted,
+  onToggleWeaponSpellBuff,
   powerRiders,
   weaponAbilityOverrides,
+  abilityMods,
 }: EquippedWeaponCard & {
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
@@ -102,9 +114,13 @@ function WeaponAttackCard({
   attackPips?: { used: number; total: number }
   onDamageRoll?: () => void
   activeSheetToggleIds?: readonly string[]
+  sheetToggleWeaponIds?: Record<string, string>
+  availableWeaponSpellBuffs?: readonly { toggleId: string; label: string }[]
   onToggleMounted?: (weaponId: string) => void
+  onToggleWeaponSpellBuff?: (toggleId: string, weaponId: string) => void
   powerRiders?: readonly PowerRiderCharacteristic[]
   weaponAbilityOverrides?: readonly WeaponAbilityOverrideCharacteristic[]
+  abilityMods?: AbilityMods | null
 }) {
   const range = getWeaponRangeText(weapon)
   const mastery = getWeaponMastery(weapon)
@@ -123,6 +139,28 @@ function WeaponAttackCard({
     ...weaponDamageDiceOptions(weapon, { stepDice: mounted }),
     ...optionalWeaponDamageReplacements(weapon, powerRiders),
   ]
+  const bonusOptions = optionalWeaponDamageBonuses(weapon, powerRiders, abilityMods, {
+    investigatorLevel: buildInputs
+      ? buildInputs.classLevels
+          .filter((row) => {
+            const cls = buildInputs.classes.find((entry) => entry.id === row.classId)
+            return /investigator/i.test(cls?.name ?? "")
+          })
+          .reduce((sum, row) => sum + (row.level ?? 0), 0) || null
+      : null,
+    activeSheetToggleIds,
+  })
+  const spellBuffOptions = (availableWeaponSpellBuffs ?? []).map((buff) => ({
+    id: buff.toggleId,
+    label: buff.label,
+    checked: isWeaponSpellBuffActiveOnWeapon({
+      toggleId: buff.toggleId,
+      weaponId: weapon.id,
+      activeToggleIds: activeSheetToggleIds,
+      bindings: sheetToggleWeaponIds,
+    }),
+    title: `${buff.label} on ${weapon.name}`,
+  }))
   const sheetContext = buildInputs
     ? buildWeaponSheetContext(weapon, buildInputs, weaponProficiencies)
     : null
@@ -162,6 +200,16 @@ function WeaponAttackCard({
                 Mounted
               </span>
             ) : null}
+            {spellBuffOptions
+              .filter((option) => option.checked)
+              .map((option) => (
+                <span
+                  key={option.id}
+                  className="rounded-full border border-violet-500/40 bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-800 dark:text-violet-200"
+                >
+                  {option.label}
+                </span>
+              ))}
           </div>
 
           {range || damageExpression ? (
@@ -320,6 +368,14 @@ function WeaponAttackCard({
                 expression={damageExpression}
                 label={`${weapon.name} damage`}
                 diceOptions={diceOptions}
+                bonusOptions={bonusOptions}
+                spellBuffOptions={spellBuffOptions}
+                onSpellBuffToggle={(buffId, checked) => {
+                  if (!checked && !spellBuffOptions.some((option) => option.id === buffId && option.checked)) {
+                    return
+                  }
+                  onToggleWeaponSpellBuff?.(buffId, weapon.id)
+                }}
                 showNoModToggle={hand === "off"}
                 defaultIncludeAbilityModifier={defaultIncludeAbilityModifier}
                 abilityModifier={abilityModifier}
@@ -347,9 +403,13 @@ export function SheetEquippedWeaponsPanel({
   onDamageRoll,
   hideHeading = false,
   activeSheetToggleIds,
+  sheetToggleWeaponIds,
+  availableWeaponSpellBuffs,
   onToggleMounted,
+  onToggleWeaponSpellBuff,
   powerRiders,
   weaponAbilityOverrides,
+  abilityMods,
 }: SheetEquippedWeaponsPanelProps) {
   if (!weapons.length) return null
 
@@ -373,8 +433,12 @@ export function SheetEquippedWeaponsPanel({
             attackPips={attackPips}
             onDamageRoll={onDamageRoll}
             activeSheetToggleIds={activeSheetToggleIds}
+            sheetToggleWeaponIds={sheetToggleWeaponIds}
+            availableWeaponSpellBuffs={availableWeaponSpellBuffs}
             onToggleMounted={onToggleMounted}
+            onToggleWeaponSpellBuff={onToggleWeaponSpellBuff}
             powerRiders={powerRiders}
+            abilityMods={abilityMods}
             weaponAbilityOverrides={weaponAbilityOverrides}
           />
         ))}

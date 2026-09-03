@@ -58,6 +58,20 @@ describe("trinket prose parsing", () => {
     )
     expect(entries).toHaveLength(1)
   })
+
+  it("parses plain-text Holy Trinkets lists (no HTML strong tags)", () => {
+    const entries = parseTrinketEntries(
+      "You can use the following trinkets (expending a use of your Trinkets to do so). " +
+        "Amulet of Warding. As a Bonus Action, you place a divine ward on a creature. " +
+        "Restorative Ankh. As a Bonus Action, a creature regains Hit Points. " +
+        "Rune of Banishment. As a Bonus Action, choose one creature that must succeed on a Charisma saving throw.",
+    )
+    expect(entries.map((entry) => entry.name)).toEqual([
+      "Amulet of Warding",
+      "Restorative Ankh",
+      "Rune of Banishment",
+    ])
+  })
 })
 
 describe("trinket action cost", () => {
@@ -99,6 +113,80 @@ describe("Investigator subclass trinkets", () => {
     const amulet = (sanitized.equipment ?? []).filter((row) => row.name === "Amulet of Warding")
     expect(amulet).toHaveLength(1)
     expect(amulet[0]?.rarity).toBe("Uncommon")
+  })
+
+  it("emits Holy Trinkets as abilities that spend the same Trinkets pool", () => {
+    const abilities = sanitized.import_proposals?.custom_abilities ?? []
+    const amulet = abilities.find((ability) => ability.name === "Amulet of Warding")
+    expect(amulet?.source_type).toBe("class")
+    expect(amulet?.source_name).toBe("Investigator")
+    expect(amulet?.definition).toMatch(/^Holy Trinket\./)
+    expect(amulet?.ability_role).toBe("upgrade")
+    expect((amulet as unknown as { uses?: unknown })?.uses).toMatchObject({
+      type: "class_resource",
+      classResourceKey: "trinkets",
+      classResourceAmount: 1,
+    })
+    expect(amulet?.casting_time).toMatch(/bonus action/i)
+  })
+
+  it("wires Consecrated Whetstone as a free Magic Weapon cast with weapon buff toggle", () => {
+    const abilities = sanitized.import_proposals?.custom_abilities ?? []
+    const whetstone = abilities.find((ability) => ability.name === "Consecrated Whetstone") as
+      | (Record<string, unknown> & { name?: string })
+      | undefined
+    expect(whetstone).toBeTruthy()
+    expect(whetstone?.uses).toMatchObject({
+      type: "class_resource",
+      classResourceKey: "trinkets",
+    })
+    const effects = ((whetstone?.linkedModifiers ?? []) as Array<{
+      activation?: { effects?: Array<{ kind?: string; castSpellName?: string; castSpellWithoutSlot?: boolean }> }
+      characteristics?: Array<{ type?: string; requiresSheetToggle?: string }>
+    }>).flatMap((mod) => mod.activation?.effects ?? [])
+    expect(effects.some((fx) => fx.kind === "cast_spell" && fx.castSpellName === "Magic Weapon" && fx.castSpellWithoutSlot)).toBe(
+      true,
+    )
+    const chars = ((whetstone?.linkedModifiers ?? []) as Array<{
+      characteristics?: Array<{ type?: string; requiresSheetToggle?: string }>
+    }>).flatMap((mod) => mod.characteristics ?? [])
+    expect(
+      chars.some(
+        (char) => char.type === "attack_roll_modifiers" && char.requiresSheetToggle === "magic_weapon_active",
+      ),
+    ).toBe(true)
+    expect(
+      chars.some(
+        (char) => char.type === "damage_roll_modifiers" && char.requiresSheetToggle === "magic_weapon_active",
+      ),
+    ).toBe(true)
+  })
+
+  it("wires Mimic-Tooth Necklace as Bonus Action 2d8 Acid spending Trinkets", () => {
+    const abilities = sanitized.import_proposals?.custom_abilities ?? []
+    const mimic = abilities.find((ability) => ability.name === "Mimic-Tooth Necklace") as
+      | Record<string, unknown>
+      | undefined
+    const effects = ((mimic?.linkedModifiers ?? []) as Array<{
+      activation?: { bonusAction?: boolean; effects?: Array<{ kind?: string; bonusDice?: string }> }
+    }>).flatMap((mod) =>
+      (mod.activation?.effects ?? []).map((effect) => ({ ...effect, bonusAction: mod.activation?.bonusAction })),
+    )
+    expect(effects.some((fx) => fx.kind === "extra_damage_on_hit" && fx.bonusDice === "2d8" && fx.bonusAction)).toBe(
+      true,
+    )
+  })
+
+  it("auto-grants Holy Trinkets from the class feature", () => {
+    const holy = sanitized.classes?.[0]?.features?.find((f) =>
+      /^holy trinkets$/i.test(f.name ?? ""),
+    ) as Feature | undefined
+    const grant = (holy?.linkedModifiers ?? [])
+      .flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "grant_custom_ability") as { abilityNames?: string[] } | undefined
+    expect(grant?.abilityNames).toEqual(
+      expect.arrayContaining(["Amulet of Warding", "Restorative Ankh", "Rune of Banishment"]),
+    )
   })
 
   it("gives every trinket its own ability that spends the Trinkets pool", () => {
@@ -177,6 +265,87 @@ describe("Investigator subclass trinkets", () => {
       /^holy trinkets$/i.test(f.name ?? ""),
     ) as Feature | undefined
     expect(resolveFeatureSheetDisplay(holy as Feature).combatActions).toBe(false)
+  })
+
+  it("never offers a Use Trinkets card — even when sheetDisplay is missing", () => {
+    const investigator = sanitized.classes?.[0]
+    const subclass = sanitized.subclasses?.find((entry) => entry.name === "Exterminator")
+    expect(investigator && subclass).toBeTruthy()
+    const { sheetDisplay: _drop, ...bareTrinkets } = {
+      ...(trinketFeature(sanitized, "Exterminator") as Feature),
+      sheetDisplay: undefined,
+    }
+    const entry = {
+      row: { class_id: "inv-1", level: 6, subclass_id: "ex-1", order: 0 },
+      class: {
+        ...investigator!,
+        id: "inv-1",
+        features: [
+          ...(investigator!.features ?? []).map((feature) =>
+            /^trinkets$/i.test(feature.name ?? "")
+              ? { ...feature, sheetDisplay: undefined }
+              : feature,
+          ),
+        ],
+        class_resources: [
+          {
+            id: "res-trinkets",
+            class_name: "Investigator",
+            resource_key: "trinkets",
+            name: "Trinkets",
+            uses: { type: "at_level", atLevelTable: [{ level: 3, count: 2 }] },
+          },
+        ],
+      },
+      subclass: {
+        ...subclass!,
+        id: "ex-1",
+        class_id: "inv-1",
+        features: [bareTrinkets as Feature],
+      },
+    } as unknown as CharacterClassDetail
+
+    const actions = collectSheetActions({
+      classDetails: [entry],
+      species: null,
+      customAbilities: [
+        {
+          id: "ability-mimic",
+          name: "Mimic-Tooth Necklace",
+          description:
+            "When you hit a creature with an attack using a weapon, you can take a Bonus Action to deal an extra 2d8 Acid damage to the creature.",
+          prerequisites: null,
+          characteristics: null,
+          attached_to_type: "subclass",
+          attached_to_id: "ex-1",
+          uses: {
+            type: "class_resource",
+            classResourceKey: "trinkets",
+            classResourceAmount: 1,
+          },
+          show_in_builder: true,
+          casting_time: "1 bonus action",
+          ability_role: "upgrade",
+          icon: null,
+          source: "Investigator (Exterminator)",
+          creator_url: null,
+          created_at: "",
+          updated_at: "",
+        },
+      ],
+    })
+
+    expect(actions.some((action) => /^trinkets$/i.test(action.name))).toBe(false)
+    const mimic = actions.find((action) => action.name === "Mimic-Tooth Necklace")
+    expect(mimic).toMatchObject({
+      classResourceKey: "trinkets",
+      classId: "inv-1",
+      limitedUses: {
+        type: "class_resource",
+        classResourceKey: "trinkets",
+        classResourceAmount: 1,
+      },
+    })
   })
 })
 
