@@ -151,6 +151,27 @@ describe("aggregateCharacteristics", () => {
     expect(initiative).toBe(5)
   })
 
+  it("adds proficiency bonus to initiative with add_proficiency (Alert)", () => {
+    const aggregated = aggregateCharacteristics([
+      {
+        id: "mod_init",
+        type: "initiative",
+        mode: "add_proficiency",
+      },
+    ])
+    expect(aggregated.initiativeIncludeProficiency).toBe(true)
+
+    const abilityMods = {
+      strength: 0,
+      dexterity: 2,
+      constitution: 0,
+      intelligence: 0,
+      wisdom: 0,
+      charisma: 0,
+    }
+    expect(computeInitiative(2, aggregated, abilityMods, 3)).toBe(5)
+  })
+
   it("does not grant a constrained skill pool until the player picks", () => {
     const pooled = aggregateCharacteristics([
       {

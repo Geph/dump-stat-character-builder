@@ -127,7 +127,7 @@ export function StatExplainPopover({
                       {line.label}
                     </a>
                   ) : (
-                    <span className="text-muted-foreground truncate">{line.label}</span>
+                    <span className="min-w-0 text-muted-foreground leading-snug">{line.label}</span>
                   )}
                   <span className="font-medium tabular-nums shrink-0">
                     {summable ? formatSignedValue(line.amount) : `${line.amount} ft`}

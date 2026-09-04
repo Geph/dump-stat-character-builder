@@ -117,6 +117,7 @@ import {
   computeDerivedCharacter,
   deriveArmorClassForLoadout,
 } from "@/lib/character/compute-derived"
+import { constrainEquipmentLoadout } from "@/lib/character/wield-constraints"
 import { filterDisplaySpeedEntries } from "@/lib/character/resolve-all-speeds"
 import {
   refreshClassDetailWiring,
@@ -225,7 +226,11 @@ import {
   weaponMasteryLabelForOption,
 } from "@/lib/compendium/weapon-mastery-choice"
 import { resolveFeatureChoiceCount } from "@/lib/compendium/resolve-feature-choice-count"
-import { collectSelectedCustomAbilityNames } from "@/lib/builder/picked-custom-abilities"
+import {
+  abilityNameIsSelected,
+  collectSelectedCustomAbilityNames,
+  isPickGatedCustomAbility,
+} from "@/lib/builder/picked-custom-abilities"
 import { normalizeAsiAllocationsMap } from "@/lib/character/level-up-feat"
 import { catalogFeatPickIdsFromPicks } from "@/lib/builder/catalog-feat-options"
 import { collectKnownDisciplineNames } from "@/lib/builder/aggregate-psionic-talents"
@@ -426,8 +431,9 @@ import {
   clearWeaponBindingsForToggles,
   isWeaponSpellBuffToggleId,
   weaponSpellBuffDefinition,
+  weaponCanReceiveSpellBuff,
+  weaponSpellBuffsAvailableToCharacter,
   weaponSpellBuffToggleForActionName,
-  WEAPON_SPELL_BUFFS,
 } from "@/lib/character/weapon-spell-buff"
 import { WeaponSpellBuffPickerOverlay } from "@/components/character-sheet/weapon-spell-buff-picker-overlay"
 import type { SheetActionEntry } from "@/lib/character/sheet-actions"
@@ -1257,13 +1263,24 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       offHandWeaponId?: string | null
     }) => {
       if (!character) return
-      const loadout = {
-        armorId: next.armorId !== undefined ? next.armorId : equippedArmorId,
-        shieldId: next.shieldId !== undefined ? next.shieldId : equippedShieldId,
-        weaponId: next.weaponId !== undefined ? next.weaponId : equippedWeaponId,
-        offHandWeaponId:
-          next.offHandWeaponId !== undefined ? next.offHandWeaponId : equippedOffHandWeaponId,
-      }
+      const catalog = equipmentCatalog.length ? equipmentCatalog : equipment
+      const resolvedById = new Map(
+        [...equipment, ...catalog].map((item) => [
+          item.id,
+          resolveCharacterEquipment(item, catalog, equipmentBaseSelections),
+        ]),
+      )
+      const loadout = constrainEquipmentLoadout(
+        {
+          armorId: next.armorId !== undefined ? next.armorId : equippedArmorId,
+          shieldId: next.shieldId !== undefined ? next.shieldId : equippedShieldId,
+          weaponId: next.weaponId !== undefined ? next.weaponId : equippedWeaponId,
+          offHandWeaponId:
+            next.offHandWeaponId !== undefined ? next.offHandWeaponId : equippedOffHandWeaponId,
+        },
+        [...resolvedById.values()],
+        derived?.extraWieldSlots ?? 0,
+      )
       const nextAc = characterBuildInputs
         ? deriveArmorClassForLoadout(characterBuildInputs, loadout)
         : character.armor_class
@@ -1289,7 +1306,18 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setEquippedOffHandWeaponId(loadout.offHandWeaponId)
       }
     },
-    [character, characterBuildInputs, equippedArmorId, equippedShieldId, equippedWeaponId, equippedOffHandWeaponId],
+    [
+      character,
+      characterBuildInputs,
+      derived?.extraWieldSlots,
+      equippedArmorId,
+      equippedShieldId,
+      equippedWeaponId,
+      equippedOffHandWeaponId,
+      equipment,
+      equipmentCatalog,
+      equipmentBaseSelections,
+    ],
   )
 
   const persistEquipmentQuantity = useCallback(
@@ -1777,13 +1805,25 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const referencedSheetToggleIds = useMemo(
     () => {
+      const selectedAbilityNames = collectSelectedCustomAbilityNames({
+        featureChoicePicks,
+        grantedCustomAbilityNames: derived?.grantedCustomAbilityNames,
+      })
       const ids = collectReferencedSheetToggleIds({
         features: sheetClassFeatures,
         feats: characterFeats,
         originFeat,
         species: character?.species ?? null,
-        customAbilities,
+        customAbilities: customAbilities.filter(
+          (ability) =>
+            !isPickGatedCustomAbility(ability) ||
+            abilityNameIsSelected(ability.name, selectedAbilityNames),
+        ),
         magicItemPowers,
+        extraActionNames: [
+          ...spells.map((spell) => spell.name),
+          ...equipment.map((item) => item.name),
+        ],
         catalog: modifierCatalog,
       })
       if (!hasMindRiderAbility) ids.delete("mind_rider_active")
@@ -1795,7 +1835,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       originFeat,
       character?.species,
       customAbilities,
+      featureChoicePicks,
+      derived?.grantedCustomAbilityNames,
       magicItemPowers,
+      spells,
+      equipment,
       modifierCatalog,
       hasMindRiderAbility,
     ],
@@ -1937,7 +1981,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         )
         return
       }
-      const def = sheetToggleDefinitions.find((entry) => entry.id === toggleId)
+      const def =
+        sheetToggleDefinitions.find((entry) => entry.id === toggleId) ??
+        getSheetToggleDefinition(toggleId)
       setActiveSheetToggleIds((prev) => {
         if (prev.includes(toggleId)) return prev
         return applySheetToggleChange(prev, toggleId, sheetToggleDefinitions)
@@ -2891,6 +2937,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   const bindWeaponSpellBuff = useCallback(
     (toggleId: string, weaponId: string) => {
+      if (!weaponCanReceiveSpellBuff({ id: weaponId })) return
       activateSheetToggle(toggleId)
       setSheetToggleWeaponIds((prev) => ({ ...prev, [toggleId]: weaponId }))
       const weaponName =
@@ -2924,7 +2971,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       if (!def) return
       const uniqueWeapons = new Map<string, (typeof equippedWeaponCards)[number]["weapon"]>()
       for (const card of equippedWeaponCards) {
-        if (card.weapon.id === "unarmed-strike") continue
+        if (!weaponCanReceiveSpellBuff(card.weapon)) continue
         uniqueWeapons.set(card.weapon.id, card.weapon)
       }
       const weapons = [...uniqueWeapons.values()]
@@ -2942,12 +2989,45 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   )
 
   const availableWeaponSpellBuffs = useMemo(() => {
-    const known = new Set(sheetToggleDefinitions.map((entry) => entry.id))
-    return WEAPON_SPELL_BUFFS.filter((buff) => known.has(buff.toggleId)).map((buff) => ({
+    const catalog = spellCatalog.length ? spellCatalog : spells
+    const resourceCastNames = resourceCastSpellIds.map(
+      (id) => catalog.find((spell) => spell.id === id)?.name ?? "",
+    )
+    return weaponSpellBuffsAvailableToCharacter({
+      spellNames: [
+        ...spells.map((spell) => spell.name),
+        ...resourceCastNames,
+        ...(derived?.grantedSpellCasts ?? []).map((profile) => profile.spellName ?? ""),
+      ],
+      actionNames: sheetActions.flatMap((action) => [
+        action.name,
+        action.castSpellChoice?.spellName ?? "",
+      ]),
+      abilityNames: sheetCustomAbilities.map((ability) => ability.name),
+      equipmentNames: equipment.map((item) => item.name),
+      featureNames: [
+        ...sheetClassFeatures.map((feature) => feature.name),
+        ...characterFeats.map((feat) => feat.name),
+        ...(originFeat ? [originFeat.name] : []),
+      ],
+      activeToggleIds: activeSheetToggleIds,
+    }).map((buff) => ({
       toggleId: buff.toggleId,
       label: buff.label,
     }))
-  }, [sheetToggleDefinitions])
+  }, [
+    spells,
+    spellCatalog,
+    resourceCastSpellIds,
+    derived?.grantedSpellCasts,
+    sheetActions,
+    sheetCustomAbilities,
+    equipment,
+    sheetClassFeatures,
+    characterFeats,
+    originFeat,
+    activeSheetToggleIds,
+  ])
 
   // Tools the character is proficient with are surfaced automatically in the
   // equipment list, even if they were never explicitly purchased/added.
@@ -3865,6 +3945,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       creatures,
       modifierCatalog,
       featureChoicePicks: character.feature_choice_picks ?? {},
+      modifierPlayerPicks: character.modifier_player_picks ?? {},
       formSelections: formSelectionsFromState(companionState),
     })
     return { rows: mergeCompanionState(companions, companionState), formGroups }
@@ -6576,6 +6657,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   equippedOffHandWeaponId={equippedOffHandWeaponId}
                   attunedItemIds={attunedItemIds}
                   maxAttunementSlots={derived?.attunementSlots ?? DEFAULT_ATTUNEMENT_SLOTS}
+                  extraWieldSlots={derived?.extraWieldSlots ?? 0}
                   pinnedEquipmentIds={pinnedEquipmentIds}
                   onTogglePinnedEquipment={togglePinnedEquipment}
                   onEquipArmor={(id) => {
@@ -7115,7 +7197,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           weapons={(() => {
             const unique = new Map<string, Equipment>()
             for (const card of equippedWeaponCards) {
-              if (card.weapon.id === "unarmed-strike") continue
+              if (!weaponCanReceiveSpellBuff(card.weapon)) continue
               unique.set(card.weapon.id, card.weapon)
             }
             return [...unique.values()]

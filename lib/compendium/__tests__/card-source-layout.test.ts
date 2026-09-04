@@ -70,6 +70,21 @@ describe("card source layout", () => {
       itemSlug: "ooze-rancher",
       displayName: "Ooze Rancher",
     })
+    expect(parseSubclassSourceBasename("Acrobat")).toMatchObject({
+      classSlug: "dancer",
+      itemSlug: "acrobat",
+      displayName: "Acrobat",
+    })
+    expect(parseSubclassSourceBasename("Fire Dancer")).toMatchObject({
+      classSlug: "dancer",
+      itemSlug: "fire-dancer",
+      displayName: "Fire Dancer",
+    })
+    expect(parseSubclassSourceBasename("Danseur Macabre")).toMatchObject({
+      classSlug: "dancer",
+      itemSlug: "danseur-macabre",
+      displayName: "Danseur Macabre",
+    })
   })
 
   it("flattens Title Case, Drive copies, and typo aliases", () => {

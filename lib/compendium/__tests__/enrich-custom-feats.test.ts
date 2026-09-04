@@ -162,6 +162,17 @@ describe("enrichCustomFeatRow PHB presets", () => {
     expect(asi).toMatchObject({ mode: "fixed", bonuses: { charisma: 1 } })
   })
 
+  it("wires Alert with initiative proficiency characteristic", () => {
+    const row = enrichCustomFeatRow({
+      name: "Alert",
+      source: PHB_SOURCE,
+      description: "Initiative Proficiency",
+    })
+    const chars = ((row.linked_modifiers ?? []) as { characteristics?: { type?: string; mode?: string }[] }[])
+      .flatMap((inst) => inst.characteristics ?? [])
+    expect(chars.some((c) => c.type === "initiative" && c.mode === "add_proficiency")).toBe(true)
+  })
+
   it("exposes presets for PHB origin, general, and fighting style feats", () => {
     for (const name of [
       "Alert",

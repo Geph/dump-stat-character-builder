@@ -303,6 +303,28 @@ describe("custom species modifier wiring", () => {
     if (tools?.type !== "tool_proficiencies") throw new Error("Expected tool characteristic")
     expect(tools.choiceCount).toBe(2)
   })
+
+  it("wires Thri-kreen Secondary Arms as extra Light wield slots", () => {
+    const enriched = enrichCustomSpeciesRow({
+      name: "Thri-kreen",
+      source: "Custom",
+      traits: [
+        {
+          name: "Secondary Arms",
+          description:
+            "Two smaller arms that can manipulate objects/open-close/pick-up or wield a light weapon.",
+        },
+      ],
+    })
+    const arms = (enriched.traits as Trait[]).find((trait) => trait.name === "Secondary Arms")
+    const wield = arms?.linkedModifiers
+      ?.flatMap((mod) => mod.characteristics ?? [])
+      .find((char) => char.type === "extra_wield_slots")
+    expect(wield?.type).toBe("extra_wield_slots")
+    if (wield?.type !== "extra_wield_slots") throw new Error("Expected extra_wield_slots")
+    expect(wield.extraSlots).toBe(1)
+    expect(wield.allowedProperties).toEqual(["light"])
+  })
 })
 
 describe("subclass feature presets", () => {

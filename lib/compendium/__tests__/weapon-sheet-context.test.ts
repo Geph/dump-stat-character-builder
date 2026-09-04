@@ -479,4 +479,57 @@ describe("buildWeaponSheetContext", () => {
 
     expect(context.appliedModifiers.some((row) => /spinning shot/i.test(row.name))).toBe(true)
   })
+
+  it("keeps Finisher on-hit triggers off the weapon badge list", () => {
+    const context = buildWeaponSheetContext(
+      mace,
+      {
+        ...baseInputs,
+        modifierCatalog: [
+          {
+            id: "cat_char_on_hit_trigger",
+            name: "On-hit trigger",
+            group: "Attack & damage",
+            characteristics: [
+              {
+                id: "mod_finisher_trigger",
+                type: "on_hit_trigger" as const,
+                label: "Finisher (Bloodied target)",
+                oncePerTurn: true,
+                onlyIfTargetBelowHalfHp: true,
+                appliesTo: "weapon",
+              },
+              {
+                id: "mod_improved_finisher_trigger",
+                type: "on_hit_trigger" as const,
+                label: "Improved Finisher (any target)",
+                oncePerTurn: true,
+                appliesTo: "weapon",
+              },
+              {
+                id: "mod_concentration_break",
+                type: "on_hit_trigger" as const,
+                label: "Concentration Break: target has Disadvantage on Concentration save when damaged",
+                appliesTo: "all",
+              },
+            ],
+          },
+        ],
+        feats: [
+          {
+            id: "investigator-finishers",
+            name: "Finisher",
+            modifierRefs: ["cat_char_on_hit_trigger"],
+          } as never,
+        ],
+        selectedFeatIds: ["investigator-finishers"],
+      },
+      ["Simple weapons"],
+    )
+
+    expect(context.appliedModifiers.some((row) => /\bfinisher\b/i.test(row.name))).toBe(false)
+    const concentration = context.appliedModifiers.find((row) => row.name === "Concentration Break")
+    expect(concentration?.description).toMatch(/Disadvantage on Concentration save/i)
+    expect(concentration?.description).toMatch(/On a hit/)
+  })
 })

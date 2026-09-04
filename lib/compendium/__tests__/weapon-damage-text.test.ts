@@ -7,6 +7,7 @@ import {
   optionalWeaponDamageBonuses,
   optionalWeaponDamageReplacements,
   preferredWeaponDamageDiceId,
+  weaponDamageDiceOptions,
 } from "@/lib/compendium/weapon-damage-roll"
 import type { PowerRiderCharacteristic } from "@/lib/compendium/characteristic-modifiers"
 import type { Equipment } from "@/lib/types"
@@ -131,6 +132,40 @@ describe("optional Grand Finale crit dice", () => {
   })
 })
 
+describe("versatile two-handed damage options", () => {
+  const longsword = {
+    ...whip,
+    name: "Longsword",
+    properties: { damage: "1d8 Slashing (1d10)", properties: ["Versatile"] },
+  } as unknown as Equipment
+
+  it("lists two-handed but prefers one-handed when a shield occupies the other hand", () => {
+    const options = weaponDamageDiceOptions(longsword, {
+      twoHandedBlocked: true,
+      twoHandedBlockedReason: "A shield occupies your other hand.",
+    })
+    expect(options).toEqual([
+      { id: "one-handed", label: "One-handed", dice: "1d8" },
+      {
+        id: "two-handed",
+        label: "Two-handed",
+        dice: "1d10",
+        disabled: true,
+        disabledReason: "A shield occupies your other hand.",
+      },
+    ])
+    expect(preferredWeaponDamageDiceId(options)).toBe("one-handed")
+  })
+
+  it("prefers two-handed when both hands are free", () => {
+    const options = weaponDamageDiceOptions(longsword)
+    const twoHanded = options.find((row) => row.id === "two-handed")
+    expect(twoHanded).toMatchObject({ dice: "1d10" })
+    expect(twoHanded?.disabled).toBeFalsy()
+    expect(preferredWeaponDamageDiceId(options)).toBe("two-handed")
+  })
+})
+
 describe("optional Fierce Start damage bonuses", () => {
   const rider = {
     id: "char_fierce_start",
@@ -195,5 +230,76 @@ describe("optional Finisher damage dice", () => {
     })
     expect(options[0]?.defaultSelected).toBe(true)
     expect(options[0]?.bonusDice).toBe("1d8")
+  })
+
+  it("offers Finisher and Improved Finisher as separate damage riders", () => {
+    const improvedRider = {
+      id: "mod_improved_finisher_power_rider",
+      type: "power_rider",
+      parentPowerNames: ["Attack", "Unarmed Strike"],
+      label: "Improved Finisher",
+      alertSummary: "Improved Finisher: once per turn on a hit.",
+    } as PowerRiderCharacteristic
+
+    const options = optionalWeaponDamageBonuses(whip, [finisherRider, improvedRider], null, {
+      investigatorLevel: 11,
+    })
+    expect(options).toEqual([
+      expect.objectContaining({
+        id: "finisher",
+        label: "Finisher (2d8, Bloodied)",
+        bonusDice: "2d8",
+        defaultSelected: false,
+      }),
+      expect.objectContaining({
+        id: "improved-finisher",
+        label: "Improved Finisher (1d8)",
+        bonusDice: "1d8",
+        defaultSelected: true,
+      }),
+    ])
+  })
+
+  it("emits a generic weaponDamageMenu rider without a Finisher name", () => {
+    const rider = {
+      id: "mod_exploit_weakness",
+      type: "power_rider",
+      parentPowerNames: ["Attack", "Unarmed Strike"],
+      label: "Exploit Weakness",
+      weaponDamageMenu: true,
+      bonusDice: "1d6",
+      alertSummary: "Once per turn you can add 1d6.",
+    } as PowerRiderCharacteristic
+
+    expect(optionalWeaponDamageBonuses(whip, [rider], null)).toEqual([
+      expect.objectContaining({
+        id: "exploit-weakness",
+        label: "Exploit Weakness (1d6)",
+        bonusDice: "1d6",
+      }),
+    ])
+  })
+
+  it("defaults Finisher (not Improved) when Bloodied and both riders exist", () => {
+    const improvedRider = {
+      id: "mod_improved_finisher_power_rider",
+      type: "power_rider",
+      parentPowerNames: ["Attack", "Unarmed Strike"],
+      label: "Improved Finisher",
+      alertSummary: "Improved Finisher: once per turn on a hit.",
+    } as PowerRiderCharacteristic
+
+    const options = optionalWeaponDamageBonuses(whip, [finisherRider, improvedRider], null, {
+      investigatorLevel: 17,
+      activeSheetToggleIds: ["below_half_hp"],
+    })
+    expect(options.find((row) => row.id === "finisher")).toMatchObject({
+      bonusDice: "3d8",
+      defaultSelected: true,
+    })
+    expect(options.find((row) => row.id === "improved-finisher")).toMatchObject({
+      bonusDice: "1d8",
+      defaultSelected: false,
+    })
   })
 })

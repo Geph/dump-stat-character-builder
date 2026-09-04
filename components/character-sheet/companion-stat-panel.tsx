@@ -253,28 +253,32 @@ export function CompanionStatPanel({
       ) : null}
 
       {(hasMeta || template.traits.length > 0 || hasActions) && (
-        <div className="px-3 py-2 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
+        <div className="px-3 py-2 space-y-2">
           {hasMeta ? (
-            <div className="space-y-0.5 sm:col-span-2">
+            <div className="space-y-0.5">
               {metaLines.map((line) => (
                 <MetaLine key={line.label} label={line.label} value={line.value} />
               ))}
             </div>
           ) : null}
           <BlockList title="Traits" blocks={template.traits} spellAttackModifier={spellAttackModifier} />
-          <div className="space-y-2">
-            <BlockList title="Actions" blocks={template.actions} spellAttackModifier={spellAttackModifier} />
-            <BlockList
-              title="Bonus Actions"
-              blocks={template.bonusActions ?? []}
-              spellAttackModifier={spellAttackModifier}
-            />
-            <BlockList
-              title="Reactions"
-              blocks={template.reactions ?? []}
-              spellAttackModifier={spellAttackModifier}
-            />
-          </div>
+          {hasActions ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
+              <BlockList title="Actions" blocks={template.actions} spellAttackModifier={spellAttackModifier} />
+              <div className="space-y-2">
+                <BlockList
+                  title="Bonus Actions"
+                  blocks={template.bonusActions ?? []}
+                  spellAttackModifier={spellAttackModifier}
+                />
+                <BlockList
+                  title="Reactions"
+                  blocks={template.reactions ?? []}
+                  spellAttackModifier={spellAttackModifier}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </section>

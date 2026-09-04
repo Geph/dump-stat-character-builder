@@ -46,7 +46,20 @@
         {
           "level": 2,
           "name": "Finisher",
-          "description": "Once per turn when you deal damage to a creature that is Bloodied, you can deal an extra 1d8 damage to the target. The damage is the same type as the damage dealt by the weapon. This damage increases as you gain Investigator levels, as shown in the Finisher column of the Investigator Features table."
+          "description": "Once per turn when you deal damage to a creature that is Bloodied, you can deal an extra 1d8 damage to the target. The damage is the same type as the damage dealt by the weapon. This damage increases as you gain Investigator levels, as shown in the Finisher column of the Investigator Features table.",
+          "mechanics": [
+            {
+              "kind": "power_rider",
+              "parentPowerNames": ["Attack", "Unarmed Strike"],
+              "selectable": true,
+              "weaponDamageMenu": true,
+              "classResourceKey": "finisher",
+              "bonusDice": "1d8",
+              "defaultSelectedWhenToggle": "below_half_hp",
+              "menuConditionLabel": "Bloodied",
+              "alertSummary": "Once per turn vs a Bloodied target: add Finisher dice under Damage modifiers on the weapon DMG menu."
+            }
+          ]
         },
         {
           "level": 2,

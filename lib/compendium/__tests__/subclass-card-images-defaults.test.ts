@@ -290,6 +290,22 @@ describe("subclass card images", () => {
     ).toBe(false)
   })
 
+  it("maps Mage Hand Press Dancer art locally", () => {
+    expectDefaultSubclassCardImage(
+      "Acrobat",
+      "Dancer",
+      /\/images\/compendium\/subclasses\/dancer\/acrobat\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Fire Dancer",
+      "Dancer",
+      /\/images\/compendium\/subclasses\/dancer\/fire-dancer\.png$/,
+    )
+    expect(
+      isBundledPublicCardArtPath("public/images/compendium/subclasses/dancer/acrobat.png"),
+    ).toBe(false)
+  })
+
   it("applies named card art on non-SRD imports (Inventor / Psion / Occultist / Warden)", () => {
     const gadgetsmith = enrichSrdSubclassRow(
       { name: "Gadgetsmith", source: "KibblesTasty Inventor", features: [] },

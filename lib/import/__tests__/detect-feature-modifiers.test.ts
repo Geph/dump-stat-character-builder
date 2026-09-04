@@ -237,6 +237,32 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "initiative proficiency (Prescience)",
+      text: "You can add your proficiency bonus to Perception and initiative rolls.",
+      ruleId: "check.bonus.initiative.proficiency",
+      assert: (detections) => {
+        const entry = detections.find((row) => row.ruleId === "check.bonus.initiative.proficiency")
+        expect(entry?.instance.catalogRefId).toBe("cat_char_initiative")
+        expect(entry?.instance.characteristics?.[0]).toMatchObject({
+          type: "initiative",
+          mode: "add_proficiency",
+        })
+      },
+    },
+    {
+      label: "initiative proficiency (Alert)",
+      text: "When you roll Initiative, you can add your Proficiency Bonus to the roll.",
+      ruleId: "check.bonus.initiative.proficiency",
+      assert: (detections) => {
+        const entry = detections.find((row) => row.ruleId === "check.bonus.initiative.proficiency")
+        expect(entry?.instance.catalogRefId).toBe("cat_char_initiative")
+        expect(entry?.instance.characteristics?.[0]).toMatchObject({
+          type: "initiative",
+          mode: "add_proficiency",
+        })
+      },
+    },
+    {
       label: "fighting style feat grant",
       text:
         "You gain a Fighting Style feat of your choice. If you choose a feat, such as Great Weapon Fighting, that requires you to hold a Melee weapon in one or two hands, you can use that feat with Ranged weapons.",
@@ -761,6 +787,25 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "regain an expended Battle Die on a crit or when a foe drops",
+      text:
+        "Whenever you or your Cohort score a Critical Hit or reduce an enemy to 0 Hit Points, you regain an expended Battle Die.",
+      ruleId: "resource.refresh_one_on_initiative_or_crit",
+      assert: (detections) => {
+        const effect = detections.find(
+          (d) => d.ruleId === "resource.refresh_one_on_initiative_or_crit",
+        )?.instance.activation?.effects?.[0]
+        expect(effect).toMatchObject({
+          kind: "class_resource",
+          classResourceKey: "battle_dice",
+          classResourceChange: "increase",
+          classResourceAmount: 1,
+          resourceRefreshOnInitiative: false,
+          resourceRefreshOnCriticalHit: true,
+        })
+      },
+    },
+    {
       label: "named species cantrip without the word cantrip",
       text: "Level 1: Speed increases to 35 ft.; know Druidcraft.",
       ruleId: "spell.know_named",
@@ -772,6 +817,20 @@ describe("detectFeatureModifiers", () => {
         expect(char?.spells?.[0]?.spellId).toContain("Druidcraft")
       },
     },
+    {
+      label: "secondary arms that can wield a light weapon",
+      text: "Two smaller arms that can manipulate objects/open-close/pick-up or wield a light weapon.",
+      ruleId: "wield.extra_slots.secondary_arms",
+      assert: (detections) => {
+        const char = detections.find((d) => d.ruleId === "wield.extra_slots.secondary_arms")
+          ?.instance.characteristics?.[0]
+        expect(char?.type).toBe("extra_wield_slots")
+        if (char?.type === "extra_wield_slots") {
+          expect(char.extraSlots).toBe(1)
+          expect(char.allowedProperties).toEqual(["light"])
+        }
+      },
+    },
   ]
 
   it.each(positiveCases)("detects $label ($ruleId)", ({ text, ruleId, assert }) => {
@@ -779,6 +838,27 @@ describe("detectFeatureModifiers", () => {
     expect(detections.some((entry) => entry.ruleId === ruleId)).toBe(true)
     expect(detections[0]?.instance.catalogRefId).toMatch(/^cat_(char|fx)_/)
     assert?.(detections)
+  })
+
+  it("maps extra_wield_slots AI mechanics to Light extra hands", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "extra_wield_slots",
+          choiceCount: 1,
+          sourcePhrase: "wield a light weapon",
+          confidence: "high",
+        },
+      ],
+      { ...baseCtx, featureName: "Secondary Arms", contentKind: "species_trait" },
+    )
+    const char = detections[0]?.instance.characteristics?.[0]
+    expect(detections[0]?.ruleId).toBe("ai.extra_wield_slots")
+    expect(char?.type).toBe("extra_wield_slots")
+    if (char?.type === "extra_wield_slots") {
+      expect(char.extraSlots).toBe(1)
+      expect(char.allowedProperties).toEqual(["light"])
+    }
   })
 
   const negativeCases = [
@@ -1423,6 +1503,53 @@ describe("detectFeatureModifiers by feature name", () => {
       incomingAttackMode: "disadvantage",
     })
     expect(fx?.limitations?.some((lim) => lim.value === "first_turn_of_combat")).toBe(true)
+  })
+
+  it("wires optional Bloodied extra dice as a weapon DMG menu rider", () => {
+    const detections = detectFeatureModifiers(
+      "Once per turn when you deal damage to a creature that is Bloodied, you can deal an extra 1d8 damage to the target.",
+      { ...baseCtx, featureName: "Coup de Grace" },
+    )
+    const rider = detections.find((entry) => entry.ruleId === "weapon.damage_menu.optional_extra_dice")
+      ?.instance.characteristics?.[0]
+    expect(rider).toMatchObject({
+      type: "power_rider",
+      weaponDamageMenu: true,
+      bonusDice: "1d8",
+      defaultSelectedWhenToggle: "below_half_hp",
+      menuConditionLabel: "Bloodied",
+    })
+    expect(detections.some((entry) => entry.ruleId === "technique.on_hit_once_per_turn")).toBe(false)
+    expect(detections.some((entry) => entry.ruleId === "damage.rider.dice")).toBe(false)
+  })
+
+  it("wires Finisher by name as a weapon DMG menu rider", () => {
+    const detections = detectFeatureModifiers("Bloodied extra damage.", {
+      ...baseCtx,
+      featureName: "Finisher",
+    })
+    const rider = detections.find((entry) => entry.ruleId === "weapon.damage_menu.finisher_by_name")
+      ?.instance.characteristics?.[0]
+    expect(rider).toMatchObject({
+      type: "power_rider",
+      weaponDamageMenu: true,
+      classResourceKey: "finisher",
+      defaultSelectedWhenToggle: "below_half_hp",
+    })
+  })
+
+  it("wires first-round ability-mod damage as a weapon DMG menu rider", () => {
+    const detections = detectFeatureModifiers(
+      "Whenever you deal damage to a creature with a weapon or Unarmed Strike on the first round of combat, you can add your Charisma modifier to the damage roll.",
+      { ...baseCtx, featureName: "Opening Flourish" },
+    )
+    const rider = detections.find((entry) => entry.ruleId === "weapon.damage_menu.optional_ability_mod")
+      ?.instance.characteristics?.[0]
+    expect(rider).toMatchObject({
+      type: "power_rider",
+      weaponDamageMenu: true,
+      ability: "charisma",
+    })
   })
 
   it("wires self Heroic Inspiration grants", () => {

@@ -48,7 +48,7 @@ export const INVESTIGATOR_PRESETS: EnrichmentPreset[] = [
     pack: "investigator",
     target: "class_feature",
     match: { className: /investigator/i, name: /^finisher$/i },
-    skipIfCharacteristicTypes: ["on_hit_trigger"],
+    skipIfCharacteristicTypes: ["power_rider"],
     operations: [{ op: "attachNamedPreset", preset: { kind: "investigator_finisher" } }],
   },
   {
@@ -56,7 +56,7 @@ export const INVESTIGATOR_PRESETS: EnrichmentPreset[] = [
     pack: "investigator",
     target: "class_feature",
     match: { className: /investigator/i, name: /^improved finisher$/i },
-    skipIfCharacteristicTypes: ["on_hit_trigger"],
+    skipIfCharacteristicTypes: ["power_rider"],
     operations: [{ op: "attachNamedPreset", preset: { kind: "investigator_improved_finisher" } }],
   },
   {

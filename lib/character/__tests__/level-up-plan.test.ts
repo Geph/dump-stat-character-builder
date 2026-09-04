@@ -431,6 +431,45 @@ describe("buildLevelUpPlan — Investigator Expertise", () => {
     )
     expect(step).toMatchObject({ kind: "modifier_choice", required: 4 })
   })
+
+  it("does not open a second empty Expertise picker for the level 9 table reminder", () => {
+    const reminder = enrichClassFeatureWithModifierPresets("Investigator", {
+      level: 9,
+      name: "Expertise",
+      description: "",
+    } as Feature)
+    const entry = investigatorAt(8)
+    const withReminder = {
+      ...entry,
+      class: {
+        ...entry.class,
+        features: [...((entry.class?.features as Feature[] | undefined) ?? []), reminder],
+      },
+    } as CharacterClassDetail
+
+    const atTwo = buildLevelUpPlan({
+      entry: investigatorAt(1),
+      subclasses: [],
+      currentTotalLevel: 1,
+      featureChoicePicks: {},
+    })
+    const slotKey = atTwo?.steps.find(
+      (step) => step.kind === "modifier_choice" && step.slot.grantsExpertise,
+    )?.id
+
+    const plan = buildLevelUpPlan({
+      entry: withReminder,
+      subclasses: [],
+      currentTotalLevel: 8,
+      featureChoicePicks: {},
+      modifierPlayerPicks: { [slotKey!]: ["Arcana", "Investigation"] },
+    })
+    const expertiseSteps = plan?.steps.filter(
+      (step) => step.kind === "modifier_choice" && step.slot.grantsExpertise,
+    )
+    expect(expertiseSteps).toHaveLength(1)
+    expect(expertiseSteps?.[0]).toMatchObject({ required: 4 })
+  })
 })
 
 describe("buildLevelUpPlan — Investigator Ritualist grimoire", () => {

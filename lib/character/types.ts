@@ -222,6 +222,8 @@ export type DerivedCharacter = {
   unarmedStrikeWeapon: import("@/lib/types").Equipment | null
   unarmedStrikeAttack: WeaponAttackDerived | null
   attunementSlots: number
+  extraWieldSlots: number
+  extraWieldAllowedProperties: string[] | null
 }
 
 export type CharacterSaveSnapshot = {

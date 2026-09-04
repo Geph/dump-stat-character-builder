@@ -165,9 +165,13 @@ export function isInvestigatorListSpell(name: string): boolean {
 }
 
 /**
- * True when a catalog row belongs on a class list. Uses the spell's classes[] tag,
- * then any persisted/import `spell_list` names, then hardcoded Investigator /
- * Necromancer fallbacks for classes imported before lists were stored.
+ * True when a catalog row belongs on a class list.
+ *
+ * Investigator and Necromancer use the official table (plus any persisted
+ * `spell_list` names) as an allowlist. A classes[] tag alone cannot pull in
+ * extra third-party spells that are not on that list.
+ *
+ * Other classes still match on the catalog tag, then `spell_list`.
  */
 export function spellMatchesClassName(
   spell: { name: string; classes?: string[] | null },
@@ -176,11 +180,15 @@ export function spellMatchesClassName(
 ): boolean {
   const needle = className.trim().toLowerCase()
   if (!needle) return false
+  const onPersistedList = spellNameOnClassList(spell.name, classSpellList)
+  if (needle === "investigator") {
+    return onPersistedList || isInvestigatorListSpell(spell.name)
+  }
+  if (needle === "necromancer") {
+    return onPersistedList || isNecromancerListSpell(spell.name)
+  }
   if (spell.classes?.some((entry) => entry.trim().toLowerCase() === needle)) return true
-  if (spellNameOnClassList(spell.name, classSpellList)) return true
-  if (needle === "investigator") return isInvestigatorListSpell(spell.name)
-  if (needle === "necromancer") return isNecromancerListSpell(spell.name)
-  return false
+  return onPersistedList
 }
 
 /**

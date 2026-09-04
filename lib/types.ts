@@ -110,6 +110,15 @@ export interface FeatureChoice {
   kind?: "options" | "feats"
   /** @deprecated Use grant_feat catalog entries instead. */
   featCategories?: string[]
+  /**
+   * Where picked option modifiers apply. `"companion"` keeps resistances, immunities,
+   * skills, and similar effects off the character sheet and onto matching companions
+   * (e.g. Captain Cohort Species → the Cohort). Nested modifier player picks still
+   * appear at level-up.
+   */
+  applyTo?: "self" | "companion"
+  /** Companion-granting feature that receives the pick (e.g. `"Cohort"`). */
+  applyToCompanionFeature?: string | null
 }
 
 /**

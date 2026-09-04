@@ -101,6 +101,10 @@ function formatExpressionWithModifier(diceExpression: string, modifier: number):
   return `${dicePart}${modSuffix}${typePart ? ` ${typePart}` : ""}`.trim()
 }
 
+function formatSignedModifier(modifier: number): string {
+  return modifier >= 0 ? `+${modifier}` : `${modifier}`
+}
+
 function resolvePreferredDiceId(
   diceOptions: WeaponDamageDiceOption[],
   defaultDiceId?: string,
@@ -305,7 +309,12 @@ export function WeaponDamageRollButton({
               onValueChange={setSelectedDiceId}
             >
               {diceOptions.map((option) => (
-                <DropdownMenuRadioItem key={option.id} value={option.id}>
+                <DropdownMenuRadioItem
+                  key={option.id}
+                  value={option.id}
+                  disabled={option.disabled}
+                  title={option.disabledReason}
+                >
                   {option.label} ({option.dice})
                 </DropdownMenuRadioItem>
               ))}
@@ -366,6 +375,14 @@ export function WeaponDamageRollButton({
     </DropdownMenu>
   )
 
+  const modLabel = formatSignedModifier(rollParsed.modifier)
+  const resultOrMod =
+    total != null ? (
+      <span className={`font-black ${filled ? "text-white" : "text-primary"}`}>{total}</span>
+    ) : (
+      <span className={filled ? "text-white" : "text-foreground"}>{modLabel}</span>
+    )
+
   const rollButton = (
     <button
       type="button"
@@ -381,17 +398,13 @@ export function WeaponDamageRollButton({
           </span>
           <span className="inline-flex items-center gap-1">
             <Dices className={`w-3.5 h-3.5 shrink-0 ${filled ? "text-white/90" : "text-muted-foreground"}`} aria-hidden />
-            {total != null ? (
-              <span className={`font-black ${filled ? "text-white" : "text-primary"}`}>{total}</span>
-            ) : null}
+            {resultOrMod}
           </span>
         </span>
       ) : (
         <>
           <Dices className={`w-3 h-3 shrink-0 ${filled ? "text-white/90" : "text-muted-foreground"}`} aria-hidden />
-          {total != null ? (
-            <span className={`font-black ${filled ? "text-white" : "text-primary"}`}>{total}</span>
-          ) : null}
+          {resultOrMod}
         </>
       )}
     </button>

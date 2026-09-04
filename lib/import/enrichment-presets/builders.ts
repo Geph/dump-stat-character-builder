@@ -118,37 +118,17 @@ function unifiedBombModifiers(damageTypes = ["Fire"]): LinkedModifierInstance[] 
 
 function finisherModifiers(): LinkedModifierInstance[] {
   return [
-    charInstance(createModifierInstanceId(), "cat_char_on_hit_trigger", [
-      {
-        id: modId("finisher_trigger"),
-        type: "on_hit_trigger",
-        oncePerTurn: true,
-        onlyIfTargetBelowHalfHp: true,
-        appliesTo: "weapon",
-        label: "Finisher (Bloodied target)",
-        effect: { catalogRefId: "cat_fx_extra_damage_on_hit" },
-      },
-    ]),
-    fxInstance(createModifierInstanceId(), "cat_fx_extra_damage_on_hit", {
-      effects: [
-        {
-          id: modId("finisher_damage"),
-          kind: "extra_damage_on_hit",
-          bonusDice: "1d8",
-          bonusByLevel: [
-            { level: 2, mode: "dice", dieCount: 1, dieType: "d8" },
-            { level: 11, mode: "dice", dieCount: 2, dieType: "d8" },
-            { level: 17, mode: "dice", dieCount: 3, dieType: "d8" },
-          ],
-          label: "Finisher damage",
-        },
-      ],
-    }),
     charInstance(createModifierInstanceId(), characteristicCatalogRefId("power_rider"), [
       {
         id: modId("finisher_power_rider"),
         type: "power_rider",
         parentPowerNames: ["Attack", "Unarmed Strike"],
+        selectable: true,
+        weaponDamageMenu: true,
+        classResourceKey: "finisher",
+        bonusDice: "1d8",
+        defaultSelectedWhenToggle: "below_half_hp",
+        menuConditionLabel: "Bloodied",
         label: "Finisher",
         alertSummary:
           "Finisher: once per turn vs a Bloodied target, add Finisher dice under Damage modifiers on the weapon DMG menu.",
@@ -159,34 +139,21 @@ function finisherModifiers(): LinkedModifierInstance[] {
 
 function improvedFinisherModifiers(): LinkedModifierInstance[] {
   return [
-    charInstance(createModifierInstanceId(), "cat_char_on_hit_trigger", [
-      {
-        id: modId("improved_finisher_trigger"),
-        type: "on_hit_trigger",
-        oncePerTurn: true,
-        appliesTo: "weapon",
-        label: "Improved Finisher (any target)",
-        effect: { catalogRefId: "cat_fx_extra_damage_on_hit" },
-      },
-    ]),
-    fxInstance(createModifierInstanceId(), "cat_fx_extra_damage_on_hit", {
-      effects: [
-        {
-          id: modId("improved_finisher_damage"),
-          kind: "extra_damage_on_hit",
-          bonusDice: "1d8",
-          label: "Improved Finisher (reduced)",
-        },
-      ],
-    }),
     charInstance(createModifierInstanceId(), characteristicCatalogRefId("power_rider"), [
       {
         id: modId("improved_finisher_power_rider"),
         type: "power_rider",
         parentPowerNames: ["Attack", "Unarmed Strike"],
+        selectable: true,
+        weaponDamageMenu: true,
+        bonusDice: "1d8",
+        dieByLevel: [
+          { level: 11, die: "1d8" },
+          { level: 17, die: "2d8" },
+        ],
         label: "Improved Finisher",
         alertSummary:
-          "Improved Finisher: once per turn on a hit, add Finisher dice under Damage modifiers on the weapon DMG menu.",
+          "Improved Finisher: once per turn on a hit, add 1d8 Finisher damage (any target) under Damage modifiers on the weapon DMG menu.",
       },
     ]),
   ]

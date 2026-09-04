@@ -18,9 +18,13 @@ import {
   type SpellcastingAbilityCharacteristic,
   type SpellsKnownCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
+import { findChoiceOption } from "@/lib/compendium/feature-choice-target"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
 import { sanitizeBonusProficienciesFeature } from "@/lib/compendium/enrich-srd-class-features"
-import { applyExpertisePresetOverride } from "@/lib/import/apply-expertise-preset-override"
+import {
+  applyExpertisePresetOverride,
+  parseExpertiseCountUnlocks,
+} from "@/lib/import/apply-expertise-preset-override"
 import {
   effectiveLinkedModifiers,
   readLinkedModifiers,
@@ -31,6 +35,7 @@ import {
   inferSpellListClassNames,
   spellMatchesClassName,
 } from "@/lib/compendium/investigator-spell-list"
+import { dedupeSpellsByName } from "@/lib/compendium/spell-name-match"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { mergeToolNameLists, toolNamesForPool, type ToolChoicePool } from "@/lib/compendium/tool-options"
@@ -53,6 +58,7 @@ export type ModifierPlayerChoiceKind =
   | "spell"
   | "spellcasting_ability"
   | "damage_type"
+  | "saving_throw"
   | "equipment"
 
 export type ModifierPlayerChoiceSlot = {
@@ -311,6 +317,31 @@ function slotsFromCharacteristic(
     return slots
   }
 
+  if (mod.type === "saving_throws") {
+    const count = mod.choiceCount ?? 0
+    if (count <= 0) return slots
+
+    const pool = (mod.choiceOptions ?? []).filter((name) => name.trim().length > 0)
+    const options =
+      pool.length > 0
+        ? pool
+        : mod.values.length > 0
+          ? mod.values
+          : ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
+
+    slots.push({
+      slotKey: modifierPlayerChoiceSlotKey(sourceKey, mod.id, "saving_throw"),
+      sourceKey,
+      sourceLabel,
+      modId: mod.id,
+      kind: "saving_throw",
+      label: mod.label ?? `Choose ${count} saving throw${count === 1 ? "" : "s"}`,
+      maxCount: count,
+      options: options.map((name) => ({ name })),
+    })
+    return slots
+  }
+
   if (mod.type === "equipment_and_magic_items" && mod.mode === "create_mundane") {
     const count = mod.choiceCount ?? 0
     const options = (mod.itemOptions ?? []).map((name) => name.trim()).filter(Boolean)
@@ -532,7 +563,7 @@ function collectSlotsFromFeature(
   if (feature.isChoice && feature.choices?.options?.length) {
     const picked = featureChoicePicks[sourceKey] ?? []
     for (const optionName of picked) {
-      const option = feature.choices.options.find((entry) => entry.name === optionName)
+      const option = findChoiceOption(feature.choices.options, optionName)
       if (!option) continue
       const optionMods = characteristicsFromLinkedModifiers(
         catalog,
@@ -544,6 +575,54 @@ function collectSlotsFromFeature(
   }
 
   return slots
+}
+
+function isExpertiseFeatureName(name: string | null | undefined): boolean {
+  return (name ?? "").trim().toLowerCase() === "expertise"
+}
+
+function expertiseUnlocksAtClassLevel(feature: Feature, classLevel: number): boolean {
+  if (
+    parseExpertiseCountUnlocks(feature.description ?? "").some(
+      (unlock) => unlock.unlocksAtClassLevel === classLevel,
+    )
+  ) {
+    return true
+  }
+  const overridden = applyExpertisePresetOverride(feature)
+  for (const instance of overridden.linkedModifiers ?? []) {
+    for (const mod of instance.characteristics ?? []) {
+      if (mod.type !== "skills") continue
+      if (
+        (mod as SkillsCharacteristic).choiceCountUnlocks?.some(
+          (unlock) => unlock.unlocksAtClassLevel === classLevel,
+        )
+      ) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * Class tables repeat Expertise at the level you get more picks (Investigator 9,
+ * Bard 9, Rogue 6). That later row is a reminder — the first feature already
+ * scales via choiceCountUnlocks. A second wired picker is empty or asks again.
+ */
+export function shouldSkipRepeatExpertiseSlots(
+  feature: Feature,
+  siblings: Feature[],
+): boolean {
+  if (!isExpertiseFeatureName(feature.name)) return false
+  const level = feature.level ?? 0
+  return siblings.some(
+    (other) =>
+      other !== feature &&
+      isExpertiseFeatureName(other.name) &&
+      (other.level ?? 0) < level &&
+      expertiseUnlocksAtClassLevel(other, level),
+  )
 }
 
 /** Spell/skill/tool picks granted by class or subclass feature choices (e.g. Divine Order). */
@@ -569,8 +648,10 @@ export function collectClassFeatureModifierPlayerChoiceSlots(params: {
       classLevel: entry.level,
     }
 
-    for (const feature of cls.features ?? []) {
+    const classFeatures = cls.features ?? []
+    for (const feature of classFeatures) {
       if (feature.level > entry.level) continue
+      if (shouldSkipRepeatExpertiseSlots(feature, classFeatures)) continue
       slots.push(
         ...collectSlotsFromFeature(
           feature,
@@ -591,8 +672,10 @@ export function collectClassFeatureModifierPlayerChoiceSlots(params: {
     if (subclassId && entry.level >= resolveSubclassUnlockLevel(cls)) {
       const subclass = subclasses.find((candidate) => candidate.id === subclassId)
       if (!subclass) continue
-      for (const feature of subclass.features ?? []) {
+      const subclassFeatures = subclass.features ?? []
+      for (const feature of subclassFeatures) {
         if (feature.level > entry.level) continue
+        if (shouldSkipRepeatExpertiseSlots(feature, subclassFeatures)) continue
         slots.push(
           ...collectSlotsFromFeature(
             feature,
@@ -867,6 +950,16 @@ export function applyModifierPlayerPicks(
       return { ...mod, values: merged, choiceCount: 0 }
     }
 
+    if (mod.type === "saving_throws") {
+      const count = mod.choiceCount ?? 0
+      if (count <= 0) return mod
+
+      const key = modifierPlayerChoiceSlotKey(sourceKey, mod.id, "saving_throw")
+      const selected = picks[key] ?? []
+      if (selected.length === 0) return mod
+      return { ...mod, values: selected, choiceCount: 0 }
+    }
+
     if (mod.type === "damage_resistance" || mod.type === "damage_immunity") {
       const damageMod = mod as DamageCharacteristic
       const count = damageMod.choiceCount ?? 0
@@ -971,17 +1064,19 @@ export function spellOptionsForModifierSlot(
   const classSet = new Set(classNames.map((name) => name.toLowerCase()))
   const maxLevel = slot.spellLevel
   return filterSpellsByAllowedSchools(
-    spells.filter((spell) => {
-      if (slot.spellLevelIsMax) {
-        // Grimoire-style: any leveled spell up to the Ritual Level cap (no cantrips).
-        if (spell.level < 1 || spell.level > maxLevel!) return false
-      } else if (spell.level !== maxLevel) {
-        return false
-      }
-      if (otherSlotSpellIds.has(spell.id) && !ownPicks.includes(spell.id)) return false
-      if (classSet.size === 0) return true
-      return classNames.some((className) => spellMatchesClassName(spell, className))
-    }),
+    dedupeSpellsByName(
+      spells.filter((spell) => {
+        if (slot.spellLevelIsMax) {
+          // Grimoire-style: any leveled spell up to the Ritual Level cap (no cantrips).
+          if (spell.level < 1 || spell.level > maxLevel!) return false
+        } else if (spell.level !== maxLevel) {
+          return false
+        }
+        if (otherSlotSpellIds.has(spell.id) && !ownPicks.includes(spell.id)) return false
+        if (classSet.size === 0) return true
+        return classNames.some((className) => spellMatchesClassName(spell, className))
+      }),
+    ),
     slot.allowedSchools,
   )
 }

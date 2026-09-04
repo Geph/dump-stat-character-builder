@@ -78,6 +78,7 @@ const CLASS_PREFIXES = [
   "Psion",
   "Warden",
   "Necromancer",
+  "Dancer",
 ].sort((a, b) => b.length - a.length)
 
 /** Unprefixed drop names (Mage Hand Press Alchemist) → parent class. */
@@ -90,6 +91,18 @@ const UNPREFIXED_SUBCLASS_CLASS = {
   "Slime Rancher": "Alchemist",
   Venomsmith: "Alchemist",
   Xenoalchemist: "Alchemist",
+  Acrobat: "Dancer",
+  Cheerleader: "Dancer",
+  Contortionist: "Dancer",
+  Courtesan: "Dancer",
+  "Danseur Macabre": "Dancer",
+  Dramaturge: "Dancer",
+  Fencer: "Dancer",
+  "Fey Ballerina": "Dancer",
+  "Fire Dancer": "Dancer",
+  Harlequin: "Dancer",
+  Marionettist: "Dancer",
+  Steelsinger: "Dancer",
 }
 
 /** Short filename remainder → official display name, keyed by class. */

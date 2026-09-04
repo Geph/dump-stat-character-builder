@@ -93,6 +93,9 @@ describe("spellMatchesClassName", () => {
     expect(
       spellMatchesClassName({ name: "Accelerate/decelerate", classes: ["Wizard"] }, "Investigator"),
     ).toBe(false)
+    expect(spellMatchesClassName({ name: "After", classes: ["Investigator"] }, "Investigator")).toBe(
+      false,
+    )
   })
 
   it("accepts official Necromancer list spells even without the class tag", () => {

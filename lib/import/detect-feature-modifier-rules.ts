@@ -157,6 +157,38 @@ function textMentionsWhileBloodied(text: string): boolean {
   )
 }
 
+function weaponDamageMenuRider(
+  ctx: DetectFeatureContext,
+  opts: {
+    bonusDice?: string
+    dieByLevel?: { level: number; die: string }[]
+    ability?: AbilityScoreKey
+    classResourceKey?: string
+    defaultSelectedWhenToggle?: string
+    menuConditionLabel?: string
+    label?: string
+    alertSummary?: string
+  },
+): LinkedModifierInstance {
+  return charInstance(newInstanceId(), characteristicCatalogRefId("power_rider"), [
+    {
+      id: modId(instanceKey(ctx, "weapon_damage_menu")),
+      type: "power_rider",
+      parentPowerNames: ["Attack", "Unarmed Strike"],
+      selectable: true,
+      weaponDamageMenu: true,
+      bonusDice: opts.bonusDice,
+      dieByLevel: opts.dieByLevel,
+      ability: opts.ability,
+      classResourceKey: opts.classResourceKey,
+      defaultSelectedWhenToggle: opts.defaultSelectedWhenToggle,
+      menuConditionLabel: opts.menuConditionLabel,
+      label: opts.label ?? ctx.featureName ?? "Damage rider",
+      alertSummary: opts.alertSummary,
+    },
+  ])
+}
+
 function grantFeatInstance(categories: FeatPickCategory[], label: string): LinkedModifierInstance {
   return buildGrantFeatModifier(categories, label, newInstanceId())
 }
@@ -204,6 +236,49 @@ export const FEATURE_NAME_MODIFIER_RULES: FeatureNameModifierRule[] = [
     confidence: "high",
     test: (featureName) => /^weapon mastery$/i.test(featureName.trim()),
     build: () => buildWeaponMasteryModifier(`modinst_weapon_mastery_${newInstanceId()}`),
+  },
+  {
+    id: "weapon.damage_menu.finisher_by_name",
+    confidence: "high",
+    test: (featureName) => /^finisher$/i.test(featureName.trim()),
+    build: (ctx) =>
+      weaponDamageMenuRider(ctx, {
+        classResourceKey: "finisher",
+        bonusDice: "1d8",
+        defaultSelectedWhenToggle: "below_half_hp",
+        menuConditionLabel: "Bloodied",
+        label: "Finisher",
+        alertSummary:
+          "Once per turn vs a Bloodied target: add Finisher dice under Damage modifiers on the weapon DMG menu.",
+      }),
+  },
+  {
+    id: "weapon.damage_menu.improved_finisher_by_name",
+    confidence: "high",
+    test: (featureName) => /^improved finisher$/i.test(featureName.trim()),
+    build: (ctx) =>
+      weaponDamageMenuRider(ctx, {
+        bonusDice: "1d8",
+        dieByLevel: [
+          { level: 11, die: "1d8" },
+          { level: 17, die: "2d8" },
+        ],
+        label: "Improved Finisher",
+        alertSummary:
+          "Once per turn on a hit: add 1d8 Finisher damage (any target) under Damage modifiers on the weapon DMG menu.",
+      }),
+  },
+  {
+    id: "weapon.damage_menu.fierce_start_by_name",
+    confidence: "high",
+    test: (featureName) => /^fierce start$/i.test(featureName.trim()),
+    build: (ctx) =>
+      weaponDamageMenuRider(ctx, {
+        ability: "charisma",
+        label: "Fierce Start",
+        alertSummary:
+          "First round of combat: add your Charisma modifier to weapon or Unarmed Strike damage (Damage modifiers on the weapon DMG menu).",
+      }),
   },
   {
     // Unleashed Mind talent — the sheet steps the die on initiative and on damage
@@ -1503,7 +1578,10 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "damage.rider.dice",
     confidence: "medium",
     test: /\b(?:deal|deals)\s+(?:an?\s+)?extra\s+(\d+d\d+)\s+([a-z]+)?\s*damage\b/i,
-    build: (match, ctx) => {
+    build: (match, ctx, text) => {
+      if (/\byou can deal\b/i.test(text) || /^(finisher|improved finisher)$/i.test(ctx.featureName ?? "")) {
+        return null
+      }
       const damageType = match[2] ? titleCaseWords(match[2]) : undefined
       return charInstance(newInstanceId(), characteristicCatalogRefId("damage_roll_modifiers"), [
         {
@@ -2395,10 +2473,11 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   },
   {
     // "You can add your proficiency bonus to Perception and initiative rolls" (Prescience).
+    // "When you roll Initiative, you can add your Proficiency Bonus to the roll" (Alert).
     id: "check.bonus.initiative.proficiency",
     confidence: "high",
     test:
-      /\badd\s+(?:your\s+)?proficiency\s+bonus\s+to\s+(?:[A-Za-z]+\s+and\s+)?initiative\s+rolls?\b/i,
+      /\badd\s+(?:your\s+)?proficiency\s+bonus\s+to\s+(?:[A-Za-z]+\s+and\s+)?initiative(?:\s+rolls?)?\b|\bwhen\s+you\s+roll\s+initiative\b[\s\S]{0,80}?\badd\s+(?:your\s+)?proficiency\s+bonus\b/i,
     build: (_match, ctx) =>
       charInstance(newInstanceId(), characteristicCatalogRefId("initiative"), [
         {
@@ -3071,7 +3150,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "resource.refresh_one_on_initiative_or_crit",
     confidence: "high",
     scope: "full",
-    test: /\bregain (?:one|a|1)\s+(?:expended\s+)?(?:risk|endurance|exploit|battle)\s+die\b[\s\S]{0,160}\b(?:initiative|critical hits?)\b|\b(?:when|whenever) you roll initiative\b[\s\S]{0,160}\bcritical hits?\b[\s\S]{0,80}\bregain (?:one|a|1)\b/i,
+    test: /\bregain (?:one|a|an|1)\s+(?:expended\s+)?(?:risk|endurance|exploit|battle)\s+die\b[\s\S]{0,160}\b(?:initiative|critical hits?|0 hit points)\b|\b(?:when|whenever) you(?: or your \w+)? (?:roll initiative|score a critical hit|reduce (?:an? )?(?:enemy|creature|hostile(?: creature)?|target) to 0 hit points)\b[\s\S]{0,200}\bregain (?:one|a|an|1)\b/i,
     build: (_match, ctx, text) => {
       const resourceKey = /risk/i.test(text)
         ? "risk_dice"
@@ -3267,6 +3346,70 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           label: `Replaces ${parentName}`,
         },
       ])
+    },
+  },
+  {
+    id: "weapon.damage_menu.optional_extra_dice",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\byou can deal an extra\s+(\d+d\d+)\b[\s\S]{0,80}?(?:damage|to the target)|\bonce per turn when you (?:deal damage|hit)[\s\S]{0,180}?\byou can deal an extra\s+(\d+d\d+)\b/i,
+    build: (match, ctx, text) => {
+      if (/^(finisher|improved finisher)$/i.test(ctx.featureName ?? "")) return null
+      if (/\b(?:spend|expend)\s+\d+\s+(?:ki|psi|focus|sorcery)\b/i.test(text)) return null
+      if (/\bas a (?:bonus )?action\b/i.test(text) && !/\bweapon\b|\bunarmed\b/i.test(text)) return null
+      const dice = (match[1] ?? match[2] ?? "").trim()
+      if (!/^\d+d\d+$/i.test(dice)) return null
+      const bloodied = /\bbloodied\b/i.test(text)
+      return weaponDamageMenuRider(ctx, {
+        bonusDice: dice,
+        classResourceKey: /finisher/i.test(ctx.featureName ?? "") ? "finisher" : undefined,
+        defaultSelectedWhenToggle: bloodied ? "below_half_hp" : undefined,
+        menuConditionLabel: bloodied ? "Bloodied" : undefined,
+        label: ctx.featureName ?? "Extra damage",
+        alertSummary: bloodied
+          ? `Once per turn vs a Bloodied target: add ${dice} under Damage modifiers on the weapon DMG menu.`
+          : `Optional extra ${dice} under Damage modifiers on the weapon DMG menu.`,
+      })
+    },
+  },
+  {
+    id: "wield.extra_slots.secondary_arms",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\b(?:secondary|smaller|extra|additional) arms\b[\s\S]{0,200}\bwield\b[\s\S]{0,80}(?:a\s+)?(?:light\s+)?weapon\b/i,
+    build: (_match, ctx, text) => {
+      const lightOnly = /\blight\b/i.test(text)
+      return charInstance(newInstanceId(), characteristicCatalogRefId("extra_wield_slots"), [
+        {
+          id: modId(instanceKey(ctx, "extra_wield_slots")),
+          type: "extra_wield_slots",
+          extraSlots: 1,
+          allowedProperties: lightOnly ? ["light"] : [],
+          label: lightOnly
+            ? "Extra hands: wield a Light weapon"
+            : "Extra hands: additional wield slot",
+        },
+      ])
+    },
+  },
+  {
+    id: "weapon.damage_menu.optional_ability_mod",
+    confidence: "high",
+    scope: "full",
+    test:
+      /\byou can add your\s+(strength|dexterity|constitution|intelligence|wisdom|charisma)\s+modifier to (?:the )?(?:weapon |unarmed strike )?damage\b/i,
+    build: (match, ctx, text) => {
+      if (/^fierce start$/i.test(ctx.featureName ?? "")) return null
+      if (/\b(?:spend|expend)\s+\d+\s+(?:ki|psi|focus|sorcery)\b/i.test(text)) return null
+      const ability = parseAbilityWord(match[1] ?? "")
+      if (!ability) return null
+      return weaponDamageMenuRider(ctx, {
+        ability,
+        label: ctx.featureName ?? "Damage bonus",
+        alertSummary: `${ctx.featureName ?? "Optional"}: add your ${match[1]} modifier under Damage modifiers on the weapon DMG menu.`,
+      })
     },
   },
   ...PSIONIC_TALENT_WIRING_RULES,

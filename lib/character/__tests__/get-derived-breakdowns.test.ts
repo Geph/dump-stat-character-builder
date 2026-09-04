@@ -4,6 +4,7 @@ import { getDerivedCharacterBreakdowns, breakdownLines } from "@/lib/character/g
 import { sumContributions } from "@/lib/character/stat-contributions"
 import { barbarianShieldFixture, linked } from "@/lib/character/__tests__/fixtures"
 import type { CharacterBuildInputs } from "@/lib/character/types"
+import type { Feat } from "@/lib/types"
 
 describe("getDerivedCharacterBreakdowns", () => {
   const inputs = barbarianShieldFixture()
@@ -21,6 +22,42 @@ describe("getDerivedCharacterBreakdowns", () => {
     const initLines = breakdownLines(breakdowns, "initiative")
     expect(sumContributions(initLines)).toBe(derived.initiative)
     expect(initLines.some((line) => line.label === "Dexterity")).toBe(true)
+  })
+
+  it("labels initiative proficiency with the granting feat", () => {
+    const alertFeat = {
+      id: "feat_alert",
+      name: "Alert",
+      description: "",
+      category: "Origin",
+      repeatable: false,
+      benefits: [],
+      linkedModifiers: linked([
+        {
+          id: "alert_initiative",
+          type: "initiative",
+          mode: "add_proficiency",
+          label: "Initiative Proficiency",
+        },
+      ]),
+      icon: null,
+      source: "SRD",
+      creator_url: null,
+      created_at: "",
+    } as unknown as Feat
+
+    const withAlert = {
+      ...inputs,
+      selectedFeatIds: [alertFeat.id],
+      feats: [alertFeat],
+    }
+    const derived = computeDerivedCharacter(withAlert)
+    const initLines = breakdownLines(getDerivedCharacterBreakdowns(withAlert), "initiative")
+    expect(sumContributions(initLines)).toBe(derived.initiative)
+    expect(initLines.some((line) => line.label === "Proficiency (Alert)")).toBe(true)
+    expect(
+      initLines.find((line) => line.label === "Proficiency (Alert)")?.amount,
+    ).toBe(derived.proficiencyBonus)
   })
 
   it("does not change computeDerivedCharacter totals", () => {

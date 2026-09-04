@@ -9,8 +9,50 @@ describe("enrichSrdFeatRow SRD presets", () => {
       source: SRD_SOURCE,
       description: "Initiative Proficiency",
     })
-    const linked = (row.linked_modifiers ?? []) as { catalogRefId?: string }[]
-    expect(linked.some((inst) => inst.catalogRefId === "cat_fx_check_roll_modifier")).toBe(true)
+    const linked = (row.linked_modifiers ?? []) as {
+      catalogRefId?: string
+      characteristics?: { type?: string; mode?: string }[]
+    }[]
+    expect(linked.some((inst) => inst.catalogRefId === "cat_char_initiative")).toBe(true)
+    expect(
+      linked.flatMap((inst) => inst.characteristics ?? []).some(
+        (mod) => mod.type === "initiative" && mod.mode === "add_proficiency",
+      ),
+    ).toBe(true)
+  })
+
+  it("migrates leftover Alert check-roll FeatureEffects to initiative proficiency", () => {
+    const row = enrichSrdFeatRow({
+      name: "Alert",
+      source: SRD_SOURCE,
+      description: "Initiative Proficiency",
+      linked_modifiers: [
+        {
+          instanceId: "modinst_alert_initiative",
+          catalogRefId: "cat_fx_check_roll_modifier",
+          activation: {
+            effects: [
+              {
+                id: "mod_alert_initiative",
+                kind: "check_bonus",
+                checkCategory: "initiative",
+                bonusConfig: { mode: "proficiency" },
+              },
+            ],
+          },
+        },
+      ],
+    })
+    const linked = (row.linked_modifiers ?? []) as {
+      catalogRefId?: string
+      characteristics?: { type?: string; mode?: string }[]
+    }[]
+    expect(linked.some((inst) => inst.catalogRefId === "cat_char_initiative")).toBe(true)
+    expect(
+      linked.flatMap((inst) => inst.characteristics ?? []).some(
+        (mod) => mod.type === "initiative" && mod.mode === "add_proficiency",
+      ),
+    ).toBe(true)
   })
 
   it("wires Skilled with shared skill/tool choice pool", () => {

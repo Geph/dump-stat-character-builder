@@ -3,6 +3,7 @@ import { buildByoExtractionPrompt, CLEAN_SOURCE_TEXT_GUIDELINES } from "@/lib/im
 import { buildImportSystemPrompt } from "@/lib/import/import-system-prompt"
 import {
   CHOICE_EXTRACTION_HINT,
+  CLASS_RESOURCE_IMPORT_HINT,
   CUSTOM_CLASS_IMPORT_HINT,
   DUPLICATE_ABILITY_MERGE_HINT,
   FEAT_CATEGORY_IMPORT_HINT,
@@ -169,6 +170,8 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("do not emit extra_weapon_mastery")
     expect(prompt).toContain("canHover")
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Divine Fury")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Valiant Surge")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("resourceRefreshOnCriticalHit")
     // Every phrase-index catalog that previously lacked a kind is now documentable
     for (const kind of [
       "on_hit_trigger",
@@ -343,6 +346,15 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("rebuild the fragments into a single HTML table")
   })
 
+  it("keeps Captain Cohort Species traits on the Cohort, not the Captain", () => {
+    expect(CLASS_RESOURCE_IMPORT_HINT).toContain("Captain Cohort Species")
+    expect(CLASS_RESOURCE_IMPORT_HINT).toContain("applyTo")
+    expect(CLASS_RESOURCE_IMPORT_HINT).toContain("applyToCompanionFeature")
+    const prompt = buildByoExtractionPrompt("classes")
+    expect(prompt).toContain("Cohort Species")
+    expect(prompt).toContain("applyTo: companion")
+  })
+
   it("splits Martyr Sacrifice named benefits in BYO class prompts", () => {
     expect(CUSTOM_CLASS_IMPORT_HINT).toContain("Sacrificial Strike")
     expect(CUSTOM_CLASS_IMPORT_HINT).toContain("Sacrificial Skill")
@@ -356,5 +368,23 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("bonusFixed 5")
     expect(prompt).toContain("Kingslayer")
     expect(prompt).toContain("actionKind bonus")
+  })
+
+  it("documents extra_wield_slots for extra hands / Secondary Arms", () => {
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("extra_wield_slots")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Secondary Arms")
+    const prompt = buildByoExtractionPrompt("species")
+    expect(prompt).toContain("extra_wield_slots")
+  })
+
+  it("routes optional extra weapon damage to the DMG menu via power_rider", () => {
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("weaponDamageMenu")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("below_half_hp")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("you can deal extra")
+    expect(CUSTOM_CLASS_IMPORT_HINT).toContain("weaponDamageMenu")
+    expect(CUSTOM_CLASS_IMPORT_HINT).toContain("Improved Finisher")
+    const prompt = buildByoExtractionPrompt("classes")
+    expect(prompt).toContain("weaponDamageMenu")
+    expect(prompt).toContain("Damage modifiers on the weapon DMG")
   })
 })

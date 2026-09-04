@@ -39,3 +39,16 @@ export function spellNameOnClassList(
     spellNameMatchKeys(listName).some((key) => spellKeys.has(key)),
   )
 }
+
+/** Collapse duplicate catalog rows that are the same spell under different ids. */
+export function dedupeSpellsByName<T extends { name?: string | null }>(spells: readonly T[]): T[] {
+  const seen = new Set<string>()
+  const unique: T[] = []
+  for (const spell of spells) {
+    const key = spellNameMatchKeys(spell.name ?? "")[0]
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    unique.push(spell)
+  }
+  return unique
+}

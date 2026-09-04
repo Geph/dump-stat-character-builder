@@ -42,6 +42,31 @@ export function resolveClassResourceCounts(inputs: {
   return counts
 }
 
+/** NdM notation for special class-resource dice (Finisher 2d8, etc.). */
+export function resolveClassResourceDamageDice(inputs: {
+  classLevels: CharacterBuildInputs["classLevels"]
+  classes: CharacterBuildInputs["classes"]
+  classResourceRows?: ClassResourceRow[]
+}): Record<string, string> {
+  const counts = resolveClassResourceCounts(inputs)
+  const dice: Record<string, string> = {}
+  for (const entry of inputs.classLevels) {
+    const cls = inputs.classes.find((row) => row.id === entry.classId)
+    if (!cls) continue
+    const resources = resolveClassResourcesForClass(cls, inputs.classResourceRows)
+    for (const resource of resources) {
+      const key = resource.id?.trim()
+      if (!key) continue
+      const count = counts[key]
+      const dieType = resource.uses?.dieType?.trim()
+      if (!count || count < 1 || !dieType) continue
+      const sides = /^d\d+$/i.test(dieType) ? dieType : `d${dieType.replace(/^d/i, "")}`
+      dice[key] = `${count}${sides}`
+    }
+  }
+  return dice
+}
+
 export function resolveClassResourceScaledBonus(
   rawCount: number,
   scale: "full" | "half_ceil" | null | undefined,

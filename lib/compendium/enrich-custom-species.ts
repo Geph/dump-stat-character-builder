@@ -2,6 +2,7 @@ import type {
   CharacteristicModifier,
   UnarmedStrikeDie,
 } from "@/lib/compendium/characteristic-modifiers"
+import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
 import { applyBundledCardImage } from "@/lib/compendium/card-image"
 import { withFilledChoiceOptionDescriptions } from "@/lib/compendium/choice-option-description"
 import {
@@ -850,9 +851,18 @@ const SPECIES_TRAIT_PRESETS: Record<string, TraitPreset> = {
   // —— Thri-kreen ——
   "Thri-kreen::Secondary Arms": {
     linkedModifiers: [
-      specialNote(
-        "Two smaller arms can manipulate objects / open-close / pick up, or wield a Light weapon",
-        "Secondary Arms",
+      charInstance(
+        "modinst_thri_kreen_secondary_arms",
+        characteristicCatalogRefId("extra_wield_slots"),
+        [
+          {
+            id: modId("thri_kreen_secondary_arms"),
+            type: "extra_wield_slots",
+            extraSlots: 1,
+            allowedProperties: ["light"],
+            label: "Secondary Arms: wield a Light weapon in addition to your other hands",
+          },
+        ],
       ),
     ],
   },

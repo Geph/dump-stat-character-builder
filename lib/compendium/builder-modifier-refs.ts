@@ -31,6 +31,7 @@ import {
 import { resolveModifierRefIds, type ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { readModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
 import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-choice-migration"
+import { featureChoiceAppliesToCompanion } from "@/lib/compendium/feature-choice-target"
 import { sanitizeCaptainSubclassFeatures } from "@/lib/compendium/captain-feature-wiring"
 import {
   collectActivationModeRiderModifiers,
@@ -97,6 +98,8 @@ function collectLinkedFromFeature(
   )
 
   if (feature.isChoice && feature.choices?.options?.length) {
+    // Companion-scoped options stay off the character aggregate (Captain Cohort Species, etc.).
+    if (featureChoiceAppliesToCompanion(feature)) return
     const key = featureChoiceKey(classId, feature.name, feature.level)
     const picked = featureChoicePicks[key] ?? []
     for (const optionName of picked) {

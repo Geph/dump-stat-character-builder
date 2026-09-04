@@ -26,6 +26,7 @@ import {
   healingDicePool,
   healSelfFx,
   hitPerLevel,
+  initiativeProf,
   imposeDisadvantageFx,
   modifyCreatureFx,
   movementEffectsPassive,
@@ -87,17 +88,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   // —— Origin ——
   Alert: {
-    linkedModifiers: [
-      checkFx(
-        "alert_initiative",
-        {
-          kind: "check_bonus",
-          checkCategory: "initiative",
-          bonusConfig: { mode: "proficiency" },
-        },
-        {},
-      ),
-    ],
+    linkedModifiers: [initiativeProf("alert_initiative")],
   },
 
   Crafter: {
@@ -479,7 +470,7 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
     linkedModifiers: [
       asiOne("mage_slayer_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       onHitTrigger("mage_slayer_concentration", {
-        label: "Concentration Breaker: target has Disadvantage on Concentration save when damaged",
+        label: "Concentration Break: target has Disadvantage on Concentration save when damaged",
       }),
       failedRollTrigger("mage_slayer_guarded", {
         triggerOn: "fail",
@@ -849,7 +840,17 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
   },
 
   Interception: {
-    linkedModifiers: [damageReductionFx("interception", { reaction: true })],
+    linkedModifiers: [
+      damageReductionFx(
+        "interception",
+        { reaction: true },
+        {
+          bonusDice: "1d10",
+          bonusConfig: { mode: "proficiency" },
+          label: "Reduce damage by 1d10 + PB",
+        },
+      ),
+    ],
   },
 
   Protection: {

@@ -6,6 +6,7 @@
  * only to the bound weapon in deriveWeaponAttack.
  */
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import { isUnarmedStrikeWeapon } from "@/lib/compendium/combat-stats"
 import type { SheetToggleKey } from "@/lib/compendium/sheet-toggle-registry"
 
 export type WeaponSpellBuffId = "magic_weapon_active" | "elemental_weapon_active"
@@ -55,12 +56,65 @@ export function weaponSpellBuffToggleForActionName(name: string): WeaponSpellBuf
   return null
 }
 
+export type WeaponSpellBuffAvailabilityInput = {
+  /** Prepared / known / always-prepared / resource-cast spell names. */
+  spellNames?: readonly string[] | null
+  /** Combat / ability action names and free-cast spell names. */
+  actionNames?: readonly string[] | null
+  /** Selected custom-ability names (not the full catalog). */
+  abilityNames?: readonly string[] | null
+  /** Owned equipment names (Consecrated Whetstone, etc.). */
+  equipmentNames?: readonly string[] | null
+  /** Class / subclass / feat feature names. */
+  featureNames?: readonly string[] | null
+  /** Keep a buff listed so the player can turn it off. */
+  activeToggleIds?: readonly string[] | null
+}
+
+function namesGrantWeaponSpellBuff(
+  names: readonly string[] | null | undefined,
+  toggleId: WeaponSpellBuffId,
+): boolean {
+  for (const name of names ?? []) {
+    if (weaponSpellBuffToggleForActionName(name) === toggleId) return true
+  }
+  return false
+}
+
+/**
+ * Magic Weapon / Elemental Weapon on the Combat ··· menu only when this
+ * character has the spell, a granting action/ability/item, or the buff is on.
+ */
+export function weaponSpellBuffsAvailableToCharacter(
+  input: WeaponSpellBuffAvailabilityInput,
+): WeaponSpellBuffDefinition[] {
+  const active = new Set(input.activeToggleIds ?? [])
+  return WEAPON_SPELL_BUFFS.filter(
+    (buff) =>
+      active.has(buff.toggleId) ||
+      namesGrantWeaponSpellBuff(input.spellNames, buff.toggleId) ||
+      namesGrantWeaponSpellBuff(input.actionNames, buff.toggleId) ||
+      namesGrantWeaponSpellBuff(input.abilityNames, buff.toggleId) ||
+      namesGrantWeaponSpellBuff(input.equipmentNames, buff.toggleId) ||
+      namesGrantWeaponSpellBuff(input.featureNames, buff.toggleId),
+  )
+}
+
+/** Magic Weapon / Elemental Weapon target a weapon, not Unarmed Strike. */
+export function weaponCanReceiveSpellBuff(weapon: {
+  id?: string | null
+  name?: string | null
+}): boolean {
+  return !isUnarmedStrikeWeapon(weapon)
+}
+
 export function boundWeaponIdForToggle(
   bindings: Record<string, string> | null | undefined,
   toggleId: string,
 ): string | null {
   const id = bindings?.[toggleId]?.trim()
-  return id || null
+  if (!id || isUnarmedStrikeWeapon({ id })) return null
+  return id
 }
 
 export function isWeaponSpellBuffActiveOnWeapon(params: {
@@ -70,6 +124,7 @@ export function isWeaponSpellBuffActiveOnWeapon(params: {
   bindings: Record<string, string> | null | undefined
 }): boolean {
   if (!isWeaponSpellBuffToggleId(params.toggleId)) return false
+  if (isUnarmedStrikeWeapon({ id: params.weaponId })) return false
   let active = false
   for (const id of params.activeToggleIds ?? []) {
     if (id === params.toggleId) {

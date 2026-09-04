@@ -414,6 +414,10 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
               id: "char_fierce_start",
               type: "power_rider",
               parentPowerNames: ["Attack", "Unarmed Strike"],
+              selectable: true,
+              weaponDamageMenu: true,
+              ability: "charisma",
+              label: "Fierce Start",
               alertSummary:
                 "Fierce Start: on the first round of combat, you can add your Charisma modifier to weapon or Unarmed Strike damage (Damage modifiers next to Deadly D4s on the weapon DMG menu).",
             },

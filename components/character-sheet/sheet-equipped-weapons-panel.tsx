@@ -5,6 +5,7 @@ import { ConditionInfoTip } from "@/components/character-sheet/condition-info-ti
 import { WeaponDamageRollButton } from "@/components/character-sheet/weapon-damage-roll-button"
 import { GameIcon } from "@/components/game-icon-picker"
 import type { CharacterBuildInputs } from "@/lib/character/types"
+import { resolveClassResourceDamageDice } from "@/lib/character/resolve-class-resource-counts"
 import {
   getEffectiveWeaponPropertyTags,
   getWeaponDamageText,
@@ -30,7 +31,10 @@ import type {
 } from "@/lib/compendium/characteristic-modifiers"
 import { weaponModifierBadgeClass } from "@/lib/character/sheet-status-colors"
 import { canMountWeapon, isWeaponMounted } from "@/lib/character/mounted-weapon"
-import { isWeaponSpellBuffActiveOnWeapon } from "@/lib/character/weapon-spell-buff"
+import {
+  isWeaponSpellBuffActiveOnWeapon,
+  weaponCanReceiveSpellBuff,
+} from "@/lib/character/weapon-spell-buff"
 import { Switch } from "@/components/ui/switch"
 import type { WeaponAttackDerived } from "@/lib/character/types"
 import type { Equipment } from "@/lib/types"
@@ -135,32 +139,43 @@ function WeaponAttackCard({
     ? canMountWeapon(weapon, buildInputs, weaponProficiencies)
     : false
   const mounted = canMount && isWeaponMounted(activeSheetToggleIds, weapon.id)
+  const twoHandedBlockedReason = !buildInputs
+    ? null
+    : hand === "off"
+      ? "This weapon is in your off hand."
+      : buildInputs.equippedShieldId
+        ? "A shield occupies your other hand."
+        : buildInputs.equippedOffHandWeaponId
+          ? "Your other hand is occupied."
+          : null
   const diceOptions = [
-    ...weaponDamageDiceOptions(weapon, { stepDice: mounted }),
+    ...weaponDamageDiceOptions(weapon, {
+      stepDice: mounted,
+      twoHandedBlocked: Boolean(twoHandedBlockedReason),
+      twoHandedBlockedReason: twoHandedBlockedReason ?? undefined,
+    }),
     ...optionalWeaponDamageReplacements(weapon, powerRiders),
   ]
   const bonusOptions = optionalWeaponDamageBonuses(weapon, powerRiders, abilityMods, {
-    investigatorLevel: buildInputs
-      ? buildInputs.classLevels
-          .filter((row) => {
-            const cls = buildInputs.classes.find((entry) => entry.id === row.classId)
-            return /investigator/i.test(cls?.name ?? "")
-          })
-          .reduce((sum, row) => sum + (row.level ?? 0), 0) || null
+    characterLevel: buildInputs
+      ? buildInputs.classLevels.reduce((sum, row) => sum + (row.level ?? 0), 0) || null
       : null,
+    classResourceDiceByKey: buildInputs ? resolveClassResourceDamageDice(buildInputs) : null,
     activeSheetToggleIds,
   })
-  const spellBuffOptions = (availableWeaponSpellBuffs ?? []).map((buff) => ({
-    id: buff.toggleId,
-    label: buff.label,
-    checked: isWeaponSpellBuffActiveOnWeapon({
-      toggleId: buff.toggleId,
-      weaponId: weapon.id,
-      activeToggleIds: activeSheetToggleIds,
-      bindings: sheetToggleWeaponIds,
-    }),
-    title: `${buff.label} on ${weapon.name}`,
-  }))
+  const spellBuffOptions = weaponCanReceiveSpellBuff(weapon)
+    ? (availableWeaponSpellBuffs ?? []).map((buff) => ({
+        id: buff.toggleId,
+        label: buff.label,
+        checked: isWeaponSpellBuffActiveOnWeapon({
+          toggleId: buff.toggleId,
+          weaponId: weapon.id,
+          activeToggleIds: activeSheetToggleIds,
+          bindings: sheetToggleWeaponIds,
+        }),
+        title: `${buff.label} on ${weapon.name}`,
+      }))
+    : []
   const sheetContext = buildInputs
     ? buildWeaponSheetContext(weapon, buildInputs, weaponProficiencies)
     : null

@@ -106,6 +106,53 @@ function syncPresetAbilityScores(
   }
 }
 
+function isInitiativeAddProficiencyInstance(instance: LinkedModifierInstance): boolean {
+  return Boolean(
+    instance.characteristics?.some((mod) => mod.type === "initiative" && mod.mode === "add_proficiency"),
+  )
+}
+
+function isLegacyInitiativeProficiencyCheck(instance: LinkedModifierInstance): boolean {
+  const effects = [...(instance.activation?.effects ?? []), ...(instance.effects ?? [])]
+  return effects.some(
+    (effect) => effect.checkCategory === "initiative" && effect.bonusConfig?.mode === "proficiency",
+  )
+}
+
+/**
+ * Replace leftover Alert-style check_bonus FeatureEffects with the initiative
+ * characteristic the name preset now authors, so existing feat rows pick up PB
+ * on derived initiative without a hand edit.
+ */
+function syncPresetInitiativeProficiency(
+  row: Record<string, unknown>,
+  preset: FeatModifierPreset,
+): Record<string, unknown> {
+  const linkedRaw = row.linkedModifiers ?? row.linked_modifiers
+  if (!Array.isArray(linkedRaw) || !linkedRaw.length) return row
+  const presetInit = (preset.linkedModifiers ?? []).filter(isInitiativeAddProficiencyInstance)
+  if (!presetInit.length) return row
+  if ((linkedRaw as LinkedModifierInstance[]).some(isInitiativeAddProficiencyInstance)) return row
+
+  let changed = false
+  const replacementById = new Map(presetInit.map((inst) => [inst.instanceId, inst]))
+  const defaultReplacement = presetInit[0]
+  const linked = (linkedRaw as LinkedModifierInstance[]).map((inst) => {
+    if (!isLegacyInitiativeProficiencyCheck(inst)) return inst
+    changed = true
+    return replacementById.get(inst.instanceId) ?? defaultReplacement
+  })
+  if (!changed) return row
+  const synced = syncModifierRefs({ linkedModifiers: linked })
+  return {
+    ...row,
+    linked_modifiers: synced.linkedModifiers,
+    linkedModifiers: synced.linkedModifiers,
+    modifier_refs: synced.modifierRefs,
+    modifierRefs: synced.modifierRefs,
+  }
+}
+
 /** Prefer custom (PHB) presets, then SRD presets — by name, independent of source. */
 export function resolveFeatNamePreset(name: string): FeatModifierPreset | undefined {
   const normalized = name.replace(/\u2019/g, "'").trim()
@@ -170,7 +217,9 @@ export function applyFeatNamePreset(
   const name = String(row.name ?? "")
   const preset = resolveFeatNamePreset(name)
   if (!preset) return row
-  if (featHasLinkedModifiers(row)) return syncPresetAbilityScores(row, preset)
+  if (featHasLinkedModifiers(row)) {
+    return syncPresetInitiativeProficiency(syncPresetAbilityScores(row, preset), preset)
+  }
 
   const description = typeof row.description === "string" ? row.description : ""
   if (shouldSkipFeatPreset(name, description, preset)) {

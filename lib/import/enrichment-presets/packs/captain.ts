@@ -1,7 +1,7 @@
 import {
   CAPTAIN_BASE_MANEUVERS,
   isCaptainBaseManeuverName,
-  sanitizeCaptainFeature,
+  sanitizeCaptainFeatures,
   sanitizeCaptainSubclassFeatures,
 } from "@/lib/compendium/captain-feature-wiring"
 import type { ImportContent } from "@/lib/import/content-schema"
@@ -131,9 +131,8 @@ export function sanitizeCaptainImportContent(content: ImportContent): ImportCont
     if (!/captain/i.test(cls.name ?? "")) return cls
     return {
       ...cls,
-      features: (cls.features ?? []).map((feature) =>
-        sanitizeCaptainFeature(feature as Feature, extraNames) as typeof feature,
-      ),
+      features: (sanitizeCaptainFeatures(cls.features as Feature[] | undefined, extraNames) ??
+        cls.features) as typeof cls.features,
     }
   })
 

@@ -151,6 +151,8 @@ describe("maneuver spend hooks", () => {
       healTarget: "choose_ally",
     })
     expect(blitz?.spendsEconomy).toBe(false)
+    expect(blitz?.kinds).not.toContain("reaction")
+    expect(blitz?.trigger).toBe("Once on each of your turns")
   })
 
   it("surfaces Warmage Kings disciplines that spend a Battle Die with no listed action", () => {

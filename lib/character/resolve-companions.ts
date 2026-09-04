@@ -8,7 +8,8 @@ import {
   type CompanionStatBlockTemplate,
   type ResolvedCompanion,
 } from "@/lib/character/companion-stat-block"
-import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
+import { isCompanionFeatureName, isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
+import { looksLikeChoicePickId } from "@/lib/character/chosen-option-label"
 import {
   familiarFormOptions,
   familiarTemplateForForm,
@@ -16,6 +17,7 @@ import {
   wildShapeTierForLevel,
   WILD_SHAPE_RECOMMENDED_FORMS,
 } from "@/lib/character/companion-form-options"
+import { applyCompanionScopedChoiceModifiers } from "@/lib/character/apply-companion-choice-modifiers"
 import { templateFromFeature } from "@/lib/character/parse-companion-stat-block"
 import { SRD_BEAST_FORMS, isDruidWildShapeFeature } from "@/lib/character/srd-beast-forms"
 import { SRD_FAMILIAR, isFamiliarFeature, isFindFamiliarSpell } from "@/lib/character/srd-familiar"
@@ -43,6 +45,68 @@ type FeatureCarrier = {
 
 function normalizeCreatureName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function abilityAttachedToClassEntry(
+  ability: CustomAbility,
+  entry: CharacterClassDetail,
+): boolean {
+  const attachType = ability.attached_to_type?.trim()
+  const attachId = ability.attached_to_id?.trim()
+  if (!attachType || !attachId) return false
+  if (attachType === "class") {
+    return (
+      entry.row.class_id === attachId ||
+      normalizeCreatureName(entry.class?.name ?? "") === normalizeCreatureName(attachId)
+    )
+  }
+  if (attachType === "subclass" && entry.subclass) {
+    return (
+      entry.subclass.id === attachId ||
+      normalizeCreatureName(entry.subclass.name) === normalizeCreatureName(attachId)
+    )
+  }
+  return false
+}
+
+function classEntryForAbility(
+  ability: CustomAbility,
+  classDetails: CharacterClassDetail[],
+): CharacterClassDetail | null {
+  return classDetails.find((entry) => abilityAttachedToClassEntry(ability, entry)) ?? null
+}
+
+/** Class/subclass feature with the same name — that feature owns the companion and its level gate. */
+function classFeatureForAbility(
+  ability: CustomAbility,
+  classDetails: CharacterClassDetail[],
+): FeatureCarrier | null {
+  const abilityName = normalizeCreatureName(ability.name)
+  if (!abilityName) return null
+  const entry = classEntryForAbility(ability, classDetails)
+  if (!entry) return null
+  const features = [
+    ...((entry.class?.features ?? []) as FeatureCarrier[]),
+    ...((entry.subclass?.features ?? []) as FeatureCarrier[]),
+  ]
+  return features.find((feature) => normalizeCreatureName(feature.name) === abilityName) ?? null
+}
+
+function displayClassNameForAbility(
+  ability: CustomAbility,
+  classDetails: CharacterClassDetail[],
+): string {
+  const attachType = ability.attached_to_type?.trim()
+  const attachId = ability.attached_to_id?.trim()
+  const sourceName = (ability as CustomAbility & { source_name?: string | null }).source_name?.trim()
+  if (attachType === "class" || attachType === "subclass") {
+    const entry = classEntryForAbility(ability, classDetails)
+    if (entry?.class?.name?.trim()) return entry.class.name.trim()
+    if (sourceName && !looksLikeChoicePickId(sourceName)) return sourceName
+    if (attachId && !looksLikeChoicePickId(attachId)) return attachId
+    return "Class"
+  }
+  return "Custom Ability"
 }
 
 /** Selected form names per group key (persisted via CharacterCompanionState.knownForms). */
@@ -360,6 +424,7 @@ export function collectCompanionCandidatesFromAbilities(
   abilities: CustomAbility[],
   creatureLookup?: Map<string, CompanionStatBlockTemplate>,
   modifierCatalog: ModifierCatalogEntry[] = [],
+  classDetails: CharacterClassDetail[] = [],
 ): { source: CompanionSource; template: CompanionStatBlockTemplate }[] {
   const out: { source: CompanionSource; template: CompanionStatBlockTemplate }[] = []
 
@@ -369,26 +434,35 @@ export function collectCompanionCandidatesFromAbilities(
       companion_stat_blocks?: CompanionStatBlockTemplate[] | null
       companion_creature_names?: string[] | null
     }
-    const baseSource: CompanionSource = {
-      featureName: ability.name,
-      featureLevel: 1,
-      className:
-        ability.attached_to_type === "class" ? ability.attached_to_id ?? "Custom" : "Custom Ability",
-      subclassName: null,
-      classId: ability.attached_to_id ?? ability.id,
-      subclassId: null,
-    }
-
-    const linkedNames = creatureNamesFromAbility(ability, modifierCatalog)
-    // Class-feature prose imported as an ability named "Cohort" is not itself a stat block.
+    const classEntry = classEntryForAbility(ability, classDetails)
+    const owningFeature = classFeatureForAbility(ability, classDetails)
+    // Duplicate of a class feature (e.g. imported Cohort prose). The feature scan
+    // already gates on class level, so a L1 Captain must not grow a Cohort panel.
+    if (owningFeature) continue
     if (
-      /^cohort$/i.test(ability.name.trim()) &&
-      !linkedNames.length &&
-      !row.companion_stat_block &&
-      !(row.companion_stat_blocks?.length)
+      classEntry &&
+      ability.level_requirement != null &&
+      ability.level_requirement > classEntry.row.level
     ) {
       continue
     }
+
+    const baseSource: CompanionSource = {
+      featureName: ability.name,
+      featureLevel: ability.level_requirement ?? 1,
+      className: displayClassNameForAbility(ability, classDetails),
+      subclassName: classEntry?.subclass?.name ?? null,
+      classId: classEntry?.row.class_id ?? ability.attached_to_id ?? ability.id,
+      subclassId: classEntry?.row.subclass_id ?? null,
+    }
+
+    const linkedNames = creatureNamesFromAbility(ability, modifierCatalog)
+    const hasCompanionPayload =
+      Boolean(row.companion_stat_block) ||
+      Boolean(row.companion_stat_blocks?.length) ||
+      linkedNames.length > 0
+    // Feature-name match alone is not a stat block (imported class-feature prose).
+    if (isCompanionFeatureName(ability.name) && !hasCompanionPayload) continue
 
     const forms = [
       ...collectLinkedCreatureTemplates(linkedNames, creatureLookup),
@@ -446,6 +520,8 @@ type ResolveCompanionsParams = {
   formSelections?: CompanionFormSelections
   /** Builder picks for class feature companions (Captain Cohort, etc.). */
   featureChoicePicks?: Record<string, string[]>
+  /** Nested modifier picks on companion-scoped options (damage type, skill, save). */
+  modifierPlayerPicks?: Record<string, string[]>
 }
 
 function classHasPactOfTheChain(classDetails: CharacterClassDetail[]): boolean {
@@ -685,6 +761,7 @@ export function resolveCharacterCompanionsDetailed(params: ResolveCompanionsPara
     params.customAbilities ?? [],
     creatureLookup,
     catalog,
+    params.classDetails,
   )
   const hasFamiliar = [...fromClasses, ...fromAbilities].some(
     (row) => row.template.name === SRD_FAMILIAR.name || /^familiar \(/i.test(row.template.name),
@@ -731,7 +808,15 @@ export function resolveCharacterCompanionsDetailed(params: ResolveCompanionsPara
 
   const byKey = new Map<string, ResolvedCompanion>()
   for (const row of candidates) {
-    const resolved = resolveCompanion(row.template, row.source, params.ctx)
+    const template = applyCompanionScopedChoiceModifiers({
+      template: row.template,
+      source: row.source,
+      classDetails: params.classDetails,
+      featureChoicePicks: params.featureChoicePicks,
+      modifierPlayerPicks: params.modifierPlayerPicks,
+      modifierCatalog: catalog,
+    })
+    const resolved = resolveCompanion(template, row.source, params.ctx)
     byKey.set(resolved.key, resolved)
   }
   return { companions: [...byKey.values()], formGroups }

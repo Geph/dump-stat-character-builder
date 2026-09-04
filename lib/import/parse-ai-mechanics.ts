@@ -847,6 +847,15 @@ function buildFromMechanic(
             mechanic.spendHitPoints != null && mechanic.spendHitPoints > 0
               ? mechanic.spendHitPoints
               : undefined,
+          weaponDamageMenu: mechanic.weaponDamageMenu === true,
+          bonusDice: mechanic.bonusDice?.trim() || undefined,
+          dieByLevel: (mechanic.dieByLevel ?? [])
+            .map((row) => ({ level: row.level, die: row.die.trim() }))
+            .filter((row) => row.die),
+          ability: mechanic.ability,
+          classResourceKey: mechanic.classResourceKey?.trim() || mechanic.resourceKey?.trim() || undefined,
+          defaultSelectedWhenToggle: mechanic.defaultSelectedWhenToggle?.trim() || undefined,
+          menuConditionLabel: mechanic.menuConditionLabel?.trim() || undefined,
         },
       ]),
     }
@@ -1531,6 +1540,27 @@ function buildFromMechanic(
                 ? `${abilityOptions.map(titleCaseWords).join(", ")} spellcasting choice`
                 : `${defaultAbility} spellcasting`),
             ...(mechanic.requiresSheetToggle ? { requiresSheetToggle: mechanic.requiresSheetToggle } : {}),
+          },
+        ]),
+      }
+    }
+    case "extra_wield_slots": {
+      const extraSlots = mechanic.choiceCount ?? 1
+      const phrase = `${matchedPhrase} ${mechanic.sourcePhrase ?? ""}`
+      const lightOnly = /\blight\b/i.test(phrase)
+      return {
+        ruleId: "ai.extra_wield_slots",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("extra_wield_slots"), [
+          {
+            id: modId(instanceKey(ctx, "extra_wield")),
+            type: "extra_wield_slots",
+            extraSlots,
+            allowedProperties: lightOnly ? ["light"] : [],
+            label: lightOnly
+              ? "Extra hands: wield a Light weapon"
+              : "Extra hands: additional wield slot",
           },
         ]),
       }

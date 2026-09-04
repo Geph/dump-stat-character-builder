@@ -50,9 +50,17 @@ describe.skipIf(!hasInvestigator)("Investigator Drive import wiring", () => {
   it("wires Finisher and Rushed Incantation", () => {
     const content = enrich("magehandpress-investigator-class")
     const finisher = content.classes?.[0]?.features?.find((f) => f.name === "Finisher") as Feature | undefined
-    expect(finisher?.linkedModifiers?.some((m) => m.characteristics?.some((c) => c.type === "on_hit_trigger"))).toBe(
-      true,
-    )
+    const rider = finisher?.linkedModifiers
+      ?.flatMap((m) => m.characteristics ?? [])
+      .find((c) => c.type === "power_rider")
+    expect(rider).toMatchObject({
+      type: "power_rider",
+      weaponDamageMenu: true,
+      classResourceKey: "finisher",
+    })
+    expect(
+      finisher?.linkedModifiers?.some((m) => m.characteristics?.some((c) => c.type === "on_hit_trigger")),
+    ).toBe(false)
     const rushed = content.classes?.[0]?.features?.find((f) => f.name === "Rushed Incantation") as Feature | undefined
     expect(rushed?.limitedUses).toMatchObject({
       type: "class_resource",

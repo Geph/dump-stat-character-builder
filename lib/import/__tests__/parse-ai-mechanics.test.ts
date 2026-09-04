@@ -9,6 +9,36 @@ import { sanitizeImportContentForPersist } from "@/lib/import/sanitize-import-co
 import type { ImportContent } from "@/lib/import/content-schema"
 
 describe("aiMechanicsToDetections", () => {
+  it("builds a weapon DMG menu power_rider from AI mechanics", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "power_rider",
+          parentPowerNames: ["Attack", "Unarmed Strike"],
+          selectable: true,
+          weaponDamageMenu: true,
+          bonusDice: "1d8",
+          classResourceKey: "finisher",
+          defaultSelectedWhenToggle: "below_half_hp",
+          menuConditionLabel: "Bloodied",
+          alertSummary: "Once per turn vs a Bloodied target.",
+          sourcePhrase: "you can deal an extra 1d8 damage",
+          confidence: "high",
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Finisher" },
+    )
+    expect(detections[0]?.ruleId).toBe("ai.power_rider")
+    expect(detections[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "power_rider",
+      weaponDamageMenu: true,
+      bonusDice: "1d8",
+      classResourceKey: "finisher",
+      defaultSelectedWhenToggle: "below_half_hp",
+      menuConditionLabel: "Bloodied",
+    })
+  })
+
   it("builds failed_roll_trigger with flat bonus from AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [

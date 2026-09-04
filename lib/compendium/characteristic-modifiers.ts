@@ -188,6 +188,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   { value: "spells_known", label: "Spells Known / Prepared" },
   { value: "craftable_items", label: "Craftable Items Known" },
   { value: "held_items_cap", label: "Held Craftable Items Cap" },
+  {
+    value: "extra_wield_slots",
+    label: "Extra Wield Slots",
+    hint: "Additional hands that can hold a weapon (Thri-kreen Secondary Arms). Lifts the exclusive two-handed + shield restriction.",
+  },
   { value: "spell_list_access", label: "Access to Class Spell List" },
   { value: "spellcasting_ability", label: "Spellcasting Ability Modifier" },
   { value: "uses", label: "Uses (Limited Ability / Resource)" },
@@ -987,6 +992,14 @@ export interface HeldItemsCapCharacteristic extends CharacteristicModifierBase {
   flatBonus?: number
 }
 
+/** Extra hands / weapon slots beyond the usual two (Secondary Arms). */
+export interface ExtraWieldSlotsCharacteristic extends CharacteristicModifierBase {
+  type: "extra_wield_slots"
+  extraSlots?: number
+  /** Extra slots may only hold weapons with these properties (e.g. Light). Empty = any. */
+  allowedProperties?: string[]
+}
+
 export interface AuraCharacteristic extends CharacteristicModifierBase {
   type: "aura"
   radiusFeet: number
@@ -1359,6 +1372,23 @@ export interface PowerRiderCharacteristic extends CharacteristicModifierBase {
   selectable?: boolean
   /** When selected, replace the parent action's HP spend with this amount. */
   spendHitPoints?: number
+  /**
+   * Optional extra damage the player ticks on the weapon DMG ··· menu
+   * (Bloodied riders, first-round bonuses, "you can deal extra…" dice).
+   */
+  weaponDamageMenu?: boolean
+  /** Extra dice when the player checks this rider (e.g. "1d8"). */
+  bonusDice?: string | null
+  /** Level ladder for bonusDice when the feature scales without a class-resource column. */
+  dieByLevel?: { level: number; die: string }[]
+  /** Flat bonus from an ability modifier (Fierce Start +CHA). */
+  ability?: AbilityScoreKey
+  /** Special class-resource die (Finisher column) that supplies bonusDice. */
+  classResourceKey?: string | null
+  /** Check this rider when the named sheet toggle is on (e.g. below_half_hp). */
+  defaultSelectedWhenToggle?: string | null
+  /** Short condition suffix on the menu label (e.g. "Bloodied"). */
+  menuConditionLabel?: string | null
 }
 
 /** Hide a prior feature and treat this one as its successor on the sheet. */
@@ -1488,6 +1518,7 @@ export type CharacteristicModifier =
   | SpellsKnownCharacteristic
   | CraftableItemsCharacteristic
   | HeldItemsCapCharacteristic
+  | ExtraWieldSlotsCharacteristic
   | SpellListAccessCharacteristic
   | SpellcastingAbilityCharacteristic
   | UsesCharacteristic
@@ -1736,6 +1767,8 @@ export function createCharacteristicModifier(
       return { id, type, items: [], category: null }
     case "held_items_cap":
       return { id, type, baseAbility: "intelligence", flatBonus: 0 }
+    case "extra_wield_slots":
+      return { id, type, extraSlots: 1, allowedProperties: [] }
     case "catalog_option":
       return { id, type, catalogAbilityId: "", catalogEntryId: "" }
     default:
@@ -2061,6 +2094,21 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
         typeof raw.spendHitPoints === "number" && raw.spendHitPoints > 0
           ? raw.spendHitPoints
           : undefined,
+      weaponDamageMenu: raw.weaponDamageMenu === true,
+      bonusDice: raw.bonusDice?.trim() || undefined,
+      dieByLevel: Array.isArray(raw.dieByLevel)
+        ? raw.dieByLevel.filter(
+            (row): row is { level: number; die: string } =>
+              typeof row?.level === "number" && typeof row?.die === "string" && Boolean(row.die.trim()),
+          )
+        : undefined,
+      ability:
+        raw.ability && (ABILITY_SCORE_KEYS as readonly string[]).includes(raw.ability)
+          ? raw.ability
+          : undefined,
+      classResourceKey: raw.classResourceKey?.trim() || undefined,
+      defaultSelectedWhenToggle: raw.defaultSelectedWhenToggle?.trim() || undefined,
+      menuConditionLabel: raw.menuConditionLabel?.trim() || undefined,
     }
   }
 
@@ -2220,6 +2268,15 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       ...raw,
       bonusSlots: raw.bonusSlots ?? 0,
       totalSlots: raw.totalSlots ?? null,
+    }
+  }
+
+  if (value.type === "extra_wield_slots") {
+    const raw = value as ExtraWieldSlotsCharacteristic
+    return {
+      ...raw,
+      extraSlots: raw.extraSlots ?? 1,
+      allowedProperties: Array.isArray(raw.allowedProperties) ? raw.allowedProperties : [],
     }
   }
 
@@ -2436,6 +2493,9 @@ export type AggregatedCharacteristics = {
   craftableItems: CraftableItemEntry[]
   heldItemsCapBonus: number
   heldItemsCapAbility: AbilityScoreKey | null
+  extraWieldSlots: number
+  /** null = extra slots may hold any weapon or shield. */
+  extraWieldAllowedProperties: string[] | null
   specialAttacks: SpecialAttackCharacteristic[]
   restReplacement: { restHours: number; replacesLongRest: boolean; description: string } | null
   magicalSleepImmunity: boolean
@@ -2550,6 +2610,8 @@ const emptyAggregated = (): AggregatedCharacteristics => ({
   craftableItems: [],
   heldItemsCapBonus: 0,
   heldItemsCapAbility: null,
+  extraWieldSlots: 0,
+  extraWieldAllowedProperties: null,
   specialAttacks: [],
   restReplacement: null,
   magicalSleepImmunity: false,
@@ -3138,6 +3200,26 @@ export function aggregateCharacteristics(
         if (mod.baseAbility) result.heldItemsCapAbility = mod.baseAbility
         result.heldItemsCapBonus += mod.flatBonus ?? 0
         break
+      case "extra_wield_slots": {
+        const slots = mod.extraSlots ?? 1
+        const firstSlot = result.extraWieldSlots === 0
+        result.extraWieldSlots += slots
+        const allowed = (mod.allowedProperties ?? []).map((entry) => entry.trim()).filter(Boolean)
+        if (!allowed.length) {
+          result.extraWieldAllowedProperties = null
+        } else if (firstSlot) {
+          result.extraWieldAllowedProperties = [...allowed]
+        } else if (result.extraWieldAllowedProperties) {
+          const seen = new Set(result.extraWieldAllowedProperties.map((entry) => entry.toLowerCase()))
+          for (const property of allowed) {
+            if (!seen.has(property.toLowerCase())) {
+              result.extraWieldAllowedProperties.push(property)
+              seen.add(property.toLowerCase())
+            }
+          }
+        }
+        break
+      }
       case "spellcasting_ability":
         result.spellcastingAbility = mod.ability
         break

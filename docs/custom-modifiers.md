@@ -78,6 +78,12 @@ only looks at authored `requiresSheetToggle` will drop inferred ids (Dance →
 `while_dancing` from `resource_ability_menu` + `sheetToggleIdActivatedByAction`).
 `isKnownSheetToggleId` builtins are also kept so activation is not undone.
 
+**Companion-scoped feature choices.** `FeatureChoice.applyTo: "companion"` (optional
+`applyToCompanionFeature`) keeps option `linkedModifiers` out of
+`aggregateCharacteristics` and applies them when resolving companions. Nested
+modifier player picks (damage type, skill, save) still appear at level-up. Do
+not add a class-name branch in the sheet for this.
+
 ## Import loop (session invariant 3)
 
 If the sheet bug existed because Drive JSON, BYO, detect, or enrichment missed
@@ -169,6 +175,14 @@ builder slot so Keen Mind / Observant pickers keep already-proficient skills
 visible. Keeper of History grants History and Performance through that flag
 instead of a Rogue-style expertise picker. Still no generic
 `conditionalUpgrade` for saves / tools / armor.
+
+**Extra wield slots (2026-09-04).** `extra_wield_slots` is the reusable extra-hands
+type (Thri-kreen Secondary Arms). `extraSlots` (default 1) plus optional
+`allowedProperties` (e.g. `["light"]`). Runtime: a weapon with **two-handed** and
+**not versatile** occupies both hands — no shield or off-hand — unless
+`extraWieldSlots > 0`. Enforcement is `lib/character/wield-constraints.ts` (Gear
+panel + persist), not a species-name branch. Do not reuse `held_items_cap`
+(Alchemist held crafts).
 
 Audit (2026-09-01): **no dead types**. “Unreachable” (applied but neither
 Compendium-authorable nor importable): `catalog_option`, `craftable_items`,

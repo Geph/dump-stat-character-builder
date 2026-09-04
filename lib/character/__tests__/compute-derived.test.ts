@@ -134,6 +134,41 @@ describe("computeDerivedCharacter", () => {
     expect(derived.speed).toBe(40)
   })
 
+  it("exposes extra wield slots from species traits", () => {
+    const derived = computeDerivedCharacter(
+      baseInputs({
+        species: {
+          id: "thri-kreen",
+          name: "Thri-kreen",
+          speed: { walk: 30 },
+          traits: [
+            {
+              name: "Secondary Arms",
+              description: "",
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_secondary_arms",
+                  catalogRefId: "cat_char_extra_wield_slots",
+                  characteristics: [
+                    {
+                      id: "extra_wield",
+                      type: "extra_wield_slots",
+                      extraSlots: 1,
+                      allowedProperties: ["light"],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        } as never,
+      }),
+    )
+
+    expect(derived.extraWieldSlots).toBe(1)
+    expect(derived.extraWieldAllowedProperties).toEqual(["light"])
+  })
+
   it("Barbarian 1 with shield uses Unarmored Defense + shield", () => {
     const derived = computeDerivedCharacter(barbarianShieldFixture())
 
@@ -731,5 +766,86 @@ describe("save vs preview invariant", () => {
         label: "Spells force INT saves",
       },
     ])
+  })
+
+  it("adds proficiency bonus to initiative from the initiative characteristic (Alert)", () => {
+    const alertFeat = {
+      id: "feat_alert",
+      name: "Alert",
+      description: "",
+      category: "Origin",
+      repeatable: false,
+      benefits: [],
+      linkedModifiers: [
+        {
+          instanceId: "modinst_alert_initiative",
+          catalogRefId: "cat_char_initiative",
+          characteristics: [
+            {
+              id: "alert_initiative",
+              type: "initiative",
+              mode: "add_proficiency",
+              label: "Initiative Proficiency",
+            },
+          ],
+        },
+      ],
+      icon: null,
+      source: "SRD",
+      creator_url: null,
+      created_at: "",
+    } as unknown as Feat
+
+    const base = barbarianShieldFixture()
+    const without = computeDerivedCharacter(base)
+    const withAlert = computeDerivedCharacter({
+      ...base,
+      selectedFeatIds: [alertFeat.id],
+      feats: [alertFeat],
+    })
+
+    expect(without.initiative).toBe(2)
+    expect(withAlert.initiative).toBe(without.initiative + withAlert.proficiencyBonus)
+  })
+
+  it("still adds proficiency when Alert is stored as a check_bonus FeatureEffect", () => {
+    const legacyAlert = {
+      id: "feat_alert_legacy",
+      name: "Alert",
+      description: "",
+      category: "Origin",
+      repeatable: false,
+      benefits: [],
+      linkedModifiers: [
+        {
+          instanceId: "modinst_alert_initiative",
+          catalogRefId: "cat_fx_check_roll_modifier",
+          activation: {
+            effects: [
+              {
+                id: "mod_alert_initiative",
+                kind: "check_bonus",
+                checkCategory: "initiative",
+                bonusConfig: { mode: "proficiency" },
+              },
+            ],
+          },
+        },
+      ],
+      icon: null,
+      source: "SRD",
+      creator_url: null,
+      created_at: "",
+    } as unknown as Feat
+
+    const base = barbarianShieldFixture()
+    const without = computeDerivedCharacter(base)
+    const withAlert = computeDerivedCharacter({
+      ...base,
+      selectedFeatIds: [legacyAlert.id],
+      feats: [legacyAlert],
+    })
+
+    expect(withAlert.initiative).toBe(without.initiative + withAlert.proficiencyBonus)
   })
 })

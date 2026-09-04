@@ -67,6 +67,7 @@ export const AI_MECHANIC_KINDS = [
   "special_attack",
   "hit_dice_restore",
   "grant_inspiration",
+  "extra_wield_slots",
 ] as const
 
 /**
@@ -307,7 +308,8 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_char_damage_roll_modifiers",
     examples: ["deal an extra 1d6 fire damage"],
     mechanicsKind: "damage_roll_modifiers",
-    notes: 'bonusDice: "1d6", damageType: "fire"',
+    notes:
+      'Always-on extra dice: bonusDice "1d6", damageType "fire". Optional "you can deal an extra" weapon/Unarmed dice are power_rider + weaponDamageMenu, not this kind.',
   },
   {
     ruleId: "damage.weapon.ability_modifier",
@@ -425,6 +427,7 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_fx_class_resource",
     examples: [
       "regain one expended Risk Die when you roll initiative or score a critical hit",
+      "Whenever you or your Cohort score a Critical Hit or reduce an enemy to 0 Hit Points, you regain an expended Battle Die.",
     ],
     notes: "Do not also set rechargeOnInitiative on the pool — the feature restores one die.",
   },
@@ -438,7 +441,41 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ],
     mechanicsKind: "on_hit_trigger",
     notes:
-      "oncePerTurn: true; optional spendResourceKey; bonusDice / scalingMode / damageTypeOptions for riders like Divine Fury",
+      "Automatic once-per-turn extra damage (Divine Fury while raging, Ki spend on hit). oncePerTurn: true; optional spendResourceKey; bonusDice / scalingMode / damageTypeOptions. Do NOT use for optional \"you can deal extra\" weapon/Unarmed dice — those are power_rider + weaponDamageMenu on the DMG ··· menu.",
+  },
+  {
+    ruleId: "weapon.damage_menu.optional_extra_dice",
+    trigger: "description",
+    catalog: "cat_char_power_rider",
+    examples: [
+      "Once per turn when you deal damage to a creature that is Bloodied, you can deal an extra 1d8 damage to the target",
+      "you can deal an extra 1d8 damage to the target",
+    ],
+    mechanicsKind: "power_rider",
+    notes:
+      "Situational extra weapon/unarmed damage the player opts into. parentPowerNames [Attack, Unarmed Strike], weaponDamageMenu true, selectable true, bonusDice or classResourceKey. Bloodied → defaultSelectedWhenToggle below_half_hp. Not damage_roll_modifiers (always-on) and not on_hit_trigger (weapon chip).",
+  },
+  {
+    ruleId: "weapon.damage_menu.optional_ability_mod",
+    trigger: "description",
+    catalog: "cat_char_power_rider",
+    examples: [
+      "Whenever you deal damage to a creature with a weapon or Unarmed Strike on the first round of combat, you can add your Charisma modifier to the damage roll",
+    ],
+    mechanicsKind: "power_rider",
+    notes:
+      "Optional ability-mod weapon damage (Fierce Start). weaponDamageMenu true + ability. Not a flat damage_roll_modifiers bonus.",
+  },
+  {
+    ruleId: "wield.extra_slots.secondary_arms",
+    trigger: "description",
+    catalog: "cat_char_extra_wield_slots",
+    examples: [
+      "Two smaller arms that can manipulate objects/open-close/pick-up or wield a light weapon.",
+    ],
+    mechanicsKind: "extra_wield_slots",
+    notes:
+      "extraSlots 1. allowedProperties [\"light\"] when the extra hands can only hold a Light weapon. Lifts exclusive two-handed + shield / off-hand restriction.",
   },
   {
     ruleId: "check.advantage.initiative",
@@ -587,10 +624,13 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ruleId: "check.bonus.initiative.proficiency",
     trigger: "description",
     catalog: "cat_char_initiative",
-    examples: ["You can add your proficiency bonus to Perception and initiative rolls."],
+    examples: [
+      "You can add your proficiency bonus to Perception and initiative rolls.",
+      "When you roll Initiative, you can add your Proficiency Bonus to the roll.",
+    ],
     mechanicsKind: "initiative",
     notes:
-      'initiativeMode: "add_proficiency". Paired skill mentions (Perception) are NOT auto-wired — add a skills mechanic or separate proficiency sentence if intended.',
+      'initiativeMode: "add_proficiency" on cat_char_initiative (not check_roll_modifier). Alert and Prescience. Paired skill mentions (Perception) are NOT auto-wired — add a skills mechanic or separate proficiency sentence if intended.',
   },
   {
     ruleId: "check.advantage.skill",
@@ -1468,6 +1508,33 @@ export const FEATURE_NAME_WIRING: ModifierWiringEntry[] = [
     notes:
       "Surfaces the Unleashed Mind talent; the sheet steps the Rampage Die on initiative and on damage taken while it is d6 or lower.",
   },
+  {
+    ruleId: "weapon.damage_menu.finisher_by_name",
+    trigger: "feature_name",
+    catalog: "cat_char_power_rider",
+    examples: ["Finisher"],
+    mechanicsKind: "power_rider",
+    notes:
+      "Optional extra weapon damage. Emit power_rider parentPowerNames [Attack, Unarmed Strike], weaponDamageMenu true, classResourceKey finisher, defaultSelectedWhenToggle below_half_hp. Not damage_roll_modifiers or on_hit_trigger.",
+  },
+  {
+    ruleId: "weapon.damage_menu.improved_finisher_by_name",
+    trigger: "feature_name",
+    catalog: "cat_char_power_rider",
+    examples: ["Improved Finisher"],
+    mechanicsKind: "power_rider",
+    notes:
+      "Reduced any-target Finisher dice on the weapon DMG ··· menu (bonusDice 1d8). Do not emit on_hit_trigger.",
+  },
+  {
+    ruleId: "weapon.damage_menu.fierce_start_by_name",
+    trigger: "feature_name",
+    catalog: "cat_char_power_rider",
+    examples: ["Fierce Start"],
+    mechanicsKind: "power_rider",
+    notes:
+      "First-round +CHA weapon/Unarmed damage on the DMG ··· menu. weaponDamageMenu true + ability charisma — not a flat damage_roll_modifiers bonus.",
+  },
 ]
 
 /**
@@ -1565,7 +1632,7 @@ export const HOMEBREW_WIRING_PATTERNS = [
   {
     source: "Investigator / ritualist investigators",
     guidance: [
-      "Ritual Level → class_resources.ritual_level (special cap). Finisher column → resource_key finisher (special NdM rider like 1d8→3d8) — NEVER finisher_dice.",
+      "Ritual Level → class_resources.ritual_level (special cap). Finisher column → resource_key finisher (special NdM rider like 1d8→3d8) — NEVER finisher_dice. Finisher / Improved Finisher themselves are optional weapon-damage riders: power_rider parentPowerNames [\"Attack\", \"Unarmed Strike\"], weaponDamageMenu true, selectable true. Finisher uses classResourceKey \"finisher\" + defaultSelectedWhenToggle \"below_half_hp\" + menuConditionLabel \"Bloodied\". Improved Finisher uses bonusDice \"1d8\" (any target, reduced). Do not emit on_hit_trigger or damage_roll_modifiers for those dice.",
       "Rushed Incantation + Trinkets → spendable pools (short regain 1 / long all). Keep \"expending a use of your Trinkets\" / Rushed Incantation spend phrasing.",
       "Subclass Trinkets + Holy Trinkets: one custom_abilities row per named trinket (Dance-styles pattern — each is its own Combat button). ability_role upgrade; subclass rows use source_type subclass / exact archetype name; holy rows use source_type class / Investigator and definition starting with \"Holy Trinket.\". Class Trinkets is NOT a class_upgrades picker — enrichment grants via grant_custom_ability on the subclass Trinkets / Holy Trinkets features.",
       "All trinkets (subclass and holy) spend the shared class_resources.trinkets pool (classResourceKey \"trinkets\"). Do not give Holy Trinkets its own limitedUses pool.",
@@ -1638,7 +1705,7 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Dance Styles picker: isChoice + choices { category: \"Dance Style\", resourceKey: \"dance_styles_known\", optionsSource: \"class_upgrades\", choiceCountByLevel: [{level:2,count:1},{level:13,count:2}] }. The Dance switcher always lists the class defaults (Agile Movement, Elegant Form, Retaliatory Swipe, Spinning Shot) plus subclass styles that keep the \"[Dance Style]\" suffix. Base styles are also custom_abilities with ability_role \"upgrade\". Gate each style's riders on dance_style_* (exclusive group dance_style), not only while_dancing.",
       "Cheerful / saves vs Frightened: check_roll_modifier with checkConditionTypes [\"Frightened\"] — never conditionNote for named conditions (conditionNote blocks auto-wire).",
       "Nimble Start / first-round incoming Disadvantage: check_roll_modifier with incomingAttackMode \"disadvantage\" + requiresSheetToggle first_turn_of_combat. The sheet files that as a Combat Passive reminder (flip First turn of combat on round 1). Detect/enrichment stub this if omitted.",
-      "Fierce Start (+CHA to weapon/Unarmed damage on the first round): power_rider parentPowerNames [\"Attack\", \"Unarmed Strike\"] — not a flat damage_roll_modifiers bonus. The sheet offers it under Damage modifiers on the weapon DMG menu (alongside Deadly D4s); player opts in on round 1.",
+      "Fierce Start (+CHA to weapon/Unarmed damage on the first round): power_rider parentPowerNames [\"Attack\", \"Unarmed Strike\"], weaponDamageMenu true, ability \"charisma\" — not a flat damage_roll_modifiers bonus. The sheet offers it under Damage modifiers on the weapon DMG menu (alongside Deadly D4s); player opts in on round 1.",
       "Enemy combat impact without an action (Charm/aura/debuff that subtracts from attack rolls, damage rolls, or saves; or modify_creature rollTarget enemy): do NOT invent Action/Bonus Action/Reaction. Set sheetDisplay combatActions (+ featuresTab). Prefer modify_creature rollTarget \"enemy\" and/or a resource_ability_menu of named picks (no actionKind). The sheet files these as Combat Passive reminders. Examples: Courtesan Beguiling Charm (Bad Influence / Friend of My Friends).",
       "Heartbreaker / style riders: power_rider parentPowerNames [\"Dance\", \"Enthralling Movement\"] + parentMenuOptionNames [\"Enthralling Movement\"] so the Dance style picker notes the rider (e.g. two Dance Dice Psychic on Enthralling Movement saves).",
       "Multi-target Extra Attack (Three/Four/Five-Target): keep the distinct feature name; do not emit extra_attack for those — enrichment attaches a power_rider reminder. Higher tiers supersede lower ones via replace_feature (Four replaces Three; Five replaces Four and Three) so only the highest available Passive shows on the sheet.",
@@ -1809,8 +1876,9 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Battle Tactics auto-grants Bolster, Born Leader, Morale Boost, Rally, and Staggering Strike via grant_custom_ability (ability_role knack). There is no Maneuvers Known column — do NOT wire optionsSource class_knacks (that is Vagabond).",
       "Maneuver options in abilities[] with \"expend one Battle Die\" — proposed as custom abilities linked to battle_dice.",
       "Subclass [Maneuver] features are additional named options (sheet combat cards), not pool picks.",
-      "Cohort feature → companion stat block; wire Weapon Mastery and Fighting Style via standard feature names.",
-      "Blitz, Valiant Surge, Legendary Commander stay narrative unless clear passive phrasing is present.",
+      "Cohort feature → companion stat block (grant_creature / creatures[]). Cohort Species is a separate isChoice picker (Dragonborn, Dwarf, Elf, Gnome, Goliath, Halfling, Human, Orc, Tiefling) with choices.applyTo: companion and applyToCompanionFeature: Cohort — option modifiers are cohort resistances/saves/skills/Relentless, never player condition_immunity or damage_resistance.",
+      "Wire Weapon Mastery and Fighting Style via standard feature names.",
+      "Valiant Surge: regain 1 Battle Die when you or your Cohort score a Critical Hit or reduce an enemy to 0 HP — feature-gated class_resource refresh (resourceRefreshOnCriticalHit + classResourceAmount 1 / classResourceChange increase) on battle_dice. The sheet files it under Passive. Legendary Commander stays narrative unless a catalog trigger exists.",
     ],
   },
 ] as const
@@ -1846,7 +1914,7 @@ function formatMechanicsCheatsheet(): string {
   const lines = [
     "mechanics[] field cheat sheet (kind → required fields):",
     `Allowed kind values: ${AI_MECHANIC_KINDS.join(", ")}`,
-    "- skills: skills [\"Stealth\"] OR choiceCount N; grantExpertise true/false",
+    "- skills: skills [\"Stealth\"] OR choiceCount N; grantExpertise true/false. Expertise is one feature — later table repeats (Investigator 9, Bard 9) are extra picks on that same feature, not a second Expertise row.",
     "- languages: languages [\"Sylvan\"] OR languageChoiceCount N; choicePool standard|standard_and_rare",
     "- spells_known: spellNames [\"Beast Sense\", \"Speak with Animals\"]; castAsRitual true for ritual-only grants; spellChoiceGrants [{ level: 0, count: 1 }]; spellChoiceLabel for filters. For subclass spell tables that unlock more spells at higher levels (e.g. \"at level 5 you also always have Conjure Animals prepared\"), emit ONE spells_known mechanic PER level tier with unlocksAtClassLevel set to that tier's level — do not lump every tier's spells into one mechanic without it, or they'll all become available at the feature's own (lowest) level.",
     "- spellcasting_ability: spellcastingAbility intelligence|wisdom|charisma. When the source lets the PLAYER choose (\"your spellcasting ability for it is Intelligence, Wisdom, or Charisma (choose when you select this feat)\"), emit ONE spellcasting_ability mechanic on the PARENT feat/feature and keep that sentence in its description — do not pick one ability yourself and do not repeat the mechanic on each choices option. Dump Stat turns the three-way wording into a build-time pick, and spell grants from the same feat/feature inherit whichever ability the player picks.",
@@ -1855,6 +1923,7 @@ function formatMechanicsCheatsheet(): string {
     "- equipment_and_magic_items: itemOptions [\"Bag\", \"Cloak\", \"Backpack\"], choiceCount 1, allowCustom true when the player may name another item",
     "- player_note: notePrompt, notePlaceholder, noteTarget feature|equipment — adds a persistent editable note on the character sheet",
     "- attunement_slots: attunementTotal 4 (sets cap) OR attunementBonus 1 (adds to default 3)",
+    "- extra_wield_slots: extra hands that can hold a weapon (Thri-kreen Secondary Arms). choiceCount is extraSlots (default 1). Mention Light when the extra hands can only wield a Light weapon. Lifts exclusive two-handed + shield / off-hand restriction.",
     "- armor_proficiencies: armor [\"Heavy Armor\", \"Shields\"]",
     "- weapon_proficiencies: weaponMode martial_weapons | simple_weapons",
     "- saving_throws: savingThrows [\"Strength\", \"Constitution\"]",
@@ -1870,15 +1939,15 @@ function formatMechanicsCheatsheet(): string {
     "- movement_grant: one-off movement (not a permanent speed increase). distanceMode fixed|fraction_of_speed|full_speed; distanceFeet when fixed; fraction 0.5 when half Speed; trigger freeform starting with bonus_action/reaction/action (e.g. \"bonus_action_spend_bardic\", \"reaction_on_mantle\") — the prefix drives the activation cost; teleport true for \"teleport to a space you can see\" (ignores terrain en route) vs normal ground movement; targets self|self_and_chosen_ally|chosen_creatures_in_range — only \"self\" (the default) is currently wired to a sheet action, others are review-only; provokesOpportunityAttacks false when the source says it doesn't; optional classResourceKey/cost when spending BI etc. (not yet wired — note the spend in description/manual review).",
     "- vision: visionRangeFeet 60; visionType darkvision|blindsight|truesight|tremorsense (default darkvision — Blind Fighting / Skulker must set blindsight)",
     "- telepathy: telepathyRangeFeet 120 (passive telepathic communication range)",
-    "- initiative: initiativeMode add_ability_modifier|ability_modifier|flat_bonus|add_proficiency; initiativeAbility charisma (for add_ability_modifier/ability_modifier); initiativeFlatBonus N. add_ability_modifier ADDS the ability on top of the normal DEX-based roll — use this for \"you can add your Wisdom modifier to the roll\" (the common phrasing, e.g. Ranger's Dread Ambusher). ability_modifier REPLACES DEX as initiative's governing ability entirely — only use when the text says initiative now uses that ability INSTEAD of Dexterity.",
+    "- initiative: initiativeMode add_ability_modifier|ability_modifier|flat_bonus|add_proficiency; initiativeAbility charisma (for add_ability_modifier/ability_modifier); initiativeFlatBonus N. add_proficiency is Alert / \"when you roll Initiative, add your Proficiency Bonus\" — this is the characteristic that feeds the printed initiative modifier, not check_roll_modifier. add_ability_modifier ADDS the ability on top of the normal DEX-based roll — use this for \"you can add your Wisdom modifier to the roll\" (the common phrasing, e.g. Ranger's Dread Ambusher). ability_modifier REPLACES DEX as initiative's governing ability entirely — only use when the text says initiative now uses that ability INSTEAD of Dexterity.",
     "- unarmed_strike_damage: unarmedDie \"1d6\" + damageType \"Slashing\" for a fixed natural weapon; dieByLevel [{ level: 3, die: \"1d8\" }, { level: 5, die: \"2d6\" }] for a martial-arts-style die ladder",
-    "- on_hit_trigger: triggerOn hit|crit; oncePerTurn true/false; bonusDice \"1d6\"; optional automaticBonusMode character_level|half_character_level_round_down; damageType / damageTypeOptions; spendResourceKey + spendResourceAmount; requiresSheetToggle when gated (e.g. while_raging). Use for Divine Fury–style once-per-turn extra damage riders and crit maximize/bonus riders.",
+    "- on_hit_trigger: triggerOn hit|crit; oncePerTurn true/false; bonusDice \"1d6\"; optional automaticBonusMode character_level|half_character_level_round_down; damageType / damageTypeOptions; spendResourceKey + spendResourceAmount; requiresSheetToggle when gated (e.g. while_raging). Use for automatic Divine Fury–style once-per-turn extra damage and crit maximize/bonus riders. Do NOT use for optional \"you can deal extra\" / Bloodied / first-round weapon damage — those belong on the weapon DMG ··· menu via power_rider + weaponDamageMenu.",
     "- turn_start_trigger: general turn-start effect (heal, grant temp HP via nested text, etc.). Optional hpBelowFraction 0.5, restoreResourceKey/Amount, grantResourceKey/Amount, blockedByConditions. Prefer the narrow kinds below when the effect is ONLY a pool refill or ephemeral bonus grant.",
     "- turn_start_resource_restore: restoreResourceKey \"psionic_energy_dice\"; restoreResourceAmount 1 — refills a spent pool toward its cap (narrow case of turn_start_trigger)",
     "- turn_start_bonus_grant: grantResourceKey \"psi_points\"; grantAmount 2; expiresEndOfTurn true; usageRestriction \"…\" — ephemeral bonus units that do NOT refill the main pool; optional grantAmountByLevel [{ level, amount }]",
     "- resource_ability_menu: classResourceKey (or resourceKey) for the pool; waiveResourceCost true when options can be used free. Prefer structured menuOptions [{ name, description, resourceCost, hitDiceCost?, unlocksAtLevel?, actionKind?, bonusConfig? }] when choices have different costs or action economies; menuAbilityNames [\"Feat of Strength\", \"Heroic Fortitude\"] remains valid for same-cost/name-only menus. When the feature says \"choose one of the following\" and only some picks spend an Action / Bonus Action / Reaction, put actionKind on those options — do not mark the whole feature as that economy. For \"roll this class-resource die and add it to AC / a save / damage\", set bonusConfig { mode: \"die\", dieScaling: \"class_resource\", classResourceKey } and omit actionKind — the sheet files that option under Passive and rolls the die on Use.",
     "- extra_attack: extraAttackCount is the number of EXTRA attacks beyond the first (1 = attack twice; 2 = attack three times). Preserve special replacement rules such as casting a cantrip in place of one attack in narrative text.",
-    "- power_rider: parentPowerNames [\"Guardian Tactics\", \"Survive\", \"Interrupt\", \"Bombs\"] — sheet alert on those actions. When the rider only applies to one menu option, also set parentMenuOptionNames [\"Block\"] | [\"Challenge\"] | [\"Grasp\"]. For Alchemist Bomb modes set appliesToAttackVariants [\"attack\"] (regular formulas such as Painkiller Bomb) or [\"primed\"] (\"When you prime a Bomb…\", e.g. Timed Demolition) and selectable true when the rider is an optional add-on. Optional alertSummary for the badge text. Do not use power_rider for \"Your X improves\" upgrades that change costs or action economy — those are replace_feature.",
+    "- power_rider: parentPowerNames [\"Guardian Tactics\", \"Survive\", \"Interrupt\", \"Bombs\"] — sheet alert on those actions. When the rider only applies to one menu option, also set parentMenuOptionNames [\"Block\"] | [\"Challenge\"] | [\"Grasp\"]. For Alchemist Bomb modes set appliesToAttackVariants [\"attack\"] (regular formulas such as Painkiller Bomb) or [\"primed\"] (\"When you prime a Bomb…\", e.g. Timed Demolition) and selectable true when the rider is an optional add-on. Optional alertSummary for the badge text. Situational extra weapon/Unarmed damage (\"you can deal extra…\", Bloodied, first-round +ability): set parentPowerNames [\"Attack\", \"Unarmed Strike\"], weaponDamageMenu true, selectable true, plus bonusDice / dieByLevel / classResourceKey / ability. Bloodied → defaultSelectedWhenToggle \"below_half_hp\" and menuConditionLabel \"Bloodied\". The sheet lists those under Damage modifiers on the weapon DMG ··· menu — do not emit damage_roll_modifiers or on_hit_trigger for them. Do not use power_rider for \"Your X improves\" upgrades that change costs or action economy — those are replace_feature.",
     "- replace_feature: replacedFeatureNames [\"Sacrificial Strike\"] — hide the named prior feature and use THIS feature as the sheet action. Use when an Improved / Greater / Superior feature changes how the original works (new cost, new action economy, first use free), not when it only scales a number (put amountByLevel / dieByLevel on the original). Pair with the improved feature's own activation. firstUseNoAction + firstUseNoActionFromLevel 17 for \"the first time you use this on each of your turns, you can do so without taking a Bonus Action\".",
     "- grant_custom_ability: abilityNames [\"Alchemy of Poison\", \"Telepathy\", \"Laughing Gas Bomb\"] — unlock a named custom ability / formula / discovery / discipline already in the batch (or seeded). Prefer this over leaving subclass formula grants unwired.",
     "- failed_roll_trigger: rollKind attack|ability|skill|save; failedTriggerOn fail|success; targetScope self|allied_creature|target_creature; optional rangeFeet, useReaction, spendResourceKey/spendResourceAmount. For a flat bonus (Guided Strike +10) set bonusFixed 10 — nested as check_roll_modifier. Prefer this over inventing a one-off reaction when the feature adds to a missed/failed (or successful) roll.",

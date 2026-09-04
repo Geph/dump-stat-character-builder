@@ -93,6 +93,33 @@ describe("creature-linked companions", () => {
     expect(wolf.maxHp).toBe(11)
   })
 
+  it("labels an ability companion with the class name, not the class UUID", () => {
+    const classId = "C082C8F9-7946-4565-9F06-34D2988986FD"
+    const ability = {
+      id: "ability-1",
+      name: "Summon Beast",
+      description: "",
+      attached_to_type: "class",
+      attached_to_id: classId,
+      companion_creature_names: ["Wolf"],
+    } as unknown as CustomAbility
+
+    const resolved = resolveCharacterCompanions({
+      classDetails: [
+        {
+          row: { class_id: classId, level: 3, subclass_id: null },
+          class: { name: "Ranger", features: [] },
+          subclass: null,
+        } as unknown as CharacterClassDetail,
+      ],
+      customAbilities: [ability],
+      ctx: CTX,
+      creatures: [WOLF],
+    })
+    expect(resolved[0]?.source.className).toBe("Ranger")
+    expect(resolved[0]?.source.className).not.toMatch(/^[0-9a-f-]{36}$/i)
+  })
+
   it("does nothing when no creatures are supplied", () => {
     const candidates = collectCompanionCandidatesFromClasses([rangerWith(["Wolf"])])
     expect(candidates).toHaveLength(0)

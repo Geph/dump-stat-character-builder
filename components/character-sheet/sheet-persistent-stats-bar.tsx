@@ -195,6 +195,7 @@ function CombatStatsCompactRow({
           layout="stack"
           modeToggleSurface="onFill"
           rollContext={{ kind: "initiative", ability: "dexterity" }}
+          featureBonusesIncluded
           onRoll={onInitiativeRoll}
         />
         <StatExplainPopover
@@ -407,6 +408,7 @@ export function SheetPersistentStatsBar({
                 title="Roll initiative"
                 size="lg"
                 rollContext={{ kind: "initiative", ability: "dexterity" }}
+                featureBonusesIncluded
                 onRoll={onInitiativeRoll}
               />
             </>

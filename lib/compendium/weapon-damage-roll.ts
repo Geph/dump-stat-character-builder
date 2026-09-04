@@ -17,6 +17,9 @@ export type WeaponDamageDiceOption = {
   id: string
   label: string
   dice: string
+  /** Shown but not selectable (e.g. two-handed while a shield is equipped). */
+  disabled?: boolean
+  disabledReason?: string
 }
 
 /** Optional flat bonuses / extra dice on the weapon DMG menu (Fierce Start, Finisher, etc.). */
@@ -89,7 +92,12 @@ export function parseWeaponDamageDice(damageText: string | null): {
 
 export function weaponDamageDiceOptions(
   weapon: Equipment,
-  options?: { overrideDieSides?: number | null; stepDice?: boolean },
+  options?: {
+    overrideDieSides?: number | null
+    stepDice?: boolean
+    twoHandedBlocked?: boolean
+    twoHandedBlockedReason?: string
+  },
 ): WeaponDamageDiceOption[] {
   const damageText = getWeaponDamageText(weapon)
   const { oneHanded, twoHanded } = parseWeaponDamageDice(damageText)
@@ -112,7 +120,18 @@ export function weaponDamageDiceOptions(
     (hasWeaponProperty(weapon, "versatile") ? bumpVersatileDie(oneHanded) : null)
   const versatile = versatileRaw ? applyOverride(versatileRaw) : null
   if (versatile && versatile !== one) {
-    optionsList.push({ id: "two-handed", label: "Two-handed", dice: versatile })
+    optionsList.push({
+      id: "two-handed",
+      label: "Two-handed",
+      dice: versatile,
+      ...(options?.twoHandedBlocked
+        ? {
+            disabled: true,
+            disabledReason:
+              options.twoHandedBlockedReason ?? "Your other hand is occupied.",
+          }
+        : {}),
+    })
   }
   return optionsList
 }
@@ -155,10 +174,12 @@ export function expectedWeaponDamageDiceValue(dice: string): number {
 export function preferredWeaponDamageDiceId(
   options: readonly WeaponDamageDiceOption[],
 ): string | undefined {
-  if (!options.length) return undefined
-  let best = options[0]!
+  const eligible = options.filter((option) => !option.disabled)
+  const pool = eligible.length ? eligible : options
+  if (!pool.length) return undefined
+  let best = pool[0]!
   let bestValue = expectedWeaponDamageDiceValue(best.dice)
-  for (const option of options.slice(1)) {
+  for (const option of pool.slice(1)) {
     const value = expectedWeaponDamageDiceValue(option.dice)
     if (value > bestValue) {
       best = option
@@ -213,24 +234,144 @@ function finisherDiceForLevel(level: number): string {
   return "1d8"
 }
 
+const ABILITY_ABBREV: Record<string, string> = {
+  strength: "STR",
+  dexterity: "DEX",
+  constitution: "CON",
+  intelligence: "INT",
+  wisdom: "WIS",
+  charisma: "CHA",
+}
+
+function riderMenuId(rider: PowerRiderCharacteristic): string {
+  if (riderMentions(rider, /improved[_ ]?finisher/i)) return "improved-finisher"
+  if (riderMentions(rider, /\bfinisher\b/i)) return "finisher"
+  if (riderMentions(rider, /fierce[_ ]?start/i)) return "fierce-start"
+  const raw = rider.id || rider.label || rider.alertSummary || "rider"
+  return (
+    raw
+      .replace(/^mod_/i, "")
+      .replace(/_power_rider$/i, "")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-|-$/g, "")
+      .toLowerCase() || "rider"
+  )
+}
+
+function riderDisplayName(rider: PowerRiderCharacteristic): string {
+  const labeled = rider.label?.trim()
+  if (labeled) return labeled
+  const summary = rider.alertSummary?.split(":")[0]?.trim()
+  if (summary) return summary
+  return "Damage rider"
+}
+
+function riderHasWeaponDamageFields(rider: PowerRiderCharacteristic): boolean {
+  return (
+    rider.weaponDamageMenu === true ||
+    Boolean(rider.bonusDice?.trim()) ||
+    Boolean(rider.dieByLevel?.length) ||
+    Boolean(rider.classResourceKey?.trim()) ||
+    Boolean(rider.ability)
+  )
+}
+
+function resolveRiderBonusDice(
+  rider: PowerRiderCharacteristic,
+  opts?: {
+    characterLevel?: number | null
+    investigatorLevel?: number | null
+    classResourceDiceByKey?: Record<string, string> | null
+  },
+): string | null {
+  const key = rider.classResourceKey?.trim()
+  if (key && opts?.classResourceDiceByKey?.[key]) return opts.classResourceDiceByKey[key]
+  const level = Math.max(1, opts?.characterLevel ?? opts?.investigatorLevel ?? 1)
+  if (rider.dieByLevel?.length) {
+    const sorted = [...rider.dieByLevel].sort((a, b) => a.level - b.level)
+    let die: string | null = null
+    for (const row of sorted) {
+      if (level >= row.level && row.die.trim()) die = row.die.trim()
+    }
+    if (die) return die
+  }
+  const explicit = rider.bonusDice?.trim()
+  if (explicit) return explicit
+  if (riderMentions(rider, /\bfinisher\b/i) && !riderMentions(rider, /improved[_ ]?finisher/i)) {
+    return finisherDiceForLevel(Math.max(1, opts?.investigatorLevel ?? opts?.characterLevel ?? 2))
+  }
+  if (riderMentions(rider, /improved[_ ]?finisher/i)) return "1d8"
+  return null
+}
+
+function optionFromWeaponDamageRider(
+  rider: PowerRiderCharacteristic,
+  abilityMods: AbilityMods | null | undefined,
+  opts?: {
+    characterLevel?: number | null
+    investigatorLevel?: number | null
+    classResourceDiceByKey?: Record<string, string> | null
+    activeSheetToggleIds?: readonly string[] | null
+  },
+): WeaponDamageBonusOption | null {
+  const name = riderDisplayName(rider)
+  const title = rider.alertSummary?.trim() || undefined
+  const toggle = rider.defaultSelectedWhenToggle?.trim()
+  const toggleOn = Boolean(toggle && (opts?.activeSheetToggleIds ?? []).includes(toggle))
+  const condition = rider.menuConditionLabel?.trim()
+  if (rider.ability && abilityMods) {
+    const bonus = abilityMods[rider.ability]
+    const signed = bonus >= 0 ? `+${bonus}` : `${bonus}`
+    const abbrev = ABILITY_ABBREV[rider.ability] ?? rider.ability.slice(0, 3).toUpperCase()
+    return {
+      id: riderMenuId(rider),
+      label: condition ? `${name} (${signed} ${abbrev}, ${condition})` : `${name} (${signed} ${abbrev})`,
+      bonus,
+      title,
+      defaultSelected: toggle ? toggleOn : undefined,
+    }
+  }
+  const dice = resolveRiderBonusDice(rider, opts)
+  if (!dice) return null
+  return {
+    id: riderMenuId(rider),
+    label: condition ? `${name} (${dice}, ${condition})` : `${name} (${dice})`,
+    bonus: 0,
+    bonusDice: dice,
+    title,
+    defaultSelected: toggle ? toggleOn : undefined,
+  }
+}
+
 /**
- * Optional flat damage bonuses (Fierce Start +CHA) and Finisher dice.
- * Shown alongside Deadly D4s whenever the rider is present (player opts in).
+ * Optional flat damage bonuses and extra dice (Fierce Start, Finisher, any
+ * power_rider with weaponDamageMenu). Player opts in from the weapon DMG ··· menu.
  */
 export function optionalWeaponDamageBonuses(
   _weapon: Equipment,
   riders: readonly PowerRiderCharacteristic[] | null | undefined,
   abilityMods: AbilityMods | null | undefined,
   opts?: {
+    characterLevel?: number | null
     investigatorLevel?: number | null
+    classResourceDiceByKey?: Record<string, string> | null
     activeSheetToggleIds?: readonly string[] | null
   },
 ): WeaponDamageBonusOption[] {
   if (!riders?.length) return []
   const options: WeaponDamageBonusOption[] = []
+  const seen = new Set<string>()
+
+  for (const rider of riders) {
+    if (!riderHasWeaponDamageFields(rider)) continue
+    const option = optionFromWeaponDamageRider(rider, abilityMods, opts)
+    if (!option || seen.has(option.id)) continue
+    seen.add(option.id)
+    options.push(option)
+  }
 
   const fierce = riders.some((rider) => riderMentions(rider, /fierce[_ ]?start/i))
-  if (fierce && abilityMods) {
+  if (fierce && abilityMods && !seen.has("fierce-start")) {
     const bonus = abilityMods.charisma
     const signed = bonus >= 0 ? `+${bonus}` : `${bonus}`
     options.push({
@@ -240,24 +381,48 @@ export function optionalWeaponDamageBonuses(
       title:
         "First round of combat: add your Charisma modifier to this weapon or Unarmed Strike damage roll.",
     })
+    seen.add("fierce-start")
   }
 
   const improved = riders.some((rider) => riderMentions(rider, /improved[_ ]?finisher/i))
-  const finisher = improved || riders.some((rider) => riderMentions(rider, /\bfinisher\b/i))
-  if (finisher) {
-    const level = Math.max(1, opts?.investigatorLevel ?? 2)
-    const dice = finisherDiceForLevel(level)
+  const baseFinisher = riders.some(
+    (rider) => riderMentions(rider, /\bfinisher\b/i) && !riderMentions(rider, /improved[_ ]?finisher/i),
+  )
+  if ((baseFinisher || improved) && (!seen.has("finisher") || !seen.has("improved-finisher"))) {
+    const level = Math.max(1, opts?.investigatorLevel ?? opts?.characterLevel ?? 2)
+    const dice =
+      opts?.classResourceDiceByKey?.finisher ?? finisherDiceForLevel(level)
     const bloodied = (opts?.activeSheetToggleIds ?? []).includes("below_half_hp")
-    options.push({
-      id: "finisher",
-      label: improved ? `Finisher (${dice})` : `Finisher (${dice}, Bloodied)`,
-      bonus: 0,
-      bonusDice: dice,
-      title: improved
-        ? "Once per turn on a hit: add Finisher damage dice."
-        : "Once per turn vs a Bloodied target: add Finisher damage dice.",
-      defaultSelected: improved || bloodied,
-    })
+    if (baseFinisher && !seen.has("finisher")) {
+      options.push({
+        id: "finisher",
+        label: `Finisher (${dice}, Bloodied)`,
+        bonus: 0,
+        bonusDice: dice,
+        title: "Once per turn vs a Bloodied target: add Finisher damage dice.",
+        defaultSelected: bloodied,
+      })
+      seen.add("finisher")
+    }
+    if (improved && !seen.has("improved-finisher")) {
+      options.push({
+        id: "improved-finisher",
+        label: "Improved Finisher (1d8)",
+        bonus: 0,
+        bonusDice: "1d8",
+        title: "Once per turn on a hit: add 1d8 Finisher damage (any target).",
+        defaultSelected: !baseFinisher || !bloodied,
+      })
+      seen.add("improved-finisher")
+    }
+  }
+
+  const bloodied = (opts?.activeSheetToggleIds ?? []).includes("below_half_hp")
+  const finisherOpt = options.find((row) => row.id === "finisher")
+  const improvedOpt = options.find((row) => row.id === "improved-finisher")
+  if (finisherOpt && improvedOpt) {
+    finisherOpt.defaultSelected = bloodied
+    improvedOpt.defaultSelected = !bloodied
   }
 
   return options

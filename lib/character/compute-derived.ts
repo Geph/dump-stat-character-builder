@@ -82,7 +82,9 @@ import {
   characterHasTwoWeaponFighting,
   defaultOffHandIncludesAbilityMod,
 } from "@/lib/compendium/two-weapon-fighting"
-import type { Background, DndClass, Equipment } from "@/lib/types"
+import type { Background, DndClass, Equipment, Feature } from "@/lib/types"
+import { resolveCheckRollMode } from "@/lib/compendium/class-feature-metadata"
+import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import type { CharacterClassRow } from "@/lib/character/character-classes"
 import {
   classLevelsToRows,
@@ -136,6 +138,71 @@ const SKILL_ROWS: { name: string; ability: AbilityScoreKey }[] = [
   { name: "Stealth", ability: "dexterity" },
   { name: "Survival", ability: "wisdom" },
 ]
+
+function asRollFeature(
+  name: string,
+  description: string | null | undefined,
+  linkedModifiers: LinkedModifierInstance[] | null | undefined,
+  level = 1,
+): Feature {
+  return {
+    name,
+    description: description ?? null,
+    level,
+    linkedModifiers: linkedModifiers ?? undefined,
+  } as Feature
+}
+
+function featureGrantsInitiativeProficiency(
+  feature: { linkedModifiers?: LinkedModifierInstance[] | null },
+): boolean {
+  for (const instance of feature.linkedModifiers ?? []) {
+    const effects = [...(instance.activation?.effects ?? []), ...(instance.effects ?? [])]
+    for (const effect of effects) {
+      if (resolveCheckRollMode(effect) !== "bonus") continue
+      if (effect.checkCategory !== "initiative") continue
+      if (effect.bonusConfig?.mode === "proficiency") return true
+    }
+  }
+  return false
+}
+
+/** Feats / traits / class features that still store Alert-style PB as a FeatureEffect. */
+function collectInitiativeProficiencyFromFeatureEffects(
+  inputs: CharacterBuildInputs,
+): import("@/lib/compendium/characteristic-modifiers").CharacteristicModifier[] {
+  const features: Feature[] = [...(inputs.resolvedFeatures ?? [])]
+  const featIds = new Set([
+    ...(inputs.selectedFeatIds ?? []),
+    ...(inputs.grantedFeatIds ?? []),
+    ...(inputs.featSelectionEntries ?? []).map((entry) => entry.featId),
+  ])
+  for (const feat of inputs.feats ?? []) {
+    if (!featIds.has(feat.id)) continue
+    features.push(asRollFeature(feat.name, feat.description, feat.linkedModifiers))
+  }
+  for (const trait of inputs.species?.traits ?? []) {
+    features.push(asRollFeature(trait.name, trait.description, trait.linkedModifiers, trait.level ?? 1))
+  }
+  if (inputs.background?.feature) {
+    features.push(
+      asRollFeature(
+        inputs.background.feature.name,
+        inputs.background.feature.description,
+        inputs.background.feature.linkedModifiers,
+      ),
+    )
+  }
+  if (!features.some(featureGrantsInitiativeProficiency)) return []
+  return [
+    {
+      id: "fx_initiative_add_proficiency",
+      type: "initiative",
+      mode: "add_proficiency",
+      label: "Initiative Proficiency",
+    },
+  ]
+}
 
 function buildWeaponAttackDerived(
   weapon: Equipment,
@@ -720,7 +787,11 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
   })
 
   const aggregatedCharacteristics = aggregateCharacteristics(
-    [...builderCharacteristicMods, ...equipmentMagicMods],
+    [
+      ...builderCharacteristicMods,
+      ...equipmentMagicMods,
+      ...collectInitiativeProficiencyFromFeatureEffects(inputs),
+    ],
     {
       activeSheetToggles: inputs.activeSheetToggles,
       activeConditions: inputs.activeConditions,
@@ -1145,6 +1216,8 @@ export function computeDerivedCharacter(inputs: CharacterBuildInputs): DerivedCh
     unarmedStrikeWeapon,
     unarmedStrikeAttack,
     attunementSlots: aggregatedCharacteristics.attunementSlots ?? 3,
+    extraWieldSlots: aggregatedCharacteristics.extraWieldSlots,
+    extraWieldAllowedProperties: aggregatedCharacteristics.extraWieldAllowedProperties,
   }
 }
 

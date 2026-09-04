@@ -8,7 +8,7 @@ import {
 import { attachClassDetails, type CharacterClassDetail } from "@/lib/character/character-classes"
 import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
 import classes from "@/lib/srd/seed-data/classes.json"
-import type { DndClass, Feature, Species } from "@/lib/types"
+import type { DndClass, Feat, Feature, Species } from "@/lib/types"
 
 function classDetail(
   features: Feature[],
@@ -1760,6 +1760,108 @@ describe("combat / utility tab classification", () => {
       species: null,
     })
     expect(actions.find((action) => action.name === "Countercharm")?.category).toBe("combat")
+  })
+
+  it("does not treat another creature taking a Reaction as the character's Reaction", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 5,
+              name: "Direct the Line",
+              description:
+                "Once on each of your turns, you can direct your Cohort or an ally within 60 feet of yourself that can see or hear you. The chosen creature can take a Reaction to move up to its Speed or make one attack with a weapon or Unarmed Strike.",
+            } as Feature,
+          ],
+          5,
+        ),
+      ],
+      species: null,
+    })
+    const command = actions.find((action) => action.name === "Direct the Line")
+    expect(command?.kinds).not.toContain("reaction")
+    expect(command?.trigger).toBe("Once on each of your turns")
+    expect(command?.spendsEconomy).toBe(false)
+  })
+
+  it("ignores a bare Reaction execution when only another creature spends that Reaction", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([], 5)],
+      species: null,
+      customAbilities: [
+        {
+          id: "ability-direct",
+          name: "Direct the Line",
+          description:
+            "<p>Once on each of your turns, you can direct your Cohort or an ally. The chosen creature can take a Reaction to move or attack.</p>",
+          execution: "Reaction",
+          attached_to_type: "class",
+          attached_to_id: "class-1",
+        } as unknown as import("@/lib/types").CustomAbility,
+      ],
+    })
+    const command = actions.find((action) => action.name === "Direct the Line")
+    expect(command).toBeDefined()
+    expect(command?.kinds).not.toContain("reaction")
+    expect(command?.trigger).toBe("Once on each of your turns")
+  })
+
+  it("files a crit-or-drop resource restore as Combat Passive", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 7,
+              name: "Valiant Surge",
+              description:
+                "Whenever you or your Cohort score a Critical Hit or reduce an enemy to 0 Hit Points, you regain an expended Battle Die.",
+            } as Feature,
+          ],
+          7,
+        ),
+      ],
+      species: null,
+    })
+    const surge = actions.find((action) => action.name === "Valiant Surge")
+    expect(surge?.trigger).toBe("When you or an ally crit or drop a foe")
+    expect(surge?.kinds).not.toContain("reaction")
+    expect(surge?.spendsEconomy).toBe(false)
+    expect(surge?.category).toBe("combat")
+    expect(surge?.showOnCombatTab).toBe(true)
+  })
+
+  it("files Interception prose as a Combat Reaction even without modifiers", () => {
+    const actions = collectSheetActions({
+      classDetails: [classDetail([], 1)],
+      species: null,
+      feats: [
+        {
+          id: "feat-interception",
+          name: "Interception",
+          description:
+            "When a creature you can see hits another creature within 5 feet of you with an attack roll, you can take a Reaction to reduce the damage dealt to the target by 1d10 plus your Proficiency Bonus. You must be holding a Shield or a Simple or Martial weapon to use this Reaction.",
+          category: "Fighting Style",
+          level_requirement: null,
+          prerequisite: null,
+          prerequisite_feat_ids: null,
+          prerequisite_class_ids: null,
+          prerequisite_species_ids: null,
+          prerequisite_background_ids: null,
+          benefits: null,
+          icon: null,
+          source: "Player's Handbook (2024)",
+          creator_url: null,
+          created_at: "",
+        },
+      ],
+    })
+    const interception = actions.find((action) => action.name === "Interception")
+    expect(interception?.kinds).toContain("reaction")
+    expect(interception?.category).toBe("combat")
+    expect(interception?.showOnCombatTab).toBe(true)
+    expect(interception?.trigger).toBeFalsy()
   })
 
   it("files a Bonus Action that spends a pool on the Combat tab", () => {

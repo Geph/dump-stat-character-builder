@@ -164,7 +164,7 @@ describe("Investigator trinket magic items", () => {
 })
 
 describe("Investigator Finisher", () => {
-  it("wires Bloodied-gated on_hit_trigger with scaling damage", () => {
+  it("wires Finisher as a weapon DMG menu power_rider", () => {
     const enriched = enrichInvestigatorFeatures({
       classes: [
         {
@@ -177,11 +177,21 @@ describe("Investigator Finisher", () => {
       ],
     } as unknown as import("@/lib/import/content-schema").ImportContent)
     const finisher = enriched.classes?.[0]?.features?.[0] as Feature
-    const trigger = (finisher.linkedModifiers ?? [])
+    const rider = (finisher.linkedModifiers ?? [])
       .flatMap((mod) => mod.characteristics ?? [])
-      .find((char) => char.type === "on_hit_trigger")
-    expect(trigger?.onlyIfTargetBelowHalfHp).toBe(true)
-    expect(trigger?.oncePerTurn).toBe(true)
+      .find((char) => char.type === "power_rider")
+    expect(rider).toMatchObject({
+      type: "power_rider",
+      weaponDamageMenu: true,
+      classResourceKey: "finisher",
+      defaultSelectedWhenToggle: "below_half_hp",
+      menuConditionLabel: "Bloodied",
+    })
+    expect(
+      (finisher.linkedModifiers ?? []).some((mod) =>
+        (mod.characteristics ?? []).some((char) => char.type === "on_hit_trigger"),
+      ),
+    ).toBe(false)
   })
 
   it("matches target HP and size conditions", () => {

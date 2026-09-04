@@ -1,4 +1,5 @@
 import { featureChoiceKey } from "@/lib/builder/choices"
+import { findChoiceOption } from "@/lib/compendium/feature-choice-target"
 import { chosenDamageTypesFromCharacteristics } from "@/lib/builder/modifier-player-choices"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
@@ -351,7 +352,7 @@ export function flexibleEconomyKindsFromText(
   description?: string | null,
 ): ActionEconomyKind[] {
   if (!description) return []
-  const text = descriptionBeforeChooseOneOptions(description)
+  const text = prepareEconomyText(description)
   const kinds = new Set<ActionEconomyKind>()
   if (ACTION_OR_BONUS_RE.test(text)) {
     kinds.add("action")
@@ -380,14 +381,27 @@ function unionActionKinds(
   return kinds
 }
 
-function kindsFromCastingTime(castingTime: string | null | undefined): ActionEconomyKind[] {
+function kindsFromCastingTime(
+  castingTime: string | null | undefined,
+  description?: string | null,
+): ActionEconomyKind[] {
   if (!castingTime) return []
-  const text = castingTime.toLowerCase()
-  if (/\bno\s+action\b/.test(text)) return []
-  const kinds = new Set<ActionEconomyKind>(flexibleEconomyKindsFromText(text))
-  if (/\bbonus\s+action\b/.test(text)) kinds.add("bonus")
-  if (/\breaction\b/.test(text)) kinds.add("reaction")
-  if (/\b(?:magic\s+)?action\b/.test(text) && (!/\bbonus\s+action\b/.test(text) || kinds.has("action"))) {
+  const exec = castingTime.trim()
+  const cleanedExec = prepareEconomyText(exec).toLowerCase()
+  if (/\bno\s+action\b/.test(cleanedExec)) return []
+  const bareReaction = /^(?:1\s+)?reactions?$/i.test(exec)
+  const descriptionPaysReaction = description
+    ? /\breaction\b/i.test(prepareEconomyText(description))
+    : true
+  const kinds = new Set<ActionEconomyKind>(flexibleEconomyKindsFromText(cleanedExec))
+  if (/\bbonus\s+action\b/.test(cleanedExec)) kinds.add("bonus")
+  if (/\breaction\b/.test(cleanedExec) && !(bareReaction && description && !descriptionPaysReaction)) {
+    kinds.add("reaction")
+  }
+  if (
+    /\b(?:magic\s+)?action\b/.test(cleanedExec) &&
+    (!/\bbonus\s+action\b/.test(cleanedExec) || kinds.has("action"))
+  ) {
     kinds.add("action")
   }
   return [...kinds]
@@ -657,10 +671,27 @@ function featureUnlocked(
 const NEGATED_ACTION_RE =
   /\b(?:(?:does|do|did)(?:n'?t| not)\s+(?:require|need|cost|use|take)|without\s+(?:using|expending|spending|taking))\s+(?:an?\s+)?(?:bonus\s+action|reaction|magic\s+action|action)\b/gi
 
+/**
+ * "The chosen creature can take a Reaction to move" is that creature's cost, not the
+ * character's. Strip those clauses before inferring Action / Bonus Action / Reaction.
+ */
+const OTHER_CREATURE_ECONOMY_RE =
+  /\b(?:(?:the|that|your|an?)\s+)?(?:chosen\s+)?(?:creature|ally|allies|cohort|companion|target)s?(?:\s+\w+){0,8}\s+(?:can|may)\s+take\s+(?:a\s+)?(?:bonus\s+action|reaction|magic\s+action|action)\b/gi
+
+function stripOtherCreatureActionEconomy(text: string): string {
+  return text.replace(OTHER_CREATURE_ECONOMY_RE, " ")
+}
+
+function prepareEconomyText(description: string | null | undefined): string {
+  return stripOtherCreatureActionEconomy(
+    descriptionBeforeChooseOneOptions(description ?? "").replace(NEGATED_ACTION_RE, " "),
+  )
+}
+
 /** Last-resort detection of an action-economy cost from the feature/trait prose. */
 function kindsFromText(description: string | null | undefined): ActionEconomyKind[] {
   if (!description) return []
-  const text = descriptionBeforeChooseOneOptions(description).replace(NEGATED_ACTION_RE, " ")
+  const text = prepareEconomyText(description)
   const kinds = new Set<ActionEconomyKind>()
   for (const { re, kind } of ACTION_TEXT_PATTERNS) {
     if (re.test(text)) kinds.add(kind)
@@ -692,6 +723,19 @@ const TRIGGER_TEXT_PATTERNS: { re: RegExp; label: string }[] = [
   { re: /\bno action required\b/i, label: "No action required" },
   { re: /\bwithout (?:using|expending|spending) an action\b/i, label: "No action required" },
 ]
+
+const ON_YOUR_TURN_TRIGGER_PATTERNS: { re: RegExp; label: string }[] = [
+  { re: /\bonce on each of your turns\b/i, label: "Once on each of your turns" },
+  { re: /\bonce (?:during|on) your turn\b/i, label: "Once on your turn" },
+]
+
+function onYourTurnTriggerLabel(description?: string | null): string | null {
+  const text = stripHtml(description ?? "")
+  for (const { re, label } of ON_YOUR_TURN_TRIGGER_PATTERNS) {
+    if (re.test(text)) return label
+  }
+  return null
+}
 
 /** Prose that declares an optional expenditure ("you can expend a spell slot"). */
 const TRIGGERED_SPEND_TEXT_RE =
@@ -750,6 +794,8 @@ function authoredTriggerLabel(item: ActivatableItem): string | null {
 function triggerLabelFromWiring(item: ActivatableItem): string | null {
   const authored = authoredTriggerLabel(item)
   if (authored) return authored
+  const refresh = resourceRefreshFlagsLabel(item)
+  if (refresh) return refresh
   for (const instance of item.linkedModifiers ?? []) {
     for (const characteristic of instance.characteristics ?? []) {
       if (characteristic.type === "bonus_damage_riders" || characteristic.type === "on_hit_trigger") {
@@ -765,6 +811,44 @@ function triggerLabelFromWiring(item: ActivatableItem): string | null {
   return null
 }
 
+/** Regain-an-expended-die prose that is a Passive reminder, not an action spend. */
+function resourceRestoreTriggerLabel(description?: string | null): string | null {
+  const text = stripHtml(description ?? "")
+  if (!/\bregain (?:one|a|an|1)\s+(?:expended\s+)?(?:\w+\s+){0,3}(?:die|dice)\b/i.test(text)) {
+    return null
+  }
+  const onCrit = /\bcritical hits?\b/i.test(text)
+  const onZero =
+    /\breduce(?:s|d)? (?:an? |the )?(?:enemy|creature|hostile(?: creature)?|target|foe).{0,40}0 hit points\b/i.test(
+      text,
+    ) || /\b(?:enemy|creature|hostile|target|foe).{0,24}to 0 hit points\b/i.test(text)
+  const onInit = /\binitiative\b/i.test(text)
+  if (!onCrit && !onZero && !onInit) return null
+  const withAlly = /\byou or your (?:cohort|companion|ally|allies)\b/i.test(text)
+  if (withAlly && onCrit && onZero) return "When you or an ally crit or drop a foe"
+  if (onCrit && onZero) return "On a crit or when a foe drops to 0 HP"
+  if (onInit && onCrit) return "When you roll Initiative or score a critical hit"
+  if (onCrit) return "On a critical hit"
+  if (onZero) return "When you reduce a creature to 0 HP"
+  return "When you roll Initiative"
+}
+
+function resourceRefreshFlagsLabel(item: ActivatableItem): string | null {
+  let onInit = false
+  let onCrit = false
+  for (const instance of item.linkedModifiers ?? []) {
+    for (const effect of instance.activation?.effects ?? []) {
+      if ((effect as { kind?: string }).kind !== "class_resource") continue
+      if (effect.resourceRefreshOnInitiative) onInit = true
+      if (effect.resourceRefreshOnCriticalHit) onCrit = true
+    }
+  }
+  if (onInit && onCrit) return "When you roll Initiative or score a critical hit"
+  if (onCrit) return "On a critical hit"
+  if (onInit) return "When you roll Initiative"
+  return null
+}
+
 /**
  * Label for a feature that fires off an event (initiative, companion death, elective spend)
  * but costs no action economy. These need a sheet card so the trigger is visible, yet they
@@ -775,6 +859,13 @@ export function resolveTriggeredActivationLabel(item: ActivatableItem): string |
   if (explicitActionKinds(item).length) return null
   const authored = authoredTriggerLabel(item)
   if (authored) return authored
+  const onYourTurn = onYourTurnTriggerLabel(item.description)
+  if (onYourTurn) return onYourTurn
+  const restore = resourceRestoreTriggerLabel(item.description)
+  if (restore) return restore
+  const refresh = resourceRefreshFlagsLabel(item)
+  if (refresh) return refresh
+  if (inferDirectCompanionEffect(item.name, item.description)) return "On your turn"
   if (!hasTriggeredSpendSignal(item)) return null
   const fromWiring = triggerLabelFromWiring(item)
   if (fromWiring) return fromWiring
@@ -1954,13 +2045,14 @@ function pushPickedChoiceOptionActions(
 ) {
   if (!classId || !featureChoicePicks) return
   if (!feature.isChoice || !feature.choices?.options?.length) return
+  if (feature.choices.applyTo === "companion") return
   // Weapon Mastery is an on-hit property while wielding — shown on equipped weapon cards,
   // not as free-floating action cards for every known weapon type (Nick's "Bonus Action"
   // wording otherwise false-positives via kindsFromText).
   if (isWeaponMasteryFeature(feature)) return
   const picks = featureChoicePicks[featureChoiceKey(classId, feature.name, feature.level)] ?? []
   for (const pick of picks) {
-    const option = feature.choices.options.find((entry) => entry.name === pick)
+    const option = findChoiceOption(feature.choices.options, pick)
     if (!option) continue
     pushActivatableItemActions(
       actions,
@@ -2163,7 +2255,10 @@ function pushCustomAbilityActions(
       linkedModifiers: ability.linked_modifiers ?? undefined,
     }
 
-    const castingKinds = kindsFromCastingTime(ability.casting_time ?? ability.execution)
+    const castingKinds = kindsFromCastingTime(
+      ability.casting_time ?? ability.execution,
+      ability.description,
+    )
     const linkedKinds = castingKinds.length ? [] : kindsFromLinkedModifiers(item.linkedModifiers)
     const textKinds =
       castingKinds.length || linkedKinds.length ? [] : kindsFromText(item.description)
@@ -2182,6 +2277,9 @@ function pushCustomAbilityActions(
       description: `${ability.description ?? ""} ${ability.execution ?? ""} ${ability.casting_time ?? ""}`,
     })
 
+    if (!kinds.length && trigger) {
+      kinds.push("action")
+    }
     if (!kinds.length && ability.ability_role === "psionic_power") {
       kinds.push("action")
     }

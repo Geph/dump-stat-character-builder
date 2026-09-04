@@ -25,6 +25,7 @@ export const FEAT_MODIFIER_CATALOG = {
   damageRollModifiers: "cat_char_damage_roll_modifiers",
   unarmedStrikeDamage: "cat_char_unarmed_strike_damage",
   damageResistance: "cat_char_damage_resistance",
+  conditionImmunity: "cat_char_condition_immunity",
   vision: "cat_char_vision",
   spellsKnown: "cat_char_spells_known",
   spellcastingAbility: "cat_char_spellcasting_ability",
@@ -245,6 +246,21 @@ export function acBonus(
   ])
 }
 
+/** Passive: add Proficiency Bonus to initiative (Alert, Prescience). */
+export function initiativeProf(
+  key: string,
+  label = "Initiative Proficiency",
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.initiative, [
+    {
+      id: modId(key),
+      type: "initiative",
+      mode: "add_proficiency",
+      label,
+    },
+  ])
+}
+
 export function attackMod(
   key: string,
   entries: import("@/lib/compendium/characteristic-modifiers").RollModifierEntry[],
@@ -325,6 +341,21 @@ export function damageResistanceFixed(
       id: modId(key),
       type: "damage_resistance",
       damageTypes,
+      label,
+    },
+  ])
+}
+
+export function conditionImmunityFixed(
+  key: string,
+  conditions: string[],
+  label: string,
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.conditionImmunity, [
+    {
+      id: modId(key),
+      type: "condition_immunity",
+      conditions,
       label,
     },
   ])
@@ -500,6 +531,7 @@ export function riderFx(
 export function damageReductionFx(
   key: string,
   activation: Partial<FeatureActivation> = { reaction: true },
+  effect: Partial<FeatureEffect> = {},
 ): LinkedModifierInstance {
   return fxInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.damageReduction, {
     ...activation,
@@ -508,6 +540,7 @@ export function damageReductionFx(
         id: modId(key),
         kind: "damage_reduction",
         mitigation: "reduction",
+        ...effect,
       },
     ],
   })
@@ -677,12 +710,16 @@ export function damageResistanceChoice(
   ])
 }
 
-export function savingThrowChoice(key: string, label: string): LinkedModifierInstance {
+export function savingThrowChoice(
+  key: string,
+  label: string,
+  values: string[] = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"],
+): LinkedModifierInstance {
   return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.savingThrows, [
     {
       id: modId(key),
       type: "saving_throws",
-      values: ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"],
+      values,
       choiceCount: 1,
       label,
     },
@@ -723,17 +760,7 @@ export function forceSaveFx(
 /** SRD feat name → common modifier presets. */
 export const FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = {
   Alert: {
-    linkedModifiers: [
-      checkFx(
-        "alert_initiative",
-        {
-          kind: "check_bonus",
-          checkCategory: "initiative",
-          bonusConfig: { mode: "proficiency" },
-        },
-        {},
-      ),
-    ],
+    linkedModifiers: [initiativeProf("alert_initiative")],
   },
 
   "Magic Initiate": {

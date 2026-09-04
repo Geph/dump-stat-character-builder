@@ -24,7 +24,70 @@ import {
 import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import { readModifierSource } from "@/lib/character/tag-modifier-source"
+import { resolveCheckRollMode } from "@/lib/compendium/class-feature-metadata"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
+import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+
+function featureEffectGrantsInitiativeProficiency(
+  linkedModifiers: LinkedModifierInstance[] | null | undefined,
+): boolean {
+  for (const instance of linkedModifiers ?? []) {
+    const effects = [...(instance.activation?.effects ?? []), ...(instance.effects ?? [])]
+    for (const effect of effects) {
+      if (resolveCheckRollMode(effect) !== "bonus") continue
+      if (effect.checkCategory !== "initiative") continue
+      if (effect.bonusConfig?.mode === "proficiency") return true
+    }
+  }
+  return false
+}
+
+/** Feat / feature names that add Proficiency Bonus to initiative (Alert, Prescience, …). */
+function initiativeProficiencyGrantNames(
+  mods: CharacteristicModifier[],
+  inputs: CharacterBuildInputs,
+): string[] {
+  const names: string[] = []
+  const seen = new Set<string>()
+  const push = (raw: string | null | undefined) => {
+    const name = raw?.trim()
+    if (!name || /^initiative proficiency$/i.test(name)) return
+    const key = name.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    names.push(name)
+  }
+
+  for (const mod of mods) {
+    if (mod.type !== "initiative" || mod.mode !== "add_proficiency") continue
+    const source = readModifierSource(mod)
+    push(source?.label || source?.source)
+  }
+
+  const featIds = new Set([
+    ...(inputs.selectedFeatIds ?? []),
+    ...(inputs.grantedFeatIds ?? []),
+    ...(inputs.featSelectionEntries ?? []).map((entry) => entry.featId),
+  ])
+  for (const feat of inputs.feats ?? []) {
+    if (!featIds.has(feat.id)) continue
+    if (featureEffectGrantsInitiativeProficiency(feat.linkedModifiers)) push(feat.name)
+  }
+  for (const trait of inputs.species?.traits ?? []) {
+    if (featureEffectGrantsInitiativeProficiency(trait.linkedModifiers)) push(trait.name)
+  }
+  if (
+    inputs.background?.feature &&
+    featureEffectGrantsInitiativeProficiency(inputs.background.feature.linkedModifiers)
+  ) {
+    push(inputs.background.feature.name)
+  }
+  for (const feature of inputs.resolvedFeatures ?? []) {
+    if (featureEffectGrantsInitiativeProficiency(feature.linkedModifiers)) push(feature.name)
+  }
+
+  return names
+}
 
 function recordAggregatedModifierContributions(
   mods: ReturnType<typeof collectBuilderModifierRefIds>,
@@ -351,12 +414,13 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
     )
   }
   if (aggregated.initiativeIncludeProficiency) {
+    const grantNames = initiativeProficiencyGrantNames(allMods, inputs)
     recorder.addSimple(
       "initiative",
       {
-        sourceType: "class",
-        source: "Proficiency",
-        label: "Proficiency",
+        sourceType: grantNames.length ? "feat" : "class",
+        source: grantNames[0] ?? "Proficiency",
+        label: grantNames.length ? `Proficiency (${grantNames.join(", ")})` : "Proficiency",
       },
       derived.proficiencyBonus,
     )

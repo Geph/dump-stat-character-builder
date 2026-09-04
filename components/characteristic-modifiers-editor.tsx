@@ -2451,6 +2451,42 @@ function ModifierFields({
         </div>
       )
 
+    case "extra_wield_slots":
+      return (
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="text-sm text-muted-foreground">Extra slots</label>
+          <input
+            type="number"
+            min={1}
+            max={4}
+            value={mod.extraSlots ?? 1}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                extraSlots: parseInt(e.target.value, 10) || 1,
+              })
+            }
+            className="w-16 px-2 py-1 bg-background border border-border rounded text-center text-sm"
+          />
+          <label className="text-sm text-muted-foreground">Allowed properties</label>
+          <input
+            type="text"
+            value={(mod.allowedProperties ?? []).join(", ")}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                allowedProperties: e.target.value
+                  .split(",")
+                  .map((entry) => entry.trim())
+                  .filter(Boolean),
+              })
+            }
+            className="min-w-[10rem] flex-1 px-2 py-1 bg-background border border-border rounded text-sm"
+            placeholder="light (empty = any)"
+          />
+        </div>
+      )
+
     case "attunement_slots":
       return (
         <div className="flex flex-wrap items-center gap-3">
@@ -3035,6 +3071,90 @@ function ModifierFields({
             />
             Optional add-on on the parent action
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={Boolean(mod.weaponDamageMenu)}
+              onChange={(e) => onChange({ ...mod, weaponDamageMenu: e.target.checked })}
+            />
+            Weapon DMG ··· menu rider (optional extra damage)
+          </label>
+          {mod.weaponDamageMenu ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Bonus dice</label>
+                <input
+                  type="text"
+                  value={mod.bonusDice ?? ""}
+                  onChange={(e) => onChange({ ...mod, bonusDice: e.target.value || undefined })}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                  placeholder="1d8"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Ability bonus</label>
+                <select
+                  value={mod.ability ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...mod,
+                      ability: (e.target.value || undefined) as typeof mod.ability,
+                    })
+                  }
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                >
+                  <option value="">None</option>
+                  {ABILITY_SCORE_KEYS.map((ability) => (
+                    <option key={ability} value={ability}>
+                      {ability}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Class resource die
+                </label>
+                <input
+                  type="text"
+                  value={mod.classResourceKey ?? ""}
+                  onChange={(e) =>
+                    onChange({ ...mod, classResourceKey: e.target.value || undefined })
+                  }
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                  placeholder="finisher"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Default on when toggle
+                </label>
+                <input
+                  type="text"
+                  value={mod.defaultSelectedWhenToggle ?? ""}
+                  onChange={(e) =>
+                    onChange({ ...mod, defaultSelectedWhenToggle: e.target.value || undefined })
+                  }
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                  placeholder="below_half_hp"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Menu condition label
+                </label>
+                <input
+                  type="text"
+                  value={mod.menuConditionLabel ?? ""}
+                  onChange={(e) =>
+                    onChange({ ...mod, menuConditionLabel: e.target.value || undefined })
+                  }
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                  placeholder="Bloodied"
+                />
+              </div>
+            </div>
+          ) : null}
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">
               Replace parent HP spend when selected

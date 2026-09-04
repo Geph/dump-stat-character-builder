@@ -45,6 +45,31 @@ describe("spellOptionsForModifierSlot Investigator list", () => {
     expect(names).not.toContain("Ballistic Smite")
   })
 
+  it("ignores an Investigator class tag on spells that are not on the official table", () => {
+    const names = spellOptionsForModifierSlot(
+      { ...slot, spellLevel: 3, spellLevelIsMax: true, label: "Choose 2 spells (up to level 3)" },
+      [
+        spell("After Image", { level: 3, classes: ["Investigator"] }),
+        spell("After", { level: 3, classes: ["Investigator"] }),
+        spell("Benign Dismemberment", { level: 3, classes: ["Investigator"] }),
+      ],
+      {},
+    ).map((row) => row.name)
+    expect(names).toEqual(["After Image", "Benign Dismemberment"])
+  })
+
+  it("collapses duplicate catalog rows of the same official spell", () => {
+    const names = spellOptionsForModifierSlot(
+      { ...slot, spellLevel: 2, label: "Choose 2 level-2 spells" },
+      [
+        spell("Jethro's Instant Reload", { level: 2, id: "jethro-1", classes: ["Investigator"] }),
+        spell("Jethro's Instant Reload", { level: 2, id: "jethro-2", classes: ["Investigator"] }),
+      ],
+      {},
+    ).map((row) => row.name)
+    expect(names).toEqual(["Jethro's Instant Reload"])
+  })
+
   it("allows any Investigator spell up to a Ritual Level max for grimoire level-ups", () => {
     const upToSlot = {
       ...slot,

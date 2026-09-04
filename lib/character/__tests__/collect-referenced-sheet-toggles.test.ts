@@ -158,6 +158,23 @@ describe("collectReferencedSheetToggleIds", () => {
     expect(ids.has("first_turn_of_combat")).toBe(true)
   })
 
+  it("includes Magic Weapon from prepared spell names, not from an unselected catalog ability", () => {
+    const fromSpell = collectReferencedSheetToggleIds({
+      features: [],
+      feats: [],
+      extraActionNames: ["Magic Weapon"],
+      catalog: [],
+    })
+    expect(fromSpell.has("magic_weapon_active")).toBe(true)
+
+    const fromCatalogLeak = collectReferencedSheetToggleIds({
+      features: [],
+      feats: [],
+      catalog: [],
+    })
+    expect(fromCatalogLeak.has("magic_weapon_active")).toBe(false)
+  })
+
   it("buildCharacterSheetToggleDefinitions omits unreferenced builtins and optional toggles", () => {
     const defs = buildCharacterSheetToggleDefinitions(new Set(["while_raging"]), [])
     expect(defs.map((entry) => entry.id)).toEqual(["while_raging"])

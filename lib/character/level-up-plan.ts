@@ -36,6 +36,7 @@ const LEVEL_UP_MODIFIER_CHOICE_KINDS: ReadonlySet<ModifierPlayerChoiceKind> = ne
   "spell",
   "spellcasting_ability",
   "damage_type",
+  "saving_throw",
   "equipment",
 ])
 

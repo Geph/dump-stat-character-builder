@@ -653,7 +653,7 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     namePattern: /\bfinisher(?:\s*dice)?\b/i,
     displayName: "Finisher",
     definition:
-      "Bonus damage dice dealt by your Finisher (e.g. 1d8 → 3d8). The die count and size scale on the class level table; this is a damage rider, not a spendable pool. Always use resource_key \"finisher\" (never finisher_dice).",
+      "Bonus damage dice dealt by your Finisher (e.g. 1d8 → 3d8). The die count and size scale on the class level table; this is a damage rider on the weapon DMG ··· menu, not a spendable pool. Always use resource_key \"finisher\" (never finisher_dice). Pair the Finisher / Improved Finisher features with power_rider + weaponDamageMenu — not on_hit_trigger.",
     spendPatterns: [],
   },
   {

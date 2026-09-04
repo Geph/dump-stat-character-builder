@@ -146,6 +146,8 @@ describe("Dancer enrichment", () => {
     expect(fierceRider).toMatchObject({
       type: "power_rider",
       parentPowerNames: ["Attack", "Unarmed Strike"],
+      weaponDamageMenu: true,
+      ability: "charisma",
     })
     expect(fierceRider?.limitations?.some((lim) => lim.value === "first_turn_of_combat")).toBeFalsy()
     expect(fierceChars.some((char) => char.type === "damage_roll_modifiers")).toBe(false)

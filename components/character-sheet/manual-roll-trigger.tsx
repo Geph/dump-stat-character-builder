@@ -102,7 +102,7 @@ export function ManualRollTrigger() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.96 }}
               className={cn(
-                "flex w-full max-w-sm flex-col overflow-hidden rounded-2xl border-2 border-border bg-gradient-to-b from-card via-card to-muted/40 shadow-2xl",
+                "flex w-full max-w-sm flex-col overflow-hidden rounded-2xl border-2 border-border bg-card text-card-foreground shadow-2xl",
                 view === "history" && "max-h-[min(70vh,32rem)]",
               )}
               onClick={(e) => e.stopPropagation()}

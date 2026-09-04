@@ -45,6 +45,98 @@ const ABILITY_LABELS: Record<(typeof ABILITY_SCORE_KEYS)[number], string> = {
   charisma: "Charisma",
 }
 
+const ABILITY_SHORT: Record<(typeof ABILITY_SCORE_KEYS)[number], string> = {
+  strength: "STR",
+  dexterity: "DEX",
+  constitution: "CON",
+  intelligence: "INT",
+  wisdom: "WIS",
+  charisma: "CHA",
+}
+
+function hasCurrentScores(
+  baseScores?: Partial<Record<(typeof ABILITY_SCORE_KEYS)[number], number>>,
+): baseScores is Partial<Record<(typeof ABILITY_SCORE_KEYS)[number], number>> {
+  return Boolean(baseScores && ABILITY_SCORE_KEYS.some((ability) => baseScores[ability] != null))
+}
+
+function CurrentAbilityScores({
+  baseScores,
+  otherBonuses,
+  allocation,
+  allowedAbilities,
+  visual,
+}: {
+  baseScores: Partial<Record<(typeof ABILITY_SCORE_KEYS)[number], number>>
+  otherBonuses?: Partial<Record<(typeof ABILITY_SCORE_KEYS)[number], number>>
+  allocation: AsiAllocation
+  allowedAbilities?: (typeof ABILITY_SCORE_KEYS)[number][]
+  visual?: boolean
+}) {
+  const allowed = allowedAbilities ? new Set(allowedAbilities) : null
+  return (
+    <div
+      className={cn(
+        "rounded-md border px-2 py-2",
+        visual ? "border-white/15 bg-white/5" : "border-border bg-muted/40",
+      )}
+    >
+      <p
+        className={cn(
+          "mb-1.5 text-[10px] font-bold uppercase tracking-wide",
+          visual ? "text-white/50" : "text-muted-foreground",
+        )}
+      >
+        Current scores
+      </p>
+      <div className="grid grid-cols-6 gap-1">
+        {ABILITY_SCORE_KEYS.map((ability) => {
+          const current = (baseScores[ability] ?? 10) + (otherBonuses?.[ability] ?? 0)
+          const added = allocation[ability] ?? 0
+          const next = current + added
+          const eligible = !allowed || allowed.has(ability)
+          return (
+            <div
+              key={ability}
+              className={cn(
+                "rounded px-0.5 py-1 text-center",
+                eligible ? (visual ? "bg-white/5" : "bg-background/70") : "opacity-50",
+              )}
+            >
+              <p
+                className={cn(
+                  "text-[8px] font-bold uppercase tracking-wide",
+                  visual ? "text-white/55" : "text-muted-foreground",
+                )}
+              >
+                {ABILITY_SHORT[ability]}
+              </p>
+              {added > 0 ? (
+                <p className={cn("text-[11px] font-black tabular-nums", visual ? "text-amber-400" : "text-primary")}>
+                  <span className={cn("font-semibold", visual ? "text-white/70" : "text-foreground")}>
+                    {current}
+                  </span>
+                  <span className="mx-0.5 text-[9px]">→</span>
+                  {next}
+                </p>
+              ) : (
+                <p
+                  className={cn(
+                    "text-[11px] font-black tabular-nums",
+                    visual ? "text-white" : "text-foreground",
+                  )}
+                >
+                  {current}
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function AsiAllocator({
   allocation,
   onChange,
@@ -167,6 +259,16 @@ export function AsiAllocator({
           {helpText} ({pointsRemaining} point{pointsRemaining === 1 ? "" : "s"} remaining)
         </p>
         {abilityRows}
+        {hasCurrentScores(baseScores) ? (
+          <div className="mt-3">
+            <CurrentAbilityScores
+              baseScores={baseScores}
+              otherBonuses={otherBonuses}
+              allocation={allocation}
+              allowedAbilities={allowedAbilities}
+            />
+          </div>
+        ) : null}
       </div>
     )
   }

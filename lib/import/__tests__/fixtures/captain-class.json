@@ -39,6 +39,11 @@
         },
         {
           "level": 2,
+          "name": "Cohort Species",
+          "description": "When you initiate a new Humanoid Cohort, you can also give it one of the following traits to reflect its species."
+        },
+        {
+          "level": 2,
           "name": "Fighting Style",
           "description": "You have honed your martial prowess and gain a Fighting Style feat of your choice."
         },

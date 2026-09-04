@@ -24,6 +24,10 @@ import {
   ownedEquipmentQuantity,
   type EquipmentQuantities,
 } from "@/lib/character/equipment-quantities"
+import {
+  exclusiveTwoHandedEquipWarning,
+  occupiedHandsBlockReason,
+} from "@/lib/character/wield-constraints"
 import { isWieldableWeaponItem } from "@/lib/compendium/magic-item-weapon-base"
 import { isLightWeapon } from "@/lib/compendium/two-weapon-fighting"
 import { EquipmentQuantityStepper } from "@/components/character-sheet/equipment-quantity-stepper"
@@ -69,6 +73,7 @@ type SheetEquipmentPanelProps = {
   ownedIds: string[]
   equipmentQuantities?: EquipmentQuantities
   onQuantityChange: (id: string, quantity: number) => void
+  extraWieldSlots?: number
 }
 
 function EquipRow({
@@ -131,9 +136,16 @@ export function SheetEquipmentPanel({
   ownedIds,
   equipmentQuantities,
   onQuantityChange,
+  extraWieldSlots = 0,
 }: SheetEquipmentPanelProps) {
   const [categoryFilter, setCategoryFilter] = useState<EquipmentSheetFilter>("all")
   const deferredSearchQuery = useDeferredValue(searchQuery)
+  const mainWeapon = useMemo(() => {
+    if (!equippedWeaponId) return null
+    const raw = equipment.find((item) => item.id === equippedWeaponId)
+    return raw ? resolveCharacterEquipment(raw, catalog, equipmentBaseSelections) : null
+  }, [catalog, equippedWeaponId, equipment, equipmentBaseSelections])
+  const twoHandedBlocksOthers = occupiedHandsBlockReason(extraWieldSlots, mainWeapon)
   const filtered = useMemo(() => {
     const bySearch = filterEquipmentList(equipment, deferredSearchQuery)
     const byCategory = bySearch.filter((item) =>
@@ -347,8 +359,17 @@ export function SheetEquipmentPanel({
                       <EquipRow
                         label="Wield"
                         checked={equippedShieldId === item.id}
-                        disabled={equipBlocked && equippedShieldId !== item.id}
-                        title={equipBlocked && equippedShieldId !== item.id ? equipBlockedTitle : undefined}
+                        disabled={
+                          (equipBlocked && equippedShieldId !== item.id) ||
+                          Boolean(twoHandedBlocksOthers && equippedShieldId !== item.id)
+                        }
+                        title={
+                          equipBlocked && equippedShieldId !== item.id
+                            ? equipBlockedTitle
+                            : twoHandedBlocksOthers && equippedShieldId !== item.id
+                              ? twoHandedBlocksOthers
+                              : undefined
+                        }
                         onChange={(checked) => onEquipShield(checked ? item.id : null)}
                       />
                     )}
@@ -373,10 +394,15 @@ export function SheetEquipmentPanel({
                         <EquipRow
                           label="Off-hand"
                           checked={equippedOffHandWeaponId === item.id}
-                          disabled={equipBlocked && equippedOffHandWeaponId !== item.id}
+                          disabled={
+                            (equipBlocked && equippedOffHandWeaponId !== item.id) ||
+                            Boolean(twoHandedBlocksOthers && equippedOffHandWeaponId !== item.id)
+                          }
                           title={
                             equipBlocked && equippedOffHandWeaponId !== item.id
                               ? equipBlockedTitle
+                              : twoHandedBlocksOthers && equippedOffHandWeaponId !== item.id
+                                ? twoHandedBlocksOthers
                               : !dualWieldSame && equippedWeaponId === item.id
                                 ? "Carry at least two to wield one in each hand"
                                 : undefined
@@ -398,7 +424,15 @@ export function SheetEquipmentPanel({
                         label="Wield"
                         checked={equippedWeaponId === item.id}
                         disabled={equipBlocked && equippedWeaponId !== item.id}
-                        title={equipBlocked && equippedWeaponId !== item.id ? equipBlockedTitle : undefined}
+                        title={
+                          equipBlocked && equippedWeaponId !== item.id
+                            ? equipBlockedTitle
+                            : exclusiveTwoHandedEquipWarning(
+                                extraWieldSlots,
+                                resolved,
+                                Boolean(equippedShieldId || equippedOffHandWeaponId),
+                              ) ?? undefined
+                        }
                         onChange={(checked) => onEquipWeapon(checked ? item.id : null)}
                       />
                     ) : null}

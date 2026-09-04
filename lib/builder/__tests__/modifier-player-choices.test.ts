@@ -111,6 +111,38 @@ describe("expertise modifier player choices", () => {
     expect(atNine?.maxCount).toBe(4)
   })
 
+  it("ignores a later table-row Expertise when the first feature already unlocks at that level", () => {
+    const atTwo = enrichClassFeatureWithModifierPresets("Investigator", {
+      level: 2,
+      name: "Expertise",
+      description:
+        "<p>You gain Expertise in two of your skill proficiencies of your choice.</p><p>At Investigator level 9, you gain Expertise in two more of your skill proficiencies of your choice.</p>",
+    } as Feature)
+    const tableReminder = enrichClassFeatureWithModifierPresets("Investigator", {
+      level: 9,
+      name: "Expertise",
+      description: "",
+    } as Feature)
+    const cls = {
+      id: "investigator",
+      name: "Investigator",
+      features: [atTwo, tableReminder],
+    } as unknown as DndClass
+
+    const slots = collectClassFeatureModifierPlayerChoiceSlots({
+      classLevels: [{ classId: "investigator", level: 9 }],
+      classes: [cls],
+      subclasses: [],
+      subclassByClassId: {},
+      featureChoicePicks: {},
+      catalog: [],
+    }).filter((slot) => slot.grantsExpertise)
+
+    expect(slots).toHaveLength(1)
+    expect(slots[0]?.maxCount).toBe(4)
+    expect(slots[0]?.sourceKey).toContain("L2")
+  })
+
   it("excludes skills that already have expertise from earlier features", () => {
     const slot = {
       slotKey: "test",

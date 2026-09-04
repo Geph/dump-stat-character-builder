@@ -15,6 +15,7 @@ import {
   sheetToggleIdActivatedByAction,
   type SheetToggleDefinition,
 } from "@/lib/compendium/sheet-toggle-registry"
+import { weaponSpellBuffToggleForActionName } from "@/lib/character/weapon-spell-buff"
 import type { CustomAbility, Feat, Feature, Species, UsesConfig } from "@/lib/types"
 import type { MagicItemPower } from "@/lib/character/magic-item-powers"
 
@@ -114,6 +115,8 @@ export function collectReferencedSheetToggleIds(params: {
   species?: Species | null
   customAbilities?: CustomAbility[]
   magicItemPowers?: MagicItemPower[]
+  /** Prepared spells / owned items that activate a toggle by name (Magic Weapon, …). */
+  extraActionNames?: readonly string[]
   catalog: ModifierCatalogEntry[]
 }): Set<string> {
   const ids = new Set<string>()
@@ -137,6 +140,13 @@ export function collectReferencedSheetToggleIds(params: {
   for (const power of params.magicItemPowers ?? []) {
     if (power.toggleId) ids.add(power.toggleId)
     collectFromCharacteristics(power.characteristics ?? [], ids)
+  }
+
+  for (const name of params.extraActionNames ?? []) {
+    const activated = sheetToggleIdActivatedByAction({ name })
+    if (activated) ids.add(activated)
+    const weaponBuff = weaponSpellBuffToggleForActionName(name)
+    if (weaponBuff) ids.add(weaponBuff)
   }
 
   return ids

@@ -69,7 +69,7 @@ export function DurationRemindersPanel({
               initial={{ opacity: 0, y: -8, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.96 }}
-              className="flex w-full max-w-sm flex-col overflow-hidden rounded-2xl border-2 border-border bg-gradient-to-b from-card via-card to-muted/40 shadow-2xl"
+              className="flex w-full max-w-sm flex-col overflow-hidden rounded-2xl border-2 border-border bg-card text-card-foreground shadow-2xl"
               onClick={(event) => event.stopPropagation()}
               role="dialog"
               aria-modal="true"
@@ -103,7 +103,7 @@ export function DurationRemindersPanel({
                     {reminders.map((reminder) => (
                       <li
                         key={reminder.id}
-                        className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2 py-1.5 text-xs"
+                        className="flex items-center justify-between gap-2 rounded-md border border-border bg-card-lighter px-2 py-1.5 text-xs"
                       >
                         <span className="min-w-0">
                           <span className="font-semibold text-foreground">{reminder.label}</span>
@@ -142,18 +142,18 @@ export function DurationRemindersPanel({
                     onChange={(event) => setLabel(event.target.value)}
                     placeholder="Effect"
                     aria-label="Effect name"
-                    className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                    className="min-w-0 flex-1 rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
                   />
                   <input
                     value={remaining}
                     onChange={(event) => setRemaining(event.target.value)}
                     placeholder="1 min"
                     aria-label="Remaining duration"
-                    className="w-20 rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                    className="w-20 rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
                   />
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs font-semibold"
+                    className="inline-flex items-center gap-1 rounded-md border border-border bg-card-lighter px-2 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
                   >
                     <Plus className="h-3 w-3" />
                     Add

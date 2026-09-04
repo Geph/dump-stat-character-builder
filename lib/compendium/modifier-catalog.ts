@@ -170,6 +170,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   catalog_option: "Feats & choices",
   craftable_items: "Equipment & items",
   held_items_cap: "Equipment & items",
+  extra_wield_slots: "Equipment & items",
   rest_replacement: "Resources & uses",
   hit_dice_restore: "Resources & uses",
   creature_size: "Movement & senses",

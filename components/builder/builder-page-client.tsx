@@ -225,6 +225,7 @@ import {
 } from "@/lib/builder/spell-limits"
 import { filterSpellsBySchool, uniqueSpellSchools } from "@/lib/builder/spell-grant-filters"
 import { spellMatchesClassName } from "@/lib/compendium/investigator-spell-list"
+import { dedupeSpellsByName } from "@/lib/compendium/spell-name-match"
 import {
   catalogFeatPickOptions,
   isCatalogFeatPickId,
@@ -6727,23 +6728,25 @@ export default function BuilderPageClient() {
                       // Magical Secrets / Divine Soul etc. grant access to extra class spell
                       // lists. These expand prepared (level 1+) spells, not cantrips.
                       const extraSpellLists = aggregatedCharacteristics.spellListAccess
-                      const classAvailableSpells = spells
-                        .filter((s) => {
-                          if (s.level === 0) {
+                      const classAvailableSpells = dedupeSpellsByName(
+                        spells
+                          .filter((s) => {
+                            if (s.level === 0) {
+                              return (
+                                spellLimits.cantrips > 0 &&
+                                spellMatchesClassName(s, casterClass.name, casterClass.spell_list)
+                              )
+                            }
+                            if (s.level > maxSpellLevel) return false
                             return (
-                              spellLimits.cantrips > 0 &&
-                              spellMatchesClassName(s, casterClass.name, casterClass.spell_list)
+                              spellMatchesClassName(s, casterClass.name, casterClass.spell_list) ||
+                              s.classes?.some((c) => extraSpellLists.includes(c))
                             )
-                          }
-                          if (s.level > maxSpellLevel) return false
-                          return (
-                            spellMatchesClassName(s, casterClass.name, casterClass.spell_list) ||
-                            s.classes?.some((c) => extraSpellLists.includes(c))
-                          )
-                        })
-                        .filter(
-                          (s) => !alreadyKnownSpellIds.has(s.id) || classSpellIds.includes(s.id),
-                        )
+                          })
+                          .filter(
+                            (s) => !alreadyKnownSpellIds.has(s.id) || classSpellIds.includes(s.id),
+                          ),
+                      )
                       const schoolFilter = spellFilterSchoolByClassId[casterClass.id] ?? "all"
                       const schoolOptions = uniqueSpellSchools(classAvailableSpells)
                       const schoolScopedSpells = filterSpellsBySchool(

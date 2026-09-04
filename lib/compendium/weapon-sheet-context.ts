@@ -292,15 +292,22 @@ function collectAppliedModifiers(
     if (mod.type === "on_hit_trigger") {
       const trigger = mod as OnHitTriggerCharacteristic
       if (!weaponMatchesAppliesTo(weapon, properties, trigger.appliesTo)) continue
+      const rawLabel = trigger.label?.trim() ?? ""
+      // Finisher dice are optional riders on the weapon DMG ··· menu, not chips.
+      if (/\bfinisher\b/i.test(rawLabel) || /\bfinisher\b/i.test(trigger.id)) continue
       const bits: string[] = []
       if (trigger.triggerOn === "crit") bits.push("On a critical hit")
       else bits.push("On a hit")
       if (trigger.oncePerTurn) bits.push("once per turn")
       if (trigger.onlyIfTargetBelowHalfHp) bits.push("Bloodied target")
-      const label = trigger.label?.trim()
+      const colon = rawLabel.indexOf(":")
+      let name =
+        colon > 0 ? rawLabel.slice(0, colon).trim() : rawLabel || (trigger.triggerOn === "crit" ? "Critical hit" : "On hit")
+      if (/^concentration breaker$/i.test(name)) name = "Concentration Break"
+      const detail = colon > 0 ? rawLabel.slice(colon + 1).trim() : ""
       applied.push({
-        name: label || (trigger.triggerOn === "crit" ? "Critical hit" : "On hit"),
-        description: label ? [label, ...bits].join(" · ") : bits.join(" · "),
+        name,
+        description: [detail, ...bits].filter(Boolean).join(" · ") || name,
         ...appliedModifierSource(mod),
       })
     }

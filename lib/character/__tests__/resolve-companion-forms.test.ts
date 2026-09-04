@@ -5,7 +5,8 @@ import {
   resolveCharacterCompanionsDetailed,
 } from "@/lib/character/resolve-companions"
 import { buildSrdCreatureSeedRows } from "@/lib/compendium/seed-srd-creatures"
-import type { Creature } from "@/lib/types"
+import { sanitizeCaptainFeatures } from "@/lib/compendium/captain-feature-wiring"
+import type { Creature, CustomAbility } from "@/lib/types"
 
 const SEED_CREATURES = buildSrdCreatureSeedRows() as unknown as Creature[]
 
@@ -300,6 +301,83 @@ describe("Captain Cohort choice", () => {
 
     expect(companions).toHaveLength(0)
     expect(formGroups.some((group) => group.featureName === "Cohort")).toBe(true)
+  })
+
+  it("does not surface an imported Cohort ability before the class feature level", () => {
+    const row = captain(1)
+    const ability = {
+      id: "ability-cohort",
+      name: "Cohort",
+      description: "You gain a loyal Cohort.",
+      attached_to_type: "class",
+      attached_to_id: "C082C8F9-7946-4565-9F06-34D2988986FD",
+      companion_stat_block: {
+        name: "Cohort",
+        ac: { parts: [{ type: "fixed", value: 16 }] },
+        hp: { parts: [{ type: "fixed", value: 20 }] },
+        traits: [],
+        actions: [],
+      },
+    } as unknown as CustomAbility
+    // Persist often stores the class UUID on the ability, not "Captain".
+    const classRow = {
+      ...row,
+      row: { ...row.row, class_id: "C082C8F9-7946-4565-9F06-34D2988986FD" },
+    } as typeof row
+
+    const { companions, formGroups } = resolveCharacterCompanionsDetailed({
+      classDetails: [classRow],
+      customAbilities: [ability],
+      ctx: { ...CTX, classLevels: [{ className: "Captain", level: 1 }] },
+    })
+
+    expect(companions).toHaveLength(0)
+    expect(formGroups.some((group) => group.featureName === "Cohort")).toBe(false)
+  })
+
+  it("applies a picked Cohort Species trait to the Cohort, including nested damage type", () => {
+    const row = captain(2)
+    const features = (row.class as unknown as { features: Record<string, unknown>[] }).features
+    features[0]!.linkedModifiers = [cohortGrant]
+    const species = sanitizeCaptainFeatures([
+      { level: 2, name: "Cohort Species", description: "When you initiate a new Humanoid Cohort, pick a species trait." },
+    ])![0]!
+    features.push(species as unknown as Record<string, unknown>)
+
+    const { companions } = resolveCharacterCompanionsDetailed({
+      classDetails: [row],
+      ctx: { ...CTX, classLevels: [{ className: "Captain", level: 2 }] },
+      creatures: [
+        { name: "Hunter", stat_block: { name: "Hunter", ac: { parts: [] }, hp: { parts: [] }, traits: [], actions: [] } },
+      ] as unknown as Creature[],
+      featureChoicePicks: {
+        "captain-1:L2:Cohort": ["Hunter"],
+        "captain-1:L2:Cohort Species": ["Dwarf"],
+      },
+    })
+
+    expect(companions).toHaveLength(1)
+    expect(companions[0]?.template.resistances).toEqual(expect.arrayContaining(["Poison"]))
+    expect(companions[0]?.template.conditionImmunities).toEqual(expect.arrayContaining(["Poisoned"]))
+    expect(companions[0]?.template.traits.some((trait) => /dwarf/i.test(trait.name))).toBe(true)
+
+    const dragonborn = resolveCharacterCompanionsDetailed({
+      classDetails: [row],
+      ctx: { ...CTX, classLevels: [{ className: "Captain", level: 2 }] },
+      creatures: [
+        { name: "Hunter", stat_block: { name: "Hunter", ac: { parts: [] }, hp: { parts: [] }, traits: [], actions: [] } },
+      ] as unknown as Creature[],
+      featureChoicePicks: {
+        "captain-1:L2:Cohort": ["Hunter"],
+        "captain-1:L2:Cohort Species": ["Dragonborn"],
+      },
+      modifierPlayerPicks: {
+        "captain-1:L2:Cohort Species::mod_cohort_dragonborn_resistance::damage_type": ["Fire"],
+      },
+    }).companions[0]
+
+    expect(dragonborn?.template.resistances).toEqual(expect.arrayContaining(["Fire"]))
+    expect(dragonborn?.template.traits.some((trait) => /dragonborn/i.test(trait.name))).toBe(true)
   })
 })
 

@@ -202,6 +202,20 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Alchemist", name: "Slime Rancher", slug: "ooze-rancher" },
   { className: "Alchemist", name: "Venomsmith", slug: "venomsmith" },
   { className: "Alchemist", name: "Xenoalchemist", slug: "xenoalchemist" },
+
+  // Mage Hand Press Dancer (local-only portraits)
+  { className: "Dancer", name: "Acrobat", slug: "acrobat" },
+  { className: "Dancer", name: "Cheerleader", slug: "cheerleader" },
+  { className: "Dancer", name: "Contortionist", slug: "contortionist" },
+  { className: "Dancer", name: "Courtesan", slug: "courtesan" },
+  { className: "Dancer", name: "Danseur Macabre", slug: "danseur-macabre" },
+  { className: "Dancer", name: "Dramaturge", slug: "dramaturge" },
+  { className: "Dancer", name: "Fencer", slug: "fencer" },
+  { className: "Dancer", name: "Fey Ballerina", slug: "fey-ballerina" },
+  { className: "Dancer", name: "Fire Dancer", slug: "fire-dancer" },
+  { className: "Dancer", name: "Harlequin", slug: "harlequin" },
+  { className: "Dancer", name: "Marionettist", slug: "marionettist" },
+  { className: "Dancer", name: "Steelsinger", slug: "steelsinger" },
 ]
 
 export function subclassCardImageLookupKey(className: string, subclassName: string): string {
