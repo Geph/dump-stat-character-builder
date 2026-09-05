@@ -31,7 +31,7 @@ import { looksLikeSituationalSpeedGrant } from "@/lib/compendium/situational-spe
 import { buildEvasionModifier } from "@/lib/compendium/shared-feature-modifier-builders"
 import type { FeatureActivation, UsesConfig } from "@/lib/types"
 
-const VALID_CHARACTERISTIC_KINDS = new Set(
+const VALID_CHARACTERISTIC_KINDS = new Set<string>(
   CHARACTERISTIC_MODIFIER_TYPE_OPTIONS.map((option) => option.value),
 )
 
@@ -273,10 +273,42 @@ function buildTemporaryHitPointsEffect(
   }
 }
 
+export type UnresolvedMechanic = {
+  kind: "unresolved"
+  raw: string
+  featureName: string
+  sourcePhrase: string
+}
+
+export type ParsedAiMechanics = {
+  detections: DetectedModifier[]
+  unresolved: UnresolvedMechanic[]
+}
+
+function toUnresolvedMechanic(
+  mechanic: ImportMechanic,
+  ctx: DetectFeatureContext,
+): UnresolvedMechanic {
+  const sourcePhrase = mechanic.sourcePhrase?.trim() ?? ""
+  const raw = mechanic.kind === "unresolved" ? sourcePhrase || mechanic.kind : mechanic.kind
+  return {
+    kind: "unresolved",
+    raw,
+    featureName: ctx.featureName ?? "",
+    sourcePhrase: sourcePhrase || raw,
+  }
+}
+
+function isUnresolvedMechanic(
+  value: DetectedModifier | UnresolvedMechanic,
+): value is UnresolvedMechanic {
+  return "kind" in value && value.kind === "unresolved"
+}
+
 function buildFromMechanic(
   mechanic: ImportMechanic,
   ctx: DetectFeatureContext,
-): DetectedModifier | null {
+): DetectedModifier | UnresolvedMechanic | null {
   const instanceId = createModifierInstanceId()
   const matchedPhrase = mechanic.sourcePhrase?.trim() || `AI: ${mechanic.kind}`
 
@@ -994,7 +1026,9 @@ function buildFromMechanic(
     }
   }
 
-  if (!VALID_CHARACTERISTIC_KINDS.has(mechanic.kind)) return null
+  if (!VALID_CHARACTERISTIC_KINDS.has(mechanic.kind)) {
+    return toUnresolvedMechanic(mechanic, ctx)
+  }
 
   switch (mechanic.kind) {
     case "skills": {
@@ -1540,6 +1574,9 @@ function buildFromMechanic(
       if (!names.length) return null
       const characteristic = grantCreatureCharacteristic(names, {
         count: mechanic.featCount ?? mechanic.choiceCount ?? 1,
+        countByLevel: mechanic.choiceCountByLevel?.filter(
+          (row) => Number.isFinite(row.level) && Number.isFinite(row.count),
+        ),
         choiceOptions: mechanic.creatureChoiceOptions?.filter((n) => n.trim()),
         polymorph: mechanic.creaturePolymorph === true,
       })
@@ -1787,8 +1824,25 @@ function buildFromMechanic(
       }
     }
     default:
-      return null
+      return toUnresolvedMechanic(mechanic, ctx)
   }
+}
+
+/** Convert AI mechanics[] into catalog detections plus explicit unresolved leftovers. */
+export function parseAiMechanics(
+  mechanics: ImportMechanic[] | undefined,
+  ctx: DetectFeatureContext,
+): ParsedAiMechanics {
+  if (!mechanics?.length) return { detections: [], unresolved: [] }
+  const detections: DetectedModifier[] = []
+  const unresolved: UnresolvedMechanic[] = []
+  for (const mechanic of mechanics) {
+    const result = buildFromMechanic(mechanic, ctx)
+    if (!result) continue
+    if (isUnresolvedMechanic(result)) unresolved.push(result)
+    else detections.push(result)
+  }
+  return { detections, unresolved }
 }
 
 /** Convert validated AI mechanics[] entries into detected modifier instances. */
@@ -1796,11 +1850,5 @@ export function aiMechanicsToDetections(
   mechanics: ImportMechanic[] | undefined,
   ctx: DetectFeatureContext,
 ): DetectedModifier[] {
-  if (!mechanics?.length) return []
-  const results: DetectedModifier[] = []
-  for (const mechanic of mechanics) {
-    const detection = buildFromMechanic(mechanic, ctx)
-    if (detection) results.push(detection)
-  }
-  return results
+  return parseAiMechanics(mechanics, ctx).detections
 }

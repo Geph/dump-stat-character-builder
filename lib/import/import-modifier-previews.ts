@@ -13,6 +13,7 @@ import {
   isSubclassSpellTableFeature,
   parseSubclassSpellTable,
 } from "@/lib/import/subclass-spell-table"
+import type { UnresolvedMechanic } from "@/lib/import/parse-ai-mechanics"
 import type { Feature } from "@/lib/types"
 
 export type ImportModifierPreviewEntry = {
@@ -34,10 +35,20 @@ export type ImportUnmatchedFeatureEntry = {
   featureLevel?: number
 }
 
+export type UnresolvedImportMechanicEntry = {
+  id: string
+  sourceLabel: string
+  featureName: string
+  featureLevel?: number
+  raw: string
+  sourcePhrase: string
+}
+
 type FeatureCarrier = Omit<Feature, "level"> & {
   /** Class/subclass features use level; abilities may use level_requirement instead. */
   level?: number
   importModifierMeta?: ImportModifierMeta[]
+  unresolvedMechanics?: UnresolvedMechanic[] | null
   psionic_augments?: import("@/lib/compendium/parse-psionic-augments").PsionicAugmentsConfig | null
 }
 
@@ -370,6 +381,74 @@ export function collectImportModifierReview(content: ImportContent): ImportModif
   }
 
   return rows
+}
+
+function pushUnresolvedEntries(
+  entries: UnresolvedImportMechanicEntry[],
+  sourceLabel: string,
+  feature: FeatureCarrier,
+): void {
+  for (const [index, item] of (feature.unresolvedMechanics ?? []).entries()) {
+    entries.push({
+      id: `${sourceLabel}::${feature.name}::unresolved::${index}`,
+      sourceLabel,
+      featureName: item.featureName || feature.name,
+      featureLevel: feature.level,
+      raw: item.raw,
+      sourcePhrase: item.sourcePhrase,
+    })
+  }
+}
+
+/** Mechanics the pipeline noticed but could not express as catalog modifiers. */
+export function collectUnresolvedImportMechanics(
+  content: ImportContent,
+): UnresolvedImportMechanicEntry[] {
+  const entries: UnresolvedImportMechanicEntry[] = []
+
+  for (const cls of content.classes ?? []) {
+    for (const feature of (cls.features ?? []) as FeatureCarrier[]) {
+      pushUnresolvedEntries(entries, `Class: ${cls.name}`, feature)
+    }
+  }
+
+  for (const subclass of content.subclasses ?? []) {
+    for (const feature of (subclass.features ?? []) as FeatureCarrier[]) {
+      pushUnresolvedEntries(
+        entries,
+        `Subclass: ${subclass.name} (${subclass.class_name})`,
+        feature,
+      )
+    }
+  }
+
+  for (const species of content.species ?? []) {
+    for (const trait of (species.traits ?? []) as FeatureCarrier[]) {
+      pushUnresolvedEntries(entries, `Species: ${species.name}`, trait)
+    }
+  }
+
+  for (const background of content.backgrounds ?? []) {
+    if (!background.feature) continue
+    pushUnresolvedEntries(
+      entries,
+      `Background: ${background.name}`,
+      background.feature as FeatureCarrier,
+    )
+  }
+
+  for (const feat of content.feats ?? []) {
+    pushUnresolvedEntries(entries, `Feat: ${feat.name}`, feat as FeatureCarrier)
+  }
+
+  for (const ability of content.abilities ?? []) {
+    const label = ability.source_name
+      ? `Ability: ${ability.name} (${ability.source_name})`
+      : `Ability: ${ability.name}`
+    pushUnresolvedEntries(entries, label, abilityAsFeatureCarrier(ability))
+  }
+
+  return entries
 }
 
 /** Collect auto-wired modifier previews for the import review UI. */

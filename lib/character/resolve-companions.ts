@@ -25,6 +25,7 @@ import { featureChoiceKey } from "@/lib/builder/choices"
 import {
   creatureNamesFromAbility,
   creatureNamesFromFeature,
+  grantCreatureCountAtLevel,
   grantCreaturesFromLinkedModifiers,
   grantCreaturesFromSpell,
 } from "@/lib/compendium/grant-creature-catalog"
@@ -259,7 +260,7 @@ function scanFeatures(
         pushChoiceGrant({
           source: baseSource(feature.name, feature.level),
           optionNames: grant.choiceOptions ?? grant.creatureNames,
-          maxKnown: grant.count ?? 1,
+          maxKnown: grantCreatureCountAtLevel(grant, ctx.maxLevel),
           creatureLookup,
           formSelections: extras.formSelections,
           formGroups,
@@ -669,7 +670,10 @@ export function collectCompanionCandidatesFromSpells(
         pushChoiceGrant({
           source,
           optionNames: grant.choiceOptions,
-          maxKnown: grant.count ?? 1,
+          maxKnown: grantCreatureCountAtLevel(
+            grant,
+            Math.max(1, ...(extras.classDetails ?? []).map((entry) => entry.row.level), source.featureLevel),
+          ),
           creatureLookup,
           formSelections: extras.formSelections,
           formGroups,
@@ -714,7 +718,7 @@ export function collectCompanionCandidatesFromEquipment(
         pushChoiceGrant({
           source,
           optionNames: grant.choiceOptions,
-          maxKnown: grant.count ?? 1,
+          maxKnown: grantCreatureCountAtLevel(grant, 1),
           creatureLookup,
           formSelections: extras.formSelections,
           formGroups,

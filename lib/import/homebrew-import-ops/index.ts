@@ -11,6 +11,15 @@ export {
 } from "@/lib/import/homebrew-import-ops/wiring-rules"
 export { sanitizeHomebrewImportJson } from "@/lib/import/homebrew-import-ops/sanitize-import"
 export {
+  assignFeatureClaims,
+  attachImportFeatureClaims,
+  collectClassClaimCoverage,
+  formatClassClaimCoverageReport,
+  reportImportClaimCoverage,
+  type ClassClaimCoverageReport,
+  type FeatureClaim,
+} from "@/lib/import/feature-claims"
+export {
   extractSourceFeatureHeaders,
   compareSourceToImport,
   formatCompletenessReport,

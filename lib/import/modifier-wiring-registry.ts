@@ -69,6 +69,7 @@ export const AI_MECHANIC_KINDS = [
   "hit_dice_restore",
   "grant_inspiration",
   "extra_wield_slots",
+  "unresolved",
 ] as const
 
 /**
@@ -1651,7 +1652,8 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Charnel Touch pool: class_resources.charnel_touch with uses { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. NEVER emit type \"multiply_level\" as the uses.type — multiply_level is only atLevelMode.",
       "Charnel Touch feature: Magic action + class_resource limitedUses with classResourceKey \"charnel_touch\", classResourceAmount 5, classResourceCostMode \"up_to_proficiency_bonus\" (cap 5 × PB). Attach two special_attack profiles: (1) melee Necrotic damageFromResourceSpend + spendResourceOnHit + criticalDamageMultiplier 2; (2) from level 2 Healing your Thralls — healFromResourceSpend true, healTarget \"controlled_companion\", unlocksAtClassLevel 2 (no attack roll; restore HP equal to points spent on a thrall). The sheet asks for points, then either Miss/Hit/Critical for the attack or a thrall picker for the heal.",
       "Thralls + CR Total columns → special caps (thralls, thrall_cr_total). Fractions like 1/4 are valid CR Total values. Do NOT wire Thralls as optionsSource class_upgrades / resourceKey thralls (that is a control cap, not a pick catalog).",
-      "Import thrall creatures[] with the class; Thralls feature → grant_creature with creatureChoiceOptions (Skeleton, Spirit, Zombie, Bone Beast, Gorger, Deadnaught, Bloodlurk).",
+      "Import thrall creatures[] with the class; Thralls feature → grant_creature with creatureChoiceOptions (Skeleton, Spirit, Zombie, Bone Beast, Gorger, Deadnaught, Bloodlurk) and choiceCountByLevel matching the Thralls column (1/3/4/5/6 at 2/7/11/15/19).",
+      "Improved Thralls is not a player pick: isChoice false, choices.applyTo companion, applyToCompanionFeature Thralls, plus condition_immunity (Charmed, Frightened) so attached thralls receive Avoidance / Necrotic Damage / Turn Immunity.",
       "Dead Space is a non-combat Magic action (activation.action + sheetDisplay abilitiesActions) with the linked-item choice, 12-corpse uses, player_note, and inventory_container (linkHostItem true so the chosen bag/cloak appears in Gear with Contents). Thrall Rush is onInitiative + combatActions, not an Attack/Bonus Action. Overcharged Thralls is on_creature_death_trigger (ally/thrall) that restores charnel_touch equal to Necromancer level.",
       "Deadnaught: category companion with HP/HD scaling from Necromancer level; keep Necromantic Bond (level 7 exclusive thrall) and Multiattack scaling in the stat block.",
       "Full caster: set classes[].spellcasting { ability: \"Intelligence\", caster_progression: \"full\" } (Alternate Necromancers may swap ability — keep INT unless the extract chooses Resurrectionist/Ghoul).",
@@ -1985,6 +1987,7 @@ function formatMechanicsCheatsheet(): string {
     "- Renamed / lightly-modified SRD features: set basedOnSrdFeature to the exact INDEX — SRD-standard feature name (e.g. \"Evasion\") while keeping the homebrew display name. Auto-wire applies the base; description/mechanics[] carry deltas (party share, extra gates).",
     "- targetCount (shared): { mode: \"ability_modifier\", ability: \"charisma\", minimum: 1 } for \"a number of creatures equal to your Charisma modifier (minimum of one)\" — use on temporary_hit_points, movement_grant, and similar targeted effects (not uses.ability_modifier, which is for use counts).",
     "Always include sourcePhrase (quote the rule sentence) and confidence high|medium|low.",
+    "- unresolved: when NO listed catalog kind fits a mechanic you noticed. Set sourcePhrase to the verbatim rule sentence. Never invent a kind name. Never silently omit a mechanic.",
   ]
   return lines.join("\n")
 }
@@ -2005,7 +2008,8 @@ Feats that grant a pick from an ability catalog (discipline / class talent / exp
 Catalog ids (generated at import — never emit in JSON):
 - Passive: cat_char_* (skills, ac, grant_feat, uses, speed, …)
 - Active: cat_fx_* (extra_attack, check_roll_modifier, damage_reduction, …)
-Allowed mechanics[].kind values are listed in the cheat sheet below — use those exact strings (e.g. damage_reduction), not invented suffixes of catalog ids.`,
+Allowed mechanics[].kind values are listed in the cheat sheet below — use those exact strings (e.g. damage_reduction), not invented suffixes of catalog ids.
+If no listed kind fits a mechanic you noticed, emit kind "unresolved" with sourcePhrase set to the verbatim rule sentence. Never invent a kind name. Never silently omit a mechanic.`,
 
     formatWiringSection("INDEX — Feature name (works with blank class-table descriptions)", FEATURE_NAME_WIRING),
 

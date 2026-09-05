@@ -25,12 +25,17 @@ const SAVE_ABILITY_NAMES = [
 const USES_ABILITY_CODES = ["STR", "DEX", "CON", "INT", "WIS", "CHA"] as const
 
 export const ImportMechanicSchema = z.object({
-  kind: z.enum(AI_MECHANIC_KINDS),
+  /** Known catalog kinds, `unresolved`, or an invented name kept for the unresolved list. */
+  kind: z.string().min(1),
   confidence: z.enum(["high", "medium", "low"]).optional(),
   sourcePhrase: z.string().optional(),
   skills: z.array(z.string()).optional(),
   grantExpertise: z.boolean().optional(),
   choiceCount: z.number().optional(),
+  /** grant_creature (and similar): pick totals that scale by class level. */
+  choiceCountByLevel: z
+    .array(z.object({ level: z.number(), count: z.number() }))
+    .optional(),
   tools: z.array(z.string()).optional(),
   armor: z.array(z.string()).optional(),
   weaponMode: z.enum(["martial_weapons", "simple_weapons"]).optional(),
@@ -495,6 +500,13 @@ export const ChoiceOptionsSchema = z.object({
     .optional(),
   swappableOnRest: z.boolean().optional(),
   swapRestType: z.enum(["short", "long"]).nullable().optional(),
+  /**
+   * Where picked (or auto-applied) option modifiers apply. `"companion"` keeps
+   * resistances / immunities off the character and onto matching companions.
+   */
+  applyTo: z.enum(["self", "companion"]).optional(),
+  /** Companion-granting feature that receives the modifiers (e.g. `"Thralls"`). */
+  applyToCompanionFeature: z.string().nullable().optional(),
 })
 
 export const SpeciesTraitSchema = z.object({
@@ -529,6 +541,17 @@ export const ClassFeatureSchema = z.object({
     .optional(),
   modifierRefs: z.array(z.string()).optional(),
   importModifierMeta: z.array(z.record(z.unknown())).optional(),
+  claims: z
+    .array(
+      z.object({
+        id: z.string(),
+        text: z.string(),
+        status: z.enum(["wired", "unresolved", "narrative"]),
+        modifierId: z.string().nullable().optional(),
+        effectId: z.string().nullable().optional(),
+      }),
+    )
+    .optional(),
   sheetDisplay: z
     .object({
       abilitiesActions: z.boolean().optional(),
@@ -1227,7 +1250,7 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Necromancer Overcharged Thralls:** on_creature_death_trigger with creatureFilter ally (thralls you control, including released). Restore Charnel Touch equal to Necromancer level is play-time; do not emit a spendable uses pool on this feature.
 - **Necromancer Death Knight Extra Attack:** extraAttackCount 1 plus power_rider reminding that one attack can be replaced with an action cantrip. Combat Research already carries Charnel Touch-as-Bonus-Action via power_rider.
 - **Necromancer critical spellcasting:** attack_roll_modifiers must use attackTarget \"spell\" (never \"all\") and criticalHitMinimum 19, improving to 18 at level 14, so weapon attacks do not inherit the spell-only critical range.
-- **Necromancer Improved Thralls:** immunities belong to the thralls, not the player character. Preserve them as companion rules text; do not emit player condition_immunity or damage_immunity mechanics.
+- **Necromancer Improved Thralls:** immunities and other thrall-only benefits belong to attached companions, not the player. Set choices.applyTo to companion and applyToCompanionFeature to Thralls, keep isChoice false so every option auto-applies, and emit condition_immunity (Charmed, Frightened) on the feature. Do not emit player condition_immunity or damage_immunity mechanics.
 - **Necromancer Lichdom:** emit damage_immunity for Necrotic and Poison plus condition_immunity for Exhaustion and Poisoned, and vision Truesight 120. Preserve Undead creature type, turn immunity, and Spirit Jar revival as narrative rules unless a dedicated mechanic exists.
 - **Necromancer subclass Charnel riders:** use power_rider parentPowerNames ["Charnel Touch"] for Charnel Drain/Resilience/Toxin/Voltage/Veil and Lichdom riders that alter Charnel Touch. These are reminders on the Charnel Touch action; do not invent unconditional HP, immunity, or weapon-reach modifiers.
 - **Necromancer subclass resource menus:** Vampiric Transformation, Charnel Aura, Domination Spells, Spell-Stitching, Quick Stitch, and Self-Stitches use resource_ability_menu with classResourceKey "charnel_touch" and structured menuOptions [{ name, description, resourceCost }]. Per-use forms/stitches are NOT build-time isChoice/choices selections.

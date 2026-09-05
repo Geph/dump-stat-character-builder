@@ -2,6 +2,8 @@ import {
   createModifierId,
   type GrantCreatureCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
+import { resolveTierCountAtLevel } from "@/lib/compendium/resolve-uses-config"
+import type { UsesAtLevel } from "@/lib/types"
 import {
   effectiveLinkedModifiers,
   resolveLinkedModifierInstance,
@@ -17,7 +19,12 @@ export const GRANT_CREATURE_CATALOG_ID = "cat_char_grant_creature"
 
 export function grantCreatureCharacteristic(
   creatureNames: string[],
-  options?: { count?: number; choiceOptions?: string[]; polymorph?: boolean },
+  options?: {
+    count?: number
+    countByLevel?: UsesAtLevel[]
+    choiceOptions?: string[]
+    polymorph?: boolean
+  },
 ): GrantCreatureCharacteristic {
   return {
     id: createModifierId(),
@@ -25,8 +32,20 @@ export function grantCreatureCharacteristic(
     creatureNames: [...creatureNames],
     ...(options?.choiceOptions?.length ? { choiceOptions: [...options.choiceOptions] } : {}),
     ...(options?.count != null ? { count: options.count } : {}),
+    ...(options?.countByLevel?.length ? { countByLevel: [...options.countByLevel] } : {}),
     ...(options?.polymorph ? { polymorph: true } : {}),
   }
+}
+
+export function grantCreatureCountAtLevel(
+  grant: { count?: number; countByLevel?: UsesAtLevel[] },
+  classLevel: number,
+): number {
+  if (grant.countByLevel?.length) {
+    const resolved = resolveTierCountAtLevel(grant.countByLevel, classLevel)
+    if (resolved > 0) return resolved
+  }
+  return grant.count ?? 1
 }
 
 export type ResolvedGrantCreature = {
@@ -36,6 +55,7 @@ export type ResolvedGrantCreature = {
   creatureNames: string[]
   choiceOptions?: string[]
   count: number
+  countByLevel?: UsesAtLevel[]
   polymorph?: boolean
 }
 
@@ -66,6 +86,7 @@ export function grantCreaturesFromLinkedModifiers(
         creatureNames: names,
         choiceOptions: mod.choiceOptions?.length ? [...mod.choiceOptions] : undefined,
         count: mod.count ?? (mod.choiceOptions?.length ? 1 : names.length),
+        countByLevel: mod.countByLevel?.length ? [...mod.countByLevel] : undefined,
         polymorph: mod.polymorph || undefined,
       })
     }

@@ -1,14 +1,42 @@
 import { describe, expect, it } from "vitest"
+import type { ImportContent, ImportMechanic } from "@/lib/import/content-schema"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import {
   collectImportModifierPreviews,
+  collectUnresolvedImportMechanics,
   removeImportModifierPreview,
 } from "@/lib/import/import-modifier-previews"
-import { aiMechanicsToDetections } from "@/lib/import/parse-ai-mechanics"
+import { aiMechanicsToDetections, parseAiMechanics } from "@/lib/import/parse-ai-mechanics"
 import { sanitizeImportContentForPersist } from "@/lib/import/sanitize-import-content"
-import type { ImportContent } from "@/lib/import/content-schema"
 
 describe("aiMechanicsToDetections", () => {
+  it("keeps grant_creature choiceCountByLevel on the wired characteristic", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "grant_creature",
+          creatureNames: ["Skeleton", "Zombie"],
+          creatureChoiceOptions: ["Skeleton", "Zombie"],
+          choiceCountByLevel: [
+            { level: 2, count: 1 },
+            { level: 7, count: 3 },
+          ],
+          sourcePhrase: "These Undead become your thralls",
+          confidence: "high",
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Thralls" },
+    )
+    expect(detections[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "grant_creature",
+      choiceOptions: ["Skeleton", "Zombie"],
+      countByLevel: [
+        { level: 2, count: 1 },
+        { level: 7, count: 3 },
+      ],
+    })
+  })
+
   it("builds a weapon DMG menu power_rider from AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [
@@ -1322,6 +1350,27 @@ describe("aiMechanicsToDetections", () => {
       },
     })
   })
+
+  it("records a bogus mechanic kind as unresolved instead of dropping it", () => {
+    const mechanic = {
+      kind: "soul_bind_living_shadow",
+      sourcePhrase: "You become a living shadow until the end of your next turn",
+      confidence: "high" as const,
+    } as ImportMechanic
+    const { detections, unresolved } = parseAiMechanics([mechanic], {
+      contentKind: "class_feature",
+      featureName: "Living Shadow",
+    })
+    expect(detections).toEqual([])
+    expect(unresolved).toEqual([
+      {
+        kind: "unresolved",
+        raw: "soul_bind_living_shadow",
+        featureName: "Living Shadow",
+        sourcePhrase: "You become a living shadow until the end of your next turn",
+      },
+    ])
+  })
 })
 
 describe("import modifier review helpers", () => {
@@ -1371,5 +1420,45 @@ describe("import modifier review helpers", () => {
     const previews = collectImportModifierPreviews(merged)
     const skillPreviews = previews.filter((entry) => entry.summary.includes("skills"))
     expect(skillPreviews.length).toBeLessThanOrEqual(1)
+  })
+
+  it("threads a bogus mechanic kind into the unresolved review list", () => {
+    const enriched = enrichImportContentModifiers({
+      classes: [
+        {
+          name: "Shade",
+          description: null,
+          hit_die: 8,
+          primary_ability: ["Dexterity"],
+          features: [
+            {
+              level: 1,
+              name: "Living Shadow",
+              description: "You become a living shadow until the end of your next turn.",
+              mechanics: [
+                {
+                  kind: "soul_bind_living_shadow",
+                  sourcePhrase: "You become a living shadow until the end of your next turn",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+    const unresolved = collectUnresolvedImportMechanics(enriched)
+    expect(unresolved).toEqual([
+      expect.objectContaining({
+        sourceLabel: "Class: Shade",
+        featureName: "Living Shadow",
+        raw: "soul_bind_living_shadow",
+        sourcePhrase: "You become a living shadow until the end of your next turn",
+      }),
+    ])
+    expect(
+      collectImportModifierPreviews(enriched).some((entry) =>
+        entry.featureName === "Living Shadow" && entry.ruleId.startsWith("ai."),
+      ),
+    ).toBe(false)
   })
 })

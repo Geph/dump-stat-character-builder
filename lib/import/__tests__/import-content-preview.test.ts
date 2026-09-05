@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   collectImportContentPreview,
   groupImportContentPreviewBySource,
+  omitCollisionsForPreviewSkipKeys,
   omitPreviewItemsBySkipKeys,
   previewSkipKeysForSkippedCollisions,
   stripSkippedImportPreviewItems,
@@ -147,6 +148,37 @@ describe("previewSkipKeysForSkippedCollisions", () => {
     const sections = omitPreviewItemsBySkipKeys(collectImportContentPreview(content), keys)
     expect(sections[0]?.items.map((item) => item.name)).toEqual(["Elf", "Custom Folk"])
     expect(sections[0]?.items.map((item) => item.sourceIndex)).toEqual([1, 2])
+  })
+})
+
+describe("omitCollisionsForPreviewSkipKeys", () => {
+  it("keeps conflicts only for rows the user still wants to import", () => {
+    const content = {
+      species: [
+        { name: "Dragonborn", size: "Medium", speed: 30, traits: [] },
+        { name: "Elf", size: "Medium", speed: 30, traits: [] },
+        { name: "Custom Folk", size: "Medium", speed: 30, traits: [] },
+      ],
+    } as unknown as ImportContent
+    const collisions = [
+      {
+        id: "species:dragonborn",
+        kind: "species" as const,
+        incomingName: "Dragonborn",
+        existingName: "Dragonborn",
+        suggestedName: "Dragonborn (Imported)",
+      },
+      {
+        id: "species:elf",
+        kind: "species" as const,
+        incomingName: "Elf",
+        existingName: "Elf",
+        suggestedName: "Elf (Imported)",
+      },
+    ]
+
+    const remaining = omitCollisionsForPreviewSkipKeys(content, collisions, ["species:0"])
+    expect(remaining.map((collision) => collision.id)).toEqual(["species:elf"])
   })
 })
 

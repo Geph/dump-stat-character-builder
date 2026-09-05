@@ -535,7 +535,7 @@ function UseDots({
   }
   return (
     <div
-      className="flex gap-1 shrink-0 flex-wrap justify-end"
+      className="flex shrink-0 flex-wrap justify-start gap-1"
       onClick={(e) => e.stopPropagation()}
     >
       {Array.from({ length: max }, (_, index) => {
@@ -3404,15 +3404,19 @@ export function SheetActionsPanel({
             </div>
 
             {subtitleMeta || showOwnUses ? (
-              <div className="flex items-center justify-between gap-2">
-                <p className="min-w-0 text-[10px] leading-snug text-muted-foreground">
-                  {[
-                    subtitleMeta,
-                    usage && showOwnUses ? `${usage.max - usage.used} / ${usage.max}` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
+              <div className="space-y-1">
+                {subtitleMeta || (usage && showOwnUses) ? (
+                  <p className="text-[10px] leading-snug text-muted-foreground tabular-nums">
+                    {[
+                      subtitleMeta,
+                      usage && showOwnUses
+                        ? `${usage.max - usage.used} / ${usage.max}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                ) : null}
                 {usage && showOwnUses ? (
                   <UseDots usage={usage} label={entry.name} tone="default" />
                 ) : null}
@@ -3459,17 +3463,19 @@ export function SheetActionsPanel({
             ) : null}
           </div>
 
-          <div className="flex w-[5.5rem] shrink-0 flex-col items-stretch gap-1 self-start">
-            {isSpecialAttack && isAttackRoll ? (
-              <ActionStatTile
-                caption="To Hit"
-                value={formatSignedModifier(attackMod + proficiencyBonus)}
-              />
-            ) : null}
-            {isSpecialAttack && saveAbility ? (
-              <ActionStatTile caption={`${saveAbility} DC`} value={String(saveDc)} />
-            ) : null}
-          </div>
+          {(isSpecialAttack && isAttackRoll) || (isSpecialAttack && saveAbility) ? (
+            <div className="flex w-[5.5rem] shrink-0 flex-col items-stretch gap-1 self-start">
+              {isSpecialAttack && isAttackRoll ? (
+                <ActionStatTile
+                  caption="To Hit"
+                  value={formatSignedModifier(attackMod + proficiencyBonus)}
+                />
+              ) : null}
+              {isSpecialAttack && saveAbility ? (
+                <ActionStatTile caption={`${saveAbility} DC`} value={String(saveDc)} />
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
     )

@@ -95,6 +95,65 @@ describe("Necromancer import sanitizer (synthetic)", () => {
     const feature = next.classes?.[0]?.features?.find((row) => row.name === "Spellcasting")
     expect(feature?.mechanics ?? []).toEqual([])
   })
+
+  it("stamps card blurb, source URL, thrall pick counts, and companion-scoped Improved Thralls", () => {
+    const next = sanitizeNecromancerImportContent({
+      classes: [
+        {
+          name: "Necromancer",
+          description: "",
+          hit_die: 6,
+          primary_ability: ["Intelligence"],
+          features: [
+            {
+              level: 2,
+              name: "Thralls",
+              description: "You animate Undead thralls.",
+              mechanics: [
+                {
+                  kind: "grant_creature",
+                  creatureNames: ["Skeleton", "Zombie"],
+                  creatureChoiceOptions: ["Skeleton", "Zombie"],
+                },
+              ],
+            },
+            {
+              level: 7,
+              name: "Improved Thralls",
+              description: "Your thralls grow stronger under your control.",
+            },
+          ],
+        },
+      ],
+    })
+    const cls = next.classes?.[0]
+    expect(cls?.card_blurb).toBe(
+      "Wields forbidden death magic and commands undead legions, torn between ambition and ethics.",
+    )
+    expect(cls?.creator_url).toContain("magehandpress.com/content-usage-policy")
+    const thralls = cls?.features?.find((row) => row.name === "Thralls")
+    expect(thralls?.mechanics?.[0]).toMatchObject({
+      kind: "grant_creature",
+      choiceCountByLevel: expect.arrayContaining([
+        { level: 2, count: 1 },
+        { level: 7, count: 3 },
+      ]),
+    })
+    const improved = cls?.features?.find((row) => row.name === "Improved Thralls")
+    expect(improved?.isChoice).toBe(false)
+    expect(improved?.choices).toMatchObject({
+      applyTo: "companion",
+      applyToCompanionFeature: "Thralls",
+    })
+    expect(improved?.mechanics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "condition_immunity",
+          conditions: ["Charmed", "Frightened"],
+        }),
+      ]),
+    )
+  })
 })
 
 describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
@@ -122,6 +181,22 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
       .find((c) => c.type === "grant_creature") as { choiceOptions?: string[] } | undefined
     expect(grant?.choiceOptions).toEqual(
       expect.arrayContaining(["Skeleton", "Spirit", "Zombie", "Deadnaught"]),
+    )
+    expect(grant).toMatchObject({
+      countByLevel: expect.arrayContaining([
+        { level: 2, count: 1 },
+        { level: 7, count: 3 },
+        { level: 19, count: 6 },
+      ]),
+    })
+    expect(content.classes?.[0]?.card_blurb).toBe(
+      "Wields forbidden death magic and commands undead legions, torn between ambition and ethics.",
+    )
+    expect(content.classes?.[0]?.creator_url).toContain(
+      "https://magehandpress.com/category/content/mage-hand-press-classes/necromancer/",
+    )
+    expect(content.classes?.[0]?.creator_url).toContain(
+      "https://magehandpress.com/content-usage-policy/",
     )
   })
 
@@ -284,7 +359,15 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
       improvedThralls?.linkedModifiers?.flatMap((modifier) =>
         (modifier.characteristics ?? []).map((row) => row.type),
       ) ?? []
-    expect(thrallTypes).not.toContain("condition_immunity")
+    expect(thrallTypes).toContain("condition_immunity")
+    expect(improvedThralls?.isChoice).toBeFalsy()
+    expect(improvedThralls?.choices).toMatchObject({
+      applyTo: "companion",
+      applyToCompanionFeature: "Thralls",
+    })
+    expect(improvedThralls?.choices?.options?.map((option) => option.name)).toEqual(
+      expect.arrayContaining(["Avoidance", "Necrotic Damage", "Turn Immunity"]),
+    )
   })
 
   it("keeps Deadnaught as companion among thrall creatures", () => {

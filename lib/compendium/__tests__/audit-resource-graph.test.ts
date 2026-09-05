@@ -1,0 +1,665 @@
+import { describe, expect, it } from "vitest"
+import {
+  aliasesForResource,
+  auditResourceGraph,
+  auditShippedResourceGraph,
+} from "@/lib/compendium/audit-resource-graph"
+import type { Feature } from "@/lib/types"
+
+describe("audit-resource-graph", () => {
+  it("flags a feature that mentions a pool in prose without a spender or restore", () => {
+    const result = auditResourceGraph([
+      {
+        name: "Necromancer",
+        resources: [
+          {
+            resource_key: "charnel_touch",
+            name: "Charnel Touch Points",
+            uses: { type: "at_level", recharges: [{ rest: "long_rest" }] },
+          },
+        ],
+        features: [
+          {
+            name: "Thralls",
+            level: 2,
+            description:
+              "Healing your Thralls. You can use your Charnel Touch on Undead under your control. The Undead regains Hit Points equal to the Charnel Touch points expended.",
+          } as Feature,
+        ],
+      },
+    ])
+    expect(result.misses).toEqual([
+      expect.objectContaining({
+        class: "Necromancer",
+        feature: "Thralls",
+        level: 2,
+        resource: "Charnel Touch Points",
+      }),
+    ])
+  })
+
+  it("builds obvious aliases from the display name and resource_key", () => {
+    expect(aliasesForResource({ resource_key: "charnel_touch", name: "Charnel Touch Points" })).toEqual(
+      expect.arrayContaining(["Charnel Touch Points", "Charnel Touch", "charnel touch"]),
+    )
+  })
+
+  const shipped = auditShippedResourceGraph()
+
+  it("includes the Necromancer Thralls / Charnel Touch miss", () => {
+    expect(
+      shipped.misses.some(
+        (row) =>
+          row.class === "Necromancer" &&
+          row.feature === "Thralls" &&
+          /charnel touch/i.test(row.resource),
+      ),
+    ).toBe(true)
+  })
+
+  it("snapshots current prose-without-wiring misses", () => {
+    expect(shipped.misses).toMatchInlineSnapshot(`
+      [
+        {
+          "class": "Alchemist",
+          "feature": "Potion Brewing",
+          "level": 1,
+          "phrase": "You can spend 10 minutes and expend any number of Reagents to brew potions, which can be done during a Short Rest",
+          "resource": "Reagents",
+        },
+        {
+          "class": "Alchemist",
+          "feature": "Prime Bomb",
+          "level": 2,
+          "phrase": "When you reach certain Alchemist levels, you can expend more Reagents, up to the number shown in the Prime Bomb column of the Alchemist Features table, adding 1d10 damage for each ",
+          "resource": "Reagents",
+        },
+        {
+          "class": "Alchemist",
+          "feature": "Painkiller Bomb [Formula] (Apothecary)",
+          "level": 3,
+          "phrase": "When you grant Temporary Hit Points using this Bomb, you can also expend Reagents to use Empowered Bomb",
+          "resource": "Reagents",
+        },
+        {
+          "class": "Alchemist",
+          "feature": "Overloaded Charge (Mad Bomber)",
+          "level": 14,
+          "phrase": "Whenever you expend a number of Reagents equal to your Proficiency Bonus to empower a Bomb, you gain 2 additional Reagents which you can immediately expend to further empower the B",
+          "resource": "Reagents",
+        },
+        {
+          "class": "Alchemist",
+          "feature": "Philosopher's Stone",
+          "level": 20,
+          "phrase": "As long as you possess the stone, you gain the following benefits: Regenerating Reagents",
+          "resource": "Reagents",
+        },
+        {
+          "class": "Barbarian",
+          "feature": "Intimidating Presence (Path of the Berserker)",
+          "level": 14,
+          "phrase": "Once you use this feature, you can't use it again until you finish a Long Rest unless you expend a use of your Rage (no action required) to restore your use of it",
+          "resource": "Rage",
+        },
+        {
+          "class": "Bard",
+          "feature": "Peerless Skill (College of Lore)",
+          "level": 14,
+          "phrase": "When you make an ability check or attack roll and fail, you can expend one use of Bardic Inspiration; roll the Bardic Inspiration die, and add the number rolled to the d20, potenti",
+          "resource": "Bardic Inspiration",
+        },
+        {
+          "class": "Captain",
+          "feature": "Battle Tactics",
+          "level": 1,
+          "phrase": "You learn maneuvers that are fueled by special dice called Battle Dice",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Captain",
+          "feature": "Challenge [Maneuver] (Lion Banner)",
+          "level": 3,
+          "phrase": "When you hit a creature with an attack using a Melee weapon or an Unarmed Strike, you can expend one Battle Die as a Bonus Action to goad the target into attacking you",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Captain",
+          "feature": "Commanding Presence (Lion Banner)",
+          "level": 3,
+          "phrase": "If you use your Born Leader maneuver and the check still fails, you don't expend the Battle Die to use the maneuver",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Captain",
+          "feature": "Eagle Eye [Maneuver] (Eagle Banner)",
+          "level": 3,
+          "phrase": "Once per turn when you miss with a ranged attack roll, you can expend one Battle Die and add it to the attack roll, potentially causing the attack to hit",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Captain",
+          "feature": "Skirmish [Maneuver] (Jolly Roger)",
+          "level": 3,
+          "phrase": "When you make an attack using a weapon, you can expend one Battle Die as a Bonus Action to make an attack using the same weapon or a different one later on the same turn",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Captain",
+          "feature": "High Morale (Lion Banner)",
+          "level": 6,
+          "phrase": "Each creature that failed its saving throw gains the benefit of Morale Boost, and you only expend one Battle Die",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Captain",
+          "feature": "Valiant Surge",
+          "level": 7,
+          "phrase": "Whenever you or your Cohort score a Critical Hit or reduce an enemy to 0 Hit Points, you regain an expended Battle Die",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Captain",
+          "feature": "Counter-Shot [Maneuver] (Eagle Banner)",
+          "level": 10,
+          "phrase": "When an enemy you can see hits a creature with a ranged attack roll, you can take a Reaction and expend one Battle Die to attempt to intercept the attack",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Captain",
+          "feature": "Teamwork Maneuvers",
+          "level": 17,
+          "phrase": "When you use a maneuver that targets an ally, you can target a second ally within range without expending an additional Battle Die",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Cleric",
+          "feature": "Supreme Healing (Life Domain)",
+          "level": 17,
+          "phrase": "When you would normally roll one or more dice to restore Hit Points to a creature with a spell or Channel Divinity, don't roll those dice for the healing; instead use the highest n",
+          "resource": "Channel Divinity",
+        },
+        {
+          "class": "Dancer",
+          "feature": "Grand Finale",
+          "level": 20,
+          "phrase": "Restore by spending 2 Dances",
+          "resource": "Dances",
+        },
+        {
+          "class": "Fighter",
+          "feature": "Tactical Mind",
+          "level": 2,
+          "phrase": "When you fail an ability check, you can expend a use of your Second Wind to push yourself toward success",
+          "resource": "Second Wind",
+        },
+        {
+          "class": "Gunslinger",
+          "feature": "Risk",
+          "level": 2,
+          "phrase": "You can perform incredible feats of daring fueled by special dice called Risk Dice",
+          "resource": "Risk Dice",
+        },
+        {
+          "class": "Gunslinger",
+          "feature": "Eagle Eye [Maneuver] (Deadeye)",
+          "level": 3,
+          "phrase": "Once per turn when you miss with a ranged attack roll, you can expend one Risk Die and add it to the attack roll, potentially causing the attack to hit",
+          "resource": "Risk Dice",
+        },
+        {
+          "class": "Gunslinger",
+          "feature": "Fan the Hammer [Maneuver] (Pistolero)",
+          "level": 3,
+          "phrase": "When you take the Attack action with a Ranged weapon that doesn't have the Two-Handed property, you can expend one Risk Die as a Bonus Action to make two additional ranged attacks ",
+          "resource": "Risk Dice",
+        },
+        {
+          "class": "Gunslinger",
+          "feature": "Lightning Disarm [Maneuver] (Gun Tank)",
+          "level": 6,
+          "phrase": "If a creature within 5 feet of you is holding a weapon, you can expend one Risk Die as a Bonus Action to attempt to take it",
+          "resource": "Risk Dice",
+        },
+        {
+          "class": "Gunslinger",
+          "feature": "Wall Dash [Maneuver] (Gun Tank)",
+          "level": 6,
+          "phrase": "You can expend one Risk Die to take the Dash action as a Bonus Action",
+          "resource": "Risk Dice",
+        },
+        {
+          "class": "Gunslinger",
+          "feature": "Showdown [Maneuver] (Pistolero)",
+          "level": 10,
+          "phrase": "When you roll Initiative, you can expend one Risk Die to draw a Ranged weapon and make an attack using it",
+          "resource": "Risk Dice",
+        },
+        {
+          "class": "Gunslinger",
+          "feature": "Flash Assault (Gun Tank)",
+          "level": 14,
+          "phrase": "You can also restore your use of it by expending two Risk Dice (no action required)",
+          "resource": "Risk Dice",
+        },
+        {
+          "class": "Gunslinger",
+          "feature": "Headshot",
+          "level": 20,
+          "phrase": "You can also restore your use of it by expending three Risk Dice (no action required)",
+          "resource": "Risk Dice",
+        },
+        {
+          "class": "Investigator",
+          "feature": "Holy Trinkets",
+          "level": 7,
+          "phrase": "You can use the following trinkets (expending a use of your Trinkets to do so)",
+          "resource": "Trinkets",
+        },
+        {
+          "class": "Investigator",
+          "feature": "Maleficium (Occultist)",
+          "level": 14,
+          "phrase": "You can also restore your use of it by expending a use of your Rushed Incantation (no action required)",
+          "resource": "Rushed Incantation",
+        },
+        {
+          "class": "Investigator",
+          "feature": "Spellbinder",
+          "level": 20,
+          "phrase": "You can use Rushed Incantation to cast the chosen spells without expending a use of the feature, and you don't need to read from your grimoire to cast them",
+          "resource": "Rushed Incantation",
+        },
+        {
+          "class": "Martyr",
+          "feature": "Spellcasting",
+          "level": 1,
+          "phrase": "Spell Slot Level Damage 1 5 2 10 3 20 4 30 5 40 Spell Uses",
+          "resource": "Spell Uses",
+        },
+        {
+          "class": "Martyr",
+          "feature": "Word of Revelation (Burden of Truth)",
+          "level": 14,
+          "phrase": "You can cast Word of Force, Word of Terror, and Word of Transience once each without taking Radiant damage or expending a spell use",
+          "resource": "Spell Uses",
+        },
+        {
+          "class": "Martyr",
+          "feature": "Anointed Healer (Burden of Mercy)",
+          "level": 18,
+          "phrase": "Whenever you cast a spell that restores Hit Points to a creature, that creature regains additional Hit Points on the turn you cast the spell equal to your Martyr level",
+          "resource": "Spell Uses",
+        },
+        {
+          "class": "Monk",
+          "feature": "Stunning Strike",
+          "level": 5,
+          "phrase": "Once per turn when you hit a creature with a Monk weapon or an Unarmed Strike, you can expend 1 Focus Point to attempt a stunning strike",
+          "resource": "Focus Points",
+        },
+        {
+          "class": "Monk",
+          "feature": "Heightened Focus",
+          "level": 10,
+          "phrase": "_** You can expend 1 Focus Point to use Flurry of Blows and make three Unarmed Strikes with it instead of two",
+          "resource": "Focus Points",
+        },
+        {
+          "class": "Monk",
+          "feature": "Quivering Palm (Warrior of the Open Hand)",
+          "level": 17,
+          "phrase": "When you hit a creature with an Unarmed Strike, you can expend 4 Focus Points to start these imperceptible vibrations, which last for a number of days equal to your Monk level",
+          "resource": "Focus Points",
+        },
+        {
+          "class": "Necromancer",
+          "feature": "Thralls",
+          "level": 2,
+          "phrase": "Instead of dealing Necrotic damage, the Undead regains Hit Points equal to the number of Charnel Touch points expended",
+          "resource": "Charnel Touch Points",
+        },
+        {
+          "class": "Necromancer",
+          "feature": "Charnel Empower (Pale Master)",
+          "level": 3,
+          "phrase": "When you deal damage with a level 1+ Necromancy spell, you can expend a number of Charnel Touch points up to a maximum of your Necromancer level plus your Intelligence modifier",
+          "resource": "Charnel Touch Points",
+        },
+        {
+          "class": "Necromancer",
+          "feature": "Combat Research (Death Knight)",
+          "level": 3,
+          "phrase": "When you take the Attack action, you can use your Charnel Touch as a Bonus Action",
+          "resource": "Charnel Touch Points",
+        },
+        {
+          "class": "Necromancer",
+          "feature": "Overcharged Thralls (Death Knight)",
+          "level": 10,
+          "phrase": "When one of your thralls is reduced to 0 Hit Points or you release it, you regain a number of expended Charnel Touch points equal to your Necromancer level",
+          "resource": "Charnel Touch Points",
+        },
+        {
+          "class": "Psion",
+          "feature": "Dark Lurker (Consuming Mind)",
+          "level": 1,
+          "phrase": "If you spend psi points on the ability, subtract the points spent from your Intelligence (Deception) result",
+          "resource": "Psi Points",
+        },
+        {
+          "class": "Psion",
+          "feature": "Balance of Power (Transcended Mind)",
+          "level": 3,
+          "phrase": "Bank healing/THP from psionic powers and spells into your Balance of Power pool (max = Psion level, 1 min decay)",
+          "resource": "Balance of Power",
+        },
+        {
+          "class": "Psion",
+          "feature": "Living Power (Elemental Mind)",
+          "level": 3,
+          "phrase": "When a spell or power targets an area, choose a number of creatures equal to the psi points spent in the area to be ignored",
+          "resource": "Psi Points",
+        },
+        {
+          "class": "Psion",
+          "feature": "Psionic Mastery",
+          "level": 5,
+          "phrase": "At the start of each of your turns, you gain 1 free psi point",
+          "resource": "Psi Points",
+        },
+        {
+          "class": "Psion",
+          "feature": "Shattered Husks (Consuming Mind)",
+          "level": 14,
+          "phrase": "Your Mind Leech always gains the Shredding modifier, and it costs no psi points to add",
+          "resource": "Psi Points",
+        },
+        {
+          "class": "Sorcerer",
+          "feature": "Metamagic",
+          "level": 2,
+          "phrase": "To use an option, you must spend the number of Sorcery Points that it costs",
+          "resource": "Sorcery Points",
+        },
+        {
+          "class": "Sorcerer",
+          "feature": "Dragon Wings (Draconic Sorcery)",
+          "level": 14,
+          "phrase": "Once you use this feature, you can't use it again until you finish a Long Rest unless you spend 3 Sorcery Points (no action required) to restore your use of it",
+          "resource": "Sorcery Points",
+        },
+        {
+          "class": "Sorcerer",
+          "feature": "Arcane Apotheosis",
+          "level": 20,
+          "phrase": "While your Innate Sorcery feature is active, you can use one Metamagic option on each of your turns without spending Sorcery Points on it",
+          "resource": "Sorcery Points",
+        },
+        {
+          "class": "Vagabond",
+          "feature": "Battle Tactics",
+          "level": 1,
+          "phrase": "You learn maneuvers that are fueled by special dice called Battle Dice",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Vagabond",
+          "feature": "Overexertion",
+          "level": 3,
+          "phrase": "If you have no Battle Dice remaining, you can regain one Battle Die to immediately expend it and use a maneuver or Vagabond feature",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Vagabond",
+          "feature": "Sick 'Em! [Maneuver] (Houndmaster)",
+          "level": 3,
+          "phrase": "As a Bonus Action, you can expend one Battle Die to command your hound to attack a creature you can see within 40 feet of it",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Vagabond",
+          "feature": "Spellbranding (Mage Brand)",
+          "level": 3,
+          "phrase": "To cast one of your level 1+ Sorcerer spells, you expend Battle Dice to create a spell slot for that spell, which is immediately expended to cast it",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Vagabond",
+          "feature": "Killing Stroke (Rōnin)",
+          "level": 10,
+          "phrase": "Once you use this feature, you can't use it again until you finish a Short or Long Rest unless you expend two Battle Dice (no action required) to restore your use of it",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Vagabond",
+          "feature": "Imprinted Spellscar (Mage Brand)",
+          "level": 14,
+          "phrase": "You have this spell prepared and can cast it by expending a number of Battle Dice equal to the spell's level",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Vagabond",
+          "feature": "Old Dog, New Tricks (Houndmaster)",
+          "level": 14,
+          "phrase": "Battle Dice",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Vagabond",
+          "feature": "Martial Recovery",
+          "level": 20,
+          "phrase": "You can take a Bonus Action to regain all of your expended Battle Dice",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Innate Magic (Astral Guardian)",
+          "level": 1,
+          "phrase": "You can cast a spell again before completing a long rest by spending 1 + the level of the spell Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Innate Magic (Beasthide)",
+          "level": 1,
+          "phrase": "You can cast a spell again before completing a long rest by spending 1 + the level of the spell Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Innate Magic (Bone Binder)",
+          "level": 1,
+          "phrase": "You can cast a spell again before completing a long rest by spending 1 + the level of the spell Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Innate Magic (Dreadwing)",
+          "level": 1,
+          "phrase": "You can cast a spell again before completing a long rest by spending 1 + the level of the spell Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Innate Magic (Elderheart)",
+          "level": 1,
+          "phrase": "You can cast a spell again before completing a long rest by spending 1 + the level of the spell Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Innate Magic (Elemental Soul)",
+          "level": 1,
+          "phrase": "You can cast a spell again before completing a long rest by spending 1 + the level of the spell Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Innate Magic (Ironbound)",
+          "level": 1,
+          "phrase": "You can cast a spell again before completing a long rest by spending 1 + the level of the spell Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Innate Magic (Stoneblood)",
+          "level": 1,
+          "phrase": "You can cast a spell again before completing a long rest by spending 1 + the level of the spell Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Innate Magic (Sunwatcher)",
+          "level": 1,
+          "phrase": "You can cast a spell again before completing a long rest by spending 1 + the level of the spell Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Innate Magic (Timetwister)",
+          "level": 1,
+          "phrase": "You can cast a spell again before completing a long rest by spending 1 + the level of the spell Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Astral Strike (Astral Guardian)",
+          "level": 3,
+          "phrase": "Additionally at 3rd level When you expend an Endurance Die, you can empower your next attack with your Astral Arms before the end of your next turn",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Dragon Breath (Dreadwing)",
+          "level": 3,
+          "phrase": "Starting at 3rd level, each time you expend an Endurance Die you build up elemental energy, storing the expended die in a special pool of charged power for 1 minute",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Elemental Reflection (Elemental Soul)",
+          "level": 3,
+          "phrase": "Additionally at 3rd level, when you expend an Endurance Die to block the damage against a melee attack, the attacker takes cold, fire or lightning damage (your choice) equal to the",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Seismic Backlash (Stoneblood)",
+          "level": 3,
+          "phrase": "Starting at 3rd level, each time you expend an Endurance Die, you store the die in a special pool of charged power for 1 minute",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Solar Flare (Sunwatcher)",
+          "level": 3,
+          "phrase": "At 3rd level, when you expend an Endurance Die to block damage, you can cause a brilliant flare of blinding light",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Timely Intervention (Timetwister)",
+          "level": 3,
+          "phrase": "Additionally at 3rd level, you can expend Endurance Dice to further bend time within your Primal Interdiction, gaining the following new options for using them: • • • Missed Beat: ",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Dragon Wings (Dreadwing)",
+          "level": 7,
+          "phrase": "As a reaction, you can expend an endurance die to block damage against a creature within 5 feet of you as if you were blocking damage against yourself",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Empowering Presence (Sunwatcher)",
+          "level": 7,
+          "phrase": "Starting at 7th level, when you expend an Endurance Die to boost a saving throw against a spell, all allies within your Primal Interdiction that make a saving throw against the sam",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Primal State (Elemental Soul)",
+          "level": 7,
+          "phrase": "Additionally at 7th level, you can expend one Endurance Die to cast become fire , become water , or become wind",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Elemental Form (Elemental Soul)",
+          "level": 14,
+          "phrase": "You can use it again before completing a long rest by expending 6 Endurance Dice",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Vicious Endurance (Beasthide)",
+          "level": 14,
+          "phrase": "When you score a critical hit with your natural weapons, you regain 1 expended Endurance Die",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Kibbles Tasty)",
+          "feature": "Invulnerable Endurance",
+          "level": 18,
+          "phrase": "Additionally at 18th level, when you roll an Endurance Die, you can roll two dice and take the higher roll",
+          "resource": "Endurance Dice",
+        },
+        {
+          "class": "Warden (Mage Hand Press)",
+          "feature": "Battle Tactics (Grey Watchman)",
+          "level": 3,
+          "phrase": "You can perform incredible feats of daring fueled by special dice called Battle Dice",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Warden (Mage Hand Press)",
+          "feature": "Unyielding Surge (Grey Watchman)",
+          "level": 6,
+          "phrase": "When you become Bloodied, you can regain an expended Battle Die (no action required)",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Warmage",
+          "feature": "Battle Tactics (House of Kings)",
+          "level": 3,
+          "phrase": "You learn maneuvers that are fueled by special dice called Battle Dice",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Warmage",
+          "feature": "Covert Magic (House of Rooks)",
+          "level": 7,
+          "phrase": "You can expend a use of Arcane Surge to regain your use of all of these spells (no action required)",
+          "resource": "Arcane Surge",
+        },
+        {
+          "class": "Warmage",
+          "feature": "Checkmate [Maneuver] (House of Kings)",
+          "level": 15,
+          "phrase": "When you hit a creature with an attack, you can expend one Battle Die as a Bonus Action to direct an ally within 60 feet of yourself that can see or hear you to strike",
+          "resource": "Battle Dice",
+        },
+        {
+          "class": "Warmage",
+          "feature": "Arcane Dominance (House of Bishops)",
+          "level": 18,
+          "phrase": "As a Bonus Action, you can expend a number of spell slots with a combined level of 6+ to regain one expended use of your Arcane Surge",
+          "resource": "Arcane Surge",
+        },
+        {
+          "class": "Warmage",
+          "feature": "Grandmaster (House of Kings)",
+          "level": 18,
+          "phrase": "Give each ally a Battle Die without expending it",
+          "resource": "Battle Dice",
+        },
+      ]
+    `)
+  })
+
+  it("snapshots spends that target an undefined resource_key", () => {
+    expect(shipped.orphanSpends).toMatchInlineSnapshot(`[]`)
+  })
+})

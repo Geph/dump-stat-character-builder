@@ -7,10 +7,16 @@ import type { ClassResourceImportRow } from "@/lib/import/enrich-import-classes"
 import {
   collectImportModifierPreviews,
   collectImportModifierReview,
+  collectUnresolvedImportMechanics,
   collectUnmatchedModifierFeatures,
   type ImportModifierReviewRow,
   type ImportUnmatchedFeatureEntry,
+  type UnresolvedImportMechanicEntry,
 } from "@/lib/import/import-modifier-previews"
+import {
+  collectClassClaimCoverage,
+  type ClassClaimCoverageReport,
+} from "@/lib/import/feature-claims"
 import { parseClassProgressionTable } from "@/lib/import/parse-class-progression-table"
 import {
   isSubclassSpellTableFeature,
@@ -104,6 +110,8 @@ export type ImportReport = {
   nextSteps: ImportReportNextStep[]
   unmatchedFeatures: ImportUnmatchedFeatureEntry[]
   modifierReview: ImportModifierReviewRow[]
+  unresolvedMechanics: UnresolvedImportMechanicEntry[]
+  claimCoverage: ClassClaimCoverageReport[]
   headline: string
   foundry?: import("@/lib/import/foundry-import-report").ImportReportFoundrySection
 }
@@ -475,6 +483,8 @@ export function buildImportReport(params: {
   const autoWiredModifiers = collectImportModifierPreviews(params.content).length
   const unmatchedFeatures = collectUnmatchedModifierFeatures(params.content)
   const modifierReview = collectImportModifierReview(params.content)
+  const unresolvedMechanics = collectUnresolvedImportMechanics(params.content)
+  const claimCoverage = collectClassClaimCoverage(params.content)
   const unmatchedEquipment = collectUnmatchedStartingEquipmentNames(params.content)
   const missingFeatGrants = collectMissingBackgroundFeatGrants(params.content)
 
@@ -511,6 +521,15 @@ export function buildImportReport(params: {
     })
   }
 
+  if (unresolvedMechanics.length > 0) {
+    nextSteps.unshift({
+      severity: "warning",
+      title: `${unresolvedMechanics.length} mechanic${unresolvedMechanics.length === 1 ? "" : "s"} couldn't be wired`,
+      detail:
+        "The import noticed these rules but no catalog kind fits. Review the Couldn't wire list and add modifiers in the compendium editor.",
+    })
+  }
+
   const wiring = subclasses.reduce(
     (acc, subclass) => {
       for (const feature of subclass.features) {
@@ -536,6 +555,8 @@ export function buildImportReport(params: {
     nextSteps,
     unmatchedFeatures,
     modifierReview,
+    unresolvedMechanics,
+    claimCoverage,
     headline: buildHeadline(
       params.totalImported,
       params.breakdown,
@@ -554,6 +575,7 @@ export function importReportHasDetail(report: ImportReport): boolean {
     report.classes.length > 0 ||
     report.subclasses.some((subclass) => subclass.features.length > 0) ||
     report.warnings.length > 0 ||
-    report.unmatchedFeatures.length > 0
+    report.unmatchedFeatures.length > 0 ||
+    (report.unresolvedMechanics?.length ?? 0) > 0
   )
 }

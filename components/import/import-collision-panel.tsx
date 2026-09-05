@@ -87,14 +87,6 @@ export function ImportCollisionPanel({
     onResolutionChange({ ...resolutionMap, [collision.id]: resolution })
   }
 
-  const skipAll = () => {
-    const next: ImportCollisionResolutionMap = { ...resolutionMap }
-    for (const collision of collisions) {
-      next[collision.id] = "skip"
-    }
-    onResolutionChange(next)
-  }
-
   /** Preserve existing compendium rows: link matching spells, skip other conflicts. */
   const keepAllExisting = () => {
     const next: ImportCollisionResolutionMap = { ...resolutionMap }
@@ -106,10 +98,6 @@ export function ImportCollisionPanel({
 
   const keepExistingResolution = (collision: ImportCollision): ImportCollisionResolution =>
     collision.kind === "spell" ? "link" : "skip"
-
-  const allSkipped = collisions.every(
-    (collision) => (resolutionMap[collision.id] ?? defaultResolution(collision)) === "skip",
-  )
 
   const allKeepingExisting = collisions.every(
     (collision) =>
@@ -136,24 +124,13 @@ export function ImportCollisionPanel({
               >
                 Keep all existing
               </button>
-              <button
-                type="button"
-                onClick={skipAll}
-                className={`rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  allSkipped
-                    ? "border-primary bg-primary/10 text-foreground"
-                    : "border-border bg-background text-muted-foreground hover:border-primary/40"
-                }`}
-              >
-                Skip all
-              </button>
             </div>
           </div>
           <p className="mt-1 text-muted-foreground">
             {hasSpellCollisions && hasOtherCollisions
               ? "Matching spells link to the existing compendium entry by default. Other content can update (add new features and images), replace the entire entry, import under a new name, or be skipped."
               : hasSpellCollisions
-                ? "These spells already exist in the compendium. They will be matched and linked by default (not replaced). You can still import a copy under a new name, or skip them."
+                ? "These spells already exist in the compendium. They will be matched and linked by default (not replaced). You can still import a copy under a new name."
                 : "These entries match existing compendium content by name. Update adds new features, resources, and images. Replace wipes the stored entry with the imported version. You can also import under a new name or skip."}
           </p>
         </div>
@@ -161,8 +138,9 @@ export function ImportCollisionPanel({
 
       <div className="space-y-3">
         {collisions.map((collision) => {
-          const resolution = resolutionMap[collision.id] ?? defaultResolution(collision)
           const isSpell = collision.kind === "spell"
+          const rawResolution = resolutionMap[collision.id] ?? defaultResolution(collision)
+          const resolution = isSpell && rawResolution === "skip" ? "link" : rawResolution
           const renameDisabled =
             resolution === "update" ||
             resolution === "overwrite" ||
@@ -234,17 +212,19 @@ export function ImportCollisionPanel({
                 >
                   Import as new name
                 </button>
-                <button
-                  type="button"
-                  onClick={() => updateResolution(collision, "skip")}
-                  className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-colors ${
-                    resolution === "skip"
-                      ? "border-primary bg-primary/10 text-foreground"
-                      : "border-border bg-background text-muted-foreground hover:border-primary/40"
-                  }`}
-                >
-                  Skip import
-                </button>
+                {!isSpell ? (
+                  <button
+                    type="button"
+                    onClick={() => updateResolution(collision, "skip")}
+                    className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-colors ${
+                      resolution === "skip"
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    Skip import
+                  </button>
+                ) : null}
               </div>
 
               {resolution === "update" ? (

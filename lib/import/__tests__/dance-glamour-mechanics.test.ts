@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { ImportMechanicSchema } from "@/lib/import/content-schema"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
-import { aiMechanicsToDetections } from "@/lib/import/parse-ai-mechanics"
+import { aiMechanicsToDetections, parseAiMechanics } from "@/lib/import/parse-ai-mechanics"
 
 describe("Dance/Glamour follow-up mechanics", () => {
   it("accepts damage_reduction kind instead of silently dropping it", () => {
@@ -21,14 +21,26 @@ describe("Dance/Glamour follow-up mechanics", () => {
     expect(detections[0]?.instance.catalogRefId).toBe("cat_fx_damage_reduction")
   })
 
-  it("rejects invented mechanic kinds that are not in AI_MECHANIC_KINDS", () => {
-    expect(
-      ImportMechanicSchema.safeParse({
-        kind: "invented_from_catalog_suffix",
+  it("keeps invented mechanic kinds as unresolved instead of dropping them", () => {
+    const parsed = ImportMechanicSchema.safeParse({
+      kind: "invented_from_catalog_suffix",
+      sourcePhrase: "x",
+      confidence: "high",
+    })
+    expect(parsed.success).toBe(true)
+    const { detections, unresolved } = parseAiMechanics([parsed.data!], {
+      contentKind: "subclass_feature",
+      featureName: "Mystery Trick",
+    })
+    expect(detections).toEqual([])
+    expect(unresolved).toEqual([
+      {
+        kind: "unresolved",
+        raw: "invented_from_catalog_suffix",
+        featureName: "Mystery Trick",
         sourcePhrase: "x",
-        confidence: "high",
-      }).success,
-    ).toBe(false)
+      },
+    ])
   })
 
   it("wires Evasion via basedOnSrdFeature when the display name differs", () => {

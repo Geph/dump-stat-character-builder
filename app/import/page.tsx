@@ -8,6 +8,7 @@ import { ImportSubclassMatchSelect } from "@/components/import/import-subclass-m
 import { ImportWorkflowGuidancePanel } from "@/components/import/import-workflow-guidance-panel"
 import { ImportContentPreviewPanel } from "@/components/import/import-content-preview-panel"
 import { ImportBackgroundFeatGapPanel } from "@/components/import/import-background-feat-gap-panel"
+import { ImportClaimCoveragePanel } from "@/components/import/import-claim-coverage-panel"
 import { ImportModifierReviewPanel } from "@/components/import/import-modifier-review-panel"
 import { ImportReportPanel, ImportTokenSavingsSummary } from "@/components/import/import-report-panel"
 import {
@@ -17,9 +18,10 @@ import {
 import { ImportCollisionPanel } from "@/components/import/import-collision-panel"
 import { ImportCardArtPanel } from "@/components/import/import-card-art-panel"
 import { ImportStagingPanel, type ImportReviewPhase } from "@/components/import/import-staging-panel"
-import type {
-  ImportSourceBulkAction,
-  ImportSourceBulkTarget,
+import {
+  ImportSourceBulkActions,
+  type ImportSourceBulkAction,
+  type ImportSourceBulkTarget,
 } from "@/components/import/import-source-bulk-actions"
 import {
   ImportAiSettings,
@@ -98,8 +100,10 @@ import {
 import { FoundryImportGuidancePanel } from "@/components/import/foundry-import-guidance-panel"
 import type { FoundryManifestInfo } from "@/lib/import/foundry-types"
 import { readImportApiJson } from "@/lib/import/read-import-api-response"
+import { collectClassClaimCoverage } from "@/lib/import/feature-claims"
 import {
   collectImportModifierReview,
+  collectUnresolvedImportMechanics,
   removeImportModifierPreview,
 } from "@/lib/import/import-modifier-previews"
 import {
@@ -116,7 +120,7 @@ import {
 } from "@/lib/import/import-card-art"
 import {
   collectImportContentPreview,
-  groupImportContentPreviewBySource,
+  omitCollisionsForPreviewSkipKeys,
   omitPreviewItemsBySkipKeys,
   previewSkipKeysForSkippedCollisions,
 } from "@/lib/import/import-content-preview"
@@ -292,6 +296,14 @@ export default function ImportPage() {
     () => (pendingImport ? collectImportModifierReview(pendingImport.content) : []),
     [pendingImport],
   )
+  const unresolvedMechanics = useMemo(
+    () => (pendingImport ? collectUnresolvedImportMechanics(pendingImport.content) : []),
+    [pendingImport],
+  )
+  const claimCoverage = useMemo(
+    () => (pendingImport ? collectClassClaimCoverage(pendingImport.content) : []),
+    [pendingImport],
+  )
   const collisionSkipKeys = useMemo(() => {
     if (!pendingImport) return new Set<string>()
     return previewSkipKeysForSkippedCollisions(
@@ -306,6 +318,23 @@ export default function ImportPage() {
     for (const key of collisionSkipKeys) next.add(key)
     return next
   }, [collisionSkipKeys, previewSkipKeys])
+  /** Collision-step skips only — keep content-step skips visible so they can be undone. */
+  const hiddenCollisionSkipKeys = useMemo(() => {
+    if (!collisionSkipKeys.size) return collisionSkipKeys
+    const hidden = new Set<string>()
+    for (const key of collisionSkipKeys) {
+      if (!previewSkipKeys.has(key)) hidden.add(key)
+    }
+    return hidden
+  }, [collisionSkipKeys, previewSkipKeys])
+  const chosenCollisions = useMemo(() => {
+    if (!pendingImport) return []
+    return omitCollisionsForPreviewSkipKeys(
+      pendingImport.content,
+      pendingImport.collisions,
+      previewSkipKeys,
+    )
+  }, [pendingImport, previewSkipKeys])
   const visibleModifierReviewRows = useMemo(() => {
     if (!pendingImport) return modifierReviewRows
     return modifierReviewRows.filter(
@@ -317,6 +346,17 @@ export default function ImportPage() {
         ),
     )
   }, [collisionResolutionMap, modifierReviewRows, pendingImport])
+  const visibleUnresolvedMechanics = useMemo(() => {
+    if (!pendingImport) return unresolvedMechanics
+    return unresolvedMechanics.filter(
+      (entry) =>
+        !importModifierMatchesSkippedCollision(
+          entry.sourceLabel,
+          pendingImport.collisions,
+          collisionResolutionMap,
+        ),
+    )
+  }, [collisionResolutionMap, pendingImport, unresolvedMechanics])
 
   const pendingBackgroundsGrantFeats = Boolean(
     pendingImport?.content.backgrounds?.some((background) => background.feat_granted?.trim()),
@@ -388,6 +428,12 @@ export default function ImportPage() {
       importModifierMatchesStage(row.sourceLabel, activeReviewStage.id),
     )
   }, [visibleModifierReviewRows, activeReviewStage])
+  const stageUnresolvedMechanics = useMemo(() => {
+    if (!activeReviewStage) return visibleUnresolvedMechanics
+    return visibleUnresolvedMechanics.filter((entry) =>
+      importModifierMatchesStage(entry.sourceLabel, activeReviewStage.id),
+    )
+  }, [visibleUnresolvedMechanics, activeReviewStage])
 
   const allCardArtTargets = useMemo(
     () =>
@@ -402,7 +448,8 @@ export default function ImportPage() {
   const stageCardArtSections = activeReviewStage
     ? IMPORT_STAGE_CARD_ART_SECTIONS[activeReviewStage.id]
     : undefined
-  const stageHasModifiers = stageModifierRows.length > 0
+  const stageHasModifiers =
+    stageModifierRows.length > 0 || stageUnresolvedMechanics.length > 0
   const stageHasCardArt = Boolean(
     includeCardArt &&
       stageCardArtSections?.some((section) =>
@@ -415,18 +462,17 @@ export default function ImportPage() {
 
   const collisionsForStage = (stage: ImportStage | null | undefined) => {
     if (!pendingImport) return []
-    if (!stage) return pendingImport.collisions
+    if (!stage) return chosenCollisions
     const kinds = new Set(IMPORT_STAGE_COLLISION_KINDS[stage.id])
-    return pendingImport.collisions.filter((collision) => kinds.has(collision.kind))
+    return chosenCollisions.filter((collision) => kinds.has(collision.kind))
   }
 
   const stageCollisions = collisionsForStage(activeReviewStage)
   const stageHasConflicts = stageCollisions.length > 0
 
   const reviewPhasesForStage = (stage: ImportStage): ImportReviewPhase[] => {
-    const phases: ImportReviewPhase[] = []
+    const phases: ImportReviewPhase[] = ["content"]
     if (collisionsForStage(stage).length > 0) phases.push("conflicts")
-    phases.push("content")
     const hasCardArt =
       includeCardArt &&
       IMPORT_STAGE_CARD_ART_SECTIONS[stage.id].some((section) =>
@@ -434,7 +480,10 @@ export default function ImportPage() {
       )
     if (hasCardArt) phases.push("card-art")
     if (
-      visibleModifierReviewRows.some((row) => importModifierMatchesStage(row.sourceLabel, stage.id))
+      visibleModifierReviewRows.some((row) => importModifierMatchesStage(row.sourceLabel, stage.id)) ||
+      visibleUnresolvedMechanics.some((entry) =>
+        importModifierMatchesStage(entry.sourceLabel, stage.id),
+      )
     ) {
       phases.push("modifiers")
     }
@@ -481,7 +530,7 @@ export default function ImportPage() {
   )
   const allCollisionsResolved = pendingImport
     ? collisionRenamesResolved(
-        pendingImport.collisions,
+        chosenCollisions,
         collisionResolutionMap,
         renameMap,
       )
@@ -495,55 +544,30 @@ export default function ImportPage() {
     stagedReview && (activeReviewPhaseIndex > 0 || reviewStageIndex > 0)
   const canGoNextReview =
     stagedReview &&
-    stageCollisionsResolved &&
+    (reviewPhase !== "conflicts" || stageCollisionsResolved) &&
     (activeReviewPhaseIndex < activeReviewPhases.length - 1 || !isLastReviewStage)
 
   const stagePreviewKeys = activeReviewStage
     ? IMPORT_STAGE_PREVIEW_KEYS[activeReviewStage.id]
     : undefined
 
-  const contentHasMultipleSources = useMemo(() => {
-    if (!pendingImport) return false
+  const stageSkipAllTargets = useMemo(() => {
+    if (!pendingImport || reviewPhase !== "content") return []
     const sections = omitPreviewItemsBySkipKeys(
       collectImportContentPreview(
         pendingImport.content,
         stagePreviewKeys ? { sectionKeys: stagePreviewKeys } : undefined,
       ),
-      collisionSkipKeys,
+      hiddenCollisionSkipKeys,
     )
-    return groupImportContentPreviewBySource(sections, pendingImport.materialSource).length > 1
-  }, [collisionSkipKeys, pendingImport, stagePreviewKeys])
-
-  const cardArtHasMultipleSources = useMemo(() => {
-    if (!stageHasCardArt || !stageCardArtSections?.length) return false
-    const allowed = new Set(stageCardArtSections)
-    const sources = new Set(
-      allCardArtTargets.filter((target) => allowed.has(target.section)).map((target) => target.source),
+    return sections.flatMap((section) =>
+      section.items.map((item) => ({
+        sectionKey: item.sectionKey,
+        sourceIndex: item.sourceIndex,
+        name: item.name,
+      })),
     )
-    return sources.size > 1
-  }, [allCardArtTargets, stageCardArtSections, stageHasCardArt])
-
-  const deferPhaseNextToSourceRow =
-    (reviewPhase === "content" && contentHasMultipleSources) ||
-    (reviewPhase === "card-art" && cardArtHasMultipleSources)
-
-  const phaseContinueLabel =
-    reviewPhase === "conflicts"
-      ? "Next: review content"
-      : reviewPhase === "content" && stageHasCardArt
-        ? "Next: review card art"
-        : reviewPhase !== "modifiers" && stageHasModifiers
-          ? "Next: review modifier wiring"
-          : "Next stage"
-
-  const phaseContinueReview =
-    canGoNextReview
-      ? {
-          label: phaseContinueLabel,
-          onClick: goNextReview,
-          disabled: !stageCollisionsResolved,
-        }
-      : undefined
+  }, [hiddenCollisionSkipKeys, pendingImport, reviewPhase, stagePreviewKeys])
 
   const handlePreviewSkipKeysChange = (next: Set<string>) => {
     setPreviewSkipKeys(next)
@@ -1502,9 +1526,18 @@ export default function ImportPage() {
                 hasModifiers={stageHasModifiers}
                 onNext={goNextReview}
                 canNext={canGoNextReview}
-                showNextInFooter={!deferPhaseNextToSourceRow}
                 onBack={goPreviousReview}
                 canBack={Boolean(canGoPreviousReview)}
+                toolbarMid={
+                  reviewPhase === "content" && !isCardArtReview && stageSkipAllTargets.length > 0 ? (
+                    <ImportSourceBulkActions
+                      source={pendingImport.materialSource}
+                      targets={stageSkipAllTargets}
+                      onAction={handleSourceBulkAction}
+                      actions={["skip"]}
+                    />
+                  ) : undefined
+                }
                 footerEnd={
                   reviewReadyToConfirm && !backgroundFeatGateBlocking ? (
                     <ImportConfirmActions
@@ -1538,14 +1571,9 @@ export default function ImportPage() {
                     showModifierReviewHint={stageHasModifiers}
                     onRenameItem={isCardArtReview ? undefined : handleRenameImportPreview}
                     skippedKeys={previewSkipKeys}
-                    hiddenKeys={collisionSkipKeys}
+                    hiddenKeys={hiddenCollisionSkipKeys}
                     onSkippedKeysChange={isCardArtReview ? undefined : handlePreviewSkipKeysChange}
                     onSourceBulkAction={isCardArtReview ? undefined : handleSourceBulkAction}
-                    continueReview={
-                      contentHasMultipleSources && reviewPhase === "content"
-                        ? phaseContinueReview
-                        : undefined
-                    }
                   />
                 }
                 cardArtChildren={
@@ -1560,28 +1588,44 @@ export default function ImportPage() {
                       skippedKeys={effectivePreviewSkipKeys}
                       embedded
                       onSourceBulkAction={handleSourceBulkAction}
-                      continueReview={
-                        cardArtHasMultipleSources && reviewPhase === "card-art"
-                          ? phaseContinueReview
-                          : undefined
-                      }
                     />
                   ) : null
                 }
                 modifiersChildren={
                   stageHasModifiers ? (
-                    <ImportModifierReviewPanel
-                      key={`modifiers-${activeReviewStage?.id ?? "all"}`}
-                      rows={stageModifierRows}
-                      onRemoveModifier={handleRemoveModifierPreview}
-                      variant="review"
-                      embedded
-                    />
+                    <>
+                      <ImportModifierReviewPanel
+                        key={`modifiers-${activeReviewStage?.id ?? "all"}`}
+                        rows={stageModifierRows}
+                        unresolved={stageUnresolvedMechanics}
+                        onRemoveModifier={handleRemoveModifierPreview}
+                        variant="review"
+                        embedded
+                      />
+                      {claimCoverage.length > 0 ? (
+                        <ImportClaimCoveragePanel reports={claimCoverage} embedded />
+                      ) : null}
+                    </>
                   ) : null
                 }
               />
             ) : (
               <>
+                <ImportContentPreviewPanel
+                  content={pendingImport.content}
+                  previewSummary={pendingImport.previewSummary}
+                  defaultSource={pendingImport.materialSource}
+                  showModifierReviewHint={
+                    visibleModifierReviewRows.length > 0 || visibleUnresolvedMechanics.length > 0
+                  }
+                  cardArtUrls={includeCardArt ? cardArtUrlMap : undefined}
+                  onCardArtChange={includeCardArt ? setCardArtUrlMap : undefined}
+                  onRenameItem={isCardArtReview ? undefined : handleRenameImportPreview}
+                  skippedKeys={previewSkipKeys}
+                  hiddenKeys={hiddenCollisionSkipKeys}
+                  onSkippedKeysChange={isCardArtReview ? undefined : handlePreviewSkipKeysChange}
+                  onSourceBulkAction={isCardArtReview ? undefined : handleSourceBulkAction}
+                />
                 <ImportCollisionPanel
                   collisions={stageCollisions}
                   value={renameMap}
@@ -1590,24 +1634,16 @@ export default function ImportPage() {
                   onResolutionChange={setCollisionResolutionMap}
                   variant={isCardArtReview ? "card-art" : "default"}
                 />
-                <ImportContentPreviewPanel
-                  content={pendingImport.content}
-                  previewSummary={pendingImport.previewSummary}
-                  defaultSource={pendingImport.materialSource}
-                  showModifierReviewHint={visibleModifierReviewRows.length > 0}
-                  cardArtUrls={includeCardArt ? cardArtUrlMap : undefined}
-                  onCardArtChange={includeCardArt ? setCardArtUrlMap : undefined}
-                  onRenameItem={isCardArtReview ? undefined : handleRenameImportPreview}
-                  skippedKeys={previewSkipKeys}
-                  hiddenKeys={collisionSkipKeys}
-                  onSkippedKeysChange={isCardArtReview ? undefined : handlePreviewSkipKeysChange}
-                />
-                {visibleModifierReviewRows.length > 0 ? (
+                {visibleModifierReviewRows.length > 0 || visibleUnresolvedMechanics.length > 0 ? (
                   <ImportModifierReviewPanel
                     rows={visibleModifierReviewRows}
+                    unresolved={visibleUnresolvedMechanics}
                     onRemoveModifier={handleRemoveModifierPreview}
                     variant="review"
                   />
+                ) : null}
+                {claimCoverage.length > 0 ? (
+                  <ImportClaimCoveragePanel reports={claimCoverage} />
                 ) : null}
                 {includeCardArt ? (
                   <ImportCardArtPanel

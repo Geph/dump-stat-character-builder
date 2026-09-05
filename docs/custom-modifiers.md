@@ -79,8 +79,9 @@ only looks at authored `requiresSheetToggle` will drop inferred ids (Dance →
 `isKnownSheetToggleId` builtins are also kept so activation is not undone.
 
 **Companion-scoped feature choices.** `FeatureChoice.applyTo: "companion"` (optional
-`applyToCompanionFeature`) keeps option `linkedModifiers` out of
-`aggregateCharacteristics` and applies them when resolving companions. Nested
+`applyToCompanionFeature`) keeps feature and option `linkedModifiers` out of
+`aggregateCharacteristics` and applies them when resolving companions. When
+`isChoice` is false, every option auto-applies (Improved Thralls). Nested
 modifier player picks (damage type, skill, save) still appear at level-up. Do
 not add a class-name branch in the sheet for this.
 

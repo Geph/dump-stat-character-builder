@@ -41,6 +41,8 @@ const ChoiceOptionsAiSchema = z.object({
     .nullable(),
   swappableOnRest: z.boolean().nullable(),
   swapRestType: z.enum(["short", "long"]).nullable(),
+  applyTo: z.enum(["self", "companion"]).nullable(),
+  applyToCompanionFeature: z.string().nullable(),
 })
 
 const PrerequisiteRuleAiSchema = z.object({
@@ -55,6 +57,9 @@ const ImportMechanicAiSchema = z.object({
   skills: z.array(z.string()).nullable(),
   grantExpertise: z.boolean().nullable(),
   choiceCount: z.number().nullable(),
+  choiceCountByLevel: z
+    .array(z.object({ level: z.number(), count: z.number() }))
+    .nullable(),
   tools: z.array(z.string()).nullable(),
   armor: z.array(z.string()).nullable(),
   weaponMode: z.enum(["martial_weapons", "simple_weapons"]).nullable(),
@@ -1053,6 +1058,8 @@ function normalizeChoiceOptions(
       choiceCountByLevel: choices.choiceCountByLevel,
       swappableOnRest: choices.swappableOnRest,
       swapRestType: choices.swapRestType,
+      applyTo: choices.applyTo,
+      applyToCompanionFeature: choices.applyToCompanionFeature,
     }),
   } as ImportChoiceOptions
 }

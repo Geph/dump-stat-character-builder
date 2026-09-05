@@ -376,8 +376,8 @@ export function ImportContentPreviewPanel({
           {sections.length > 0 ? (
             <p className="mt-1 text-muted-foreground">
               {sectionKeys
-                ? "Check the parsed entries for this stage before continuing."
-                : "Check parsed content below before confirming."}
+                ? "Choose which entries to import for this stage. Skip anything you do not want before continuing."
+                : "Choose which entries to import. Skip anything you do not want before confirming."}
             </p>
           ) : allHiddenByConflicts ? (
             <p className="mt-1 text-muted-foreground">
@@ -386,7 +386,7 @@ export function ImportContentPreviewPanel({
           ) : null}
           {showModifierReviewHint ? (
             <p className="mt-1 text-muted-foreground">
-              Review auto-wired modifiers in the next section, then confirm to write everything to the
+              Review auto-wired modifiers later in this stage, then confirm to write everything to the
               compendium.
             </p>
           ) : null}
@@ -398,8 +398,8 @@ export function ImportContentPreviewPanel({
               ? "Edit names and optional card art below, then continue to modifier wiring."
               : "Edit names and optional card art below before confirming."
             : showModifierReviewHint
-              ? "Review content below, then continue through the remaining review steps."
-              : "Review content below before continuing."}
+              ? "Choose which entries to import, then continue through the remaining review steps."
+              : "Choose which entries to import before continuing."}
         </p>
       ) : allHiddenByConflicts ? (
         <p className="text-xs text-muted-foreground">

@@ -37,6 +37,10 @@ import {
   collectActivationModeRiderModifiers,
   featureHasActivationModeRiders,
 } from "@/lib/character/activation-mode-riders"
+import {
+  grantedEquipmentFeatureId,
+  stampGrantedEquipmentSource,
+} from "@/lib/character/granted-equipment"
 import { tagModifierSource } from "@/lib/character/tag-modifier-source"
 import {
   abilitySpecializationChoice,
@@ -89,6 +93,8 @@ function collectLinkedFromFeature(
   instances: LinkedModifierInstance[],
 ): void {
   const feature = migrateFeatureOptionPickers(rawFeature)
+  // Companion-scoped features (picked or auto-applied) stay off the character aggregate.
+  if (featureChoiceAppliesToCompanion(feature)) return
   instances.push(
     ...effectiveLinkedModifiers(
       readLinkedModifiers(feature as unknown as Record<string, unknown>, catalog),
@@ -98,8 +104,6 @@ function collectLinkedFromFeature(
   )
 
   if (feature.isChoice && feature.choices?.options?.length) {
-    // Companion-scoped options stay off the character aggregate (Captain Cohort Species, etc.).
-    if (featureChoiceAppliesToCompanion(feature)) return
     const key = featureChoiceKey(classId, feature.name, feature.level)
     const picked = featureChoicePicks[key] ?? []
     for (const optionName of picked) {
@@ -246,12 +250,21 @@ function classCharacteristicsWithPlayerPicks(params: {
         const filtered = filterSpellsKnownByClassLevel(instances, entry.level)
         const key = featureChoiceKey(entry.classId, rawFeature.name, rawFeature.level)
         const chars = characteristicsFromLinkedModifiers(catalog, filtered, rawFeature.modifierRefs)
+        const featureId = grantedEquipmentFeatureId({
+          ownerId: entry.classId,
+          featureName: rawFeature.name,
+          level: rawFeature.level,
+          featureId: rawFeature.id,
+        })
         mods.push(
-          ...tagModifierSource(applyModifierPlayerPicks(chars, key, modifierPlayerPicks), {
-            sourceType: "class",
-            source: rawFeature.name,
-            label: `${rawFeature.name} (${ownerName})`,
-          }),
+          ...stampGrantedEquipmentSource(
+            tagModifierSource(applyModifierPlayerPicks(chars, key, modifierPlayerPicks), {
+              sourceType: "class",
+              source: rawFeature.name,
+              label: `${rawFeature.name} (${ownerName})`,
+            }),
+            featureId,
+          ),
         )
       }
     }
@@ -350,12 +363,19 @@ function speciesCharacteristicsWithPlayerPicks(
         )
       : []
     mods.push(
-      ...tagModifierSource(applyModifierPlayerPicks(chars, sourceKey, modifierPlayerPicks), {
-        sourceType: "species",
-        source: trait.name,
-        label: trait.name,
-        sourceId: species.id,
-      }),
+      ...stampGrantedEquipmentSource(
+        tagModifierSource(applyModifierPlayerPicks(chars, sourceKey, modifierPlayerPicks), {
+          sourceType: "species",
+          source: trait.name,
+          label: trait.name,
+          sourceId: species.id,
+        }),
+        grantedEquipmentFeatureId({
+          ownerId: species.id,
+          featureName: trait.name,
+          level: trait.level ?? 1,
+        }),
+      ),
     )
   })
 
@@ -429,14 +449,20 @@ export function collectBuilderModifierRefIds(params: {
   const backgroundBase = backgroundInstances.length
     ? resolveLinkedModifiers(backgroundInstances, catalog).characteristics
     : []
-  const backgroundResolved =
+  const backgroundResolved = stampGrantedEquipmentSource(
     background?.id && backgroundBase.length
       ? applyModifierPlayerPicks(
           backgroundBase,
           `background:${background.id}:feature`,
           modifierPlayerPicks,
         )
-      : backgroundBase
+      : backgroundBase,
+    grantedEquipmentFeatureId({
+      ownerId: background?.id ?? "background",
+      featureName: background?.feature?.name ?? background?.name ?? "Background",
+      level: 1,
+    }),
+  )
 
   const featEntries =
     featSelectionEntries.length > 0
@@ -464,12 +490,20 @@ export function collectBuilderModifierRefIds(params: {
     const instances = linkedModifiersForFeat(feat, choicePickKey, featChoicePicks, catalog)
     const refs = feat.modifierRefs ?? readModifierRefs(feat as unknown as unknown as Record<string, unknown>)
     const mods = characteristicsFromLinkedModifiers(catalog, instances, refs)
-    return tagModifierSource(applyModifierPlayerPicks(mods, choicePickKey, modifierPlayerPicks), {
-      sourceType: "feat",
-      source: feat.name,
-      label: feat.name,
-      sourceId: feat.id,
-    })
+    return stampGrantedEquipmentSource(
+      tagModifierSource(applyModifierPlayerPicks(mods, choicePickKey, modifierPlayerPicks), {
+        sourceType: "feat",
+        source: feat.name,
+        label: feat.name,
+        sourceId: feat.id,
+      }),
+      grantedEquipmentFeatureId({
+        ownerId: feat.id,
+        featureName: feat.name,
+        level: feat.level_requirement ?? 1,
+        featureId: feat.id,
+      }),
+    )
   })
 
   // Fixed grants (archetype primary discipline, etc.) come from class/feat features —
@@ -508,12 +542,20 @@ export function collectBuilderModifierRefIds(params: {
         ]
       }
     }
-    return tagModifierSource(characteristicsFromLinkedModifiers(catalog, linked, refs), {
-      sourceType: "feature",
-      source: ability.name,
-      label: ability.name,
-      sourceId: ability.id,
-    })
+    return stampGrantedEquipmentSource(
+      tagModifierSource(characteristicsFromLinkedModifiers(catalog, linked, refs), {
+        sourceType: "feature",
+        source: ability.name,
+        label: ability.name,
+        sourceId: ability.id,
+      }),
+      grantedEquipmentFeatureId({
+        ownerId: ability.id,
+        featureName: ability.name,
+        level: ability.level_requirement ?? 1,
+        featureId: ability.id,
+      }),
+    )
   })
 
   // Discipline-nested talent options store modifiers on the option, not a separate ability row.

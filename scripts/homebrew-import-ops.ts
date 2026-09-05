@@ -5,6 +5,7 @@
  *   npm run import:audit -- <json-path> [--source <source-path>] [--fix]
  *   npm run import:merge -- --base <drive-json> --incoming <full.json> [--write <out>] [--mode spells|abilities|auto]
  *   npm run import:ops -- completeness <json-path> --source <source-path>
+ *   npm run import:ops -- claims <json-path-or-drive-basename>
  *   npm run import:ops -- smoke
  *   npm run import:smoke
  */
@@ -15,6 +16,7 @@ import {
   auditImportWiring,
   compareSourceToImport,
   extractCustomAbilities,
+  formatClassClaimCoverageReport,
   formatCompletenessReport,
   homebrewImportJsonDir,
   homebrewSourceTextsDir,
@@ -27,12 +29,17 @@ import {
   resolveHomebrewImportJsonPath,
 } from "@/lib/import/homebrew-import-ops"
 import { IMPORT_TO_SOURCE_BASENAME } from "@/lib/import/homebrew-import-ops/paths"
+import { applyClassSpellListsToImport } from "@/lib/import/class-spell-lists"
+import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
+import { collectClassClaimCoverage } from "@/lib/import/feature-claims"
+import { parseImportContentJson } from "@/lib/import/parse-import-content-json"
 
 function usage(): never {
   console.error(`Usage:
   npm run import:audit -- <json> [--source <txt>] [--fix]
   npm run import:merge -- --base <json> --incoming <json> [--write <json>] [--mode spells|abilities|auto]
   npm run import:ops -- completeness <json> --source <txt>
+  npm run import:ops -- claims <json-or-drive-basename>
   npm run import:ops -- smoke
 
   --mode auto (default): merge spells if incoming has spells[]; merge custom abilities if incoming has them.
@@ -175,6 +182,27 @@ function cmdCompleteness(jsonPath: string, flags: Record<string, string | boolea
   process.exit(findings.some((f) => f.status === "missing_in_json") ? 1 : 0)
 }
 
+function resolveClaimsPath(input: string): string {
+  if (existsSync(input)) return input
+  const drive = resolveHomebrewImportJsonPath(input)
+  if (drive) return drive
+  console.error(`No import JSON at ${input} (also checked HOMEBREW_IMPORT_JSON_DIR)`)
+  process.exit(2)
+}
+
+function cmdClaims(input: string) {
+  const path = resolveClaimsPath(input)
+  const parsed = parseImportContentJson(readFileSync(path, "utf8"))
+  if (!parsed) {
+    console.error(`Could not parse import JSON: ${path}`)
+    process.exit(2)
+  }
+  const enriched = enrichImportContentModifiers(applyClassSpellListsToImport(parsed))
+  const reports = collectClassClaimCoverage(enriched)
+  console.log(`Claim coverage ← ${path}`)
+  console.log(formatClassClaimCoverageReport(reports))
+}
+
 function cmdSmoke() {
   let failed = 0
   for (const file of DRIVE_SMOKE_IMPORT_FILES) {
@@ -217,6 +245,10 @@ function main() {
       break
     case "smoke":
       cmdSmoke()
+      break
+    case "claims":
+      if (!positional[0]) usage()
+      cmdClaims(positional[0])
       break
     default:
       usage()

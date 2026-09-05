@@ -4,7 +4,7 @@
  * belong on `FeatureEffect` (`lib/types.ts`) instead — see
  * `docs/modifier-vs-feature-effect.md` for the full decision rule.
  */
-import type { UsesConfig } from "@/lib/types"
+import type { UsesAtLevel, UsesConfig } from "@/lib/types"
 import type { BonusByLevelEntry } from "@/lib/compendium/bonus-by-level"
 import { resolveFixedValueAtLevel } from "@/lib/compendium/bonus-by-level"
 import { normalizeBonusByLevel } from "@/lib/compendium/bonus-by-level"
@@ -1343,6 +1343,8 @@ export interface GrantCreatureCharacteristic extends CharacteristicModifierBase 
   choiceOptions?: string[]
   /** How many creatures to pick when choiceOptions is set (default 1). */
   count?: number
+  /** Level-scaled pick totals (Thralls column, etc.). Overrides `count` when present. */
+  countByLevel?: UsesAtLevel[]
   /** When true, the form uses polymorph rules (Wild Shape). */
   polymorph?: boolean
 }
@@ -2609,9 +2611,16 @@ export type AggregatedCharacteristics = {
   featureChoiceOptionGrants: FeatureChoiceOptionGrantCharacteristic[]
 }
 
+/** Feature + modifier that handed the item out. Dedupe still keys on item name. */
+export type GrantedEquipmentSource = {
+  featureId: string
+  modifierId: string
+}
+
 export type GrantedEquipmentEntry = {
   name: string
   quantity: number
+  grantedBy?: GrantedEquipmentSource
 }
 
 const UNARMED_DIE_RANK: Record<UnarmedStrikeDie, number> = {
@@ -2752,21 +2761,32 @@ function pushUnique(list: string[], values: string[] | null | undefined) {
   }
 }
 
+function readGrantedBy(mod: GrantEquipmentCharacteristic): GrantedEquipmentSource | undefined {
+  const tagged = (mod as GrantEquipmentCharacteristic & { _grantedBy?: GrantedEquipmentSource })
+    ._grantedBy
+  const featureId = tagged?.featureId?.trim()
+  const modifierId = tagged?.modifierId?.trim() || mod.id?.trim()
+  if (!featureId || !modifierId) return undefined
+  return { featureId, modifierId }
+}
+
 /** Two features naming the same item grant it once, at the larger requested count. */
 function pushGrantedEquipment(
   list: GrantedEquipmentEntry[],
   mod: GrantEquipmentCharacteristic,
 ) {
   const quantity = Math.max(1, Math.floor(mod.quantityPerItem ?? 1))
+  const grantedBy = readGrantedBy(mod)
   for (const raw of mod.equipmentNames ?? []) {
     const name = raw.trim()
     if (!name) continue
     const existing = list.find((entry) => entry.name.toLowerCase() === name.toLowerCase())
     if (existing) {
       existing.quantity = Math.max(existing.quantity, quantity)
+      if (!existing.grantedBy && grantedBy) existing.grantedBy = grantedBy
       continue
     }
-    list.push({ name, quantity })
+    list.push(grantedBy ? { name, quantity, grantedBy } : { name, quantity })
   }
 }
 

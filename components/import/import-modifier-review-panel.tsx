@@ -5,6 +5,7 @@ import { ModifierWiringRegistryCoverageLine } from "@/components/import/modifier
 import type {
   ImportModifierPreviewEntry,
   ImportModifierReviewRow,
+  UnresolvedImportMechanicEntry,
 } from "@/lib/import/import-modifier-previews"
 import {
   Dialog,
@@ -13,10 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, Link2, Sparkles, X } from "lucide-react"
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, HelpCircle, Info, Link2, Sparkles, X } from "lucide-react"
 
 type ImportModifierReviewPanelProps = {
   rows: ImportModifierReviewRow[]
+  unresolved?: UnresolvedImportMechanicEntry[]
   onRemoveModifier?: (previewId: string) => void
   variant?: "review" | "report"
   /** Nested inside Staged import — omit the outer bordered shell. */
@@ -228,6 +230,7 @@ function SourceGroupCard({
 
 export function ImportModifierReviewPanel({
   rows,
+  unresolved = [],
   onRemoveModifier,
   variant = "review",
   embedded = false,
@@ -281,7 +284,7 @@ export function ImportModifierReviewPanel({
               ? "Auto-wiring runs on import; finish any “Not wired” rows in the compendium editor (modifier effects on each feature), then save."
               : "Summary of modifier auto-wiring from this import."}
           </p>
-          {rows.length > 0 ? (
+          {rows.length > 0 || unresolved.length > 0 ? (
             <p className="mt-2 text-xs">
               <span className="font-medium text-success">{wiredCount} wired</span>
               {structuralCount > 0 ? (
@@ -296,6 +299,14 @@ export function ImportModifierReviewPanel({
               <span className={`font-medium ${unwiredCount > 0 ? "text-destructive" : "text-muted-foreground"}`}>
                 {unwiredCount} not wired
               </span>
+              {unresolved.length > 0 ? (
+                <>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="font-medium text-destructive">
+                    {unresolved.length} couldn&apos;t wire
+                  </span>
+                </>
+              ) : null}
               {pageOneAtATime ? (
                 <>
                   <span className="text-muted-foreground"> · </span>
@@ -314,6 +325,45 @@ export function ImportModifierReviewPanel({
           <ModifierWiringRegistryCoverageLine className="mt-2" />
         </div>
       </div>
+
+      {unresolved.length > 0 ? (
+        <div className="space-y-2 rounded-lg border border-destructive/35 bg-destructive/5 px-3 py-2">
+          <div className="flex items-start gap-2">
+            <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <div>
+              <p className="font-semibold text-foreground">Couldn&apos;t wire</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                The import noticed these mechanics but no catalog kind fits. Add modifiers in the
+                compendium editor after import.
+              </p>
+            </div>
+          </div>
+          <ul className="space-y-2">
+            {unresolved.map((entry) => (
+              <li key={entry.id} className="rounded-md border border-destructive/25 bg-background/60 px-3 py-2">
+                <p className="font-medium text-foreground">
+                  {entry.featureName}
+                  {entry.featureLevel != null ? (
+                    <span className="ml-1 text-muted-foreground">· L{entry.featureLevel}</span>
+                  ) : null}
+                </p>
+                <p className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {entry.sourceLabel}
+                </p>
+                <p className="mt-1 text-xs text-destructive/90">
+                  <span className="font-medium">kind</span>{" "}
+                  <code className="rounded bg-destructive/10 px-1 py-0.5">{entry.raw}</code>
+                </p>
+                {entry.sourcePhrase ? (
+                  <blockquote className="mt-1.5 border-l-2 border-destructive/40 pl-2 text-xs text-muted-foreground">
+                    {entry.sourcePhrase}
+                  </blockquote>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {rows.length > 0 ? (
         <div className="space-y-3">

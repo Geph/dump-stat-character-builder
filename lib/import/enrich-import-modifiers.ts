@@ -8,7 +8,10 @@ import {
   type DetectFeatureContext,
   type ImportModifierMeta,
 } from "@/lib/import/detect-feature-modifiers"
-import { aiMechanicsToDetections } from "@/lib/import/parse-ai-mechanics"
+import {
+  parseAiMechanics,
+  type UnresolvedMechanic,
+} from "@/lib/import/parse-ai-mechanics"
 import { enrichImportChoiceFeatures } from "@/lib/import/enrich-import-choices"
 import { enrichAbilityPsionicAugments } from "@/lib/import/normalize-ability-import"
 import { nestPsionicAbilityLibrary } from "@/lib/import/nest-psionic-ability-library"
@@ -42,6 +45,7 @@ import { inferFeatImportFields } from "@/lib/import/infer-feat-import-fields"
 import { applyFeatNamePreset, featHasNamePreset } from "@/lib/compendium/apply-feat-name-preset"
 import type { Feature, Trait } from "@/lib/types"
 import { hoistCompanionStatBlocksToCreatures } from "@/lib/import/hoist-companion-stat-blocks"
+import { attachImportFeatureClaims } from "@/lib/import/feature-claims"
 
 type ImportFeatRow = ImportContent["feats"] extends (infer T)[] | undefined ? T : never
 
@@ -54,9 +58,21 @@ type ImportMechanicsCarrier = {
   modifierRefs?: Feature["modifierRefs"]
   importModifierMeta?: ImportModifierMeta[]
   companion_stat_block?: Feature["companion_stat_block"]
+  unresolvedMechanics?: UnresolvedMechanic[] | null
 }
 
 type PresetScope = { className: string; subclassName?: string | null }
+
+function withUnresolvedMechanics<T extends ImportMechanicsCarrier>(
+  feature: T,
+  unresolved: UnresolvedMechanic[],
+): T {
+  if (!unresolved.length) {
+    if (!feature.unresolvedMechanics?.length) return feature
+    return { ...feature, unresolvedMechanics: undefined }
+  }
+  return { ...feature, unresolvedMechanics: unresolved }
+}
 
 function enrichFeatureLike<T extends ImportMechanicsCarrier>(
   item: T,
@@ -87,7 +103,7 @@ function enrichFeatureLike<T extends ImportMechanicsCarrier>(
       }
     }
   }
-  const aiDetections = aiMechanicsToDetections(baseFeature.mechanics, ctx)
+  const { detections: aiDetections, unresolved } = parseAiMechanics(baseFeature.mechanics, ctx)
   const detectorDetections = detectFeatureModifiers(baseFeature.description ?? "", {
     ...ctx,
     basedOnSrdFeature: basedOn || ctx.basedOnSrdFeature,
@@ -101,19 +117,25 @@ function enrichFeatureLike<T extends ImportMechanicsCarrier>(
         baseFeature.name,
         baseFeature.description ?? "",
       )
-      return syncModifierRefs({
+      return withUnresolvedMechanics(
+        syncModifierRefs({
+          ...baseFeature,
+          companion_stat_block,
+          linkedModifiers: baseFeature.linkedModifiers,
+          modifierRefs: baseFeature.modifierRefs,
+        }) as unknown as T,
+        unresolved,
+      )
+    }
+    if (baseFeature === item && !unresolved.length) return item
+    return withUnresolvedMechanics(
+      syncModifierRefs({
         ...baseFeature,
-        companion_stat_block,
         linkedModifiers: baseFeature.linkedModifiers,
         modifierRefs: baseFeature.modifierRefs,
-      }) as unknown as T
-    }
-    if (baseFeature === item) return item
-    return syncModifierRefs({
-      ...baseFeature,
-      linkedModifiers: baseFeature.linkedModifiers,
-      modifierRefs: baseFeature.modifierRefs,
-    }) as unknown as T
+      }) as unknown as T,
+      unresolved,
+    )
   }
 
   const merged = mergeFeatureModifierDetections(
@@ -130,13 +152,16 @@ function enrichFeatureLike<T extends ImportMechanicsCarrier>(
         }
       : merged
 
-  return {
-    ...baseFeature,
-    linkedModifiers: withCompanion.linkedModifiers,
-    modifierRefs: withCompanion.modifierRefs,
-    importModifierMeta: withCompanion.importModifierMeta,
-    companion_stat_block: withCompanion.companion_stat_block ?? baseFeature.companion_stat_block,
-  } as unknown as T
+  return withUnresolvedMechanics(
+    {
+      ...baseFeature,
+      linkedModifiers: withCompanion.linkedModifiers,
+      modifierRefs: withCompanion.modifierRefs,
+      importModifierMeta: withCompanion.importModifierMeta,
+      companion_stat_block: withCompanion.companion_stat_block ?? baseFeature.companion_stat_block,
+    } as unknown as T,
+    unresolved,
+  )
 }
 
 function enrichFeatures(
@@ -586,7 +611,9 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
   )
   const withSubclassSpells = enrichSubclassSpellTablesOnImport(withSpells)
 
-  return hoistCompanionStatBlocksToCreatures(
-    enrichImportChoiceFeatures(applyImportEnrichmentPresets(withSubclassSpells)),
+  return attachImportFeatureClaims(
+    hoistCompanionStatBlocksToCreatures(
+      enrichImportChoiceFeatures(applyImportEnrichmentPresets(withSubclassSpells)),
+    ),
   )
 }

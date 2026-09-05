@@ -418,6 +418,8 @@ export interface FeatureActivation {
 export interface Feature {
   level: number
   name: string
+  /** Persisted id when the feature is a catalog row; grants synthesize one when missing. */
+  id?: string
   description: string
   prerequisite_rules?: import("@/lib/import/content-schema").PrerequisiteRule[] | null
   isChoice?: boolean
@@ -441,6 +443,21 @@ export interface Feature {
   linkedModifiers?: LinkedModifierInstance[]
   /** Import pipeline metadata (stripped before persist when configured). */
   importModifierMeta?: import("@/lib/import/detect-feature-modifiers").ImportModifierMeta[]
+  /** Mechanics the import pipeline noticed but could not express as catalog modifiers. */
+  unresolvedMechanics?: {
+    kind: "unresolved"
+    raw: string
+    featureName: string
+    sourcePhrase: string
+  }[] | null
+  /** Atomic description claims with per-claim wiring status (import instrumentation). */
+  claims?: {
+    id: string
+    text: string
+    status: "wired" | "unresolved" | "narrative"
+    modifierId?: string | null
+    effectId?: string | null
+  }[] | null
   /** Where this feature appears on the character sheet (all optional; inferred when unset). */
   sheetDisplay?: FeatureSheetDisplay | null
 }

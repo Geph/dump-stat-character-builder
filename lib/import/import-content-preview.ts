@@ -3,10 +3,11 @@ import type { ImportContent, PrerequisiteRule } from "@/lib/import/content-schem
 import { formatEquipmentCost } from "@/lib/compendium/equipment-display"
 import { isMagicItem } from "@/lib/compendium/equipment-attunement"
 import { importCardArtTargetKey } from "@/lib/import/import-card-art"
-import type {
-  ImportCollision,
-  ImportCollisionKind,
-  ImportCollisionResolutionMap,
+import {
+  importCollisionId,
+  type ImportCollision,
+  type ImportCollisionKind,
+  type ImportCollisionResolutionMap,
 } from "@/lib/import/import-collisions"
 import type { Equipment } from "@/lib/types"
 
@@ -112,6 +113,45 @@ export function previewSkipKeysForSkippedCollisions(
     })
   }
   return keys
+}
+
+const PREVIEW_SECTION_COLLISION_KIND: Partial<
+  Record<ImportContentPreviewSectionKey, ImportCollisionKind>
+> = {
+  classes: "class",
+  feats: "feat",
+  species: "species",
+  spells: "spell",
+  backgrounds: "background",
+  languages: "language",
+}
+
+/** Drop name conflicts for rows the user already chose not to import. */
+export function omitCollisionsForPreviewSkipKeys(
+  content: ImportContent,
+  collisions: readonly ImportCollision[],
+  previewSkipKeys: ReadonlySet<string> | readonly string[],
+): ImportCollision[] {
+  const skipped = previewSkipKeys instanceof Set ? previewSkipKeys : new Set(previewSkipKeys)
+  if (!skipped.size || !collisions.length) return [...collisions]
+
+  const skippedIds = new Set<string>()
+  for (const key of skipped) {
+    const colon = key.lastIndexOf(":")
+    if (colon <= 0) continue
+    const section = key.slice(0, colon) as ImportContentPreviewSectionKey
+    const index = Number(key.slice(colon + 1))
+    if (!Number.isInteger(index) || index < 0) continue
+    const kind = PREVIEW_SECTION_COLLISION_KIND[section]
+    if (!kind) continue
+    const rows = content[section]
+    if (!Array.isArray(rows)) continue
+    const name = String((rows[index] as { name?: string } | undefined)?.name ?? "").trim()
+    if (!name) continue
+    skippedIds.add(importCollisionId(kind, name))
+  }
+  if (!skippedIds.size) return [...collisions]
+  return collisions.filter((collision) => !skippedIds.has(collision.id))
 }
 
 /** Remove hidden rows from preview sections without reindexing sourceIndex. */

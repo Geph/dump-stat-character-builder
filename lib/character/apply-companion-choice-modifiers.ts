@@ -56,6 +56,7 @@ function applyLinkedToTemplate(
   optionDescription: string,
   instances: ReturnType<typeof effectiveLinkedModifiers>,
   characteristics: ReturnType<typeof characteristicsFromLinkedModifiers>,
+  extras?: { omitTrait?: boolean },
 ): CompanionStatBlockTemplate {
   let next = template
 
@@ -87,12 +88,14 @@ function applyLinkedToTemplate(
   }
 
   const relentless = instances.some((instance) => instance.activation?.onDropToZeroHp)
-  const traitName = optionName.trim() || "Species Trait"
-  next = pushTrait(next, {
-    name: traitName,
-    description: optionDescription.trim() || traitName,
-    tag: relentless ? "1/Day" : null,
-  })
+  if (!extras?.omitTrait) {
+    const traitName = optionName.trim() || "Species Trait"
+    next = pushTrait(next, {
+      name: traitName,
+      description: optionDescription.trim() || traitName,
+      tag: relentless ? "1/Day" : null,
+    })
+  }
 
   return next
 }
@@ -121,7 +124,29 @@ export function applyCompanionScopedChoiceModifiers(params: {
       if (!featureChoiceAppliesToCompanion(feature)) continue
       if (!companionSourceMatchesChoice(feature, params.source)) continue
       const key = featureChoiceKey(entry.row.class_id, feature.name, feature.level)
-      const chosen = picks[key] ?? picks[featureChoiceKey(entry.row.class_id, feature.name)] ?? []
+      const featureInstances = effectiveLinkedModifiers(
+        feature.linkedModifiers,
+        feature.modifierRefs,
+        catalog,
+      )
+      if (featureInstances.length) {
+        const featureCharacteristics = applyModifierPlayerPicks(
+          characteristicsFromLinkedModifiers(catalog, featureInstances, feature.modifierRefs),
+          key,
+          playerPicks,
+        )
+        template = applyLinkedToTemplate(
+          template,
+          feature.name,
+          feature.description,
+          featureInstances,
+          featureCharacteristics,
+          { omitTrait: Boolean(feature.choices?.options?.length) },
+        )
+      }
+      const chosen = feature.isChoice
+        ? (picks[key] ?? picks[featureChoiceKey(entry.row.class_id, feature.name)] ?? [])
+        : (feature.choices?.options ?? []).map((option) => option.name)
       for (const optionName of chosen) {
         const option = findChoiceOption(feature.choices?.options, optionName)
         if (!option) continue

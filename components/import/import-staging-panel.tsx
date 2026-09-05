@@ -24,11 +24,11 @@ type ImportStagingPanelProps = {
   canNext: boolean
   onBack?: () => void
   canBack?: boolean
-  /** When false, hide the footer Next control (e.g. deferred to last-source row). */
-  showNextInFooter?: boolean
-  /** Right-side footer actions when Next is hidden (e.g. Confirm / Cancel on the last step). */
+  /** Extra controls in the top nav row (e.g. Skip all on the content step). */
+  toolbarMid?: ReactNode
+  /** Right-side header actions when Next is hidden (e.g. Confirm / Cancel on the last step). */
   footerEnd?: ReactNode
-  /** Name-collision review (first step when this stage has conflicts). */
+  /** Name-collision review (after the user picks what to import). */
   conflictsChildren?: ReactNode
   /** Parsed content for the active stage. */
   contentChildren: ReactNode
@@ -50,7 +50,7 @@ export function ImportStagingPanel({
   canNext,
   onBack,
   canBack = false,
-  showNextInFooter = true,
+  toolbarMid,
   footerEnd,
   conflictsChildren,
   contentChildren,
@@ -62,26 +62,25 @@ export function ImportStagingPanel({
   const safeIndex = Math.min(Math.max(activeIndex, 0), stages.length - 1)
   const stage = stages[safeIndex]
   const phaseTabs = [
-    ...(hasConflicts ? [{ id: "conflicts" as const, label: "Name conflicts" }] : []),
     { id: "content" as const, label: "Content" },
+    ...(hasConflicts ? [{ id: "conflicts" as const, label: "Name conflicts" }] : []),
     ...(hasCardArt ? [{ id: "card-art" as const, label: "Card art" }] : []),
     ...(hasModifiers ? [{ id: "modifiers" as const, label: "Modifiers" }] : []),
   ]
   const phaseLabel =
-    phase === "conflicts"
-      ? "name conflicts"
-      : phase === "content"
-        ? "Parsed content"
+    phase === "content"
+      ? "parsed content"
+      : phase === "conflicts"
+        ? "name conflicts"
         : phase === "card-art"
           ? "Card art"
           : "modifier wiring"
   const showPhaseToggle = phaseTabs.length > 1
-  const showFooterNext = canNext && showNextInFooter
-  const showFooter = canBack || showFooterNext || Boolean(footerEnd)
+  const showHeaderNav = canBack || canNext || Boolean(toolbarMid) || Boolean(footerEnd)
   const nextLabel =
-    phase === "conflicts"
-      ? "Next: review content"
-      : phase === "content" && hasCardArt
+    phase === "content" && hasConflicts
+      ? "Next: resolve name conflicts"
+      : (phase === "content" || phase === "conflicts") && hasCardArt
         ? "Next: review card art"
         : phase !== "modifiers" && hasModifiers
           ? "Next: review modifier wiring"
@@ -90,11 +89,15 @@ export function ImportStagingPanel({
     phase === "modifiers"
       ? hasCardArt
         ? "Back: card art"
-        : "Back: content"
-      : phase === "card-art"
-        ? "Back: content"
-        : phase === "content" && hasConflicts
+        : hasConflicts
           ? "Back: name conflicts"
+          : "Back: content"
+      : phase === "card-art"
+        ? hasConflicts
+          ? "Back: name conflicts"
+          : "Back: content"
+        : phase === "conflicts"
+          ? "Back: content"
           : "Previous stage"
 
   const phaseBody =
@@ -180,10 +183,8 @@ export function ImportStagingPanel({
         </div>
       ) : null}
 
-      <div className="space-y-4">{phaseBody}</div>
-
-      {showFooter ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3">
+      {showHeaderNav ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-3">
           <div className="flex flex-wrap items-center gap-2">
             {canBack && onBack ? (
               <button
@@ -195,8 +196,9 @@ export function ImportStagingPanel({
                 {backLabel}
               </button>
             ) : null}
+            {toolbarMid}
           </div>
-          {showFooterNext ? (
+          {canNext ? (
             <button
               type="button"
               onClick={onNext}
@@ -212,6 +214,8 @@ export function ImportStagingPanel({
           )}
         </div>
       ) : null}
+
+      <div className="space-y-4">{phaseBody}</div>
     </div>
   )
 }

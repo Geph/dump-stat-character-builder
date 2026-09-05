@@ -1,5 +1,6 @@
 "use client"
 
+import { ImportClaimCoveragePanel } from "@/components/import/import-claim-coverage-panel"
 import { ImportModifierReviewPanel } from "@/components/import/import-modifier-review-panel"
 import { ImportUnmatchedFeaturesPanel } from "@/components/import/import-unmatched-features-panel"
 import type { ImportReport } from "@/lib/import/build-import-report"
@@ -155,7 +156,13 @@ export function ImportReportPanel({ report, onDismiss }: ImportReportPanelProps)
 
       {report.tokenSavings ? <ImportTokenSavingsSummary savings={report.tokenSavings} /> : null}
 
-      <ImportModifierReviewPanel rows={report.modifierReview ?? []} variant="report" />
+      <ImportModifierReviewPanel
+        rows={report.modifierReview ?? []}
+        unresolved={report.unresolvedMechanics ?? []}
+        variant="report"
+      />
+
+      <ImportClaimCoveragePanel reports={report.claimCoverage ?? []} />
 
       {report.unmatchedFeatures.length > 0 ? (
         <ImportUnmatchedFeaturesPanel entries={report.unmatchedFeatures} variant="report" />

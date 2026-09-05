@@ -7,6 +7,7 @@ import type { Feature } from "@/lib/types"
 type StagingFeature = Feature & {
   mechanics?: unknown[]
   importModifierMeta?: unknown[]
+  unresolvedMechanics?: unknown[]
   new_toggles?: NewToggleImport[]
 }
 
@@ -34,8 +35,14 @@ function hoistNewTogglesFromFeatures(
 
 function stripFeatureStagingFields<T extends StagingFeature>(
   feature: T,
-): Omit<T, "mechanics" | "importModifierMeta" | "new_toggles"> {
-  const { mechanics: _mechanics, importModifierMeta: _meta, new_toggles: _toggles, ...rest } = feature
+): Omit<T, "mechanics" | "importModifierMeta" | "unresolvedMechanics" | "new_toggles"> {
+  const {
+    mechanics: _mechanics,
+    importModifierMeta: _meta,
+    unresolvedMechanics: _unresolved,
+    new_toggles: _toggles,
+    ...rest
+  } = feature
   return rest
 }
 

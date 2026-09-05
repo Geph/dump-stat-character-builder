@@ -1914,9 +1914,12 @@ export default function BuilderPageClient() {
   // for characters built at or above the granting level. Keyed off a signature because the
   // aggregation above is rebuilt on every render.
   const grantedEquipmentKey = grantedEquipmentSignature(aggregatedCharacteristics.grantedEquipment)
+  const grantedByKey = aggregatedCharacteristics.grantedEquipment
+    .map((entry) => `${entry.grantedBy?.featureId ?? ""}:${entry.grantedBy?.modifierId ?? ""}`)
+    .join("|")
   const featureGrantedEquipment = useMemo(
-    () => resolveGrantedEquipmentHoldings(grantedEquipmentKey, equipment),
-    [grantedEquipmentKey, equipment],
+    () => resolveGrantedEquipmentHoldings(aggregatedCharacteristics.grantedEquipment, equipment),
+    [grantedEquipmentKey, grantedByKey, equipment, aggregatedCharacteristics.grantedEquipment],
   )
 
   /** Gear picked beyond starting packages: gold buys, modifier choices, and feature grants. */

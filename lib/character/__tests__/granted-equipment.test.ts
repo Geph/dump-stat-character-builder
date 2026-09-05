@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest"
 import {
+  collectGrantedEquipmentFromFeatures,
+  grantedEquipmentFeatureId,
   grantedEquipmentSignature,
   planEquipmentGrants,
   resolveGrantedEquipmentHoldings,
+  stampGrantedEquipmentSource,
 } from "@/lib/character/granted-equipment"
 import { aggregateCharacteristics } from "@/lib/compendium/characteristic-modifiers"
 import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
-import type { Equipment } from "@/lib/types"
+import type { Equipment, Feature } from "@/lib/types"
 
 function item(id: string, name: string): Equipment {
   return {
@@ -52,6 +55,24 @@ describe("grant_equipment aggregation", () => {
 
   it("skips blank names", () => {
     expect(aggregateCharacteristics([grantMod(["", "  "])]).grantedEquipment).toEqual([])
+  })
+
+  it("copies grantedBy from the granting modifier and keeps name-keyed dedupe", () => {
+    const first = stampGrantedEquipmentSource(
+      [{ ...grantMod(["Fogstone Periapt"]), id: "mod-holy" }],
+      "feature:investigator:holy-trinkets:3",
+    )
+    const second = stampGrantedEquipmentSource(
+      [{ ...grantMod(["fogstone periapt"], 2), id: "mod-reimport" }],
+      "feature:investigator:holy-trinkets:3-reimport",
+    )
+    expect(aggregateCharacteristics([...first, ...second]).grantedEquipment).toEqual([
+      {
+        name: "Fogstone Periapt",
+        quantity: 2,
+        grantedBy: { featureId: "feature:investigator:holy-trinkets:3", modifierId: "mod-holy" },
+      },
+    ])
   })
 })
 
@@ -157,34 +178,117 @@ describe("planEquipmentGrants", () => {
     })
     expect(plan?.quantities["eq-key"]).toBe(2)
   })
+
+  it("carries grantedBy onto the inventory holding without using it as the honor key", () => {
+    const grants = [
+      {
+        name: "Fogstone Periapt",
+        quantity: 1,
+        grantedBy: { featureId: "feature:inv:trinkets:3", modifierId: "mod-grant" },
+      },
+    ]
+    const first = planEquipmentGrants({
+      grants,
+      catalog,
+      equipmentIds: [],
+      quantities: {},
+      alreadyGrantedNames: [],
+    })
+    expect(first?.holdings).toEqual([
+      {
+        id: "eq-fogstone",
+        name: "Fogstone Periapt",
+        quantity: 1,
+        grantedBy: { featureId: "feature:inv:trinkets:3", modifierId: "mod-grant" },
+      },
+    ])
+
+    const replay = planEquipmentGrants({
+      grants: [
+        {
+          name: "Fogstone Periapt",
+          quantity: 1,
+          grantedBy: { featureId: "feature:inv:trinkets:3", modifierId: "mod-regenerated" },
+        },
+      ],
+      catalog,
+      equipmentIds: first?.equipmentIds ?? [],
+      quantities: first?.quantities,
+      alreadyGrantedNames: first?.grantedNames,
+    })
+    expect(replay).toBeNull()
+  })
 })
 
 describe("builder starting-inventory holdings", () => {
-  it("round-trips a grant signature into owned holdings", () => {
-    const signature = grantedEquipmentSignature([
-      { name: "Fogstone Periapt", quantity: 1 },
+  it("round-trips a grant list into owned holdings with grantedBy", () => {
+    const grants = [
+      {
+        name: "Fogstone Periapt",
+        quantity: 1,
+        grantedBy: { featureId: "feature:inv:trinkets:3", modifierId: "mod-1" },
+      },
       { name: "Skeleton's Key", quantity: 2 },
-    ])
-    const holdings = resolveGrantedEquipmentHoldings(signature, catalog)
+    ]
+    const holdings = resolveGrantedEquipmentHoldings(grants, catalog)
     expect(holdings.ids).toEqual(["eq-fogstone", "eq-key"])
     expect(holdings.quantities).toEqual({ "eq-key": 2 })
     expect(holdings.names).toEqual(["Fogstone Periapt", "Skeleton's Key"])
+    expect(holdings.holdings).toEqual([
+      {
+        id: "eq-fogstone",
+        name: "Fogstone Periapt",
+        quantity: 1,
+        grantedBy: { featureId: "feature:inv:trinkets:3", modifierId: "mod-1" },
+      },
+      { id: "eq-key", name: "Skeleton's Key", quantity: 2 },
+    ])
   })
 
   it("omits names with no compendium row so the sheet can grant them later", () => {
-    const signature = grantedEquipmentSignature([
-      { name: "Fogstone Periapt", quantity: 1 },
-      { name: "Nonexistent Bauble", quantity: 1 },
-    ])
-    expect(resolveGrantedEquipmentHoldings(signature, catalog).names).toEqual([
-      "Fogstone Periapt",
-    ])
+    expect(
+      resolveGrantedEquipmentHoldings(
+        [
+          { name: "Fogstone Periapt", quantity: 1 },
+          { name: "Nonexistent Bauble", quantity: 1 },
+        ],
+        catalog,
+      ).names,
+    ).toEqual(["Fogstone Periapt"])
   })
 
   it("is stable for equal grant lists and empty for none", () => {
     const a = grantedEquipmentSignature([{ name: "Glass Medallion", quantity: 1 }])
     const b = grantedEquipmentSignature([{ name: "Glass Medallion", quantity: 1 }])
     expect(a).toBe(b)
-    expect(resolveGrantedEquipmentHoldings("", catalog).ids).toEqual([])
+    expect(resolveGrantedEquipmentHoldings([], catalog).ids).toEqual([])
+  })
+
+  it("walks a feature and stamps feature id + modifier id on the holding", () => {
+    const feature = {
+      id: "feat-trinkets",
+      name: "Trinkets",
+      level: 3,
+      description: "",
+      linkedModifiers: [
+        {
+          instanceId: "inst-1",
+          catalogRefId: "cat_char_grant_equipment",
+          characteristics: [grantMod(["Glass Medallion"])],
+        },
+      ],
+    } as Feature
+    const grants = collectGrantedEquipmentFromFeatures([
+      { feature, ownerId: "investigator" },
+    ])
+    expect(grants[0]?.grantedBy).toEqual({
+      featureId: "feat-trinkets",
+      modifierId: "mod-1",
+    })
+    expect(grantedEquipmentFeatureId({ ownerId: "Investigator", featureName: "Holy Trinkets", level: 3 })).toBe(
+      "feature:investigator:holy_trinkets:3",
+    )
+    const holdings = resolveGrantedEquipmentHoldings(grants, catalog)
+    expect(holdings.holdings[0]?.grantedBy).toEqual(grants[0]?.grantedBy)
   })
 })

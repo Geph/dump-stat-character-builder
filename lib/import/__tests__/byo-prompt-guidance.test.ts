@@ -385,6 +385,17 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("classResourceAmount 5")
     expect(prompt).toContain("healFromResourceSpend")
     expect(prompt).toContain("controlled_companion")
+    expect(prompt).toContain("choiceCountByLevel matching the Thralls column")
+    expect(prompt).toContain("applyToCompanionFeature Thralls")
+  })
+
+  it("requires unresolved kind instead of inventing or omitting a mechanic", () => {
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain('kind "unresolved"')
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Never invent a kind name")
+    expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("Never silently omit a mechanic")
+    const prompt = buildByoExtractionPrompt("classes")
+    expect(prompt).toContain('kind "unresolved"')
+    expect(prompt).toContain("Never invent a kind name")
   })
 
   it("documents inventory_container for Dead Space / Bag of Holding style gear", () => {

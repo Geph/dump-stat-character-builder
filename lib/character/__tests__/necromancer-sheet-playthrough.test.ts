@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { attachClassDetails, type CharacterClassDetail } from "@/lib/character/character-classes"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
 import { resolveCharacterCompanionsDetailed } from "@/lib/character/resolve-companions"
+import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { buildCreaturePersistRows } from "@/lib/import/build-creature-persist-rows"
 import { loadMageHandPressPack } from "@/lib/seed-packs/mage-hand-press/load"
@@ -188,6 +189,10 @@ describe("Necromancer free-subclass sheet playthrough", () => {
     expect(grant).toMatchObject({
       type: "grant_creature",
       choiceOptions: expect.arrayContaining(["Skeleton", "Spirit", "Zombie"]),
+      countByLevel: expect.arrayContaining([
+        { level: 2, count: 1 },
+        { level: 7, count: 3 },
+      ]),
     })
 
     const { formGroups, companions } = resolveCharacterCompanionsDetailed({
@@ -300,6 +305,52 @@ describe("Necromancer free-subclass sheet playthrough", () => {
 
   it("Improved Thralls does not put thrall immunities on the Necromancer", () => {
     const improved = featureOf(detailAt(7), "Improved Thralls")
-    expect(chars(improved).some((row) => row.type === "condition_immunity")).toBe(false)
+    expect(improved?.choices).toMatchObject({
+      applyTo: "companion",
+      applyToCompanionFeature: "Thralls",
+    })
+    expect(chars(improved).some((row) => row.type === "condition_immunity")).toBe(true)
+    const onNecromancer = collectBuilderModifierRefIds({
+      catalog: [],
+      speciesTraitPicks: {},
+      feats: [],
+      selectedFeatIds: [],
+      classLevels: [{ classId: cls.id, level: 7 }],
+      classes: [cls],
+      subclasses: [],
+      subclassByClassId: {},
+      featureChoicePicks: {},
+    })
+    expect(onNecromancer.some((row) => row.type === "condition_immunity")).toBe(false)
+  })
+
+  it("level 7: Improved Thralls applies immunities to attached thralls", () => {
+    const entry = detailAt(7)
+    const resolved = resolveCharacterCompanionsDetailed({
+      classDetails: [entry],
+      customAbilities: [],
+      creatures,
+      formSelections: {},
+      ctx: { ...CTX, classLevels: [{ className: "Necromancer", level: 7 }] },
+    })
+    const groupKey = resolved.formGroups.find((group) => /thrall/i.test(group.featureName))?.key
+    expect(resolved.formGroups.find((group) => /thrall/i.test(group.featureName))?.maxKnown).toBe(3)
+    const { companions } = resolveCharacterCompanionsDetailed({
+      classDetails: [entry],
+      customAbilities: [],
+      creatures,
+      formSelections: groupKey ? { [groupKey]: ["Skeleton", "Zombie"] } : {},
+      ctx: { ...CTX, classLevels: [{ className: "Necromancer", level: 7 }] },
+    })
+    expect(companions.map((row) => row.template.name)).toEqual(
+      expect.arrayContaining(["Skeleton", "Zombie"]),
+    )
+    const skeleton = companions.find((row) => row.template.name === "Skeleton")
+    expect(skeleton?.template.conditionImmunities).toEqual(
+      expect.arrayContaining(["Charmed", "Frightened"]),
+    )
+    expect(skeleton?.template.traits.map((trait) => trait.name)).toEqual(
+      expect.arrayContaining(["Avoidance", "Necrotic Damage", "Turn Immunity"]),
+    )
   })
 })
