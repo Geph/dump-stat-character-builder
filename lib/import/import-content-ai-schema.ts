@@ -361,6 +361,9 @@ const ImportMechanicAiSchema = z.object({
   areaLengthFeet: z.number().nullable(),
   areaWidthFeet: z.number().nullable(),
   damageDice: z.string().nullable(),
+  damageFromResourceSpend: z.boolean().nullable(),
+  spendResourceOnHit: z.boolean().nullable(),
+  criticalDamageMultiplier: z.number().min(1).max(4).nullable(),
   saveAbility: z
     .enum(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"])
     .nullable(),

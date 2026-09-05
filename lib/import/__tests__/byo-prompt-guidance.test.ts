@@ -377,6 +377,14 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("extra_wield_slots")
   })
 
+  it("documents spend-based Charnel Touch special attacks", () => {
+    const prompt = buildByoExtractionPrompt("classes")
+    expect(prompt).toContain("damageFromResourceSpend")
+    expect(prompt).toContain("spendResourceOnHit")
+    expect(prompt).toContain("criticalDamageMultiplier")
+    expect(prompt).toContain("classResourceAmount 5")
+  })
+
   it("routes optional extra weapon damage to the DMG menu via power_rider", () => {
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("weaponDamageMenu")
     expect(COMMON_MODIFIERS_IMPORT_HINT).toContain("below_half_hp")

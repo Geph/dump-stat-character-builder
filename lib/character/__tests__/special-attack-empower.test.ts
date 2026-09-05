@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   resolveOverloadedCharge,
+  resolveResourceSpendAttackOutcome,
   resolveSpecialAttackAtLevel,
   resolveSpecialAttackEmpower,
 } from "@/lib/character/special-attack-empower"
@@ -51,6 +52,26 @@ describe("special attack empower", () => {
     expect(resolveSpecialAttackAtLevel(bomb, 10)).toMatchObject({
       damageDiceCount: 2,
       damageDieType: "d10",
+    })
+  })
+
+  it("uses selected points as Charnel Touch damage and spends only on a hit", () => {
+    const charnel = {
+      damageFromResourceSpend: true,
+      spendResourceOnHit: true,
+      criticalDamageMultiplier: 2,
+    }
+    expect(resolveResourceSpendAttackOutcome(charnel, 7, "miss")).toEqual({
+      resourceSpent: 0,
+      damage: 0,
+    })
+    expect(resolveResourceSpendAttackOutcome(charnel, 7, "hit")).toEqual({
+      resourceSpent: 7,
+      damage: 7,
+    })
+    expect(resolveResourceSpendAttackOutcome(charnel, 7, "critical")).toEqual({
+      resourceSpent: 7,
+      damage: 14,
     })
   })
 })

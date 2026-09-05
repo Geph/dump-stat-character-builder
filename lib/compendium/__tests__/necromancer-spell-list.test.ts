@@ -38,7 +38,13 @@ describe("isNecromancerListSpell", () => {
       ]),
     )
     expect(NECROMANCER_SPELLS_BY_LEVEL[1]).toEqual(
-      expect.arrayContaining(["Alarm", "Exhume", "Mage Armor", "Ray of Sickness"]),
+      expect.arrayContaining([
+        "Alarm",
+        "Exhume",
+        "Gahoul's Shrieking Skull",
+        "Mage Armor",
+        "Ray of Sickness",
+      ]),
     )
   })
 })

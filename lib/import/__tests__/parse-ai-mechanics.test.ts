@@ -110,6 +110,34 @@ describe("aiMechanicsToDetections", () => {
     expect(detections[0]?.instance.activation?.action).toBe(true)
   })
 
+  it("builds a spend-based special attack that charges only on hit", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "special_attack",
+          attackName: "Charnel Touch",
+          attackProfile: "melee",
+          damageType: "Necrotic",
+          damageFromResourceSpend: true,
+          spendResourceOnHit: true,
+          criticalDamageMultiplier: 2,
+          sourcePhrase: "damage equal to points expended; points aren't expended on a miss",
+          confidence: "high",
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Charnel Touch" },
+    )
+    expect(detections[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "special_attack",
+      attackProfile: "melee",
+      damageTypes: ["Necrotic"],
+      damageDiceCount: 0,
+      damageFromResourceSpend: true,
+      spendResourceOnHit: true,
+      criticalDamageMultiplier: 2,
+    })
+  })
+
   it("builds grant_custom_ability from AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [

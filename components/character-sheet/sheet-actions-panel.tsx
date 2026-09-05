@@ -66,6 +66,7 @@ import { applyResourceToResourceRestore } from "@/lib/character/resource-convers
 import {
   formatEmpowerEffect,
   resolveOverloadedCharge,
+  resolveResourceSpendAttackOutcome,
   resolveSpecialAttackEmpower,
 } from "@/lib/character/special-attack-empower"
 import { defaultSheetPlayState } from "@/lib/character/sheet-play-state"
@@ -441,6 +442,10 @@ function specialAttackDamageLabel(
   ctx: ResolveUsesContext,
 ): string | null {
   if (attack.useWeaponDamage) return "Weapon damage"
+  if (attack.damageFromResourceSpend) {
+    const type = formatSpecialAttackDamageTypes(attack.damageTypes, attack.chooseDamageType)
+    return `Selected resource spend${type ? ` ${type}` : ""}`
+  }
   if (!(attack.damageDiceCount > 0)) return null
   const sides = dieSides(attack.damageDieType)
   const modifier = specialAttackDamageModifier(attack, ctx)
@@ -561,6 +566,8 @@ function ActionRollStep({
   hitDiceSpent,
   hitPointsSpent,
   augmentSummary,
+  resourceSpendDamage = null,
+  onMarkDamageDealt,
   onClose,
 }: {
   action: SheetActionEntry
@@ -577,12 +584,21 @@ function ActionRollStep({
   hitDiceSpent: number
   hitPointsSpent: number
   augmentSummary: string | null
+  resourceSpendDamage?: {
+    amount: number
+    resourceName: string
+    criticalMultiplier: number
+    spendOnHit: boolean
+    onConfirmHit: () => boolean
+  } | null
+  onMarkDamageDealt?: () => void
   onClose: () => void
 }) {
   const history = useSheetRollHistory()
   const rollCtx = useSheetRollContext()
   const [attackSummary, setAttackSummary] = useState<string | null>(null)
   const [damageRollText, setDamageRollText] = useState<string | null>(null)
+  const [attackOutcome, setAttackOutcome] = useState<"hit" | "critical" | "miss" | null>(null)
   const choosesDamageType = specialAttackChoosesDamageType(specialAttack)
   const [selectedDamageType, setSelectedDamageType] = useState(
     specialAttack.damageTypes[0] ?? "",
@@ -603,7 +619,21 @@ function ActionRollStep({
 
   const sides = dieSides(specialAttack.damageDieType)
   const extraDice = bonusDice && bonusDice.count > 0 ? bonusDice : null
-  const damageExpression = `${specialAttack.damageDiceCount}d${sides}${
+  const resourceDamage =
+    resourceSpendDamage && attackOutcome !== "miss"
+      ? resourceSpendDamage.amount *
+        (attackOutcome === "critical" ? resourceSpendDamage.criticalMultiplier : 1)
+      : 0
+  const damageExpression = specialAttack.damageFromResourceSpend
+    ? attackOutcome === "critical"
+      ? `${resourceDamage} (Critical Hit)`
+      : attackOutcome === "hit"
+        ? `${resourceDamage}`
+        : `${resourceSpendDamage?.amount ?? 0} on hit · ${
+            (resourceSpendDamage?.amount ?? 0) *
+            (resourceSpendDamage?.criticalMultiplier ?? 2)
+          } on Critical Hit`
+    : `${specialAttack.damageDiceCount}d${sides}${
     extraDice ? ` + ${extraDice.count}d${extraDice.sides}` : ""
   }${damageModifier ? ` ${damageModifier >= 0 ? "+" : ""}${damageModifier}` : ""}${
     activeDamageType ? ` ${activeDamageType}` : ""
@@ -661,6 +691,36 @@ function ActionRollStep({
     })
   }
 
+  const resolveAttackOutcome = (outcome: "hit" | "critical" | "miss") => {
+    if (attackOutcome) return
+    const resolved = resolveResourceSpendAttackOutcome(
+      specialAttack,
+      resourceSpendDamage?.amount ?? 0,
+      outcome,
+    )
+    if (
+      resolved.resourceSpent > 0 &&
+      resourceSpendDamage?.spendOnHit &&
+      !resourceSpendDamage.onConfirmHit()
+    ) {
+      return
+    }
+    setAttackOutcome(outcome)
+    if (outcome !== "miss") {
+      onMarkDamageDealt?.()
+      if (specialAttack.damageFromResourceSpend) {
+        setDamageRollText(String(resolved.damage))
+        history?.logRoll({
+          kind: "damage",
+          label: `${action.name} damage`,
+          summary: `${resolved.damage}${activeDamageType ? ` ${activeDamageType}` : ""}${
+            outcome === "critical" ? " (Critical Hit)" : ""
+          }`,
+        })
+      }
+    }
+  }
+
   useEffect(() => {
     if (isAttackRoll) rollAttack()
     if (specialAttack.damageDiceCount > 0) rollDamage()
@@ -713,6 +773,56 @@ function ActionRollStep({
             <Dices className="h-3.5 w-3.5" />
             Reroll attack
           </button>
+          {specialAttack.damageFromResourceSpend && resourceSpendDamage ? (
+            <div className="grid grid-cols-3 gap-2 pt-2">
+              <button
+                type="button"
+                disabled={Boolean(attackOutcome)}
+                onClick={() => resolveAttackOutcome("miss")}
+                className="rounded-lg border-2 border-border px-2 py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                Miss
+                <span className="block text-[10px] font-normal text-muted-foreground">
+                  {resourceSpendDamage.spendOnHit ? "spend 0" : `spent ${resourceSpendDamage.amount}`}
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(attackOutcome)}
+                onClick={() => resolveAttackOutcome("hit")}
+                className="rounded-lg border-2 border-primary/50 px-2 py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                Hit
+                <span className="block text-[10px] font-normal text-muted-foreground">
+                  spend {resourceSpendDamage.amount}
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(attackOutcome)}
+                onClick={() => resolveAttackOutcome("critical")}
+                className="rounded-lg border-2 border-primary/50 px-2 py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                Critical
+                <span className="block text-[10px] font-normal text-muted-foreground">
+                  {resourceSpendDamage.amount * resourceSpendDamage.criticalMultiplier} damage
+                </span>
+              </button>
+            </div>
+          ) : null}
+          {attackOutcome ? (
+            <p className="text-xs font-semibold text-primary">
+              {attackOutcome === "miss"
+                ? resourceSpendDamage?.spendOnHit
+                  ? `Miss — no ${resourceSpendDamage.resourceName} spent`
+                  : `Miss — ${resourceSpendDamage?.amount ?? 0} ${
+                      resourceSpendDamage?.resourceName ?? "resource"
+                    } already spent`
+                : `${attackOutcome === "critical" ? "Critical Hit" : "Hit"} — spent ${
+                    resourceSpendDamage?.amount ?? 0
+                  } ${resourceSpendDamage?.resourceName ?? "resource"}`}
+            </p>
+          ) : null}
         </div>
       ) : saveAbility ? (
         <div className="space-y-1">
@@ -726,7 +836,7 @@ function ActionRollStep({
         </div>
       ) : null}
 
-      {specialAttack.damageDiceCount > 0 ? (
+      {specialAttack.damageDiceCount > 0 || specialAttack.damageFromResourceSpend ? (
         <div className="space-y-2">
           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
             Damage ({damageExpression})
@@ -758,23 +868,26 @@ function ActionRollStep({
               ? `${damageRollText}${activeDamageType ? ` ${activeDamageType}` : ""}`
               : "—"}
           </p>
-          <button
-            type="button"
-            onClick={rollDamage}
-            className="inline-flex items-center gap-1.5 rounded-lg border-2 border-border px-3 py-1.5 text-xs font-semibold hover:border-primary/40"
-          >
-            <Dices className="h-3.5 w-3.5" />
-            Reroll damage
-          </button>
+          {!specialAttack.damageFromResourceSpend ? (
+            <button
+              type="button"
+              onClick={rollDamage}
+              className="inline-flex items-center gap-1.5 rounded-lg border-2 border-border px-3 py-1.5 text-xs font-semibold hover:border-primary/40"
+            >
+              <Dices className="h-3.5 w-3.5" />
+              Reroll damage
+            </button>
+          ) : null}
         </div>
       ) : null}
 
       <button
         type="button"
+        disabled={Boolean(resourceSpendDamage && !attackOutcome)}
         onClick={onClose}
-        className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90"
+        className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Done
+        {resourceSpendDamage && !attackOutcome ? "Resolve attack first" : "Done"}
       </button>
     </div>
   )
@@ -1023,16 +1136,27 @@ function ActionDetailOverlay({
               action.limitedUses?.classResourceCostAbility ?? "CHA"
             ] ?? 0,
           ) * configuredResourceCost
-        : configuredResourceCost
+        : // Flat-cost resources still need a selectable range when damage equals spend.
+          specialAttack?.damageFromResourceSpend
+          ? Math.max(1, configuredResourceCost)
+          : configuredResourceCost
   // Menu options own their exact cost. A negative cost is a refund operation such as
   // distilling an Alchemist potion back into its original Reagents.
   const selectedResourceCost = selectedOption?.resourceCost
+  const usesVariableResourceSpend =
+    selectedResourceCost == null &&
+    (resourceCostMode !== "fixed" || Boolean(specialAttack?.damageFromResourceSpend))
+  const availableResourcePoints = usage ? Math.max(0, usage.max - usage.used) : resourceSpendCap
+  const maxSelectableResourceSpend = Math.max(
+    1,
+    Math.min(resourceSpendCap, Math.max(availableResourcePoints, 1)),
+  )
   const resourceSpend =
     selectedResourceCost != null
       ? selectedResourceCost
-      : resourceCostMode === "fixed"
-        ? configuredResourceCost
-        : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
+      : usesVariableResourceSpend
+        ? Math.max(1, Math.min(resourceSpendAmount, maxSelectableResourceSpend))
+        : configuredResourceCost
   const chargeExhausted =
     usage != null && resourceSpend > 0 && usage.max - usage.used < resourceSpend
 
@@ -1093,9 +1217,9 @@ function ActionDetailOverlay({
     const optionResource =
       option.resourceCost != null
         ? option.resourceCost
-        : resourceCostMode === "fixed"
-          ? configuredResourceCost
-          : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
+        : usesVariableResourceSpend
+          ? Math.max(1, Math.min(resourceSpendAmount, maxSelectableResourceSpend))
+          : configuredResourceCost
     const optionExhausted =
       usage != null && optionResource > 0 && usage.max - usage.used < optionResource
     return (
@@ -1122,9 +1246,9 @@ function ActionDetailOverlay({
         ? option.resourceCost
         : !option
           ? resourceSpend
-          : resourceCostMode === "fixed"
-            ? configuredResourceCost
-            : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
+          : usesVariableResourceSpend
+            ? Math.max(1, Math.min(resourceSpendAmount, maxSelectableResourceSpend))
+            : configuredResourceCost
     const extras: string[] = []
     if (option?.actionKind) extras.push(ACTION_KIND_LABELS[option.actionKind])
     else if (showEconomyPicker) extras.push(ACTION_KIND_LABELS[selectedEconomyKind])
@@ -1169,6 +1293,10 @@ function ActionDetailOverlay({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset when the opened action changes
   }, [action.id])
 
+  useEffect(() => {
+    setResourceSpendAmount((prev) => Math.min(Math.max(1, prev), maxSelectableResourceSpend))
+  }, [maxSelectableResourceSpend])
+
   const handleUse = (optionName?: string | null, activationNames?: string[]) => {
     const option =
       (optionName != null && optionName !== ""
@@ -1182,9 +1310,9 @@ function ActionDetailOverlay({
     const useResourceSpend =
       option?.resourceCost != null
         ? option.resourceCost
-        : resourceCostMode === "fixed"
-          ? configuredResourceCost
-          : Math.max(1, Math.min(resourceSpendAmount, resourceSpendCap))
+        : usesVariableResourceSpend
+          ? Math.max(1, Math.min(resourceSpendAmount, maxSelectableResourceSpend))
+          : configuredResourceCost
     const useChargeExhausted =
       usage != null && useResourceSpend > 0 && usage.max - usage.used < useResourceSpend
     const useCanAffordHitDice = useHitDiceNeeded <= 0 || useHitDiceNeeded <= hitDiceRemaining
@@ -1246,9 +1374,15 @@ function ActionDetailOverlay({
     }
 
     const spendViaAugments = psiCost > 0
+    const deferResourceSpendUntilHit = Boolean(
+      specialAttack?.spendResourceOnHit &&
+        usage &&
+        !spendViaAugments &&
+        useResourceSpend > 0,
+    )
     const sharesEmpowerPool =
       empowerPool != null && usage != null && empowerPool.resourceId === usage.resourceId
-    if (usage && !spendViaAugments) {
+    if (usage && !spendViaAugments && !deferResourceSpendUntilHit) {
       usage.setUsed(usage.used + useResourceSpend + (sharesEmpowerPool ? empowerResourceCost : 0))
     }
     setParentUsedThisOpen(true)
@@ -1474,14 +1608,20 @@ function ActionDetailOverlay({
         }
       }
     }
-    if ((specialAttack?.damageDiceCount ?? 0) > 0 && onMarkDamageDealt) {
+    if (
+      (specialAttack?.damageDiceCount ?? 0) > 0 &&
+      !deferResourceSpendUntilHit &&
+      onMarkDamageDealt
+    ) {
       onMarkDamageDealt()
     }
     if (useHitDiceNeeded > 0) parts.push(`Spent ${useHitDiceNeeded} Hit Dice`)
     if (psiCost > 0) parts.push(`Spent ${psiCost} psi`)
     if (augmentSummary) parts.push(augmentSummary)
-    if (usage && !spendViaAugments && useResourceSpend > 0) {
+    if (usage && !spendViaAugments && useResourceSpend > 0 && !deferResourceSpendUntilHit) {
       parts.push(`Spent ${useResourceSpend} ${usage.resourceName ?? "resource"}`)
+    } else if (deferResourceSpendUntilHit) {
+      parts.push(`Spend ${useResourceSpend} ${usage?.resourceName ?? "resource"} on hit`)
     }
 
     const actionHealCtx = healContextForAction(healContext, action)
@@ -1537,7 +1677,7 @@ function ActionDetailOverlay({
       if (appliedAny) {
         if (banked > 0 && onBankBalanceOfPower) onBankBalanceOfPower(banked)
         setUseFeedback(healParts.join(" · ") || "Used!")
-        if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile)) {
+        if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile || specialAttack.damageFromResourceSpend)) {
           setStep("roll")
           return
         }
@@ -1546,7 +1686,7 @@ function ActionDetailOverlay({
       }
     }
 
-    if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile)) {
+    if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile || specialAttack.damageFromResourceSpend)) {
       setStep("roll")
       return
     }
@@ -1889,6 +2029,24 @@ function ActionDetailOverlay({
             hitDiceSpent={hitDiceNeeded}
             hitPointsSpent={hitPointsNeeded}
             augmentSummary={augmentSummary}
+            resourceSpendDamage={
+              specialAttack.damageFromResourceSpend &&
+              usage &&
+              resourceSpend > 0
+                ? {
+                    amount: resourceSpend,
+                    resourceName: usage.resourceName ?? action.classResourceKey ?? "resource",
+                    criticalMultiplier: specialAttack.criticalDamageMultiplier ?? 2,
+                    spendOnHit: Boolean(specialAttack.spendResourceOnHit),
+                    onConfirmHit: () => {
+                      if (usage.max - usage.used < resourceSpend) return false
+                      usage.setUsed(usage.used + resourceSpend)
+                      return true
+                    },
+                  }
+                : null
+            }
+            onMarkDamageDealt={onMarkDamageDealt}
             onClose={onClose}
           />
         ) : step === "spell" && action.castSpellChoice ? (
@@ -2506,29 +2664,71 @@ function ActionDetailOverlay({
               {usage &&
               action.classResourceKey &&
               selectedResourceCost == null &&
-              resourceCostMode !== "fixed" ? (
-                <label className="flex items-center justify-between gap-3 text-xs font-semibold text-foreground">
-                  Resource spend
-                  <input
-                    type="number"
-                    min={1}
-                    max={Math.min(resourceSpendCap, usage.max - usage.used)}
-                    value={resourceSpendAmount}
-                    onChange={(event) =>
-                      setResourceSpendAmount(
-                        Math.max(
-                          1,
-                          Math.min(
-                            resourceSpendCap,
-                            usage.max - usage.used,
-                            Number(event.target.value),
-                          ),
-                        ),
+              usesVariableResourceSpend ? (
+                <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-primary">
+                      {specialAttack?.damageFromResourceSpend
+                        ? `Points to spend · ${
+                            formatSpecialAttackDamageTypes(
+                              specialAttack.damageTypes,
+                              specialAttack.chooseDamageType,
+                            ) || "damage"
+                          } on hit`
+                        : `Spend ${usage.resourceName ?? "resource"}`}
+                    </p>
+                    <p className="text-[10px] tabular-nums text-muted-foreground">
+                      {availableResourcePoints} left
+                      {resourceCostMode !== "fixed" ? ` · max ${resourceSpendCap}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from({ length: maxSelectableResourceSpend }, (_, index) => {
+                      const spend = index + 1
+                      const affordable = spend <= availableResourcePoints
+                      return (
+                        <button
+                          key={spend}
+                          type="button"
+                          disabled={!affordable}
+                          onClick={() => setResourceSpendAmount(spend)}
+                          className={cn(
+                            "min-w-9 rounded-lg border px-2 py-1.5 text-xs font-semibold tabular-nums transition-colors",
+                            spend === resourceSpend
+                              ? "border-primary bg-primary/15 text-foreground"
+                              : "border-border hover:border-primary/40",
+                            !affordable && "opacity-40",
+                          )}
+                        >
+                          {spend}
+                        </button>
                       )
-                    }
-                    className="h-8 w-20 rounded border border-border bg-background px-2 text-center"
-                  />
-                </label>
+                    })}
+                  </div>
+                  {specialAttack?.damageFromResourceSpend ? (
+                    <p className="text-xs text-muted-foreground">
+                      {(() => {
+                        const damageType =
+                          formatSpecialAttackDamageTypes(
+                            specialAttack.damageTypes,
+                            specialAttack.chooseDamageType,
+                          ) || "damage"
+                        return (
+                          <>
+                            Hit deals {resourceSpend} {damageType}
+                            {" · "}
+                            Critical deals{" "}
+                            {resourceSpend * (specialAttack.criticalDamageMultiplier ?? 2)}{" "}
+                            {damageType}
+                            {specialAttack.spendResourceOnHit
+                              ? " · points spent only on a hit"
+                              : ""}
+                          </>
+                        )
+                      })()}
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
               {empower && empowerPool ? (
                 <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">

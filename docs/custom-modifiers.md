@@ -184,6 +184,13 @@ type (Thri-kreen Secondary Arms). `extraSlots` (default 1) plus optional
 panel + persist), not a species-name branch. Do not reuse `held_items_cap`
 (Alchemist held crafts).
 
+**Spend-based special attacks (2026-09-04).** `special_attack` can set
+`damageFromResourceSpend`, `spendResourceOnHit`, and `criticalDamageMultiplier`.
+The action's variable `limitedUses` chooses and caps the spend; the roll step
+then confirms Miss / Hit / Critical, deducts only on a hit when configured, and
+uses the selected spend as flat damage. Charnel Touch uses this with a 5 × PB
+cap. Keep this generic—do not branch on the feature name in sheet runtime.
+
 Audit (2026-09-01): **no dead types**. “Unreachable” (applied but neither
 Compendium-authorable nor importable): `catalog_option`, `craftable_items`,
 `held_items_cap`. Those are enrichment / system-inserted. Untested:

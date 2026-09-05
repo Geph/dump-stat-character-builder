@@ -23,6 +23,32 @@ export type OverloadedCharge = {
   canAfford: boolean
 }
 
+export type ResourceSpendAttackOutcome = "hit" | "critical" | "miss"
+
+/** Resolve flat spend-based damage and whether the selected resource is actually consumed. */
+export function resolveResourceSpendAttackOutcome(
+  attack: Pick<
+    SpecialAttackCharacteristic,
+    "damageFromResourceSpend" | "spendResourceOnHit" | "criticalDamageMultiplier"
+  >,
+  selectedSpend: number,
+  outcome: ResourceSpendAttackOutcome,
+): { resourceSpent: number; damage: number } {
+  const spend = Math.max(0, Math.floor(selectedSpend))
+  if (outcome === "miss") {
+    return {
+      resourceSpent: attack.spendResourceOnHit ? 0 : spend,
+      damage: 0,
+    }
+  }
+  const multiplier =
+    outcome === "critical" ? Math.max(1, attack.criticalDamageMultiplier ?? 2) : 1
+  return {
+    resourceSpent: spend,
+    damage: attack.damageFromResourceSpend ? spend * multiplier : 0,
+  }
+}
+
 /** Mad Bomber: spend PB real Reagents, then apply two generated Reagents beyond the normal cap. */
 export function resolveOverloadedCharge(
   proficiencyBonus: number,

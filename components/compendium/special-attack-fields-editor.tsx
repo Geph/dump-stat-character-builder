@@ -269,6 +269,55 @@ export function SpecialAttackFieldsEditor({
         Use weapon damage dice (Volley, Whirlwind, Steel Wind Slash, etc.)
       </label>
 
+      <div className="space-y-2 rounded-lg border border-border bg-card/50 p-3">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={Boolean(mod.damageFromResourceSpend)}
+            onChange={(event) =>
+              onChange({
+                ...mod,
+                damageFromResourceSpend: event.target.checked,
+                damageDiceCount: event.target.checked ? 0 : Math.max(1, mod.damageDiceCount),
+              })
+            }
+            className="accent-primary"
+          />
+          Damage equals the variable class-resource spend
+        </label>
+        {mod.damageFromResourceSpend ? (
+          <>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={Boolean(mod.spendResourceOnHit)}
+                onChange={(event) =>
+                  onChange({ ...mod, spendResourceOnHit: event.target.checked })
+                }
+                className="accent-primary"
+              />
+              Deduct the resource only after a hit
+            </label>
+            <label className="block text-xs text-muted-foreground">
+              Critical-hit damage multiplier
+              <input
+                type="number"
+                min={1}
+                max={4}
+                value={mod.criticalDamageMultiplier ?? 2}
+                onChange={(event) =>
+                  onChange({
+                    ...mod,
+                    criticalDamageMultiplier: parseInt(event.target.value, 10) || 2,
+                  })
+                }
+                className="ml-2 w-16 rounded border border-border bg-background px-2 py-1 text-center text-sm"
+              />
+            </label>
+          </>
+        ) : null}
+      </div>
+
       <div>
         <label className="block text-xs font-semibold text-foreground mb-2">Weapon properties</label>
         <WeaponPropertiesChecklist
@@ -282,9 +331,17 @@ export function SpecialAttackFieldsEditor({
           <label className="block text-xs text-muted-foreground mb-1">Base dice count</label>
           <input
             type="number"
-            min={1}
+            min={mod.damageFromResourceSpend ? 0 : 1}
             value={mod.damageDiceCount}
-            onChange={(e) => onChange({ ...mod, damageDiceCount: parseInt(e.target.value, 10) || 1 })}
+            onChange={(e) =>
+              onChange({
+                ...mod,
+                damageDiceCount: mod.damageFromResourceSpend
+                  ? Math.max(0, parseInt(e.target.value, 10) || 0)
+                  : parseInt(e.target.value, 10) || 1,
+              })
+            }
+            disabled={Boolean(mod.damageFromResourceSpend)}
             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
           />
         </div>

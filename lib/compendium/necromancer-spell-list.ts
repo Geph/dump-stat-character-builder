@@ -46,6 +46,7 @@ export const NECROMANCER_SPELLS_BY_LEVEL: Readonly<Record<number, readonly strin
     "Feather Fall",
     "Flawed Reconstruction",
     "Fog Cloud",
+    "Gahoul's Shrieking Skull",
     "Grease",
     "Hideous Laughter",
     "Identify",

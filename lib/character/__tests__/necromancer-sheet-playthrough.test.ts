@@ -128,10 +128,21 @@ describe("Necromancer free-subclass sheet playthrough", () => {
     expect(touch?.limitedUses).toMatchObject({
       type: "class_resource",
       classResourceKey: "charnel_touch",
+      classResourceAmount: 5,
+      classResourceCostMode: "up_to_proficiency_bonus",
     })
     const action = actionsAt(1).find((row) => row.name === "Charnel Touch")
     expect(action).toMatchObject({
       kinds: expect.arrayContaining(["action"]),
+      classResourceKey: "charnel_touch",
+      specialAttack: {
+        attackProfile: "melee",
+        damageTypes: ["Necrotic"],
+        damageDiceCount: 0,
+        damageFromResourceSpend: true,
+        spendResourceOnHit: true,
+        criticalDamageMultiplier: 2,
+      },
     })
     const pool = entry.class?.class_resources?.find((row) => row.id === "charnel_touch")
     expect(pool?.uses).toMatchObject({

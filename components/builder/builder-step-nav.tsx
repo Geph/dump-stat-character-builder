@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { ChevronLeft, ChevronRight, Check, ExternalLink } from "lucide-react"
 import { ProceedBlockerBanner } from "@/components/builder/proceed-blocker-banner"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { BuilderBlocker } from "@/lib/builder/proceed-blockers"
 import { cn } from "@/lib/utils"
 
@@ -112,39 +111,70 @@ function BlockedActionButton({
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const panelId = useId()
+
+  // Plain local panel — Radix Popover/HoverCard both looped here with parent re-renders.
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false)
+    }
+    document.addEventListener("pointerdown", onPointerDown)
+    document.addEventListener("keydown", onKeyDown)
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown)
+      document.removeEventListener("keydown", onKeyDown)
+    }
+  }, [open])
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <span
-          tabIndex={0}
-          role="button"
-          aria-label={title}
-          className="inline-flex cursor-not-allowed rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-          onMouseEnter={() => setOpen(true)}
-          onFocus={() => setOpen(true)}
-        >
-          {children}
-        </span>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        side="top"
-        sideOffset={8}
-        className="w-[min(22rem,calc(100vw-2rem))] border-destructive/40 bg-card text-foreground p-4 shadow-xl z-[110]"
-        onOpenAutoFocus={(event) => event.preventDefault()}
-        onCloseAutoFocus={(event) => event.preventDefault()}
+    <div
+      ref={rootRef}
+      className="relative inline-flex"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <span
+        tabIndex={0}
+        role="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={title}
+        className={cn(
+          "inline-flex cursor-not-allowed rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+          compact && "max-sm:rounded-lg",
+        )}
+        onClick={() => setOpen((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault()
+            setOpen((value) => !value)
+          }
+        }}
       >
-        <ProceedBlockerBanner
-          blockers={blockers}
-          heading={heading}
-          onJump={(blocker) => {
-            setOpen(false)
-            onJump?.(blocker)
-          }}
-        />
-      </PopoverContent>
-    </Popover>
+        {children}
+      </span>
+      {open ? (
+        <div
+          id={panelId}
+          role="status"
+          className="absolute bottom-full right-0 mb-2 w-[min(22rem,calc(100vw-2rem))] rounded-md border border-destructive/40 bg-card p-4 text-foreground shadow-xl z-[110]"
+        >
+          <ProceedBlockerBanner
+            blockers={blockers}
+            heading={heading}
+            onJump={(blocker) => {
+              setOpen(false)
+              onJump?.(blocker)
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
   )
 }
 

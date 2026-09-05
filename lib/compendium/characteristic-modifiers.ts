@@ -770,6 +770,12 @@ export interface SpecialAttackCharacteristic extends CharacteristicModifierBase 
   damageDiceCount: number
   damageDieType: SpecialAttackDieType
   damageByLevel?: BonusByLevelEntry[]
+  /** Damage is the selected variable class-resource spend rather than dice. */
+  damageFromResourceSpend?: boolean
+  /** Deduct the selected class-resource spend only after a hit is confirmed. */
+  spendResourceOnHit?: boolean
+  /** Multiplier for resource-spend damage on a critical hit (default 2). */
+  criticalDamageMultiplier?: number | null
   saveAbility?: string | null
   saveDCBase?: number | null
   /** On a successful save, target takes half damage (area exploits). */
@@ -2202,6 +2208,9 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       damageDiceCount: raw.damageDiceCount ?? 1,
       damageDieType: raw.damageDieType ?? "d6",
       damageByLevel: raw.damageByLevel ?? [],
+      damageFromResourceSpend: raw.damageFromResourceSpend ?? false,
+      spendResourceOnHit: raw.spendResourceOnHit ?? false,
+      criticalDamageMultiplier: raw.criticalDamageMultiplier ?? 2,
     }
   }
 

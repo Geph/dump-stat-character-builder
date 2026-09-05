@@ -8,6 +8,7 @@ import { sanitizeCaptainSubclassFeatures } from "@/lib/compendium/captain-featur
 import { enrichSubclassDisplayList } from "@/lib/compendium/enrich-subclass-display"
 import { enrichPsionicTalentGrantFeatures } from "@/lib/builder/aggregate-psionic-talents"
 import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
+import { filterSpellsForBuilder } from "@/lib/compendium/builder-spell-availability"
 import { filterEnabled } from "@/lib/compendium/compendium-enabled"
 import { loadModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { loadCustomAbilitiesForGameplay } from "@/lib/compendium/load-custom-abilities-for-gameplay"
@@ -299,7 +300,7 @@ async function fetchBuilderCompendium(db: DataClient): Promise<BuilderCompendium
     ) as unknown as Feat[]
   }
 
-  const spells = filterEnabled(
+  const spells = filterSpellsForBuilder(
     asCompendiumRows(spellsRes.data).map((row) =>
       enrichSpellRowWithBundledCardImage(row as Record<string, unknown>),
     ),
