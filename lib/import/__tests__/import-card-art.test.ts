@@ -331,8 +331,17 @@ describe("import-card-art", () => {
       { [importCardArtTargetKey("backgrounds", 0)]: "" },
       targets,
     )
+    const acolyteOnDisk = existsSync(
+      join(process.cwd(), "public/images/compendium/backgrounds/acolyte.png"),
+    )
     if (charlatanOnDisk) {
       expect(filled?.[importCardArtTargetKey("backgrounds", 0)]).toMatch(/charlatan\.png$/)
+    } else if (acolyteOnDisk) {
+      // Charlatan stays blank; other blank targets with present local art are restored.
+      expect(filled?.[importCardArtTargetKey("backgrounds", 0)] ?? "").toBe("")
+      expect(filled?.[importCardArtTargetKey("backgrounds", 1)]).toMatch(
+        /\/images\/compendium\/backgrounds\/acolyte\.png$/,
+      )
     } else {
       expect(filled).toBeNull()
     }

@@ -119,6 +119,8 @@ describe("LaserLlama Alternate Sorcerer import", () => {
       selectedCustomAbilityNames: ["Careful Spell"],
       spellLevel: 2,
     })
-    expect(options).toEqual([{ id: "mm_careful", name: "Careful Spell", cost: 1 }])
+    expect(options).toEqual([
+      { id: "mm_careful", name: "Careful Spell", cost: 1, effectHint: null },
+    ])
   })
 })
