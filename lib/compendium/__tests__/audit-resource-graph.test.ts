@@ -62,13 +62,6 @@ describe("audit-resource-graph", () => {
       [
         {
           "class": "Alchemist",
-          "feature": "Potion Brewing",
-          "level": 1,
-          "phrase": "You can spend 10 minutes and expend any number of Reagents to brew potions, which can be done during a Short Rest",
-          "resource": "Reagents",
-        },
-        {
-          "class": "Alchemist",
           "feature": "Prime Bomb",
           "level": 2,
           "phrase": "When you reach certain Alchemist levels, you can expend more Reagents, up to the number shown in the Prime Bomb column of the Alchemist Features table, adding 1d10 damage for each ",
@@ -149,13 +142,6 @@ describe("audit-resource-graph", () => {
           "feature": "High Morale (Lion Banner)",
           "level": 6,
           "phrase": "Each creature that failed its saving throw gains the benefit of Morale Boost, and you only expend one Battle Die",
-          "resource": "Battle Dice",
-        },
-        {
-          "class": "Captain",
-          "feature": "Valiant Surge",
-          "level": 7,
-          "phrase": "Whenever you or your Cohort score a Critical Hit or reduce an enemy to 0 Hit Points, you regain an expended Battle Die",
           "resource": "Battle Dice",
         },
         {
@@ -269,13 +255,6 @@ describe("audit-resource-graph", () => {
           "level": 20,
           "phrase": "You can use Rushed Incantation to cast the chosen spells without expending a use of the feature, and you don't need to read from your grimoire to cast them",
           "resource": "Rushed Incantation",
-        },
-        {
-          "class": "Martyr",
-          "feature": "Spellcasting",
-          "level": 1,
-          "phrase": "Spell Slot Level Damage 1 5 2 10 3 20 4 30 5 40 Spell Uses",
-          "resource": "Spell Uses",
         },
         {
           "class": "Martyr",
@@ -611,13 +590,6 @@ describe("audit-resource-graph", () => {
           "feature": "Battle Tactics (Grey Watchman)",
           "level": 3,
           "phrase": "You can perform incredible feats of daring fueled by special dice called Battle Dice",
-          "resource": "Battle Dice",
-        },
-        {
-          "class": "Warden (Mage Hand Press)",
-          "feature": "Unyielding Surge (Grey Watchman)",
-          "level": 6,
-          "phrase": "When you become Bloodied, you can regain an expended Battle Die (no action required)",
           "resource": "Battle Dice",
         },
         {

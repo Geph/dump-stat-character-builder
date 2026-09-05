@@ -377,12 +377,10 @@ export function SpellDetailOverlay({
             )}
           </dl>
 
-          {spell.description && (
-            <div>
-              <h3 className="text-xs font-bold uppercase text-muted-foreground mb-1">Description</h3>
-              <RichTextContent html={spell.description} className="text-sm text-foreground leading-relaxed" />
-            </div>
-          )}
+          <div>
+            <h3 className="text-xs font-bold uppercase text-muted-foreground mb-1">Description</h3>
+            <RichTextContent html={spell.description} className="text-sm text-foreground leading-relaxed" />
+          </div>
 
           {spell.higher_levels && (
             <div>

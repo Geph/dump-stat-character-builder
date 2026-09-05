@@ -48,7 +48,7 @@ export const MHP_SUBCLASS_FLAVOR: Record<string, string> = {
   "Necromancer::Overlord":
     "The army is the point. You spend the turn issuing orders to a tide of obedient corpses.",
   "Necromancer::Pale Master":
-    "Lichdom as a syllabus. You chase the classic horrors—phylactery logic, draining touch, and a body that forgets mortality.",
+    "Lichdom as a syllabus. You chase classic horrors—phylactery logic, draining touch, and a body that forgets mortality.",
   "Vagabond::Houndmaster":
     "The road is less lonely with a good dog. You fight as a pair and let the hound create the opening.",
   "Vagabond::Mage Brand":

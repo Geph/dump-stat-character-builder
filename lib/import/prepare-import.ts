@@ -17,6 +17,7 @@ import {
 } from "@/lib/import/import-proposals"
 import {
   applyImportCollisionResolutions,
+  collisionOverwriteNamesByKind,
   applyImportRenames,
   collisionUpdateNamesByKind,
   type ImportCollision,
@@ -190,6 +191,10 @@ export async function finalizeImportWithPersist(
         ...persistOptions?.updateExistingNames,
         ...collisionUpdateNamesByKind(collisions, collisionResolutionMap),
       },
+      overwriteExistingNames: {
+        ...persistOptions?.overwriteExistingNames,
+        ...collisionOverwriteNamesByKind(collisions, collisionResolutionMap),
+      },
     })
   }
 
@@ -205,6 +210,10 @@ export async function finalizeImportWithPersist(
     updateExistingNames: {
       ...persistOptions?.updateExistingNames,
       ...collisionUpdateNamesByKind(collisions, collisionResolutionMap),
+    },
+    overwriteExistingNames: {
+      ...persistOptions?.overwriteExistingNames,
+      ...collisionOverwriteNamesByKind(collisions, collisionResolutionMap),
     },
   })
 }

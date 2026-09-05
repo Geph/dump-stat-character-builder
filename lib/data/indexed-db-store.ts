@@ -8,6 +8,7 @@ import {
 } from "@/lib/character/character-classes"
 import { attachClassResourcesToClass } from "@/lib/compendium/resolve-class-resources"
 import { unionSpellClassNames } from "@/lib/import/class-spell-lists"
+import { mergeSpellRowForPersist } from "@/lib/import/merge-spell-persist"
 
 const DB_NAME = "dump-stat"
 /** Bump when COMPENDIUM_TABLES or app stores gain a new store (v6: parties + character_snapshots). */
@@ -246,12 +247,18 @@ async function upsertByName(
     const name = row.name as string
     if (!name) continue
     const prev = byName.get(name)
-    const payload: Record<string, unknown> = {
-      ...row,
-      id: (prev?.id as string) ?? (row.id as string) ?? newId(),
-      created_at: prev?.created_at ?? now,
-      updated_at: now,
-    }
+    const payload: Record<string, unknown> =
+      prev && storeName === "spells"
+        ? {
+            ...mergeSpellRowForPersist(prev, row),
+            updated_at: now,
+          }
+        : {
+            ...row,
+            id: (prev?.id as string) ?? (row.id as string) ?? newId(),
+            created_at: prev?.created_at ?? now,
+            updated_at: now,
+          }
     // Keep the user's enable/disable toggle across SRD reseeds.
     if (prev && "enabled" in prev) {
       payload.enabled = prev.enabled

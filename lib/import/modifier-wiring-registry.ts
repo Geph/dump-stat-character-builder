@@ -391,6 +391,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       'classResourceKey: "psi_points", classResourceCost from match. "unless you expend N psi points" refresh clauses are skipped (not an activation cost).',
   },
   {
+    ruleId: "resource.expend_spell_uses",
+    trigger: "description",
+    catalog: "cat_char_uses",
+    examples: [
+      "When you cast one of your level 1+ Martyr spells, you expend one use of your spell uses in addition to taking Radiant damage",
+    ],
+    mechanicsKind: "uses",
+    notes:
+      'classResourceKey: "spell_uses", classResourceAmount 1. Hit Point Spellcasting still spends current HP separately — do not invent slot progression.',
+  },
+  {
     ruleId: "heal.turn_start_low_hp",
     trigger: "description",
     catalog: "cat_char_turn_start_trigger",

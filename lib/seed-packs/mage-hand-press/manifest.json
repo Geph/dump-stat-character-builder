@@ -2,7 +2,7 @@
   "id": "mage-hand-press",
   "label": "Mage Hand Press",
   "source": "Mage Hand Press",
-  "version": "2026-08-20",
+  "version": "2026-09-05",
   "files": [
     "magehandpress-alchemist-class.json",
     "magehandpress-captain-class.json",

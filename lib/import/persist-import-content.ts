@@ -274,6 +274,7 @@ export async function persistImportedContent(
       existingClasses: await listRows("classes"),
       incomingClasses: sanitized.classes as unknown as Record<string, unknown>[] | undefined,
       incomingSpells: sanitized.spells?.map((s) => stampSource({ ...s }, source)),
+      replaceSourceNames: options.overwriteExistingNames?.spell,
     })
     const spellRows = [...catalogPatches, ...incoming]
     if (spellRows.length) {

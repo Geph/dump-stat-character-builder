@@ -3,6 +3,7 @@ import {
   applyImportCollisionResolutions,
   applyImportRenames,
   buildImportCollisions,
+  collisionOverwriteNamesByKind,
   collisionUpdateNamesByKind,
   defaultCollisionResolutionMap,
   defaultRenameMap,
@@ -99,6 +100,9 @@ describe("buildImportCollisions", () => {
     )
     expect(next.classes?.[0].name).toBe("Alchemist")
     expect(collisionUpdateNamesByKind(collisions, { [collisions[0].id]: "update" })).toEqual({
+      class: ["alchemist"],
+    })
+    expect(collisionOverwriteNamesByKind(collisions, { [collisions[0].id]: "overwrite" })).toEqual({
       class: ["alchemist"],
     })
   })

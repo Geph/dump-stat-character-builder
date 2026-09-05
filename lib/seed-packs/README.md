@@ -37,7 +37,7 @@ To re-strip paid abilities from already-built JSON without a full Drive rebuild:
 node scripts/strip-mhp-paid-abilities.mjs
 ```
 
-Card art is **not** stored in these JSON files. After you optimize local Kibbles (or Mage Hand Press) portraits, import / Seed Example Content attaches `/images/compendium/…` only when the file exists on this machine.
+Card art is **not** stored in these JSON files. Hosted `jeffginger.com` portraits are stripped at pack build time; leave `card_image_url` blank so a user can attach art later. After you optimize local Kibbles (or Mage Hand Press) portraits, import / Seed Example Content attaches `/images/compendium/…` only when the file exists on this machine.
 
 ## Runtime seed
 

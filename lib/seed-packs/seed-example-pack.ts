@@ -4,6 +4,7 @@ import type { PersistImportOptions } from "@/lib/import/persist-import-options"
 import type { PersistImportResult } from "@/lib/import/persist-import-types"
 import { loadExampleSeedPack } from "@/lib/seed-packs/load-pack"
 import type { ExampleSeedPackId } from "@/lib/seed-packs/pack-ids"
+import { stripBlockedHostedCardArt } from "@/lib/seed-packs/strip-hosted-card-art"
 
 export type ExampleSeedFileError = {
   fileIndex: number
@@ -86,7 +87,7 @@ export async function seedExamplePack(
     const file = loaded.files[index]
     const fileLabel = labelSeedPackFile(file, index)
     try {
-      const result = await persist(file, loaded.source, {
+      const result = await persist(stripBlockedHostedCardArt(file), loaded.source, {
         ...persistOptions,
         preferSameSourceReplacements: true,
       })

@@ -3213,6 +3213,25 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "resource.expend_spell_uses",
+    confidence: "high",
+    scope: "full",
+    test: /\bexpend(?:s|ing)?\s+(?:one|a|1)\s+use\s+of\s+your\s+spell\s+uses\b/i,
+    build: (_match, ctx) =>
+      charInstance(newInstanceId(), characteristicCatalogRefId("uses"), [
+        {
+          id: modId(instanceKey(ctx, "spell_uses_spend")),
+          type: "uses",
+          uses: {
+            type: "class_resource",
+            classResourceKey: "spell_uses",
+            classResourceAmount: 1,
+          },
+          label: "Spell Uses",
+        },
+      ]),
+  },
+  {
     id: "spellcasting.ability",
     confidence: "high",
     test:

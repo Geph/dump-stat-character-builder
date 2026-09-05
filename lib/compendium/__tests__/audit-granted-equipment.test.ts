@@ -145,6 +145,9 @@ describe("audit-granted-equipment", () => {
       classes: [
         {
           name: "Investigator",
+          description: null,
+          hit_die: 8,
+          primary_ability: ["Intelligence"],
           features: [
             grantFeature({
               name: "Holy Trinkets",

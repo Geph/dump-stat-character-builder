@@ -85,6 +85,16 @@ describe.skipIf(!hasMartyr)("Martyr Drive import wiring", () => {
     const spellcasting = content.classes?.[0]?.features?.find((f) => f.name === "Spellcasting") as Feature | undefined
     expect(spellcasting?.description).toMatch(/Hit Point Spellcasting/i)
     expect(spellcasting?.description).toMatch(/current HP/i)
+    expect(
+      spellcasting?.linkedModifiers
+        ?.flatMap((instance) => instance.characteristics ?? [])
+        .some(
+          (char) =>
+            char.type === "uses" &&
+            char.uses?.type === "class_resource" &&
+            char.uses.classResourceKey === "spell_uses",
+        ),
+    ).toBe(true)
   })
 
   it("wires Undying, Miraculous Healing, and Reprisal activations", () => {

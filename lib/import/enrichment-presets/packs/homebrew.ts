@@ -1449,6 +1449,27 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
         op: "appendDescription",
         text: "The sheet deducts Hit Point Spellcasting damage from current HP when you cast a level 1+ Martyr spell (bypasses Temporary Hit Points; ignores Resistance and Immunity). Spell Uses are a separate long-rest pool. Do not invent normal spell-slot progression.",
       },
+      {
+        op: "attachNamedPreset",
+        skipIfCharacteristicTypes: ["uses"],
+        preset: {
+          kind: "char_instance",
+          idKey: "martyr_spell_uses",
+          catalogRefId: characteristicCatalogRefId("uses"),
+          characteristics: [
+            {
+              id: modId("martyr_spell_uses"),
+              type: "uses",
+              uses: {
+                type: "class_resource",
+                classResourceKey: "spell_uses",
+                classResourceAmount: 1,
+              },
+              label: "Spell Uses",
+            },
+          ],
+        },
+      },
     ],
   },
   {

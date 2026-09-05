@@ -5,7 +5,9 @@ import { serializeRow, serializeRows } from "./serialize"
 import type { TableName } from "./schema"
 import type { CompendiumTable, ResolvableTable } from "./tables"
 import { isCompendiumTable } from "./tables"
+import { fillEmptySpellWriteup, fillEmptySpellWriteups } from "@/lib/compendium/fill-spell-writeup-from-srd"
 import { unionSpellClassNames } from "@/lib/import/class-spell-lists"
+import { mergeSpellRowForPersist } from "@/lib/import/merge-spell-persist"
 
 export type Filter =
   | { op: "eq"; column: string; value: unknown }
@@ -79,14 +81,17 @@ export async function listRows(
   if (orderBy.length) query = query.orderBy(...orderBy)
   if (options.limit) query = query.limit(options.limit)
   const rows = await query
-  return serializeRows(rows as unknown as Record<string, unknown>[])
+  const serialized = serializeRows(rows as unknown as Record<string, unknown>[])
+  return table === "spells" ? fillEmptySpellWriteups(serialized) : serialized
 }
 
 export async function getRowById(table: ResolvableTable, id: string) {
   const t = getTable(table)
   const db = getDb()
   const [row] = await db.select().from(t).where(eq(t.id, id)).limit(1)
-  return row ? serializeRow(row as unknown as Record<string, unknown>) : null
+  if (!row) return null
+  const serialized = serializeRow(row as unknown as Record<string, unknown>)
+  return table === "spells" ? fillEmptySpellWriteup(serialized) : serialized
 }
 
 export async function insertRows(table: ResolvableTable, rows: Record<string, unknown>[]) {
@@ -137,26 +142,33 @@ export async function upsertByName(table: CompendiumTable, rows: Record<string, 
     const name = row.name as string
     if (!name) continue
     const [existing] = await db.select().from(t).where(eq(t.name, name)).limit(1)
-    const payload: Record<string, unknown> = {
-      ...row,
-      id: (existing as { id?: string } | undefined)?.id ?? randomUUID(),
-    }
-    if (existing) {
+    const existingRow = existing
+      ? serializeRow(existing as unknown as Record<string, unknown>)
+      : null
+    const payload: Record<string, unknown> =
+      existingRow && table === "spells"
+        ? mergeSpellRowForPersist(existingRow, row)
+        : {
+            ...row,
+            id: existingRow?.id ?? randomUUID(),
+          }
+    if (existingRow) {
       // Keep the user's enable/disable toggle across SRD reseeds.
-      if ("enabled" in (existing as object)) {
-        ;(payload as Record<string, unknown>).enabled = (existing as { enabled: unknown }).enabled
+      if ("enabled" in existingRow) {
+        payload.enabled = existingRow.enabled
       }
       if (table === "spells") {
-        ;(payload as Record<string, unknown>).classes = unionSpellClassNames(
-          Array.isArray((existing as { classes?: unknown }).classes)
-            ? ((existing as { classes: string[] }).classes)
-            : null,
+        payload.classes = unionSpellClassNames(
+          Array.isArray(existingRow.classes) ? (existingRow.classes as string[]) : null,
           Array.isArray(payload.classes) ? (payload.classes as string[]) : null,
         )
+      } else {
+        payload.id = existingRow.id
       }
-      const { id: _id, created_at: _c, ...rest } = payload as Record<string, unknown>
-      await db.update(t).set(rest as never).where(eq(t.id, (existing as { id: string }).id))
+      const { id: _id, created_at: _c, ...rest } = payload
+      await db.update(t).set(rest as never).where(eq(t.id, existingRow.id as string))
     } else {
+      if (!payload.id) payload.id = randomUUID()
       await db.insert(t).values(payload as never)
     }
   }

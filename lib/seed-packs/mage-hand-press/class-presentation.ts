@@ -1,3 +1,5 @@
+import { MHP_SUBCLASS_FLAVOR } from "@/lib/seed-packs/mage-hand-press/subclass-flavor"
+
 /**
  * Curated Mage Hand Press class card presentation (icons, blurbs, source details,
  * and stripped "Becoming…" descriptions). Sourced from the local default load set.
@@ -9,13 +11,30 @@ export type MhpClassPresentation = {
   creator_url: string
   /** Rules-only class description (no flavor paragraphs). */
   description: string
+  /** Local filename slug when the user later attaches card art. Not a hosted URL. */
   card_image_slug: string
 }
 
-const MHP_CARD_IMAGE_BASE = "https://jeffginger.com/dumpstat/images/magehandpress/classes"
+/** Bundled packs leave card art blank. Users overwrite with local `/images/compendium/…`. */
+export function mhpClassCardImageUrl(_slug: string): null {
+  return null
+}
 
-export function mhpClassCardImageUrl(slug: string): string {
-  return `${MHP_CARD_IMAGE_BASE}/${slug}.png`
+function classNameBase(name: string): string {
+  return name.replace(/\s*\(.*\)\s*$/, "").trim() || name
+}
+
+/** Drive JSON often omits subclass blurbs; keep the curated overlay text on seed rebuild. */
+export function applyMhpSubclassCardBlurbs<
+  T extends { name?: string | null; class_name?: string | null; card_blurb?: string | null },
+>(subclasses: T[] | undefined): T[] | undefined {
+  if (!subclasses?.length) return subclasses
+  return subclasses.map((row) => {
+    if (row.card_blurb?.trim()) return row
+    const key = `${classNameBase(String(row.class_name ?? ""))}::${String(row.name ?? "").trim()}`
+    const blurb = MHP_SUBCLASS_FLAVOR[key]
+    return blurb ? { ...row, card_blurb: blurb } : row
+  })
 }
 
 export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {

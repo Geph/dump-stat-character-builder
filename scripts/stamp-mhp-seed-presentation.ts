@@ -8,12 +8,14 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { ImportContent } from "@/lib/import/content-schema"
 import {
+  applyMhpSubclassCardBlurbs,
   MHP_CLASS_PRESENTATION,
   MHP_CLASSES_STRIP_DESCRIPTION_ONLY,
   MHP_WARDEN_CARD_IMAGE_SLUG,
   MHP_WARDEN_CREATOR_URL,
   mhpClassCardImageUrl,
 } from "@/lib/seed-packs/mage-hand-press/class-presentation"
+import { stripBlockedHostedCardArt } from "@/lib/seed-packs/strip-hosted-card-art"
 import { MHP_CLASS_COMPLEXITY_BY_NAME } from "@/lib/compendium/class-complexity"
 
 const ROOT = join(process.cwd(), "lib/seed-packs")
@@ -48,6 +50,7 @@ function applyMhpPresentation(content: ImportContent): ImportContent {
       }
       return cls
     }),
+    subclasses: applyMhpSubclassCardBlurbs(content.subclasses),
   }
 }
 
@@ -104,9 +107,12 @@ function labelWarden(content: ImportContent, source: string): ImportContent {
 }
 
 function stampFile(path: string, transform: (c: ImportContent) => ImportContent) {
-  const content = JSON.parse(readFileSync(path, "utf8")) as ImportContent
-  const next = transform(content)
-  writeFileSync(path, `${JSON.stringify(next)}\n`, "utf8")
+  const raw = readFileSync(path, "utf8")
+  const content = JSON.parse(raw) as ImportContent
+  const next = stripBlockedHostedCardArt(transform(content))
+  if (JSON.stringify(JSON.parse(raw)) !== JSON.stringify(next)) {
+    writeFileSync(path, `${JSON.stringify(next)}\n`, "utf8")
+  }
   const cls = next.classes?.[0]
   if (cls) {
     console.log(
@@ -127,5 +133,12 @@ for (const file of readdirSync(mhpDir).filter((f) => f.endsWith("-class.json")))
 
 console.log("\nLabeling Kibbles Tasty Warden collision…")
 stampFile(join(kibblesDir, "kibbles-warden-class.json"), (c) => labelWarden(c, "Kibbles Tasty"))
+
+console.log("\nClearing jeffginger.com card art URLs from bundled packs…")
+for (const dir of [mhpDir, kibblesDir]) {
+  for (const file of readdirSync(dir).filter((name) => name.endsWith(".json") && name !== "manifest.json")) {
+    stampFile(join(dir, file), (content) => content)
+  }
+}
 
 console.log("\nDone.")

@@ -551,6 +551,7 @@ export const ClassFeatureSchema = z.object({
         effectId: z.string().nullable().optional(),
       }),
     )
+    .nullable()
     .optional(),
   sheetDisplay: z
     .object({
@@ -559,6 +560,7 @@ export const ClassFeatureSchema = z.object({
       featuresTab: z.boolean().optional(),
       restDialogues: z.boolean().optional(),
     })
+    .nullable()
     .optional(),
 })
 

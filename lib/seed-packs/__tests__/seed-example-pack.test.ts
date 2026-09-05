@@ -18,6 +18,7 @@ describe("seedExamplePack resilience", () => {
     expect(result.errors.some((e) => e.fileLabel === "Captain")).toBe(true)
     expect(result.partial || result.filesSucceeded > 0).toBe(true)
     expect(result.total).toBe(result.filesSucceeded)
+    expect(JSON.stringify(persist.mock.calls)).not.toContain("jeffginger.com")
   })
 
   it("retries only requested file indexes", async () => {

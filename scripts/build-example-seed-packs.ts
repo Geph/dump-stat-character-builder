@@ -24,12 +24,14 @@ import {
   normalizeSubclassMatchKey,
 } from "@/lib/seed-packs/mage-hand-press-free-subclasses"
 import {
+  applyMhpSubclassCardBlurbs,
   MHP_CLASS_PRESENTATION,
   MHP_CLASSES_STRIP_DESCRIPTION_ONLY,
   MHP_WARDEN_CARD_IMAGE_SLUG,
   MHP_WARDEN_CREATOR_URL,
   mhpClassCardImageUrl,
 } from "@/lib/seed-packs/mage-hand-press/class-presentation"
+import { stripBlockedHostedCardArt } from "@/lib/seed-packs/strip-hosted-card-art"
 import { MHP_CLASS_COMPLEXITY_BY_NAME } from "@/lib/compendium/class-complexity"
 import {
   applyKibblesRowPresentation,
@@ -76,6 +78,7 @@ const MHP_FILES: PackFileSpec[] = [
   { sourceName: "magehandpress-warmage-class", outName: "magehandpress-warmage-class.json", filterMhpSubclasses: true },
   { sourceName: "magehandpress-witch-class", outName: "magehandpress-witch-class.json", filterMhpSubclasses: true },
   { sourceName: "magehandpress-masteries-custom", outName: "magehandpress-masteries-custom.json" },
+  { sourceName: "magehandpress-weapons", outName: "magehandpress-weapons.json" },
   { sourceName: "magehandpress-spells", outName: "magehandpress-spells.json" },
 ]
 
@@ -219,6 +222,7 @@ function applyMhpClassPresentation(content: ImportContent): ImportContent {
       }
       return cls
     }),
+    subclasses: applyMhpSubclassCardBlurbs(content.subclasses),
   }
 }
 
@@ -351,7 +355,7 @@ function prepareFile(
   content = stampSourceDeep(content, source)
   content = applyPackClassCollisionLabels(content, source)
   content = stampAbilityDefaultIcons(content) as ImportContent
-  return content
+  return stripBlockedHostedCardArt(content)
 }
 
 function resolveSourcePath(dir: string, sourceName: string): string {

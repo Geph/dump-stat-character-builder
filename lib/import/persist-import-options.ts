@@ -11,6 +11,8 @@ export type PersistImportOptions = {
   preferSameSourceReplacements?: boolean
   /** Lowercased names to merge into existing rows instead of replacing them. */
   updateExistingNames?: Partial<Record<ImportCollisionKind, string[]>>
+  /** Lowercased names the importer chose to overwrite (may replace source). */
+  overwriteExistingNames?: Partial<Record<ImportCollisionKind, string[]>>
 }
 
 export function preferredSourceForPersist(

@@ -456,18 +456,34 @@ export function importCollisionsNeedResolution(collisions: ImportCollision[]): b
   return collisions.length > 0
 }
 
-/** Lowercased incoming names the user chose to merge into existing rows. */
-export function collisionUpdateNamesByKind(
+function collisionNamesByResolution(
   collisions: ImportCollision[],
   resolutionMap: ImportCollisionResolutionMap,
+  wanted: ImportCollisionResolution,
 ): Partial<Record<ImportCollisionKind, string[]>> {
   const byKind: Partial<Record<ImportCollisionKind, string[]>> = {}
   for (const collision of collisions) {
     const resolution = resolutionMap[collision.id] ?? defaultResolutionFor(collision)
-    if (resolution !== "update") continue
+    if (resolution !== wanted) continue
     const list = byKind[collision.kind] ?? []
     list.push(collision.incomingName.trim().toLowerCase())
     byKind[collision.kind] = list
   }
   return byKind
+}
+
+/** Lowercased incoming names the user chose to merge into existing rows. */
+export function collisionUpdateNamesByKind(
+  collisions: ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+): Partial<Record<ImportCollisionKind, string[]>> {
+  return collisionNamesByResolution(collisions, resolutionMap, "update")
+}
+
+/** Lowercased incoming names the user chose to replace existing rows. */
+export function collisionOverwriteNamesByKind(
+  collisions: ImportCollision[],
+  resolutionMap: ImportCollisionResolutionMap,
+): Partial<Record<ImportCollisionKind, string[]>> {
+  return collisionNamesByResolution(collisions, resolutionMap, "overwrite")
 }
