@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { FEAT_MODIFIER_PRESETS } from "@/lib/compendium/feat-modifier-presets"
-import { assignLevelUpSpellsToNewModifierSlots, buildLevelUpPlan, countReplacedPicks } from "@/lib/character/level-up-plan"
+import {
+  assignLevelUpSpellsToNewModifierSlots,
+  buildLevelUpPlan,
+  countReplacedPicks,
+  spellsEligibleForLevelUp,
+} from "@/lib/character/level-up-plan"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
-import type { DndClass, Feature } from "@/lib/types"
+import type { DndClass, Feature, Spell } from "@/lib/types"
 import { enrichClassFeatureWithModifierPresets } from "@/lib/compendium/enrich-srd-class-features"
 
 function feature(name: string, level: number, extra: Partial<Feature> = {}): Feature {
@@ -533,5 +538,32 @@ describe("countReplacedPicks", () => {
   it("rejects replacing two picks or dropping below the known count", () => {
     expect(countReplacedPicks(original, ["Acid Bomb", "Sleep Bomb", "Glue Bomb"])).toBeNull()
     expect(countReplacedPicks(original, ["Acid Bomb", "Frost Bomb"])).toBeNull()
+  })
+})
+
+describe("spellsEligibleForLevelUp", () => {
+  it("keeps Necromancer allowlist spells and drops duplicate apostrophe variants", () => {
+    const pool = [
+      { id: "alarm", name: "Alarm", level: 1, classes: ["Inventor"] },
+      { id: "gahoul-ascii", name: "Gahoul's Shrieking Skull", level: 1, classes: ["Necromancer"] },
+      { id: "gahoul-curly", name: "Gahoul’s Shrieking Skull", level: 1, classes: ["Necromancer"] },
+      { id: "fireball", name: "Fireball", level: 3, classes: ["Wizard"] },
+      { id: "exhume", name: "Exhume", level: 1, classes: ["Necromancer"] },
+    ] as Spell[]
+
+    const eligible = spellsEligibleForLevelUp(pool, "Necromancer", 1, ["exhume"])
+    expect(eligible.map((spell) => spell.name).sort()).toEqual([
+      "Alarm",
+      "Gahoul's Shrieking Skull",
+    ])
+  })
+
+  it("hides a second catalog copy when one apostrophe variant is already known", () => {
+    const pool = [
+      { id: "gahoul-ascii", name: "Gahoul's Shrieking Skull", level: 1, classes: ["Necromancer"] },
+      { id: "gahoul-curly", name: "Gahoul’s Shrieking Skull", level: 1, classes: ["Necromancer"] },
+    ] as Spell[]
+
+    expect(spellsEligibleForLevelUp(pool, "Necromancer", 1, ["gahoul-ascii"])).toEqual([])
   })
 })

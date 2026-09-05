@@ -26,6 +26,7 @@ import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
 import { resolveClassResourcesForClass } from "@/lib/compendium/resolve-class-resources"
 import type { Feature, Species, Spell, Subclass } from "@/lib/types"
 import { spellMatchesClassName } from "@/lib/compendium/investigator-spell-list"
+import { dedupeSpellsByName, spellNameMatchKeys } from "@/lib/compendium/spell-name-match"
 
 const LEVEL_UP_MODIFIER_CHOICE_KINDS: ReadonlySet<ModifierPlayerChoiceKind> = new Set([
   "skill",
@@ -587,12 +588,22 @@ export function spellsEligibleForLevelUp(
   alreadyKnownIds: string[],
   classSpellList?: readonly string[] | null,
 ): Spell[] {
-  const known = new Set(alreadyKnownIds)
-  return spells.filter((spell) => {
-    if (known.has(spell.id)) return false
-    if ((spell.level ?? 0) > maxSpellLevel) return false
-    const lists = spell.classes ?? []
-    if (!lists.length) return true
-    return spellMatchesClassName(spell, className, classSpellList)
-  })
+  const knownIds = new Set(alreadyKnownIds)
+  const knownNameKeys = new Set(
+    spells
+      .filter((spell) => knownIds.has(spell.id))
+      .flatMap((spell) => spellNameMatchKeys(spell.name ?? "")),
+  )
+  return dedupeSpellsByName(
+    spells.filter((spell) => {
+      if (knownIds.has(spell.id)) return false
+      if (spellNameMatchKeys(spell.name ?? "").some((key) => knownNameKeys.has(key))) {
+        return false
+      }
+      if ((spell.level ?? 0) > maxSpellLevel) return false
+      const lists = spell.classes ?? []
+      if (!lists.length) return true
+      return spellMatchesClassName(spell, className, classSpellList)
+    }),
+  )
 }

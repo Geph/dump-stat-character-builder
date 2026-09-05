@@ -112,6 +112,7 @@ import {
   resolveSpellcastingAbilityKey,
   spellSlotTableKey,
 } from "@/lib/compendium/spell-slots"
+import { filterSpellsForBuilder } from "@/lib/compendium/builder-spell-availability"
 import {
   buildInputsFromSavedCharacter,
   computeDerivedCharacter,
@@ -962,7 +963,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
         const { data: spellCatalogData } = await db.from("spells").select("*")
         if (spellCatalogData) {
-          setSpellCatalog(asCompendiumRows<Spell & Record<string, unknown>>(spellCatalogData) as Spell[])
+          setSpellCatalog(
+            filterSpellsForBuilder(
+              asCompendiumRows<Spell & Record<string, unknown>>(spellCatalogData) as Spell[],
+            ),
+          )
         }
 
         if (row.equipment_ids?.length) {

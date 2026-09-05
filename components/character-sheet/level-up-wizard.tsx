@@ -79,6 +79,7 @@ import { mergeAlchemistDiscoveryPicks } from "@/lib/compendium/alchemist-feature
 import { normalizeBuilderPicks } from "@/lib/builder/builder-picks"
 import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import { enrichFeatsList } from "@/lib/compendium/normalize-feats"
+import { filterSpellsForBuilder } from "@/lib/compendium/builder-spell-availability"
 import { filterEnabled } from "@/lib/compendium/compendium-enabled"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
@@ -237,7 +238,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
             ),
           ),
         feats: enrichedFeats,
-        spells: filterEnabled(asCompendiumRows(spells) as unknown as Spell[]),
+        spells: filterSpellsForBuilder(asCompendiumRows(spells) as unknown as Spell[]),
         equipment: filterEnabled(asCompendiumRows(equipment) as unknown as Equipment[]),
         customAbilities: filterEnabled(
           asCompendiumRows(customAbilities) as unknown as CustomAbility[],
