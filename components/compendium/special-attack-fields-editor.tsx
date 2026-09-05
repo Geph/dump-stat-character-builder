@@ -290,27 +290,86 @@ export function SpecialAttackFieldsEditor({
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                checked={Boolean(mod.spendResourceOnHit)}
-                onChange={(event) =>
-                  onChange({ ...mod, spendResourceOnHit: event.target.checked })
-                }
-                className="accent-primary"
-              />
-              Deduct the resource only after a hit
-            </label>
-            <label className="block text-xs text-muted-foreground">
-              Critical-hit damage multiplier
-              <input
-                type="number"
-                min={1}
-                max={4}
-                value={mod.criticalDamageMultiplier ?? 2}
+                checked={Boolean(mod.healFromResourceSpend)}
                 onChange={(event) =>
                   onChange({
                     ...mod,
-                    criticalDamageMultiplier: parseInt(event.target.value, 10) || 2,
+                    healFromResourceSpend: event.target.checked,
+                    spendResourceOnHit: event.target.checked ? false : mod.spendResourceOnHit,
+                    healTarget: event.target.checked
+                      ? (mod.healTarget ?? "controlled_companion")
+                      : mod.healTarget,
                   })
                 }
+                className="accent-primary"
+              />
+              Restore HP equal to spend (no attack roll)
+            </label>
+            {mod.healFromResourceSpend ? (
+              <label className="block text-xs text-muted-foreground">
+                Heal target
+                <select
+                  value={mod.healTarget ?? "controlled_companion"}
+                  onChange={(event) =>
+                    onChange({
+                      ...mod,
+                      healTarget: event.target.value as NonNullable<
+                        SpecialAttackCharacteristic["healTarget"]
+                      >,
+                    })
+                  }
+                  className="ml-2 rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
+                >
+                  <option value="controlled_companion">Controlled companion / thrall</option>
+                  <option value="choose_ally">Any ally or companion</option>
+                </select>
+              </label>
+            ) : (
+              <>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(mod.spendResourceOnHit)}
+                    onChange={(event) =>
+                      onChange({ ...mod, spendResourceOnHit: event.target.checked })
+                    }
+                    className="accent-primary"
+                  />
+                  Deduct the resource only after a hit
+                </label>
+                <label className="block text-xs text-muted-foreground">
+                  Critical-hit damage multiplier
+                  <input
+                    type="number"
+                    min={1}
+                    max={4}
+                    value={mod.criticalDamageMultiplier ?? 2}
+                    onChange={(event) =>
+                      onChange({
+                        ...mod,
+                        criticalDamageMultiplier: parseInt(event.target.value, 10) || 2,
+                      })
+                    }
+                    className="ml-2 w-16 rounded border border-border bg-background px-2 py-1 text-center text-sm"
+                  />
+                </label>
+              </>
+            )}
+            <label className="block text-xs text-muted-foreground">
+              Unlocks at class level (optional)
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={mod.unlocksAtClassLevel ?? ""}
+                placeholder="Always"
+                onChange={(event) => {
+                  const raw = event.target.value.trim()
+                  onChange({
+                    ...mod,
+                    unlocksAtClassLevel: raw ? Math.max(1, parseInt(raw, 10) || 1) : null,
+                  })
+                }}
                 className="ml-2 w-16 rounded border border-border bg-background px-2 py-1 text-center text-sm"
               />
             </label>

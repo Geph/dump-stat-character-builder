@@ -2,7 +2,7 @@
 
 [![Dump Stat landing page](./public/images/features/readme-landing.png)](https://geph.github.io/dump-stat-character-builder/)
 
-A 5E-compatible character builder and compendium. **[Try the live app](https://geph.github.io/dump-stat-character-builder/)** (static GitHub Pages, data stays in your browser). Current release: **0.25**.
+A 5E-compatible character builder and compendium. **[Try the live app](https://geph.github.io/dump-stat-character-builder/)** (static GitHub Pages, data stays in your browser). Current release: **0.26**.
 
 **Maximally customizable by design.** Nearly every mechanical decision — species, classes, subclasses, feats, spells, equipment, backgrounds, creatures & companions, custom abilities, and the modifier effects behind them — is editable in-app from a single shared catalog. The same wiring that powers the bundled SRD content can process your own imported homebrew.
 

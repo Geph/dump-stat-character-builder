@@ -167,6 +167,7 @@ const CHARACTERISTIC_GROUP: Record<CharacteristicModifierType, ModifierCatalogGr
   subclass_unlock: "Feats & choices",
   equipment_and_magic_items: "Equipment & items",
   player_note: "Equipment & items",
+  inventory_container: "Equipment & items",
   catalog_option: "Feats & choices",
   craftable_items: "Equipment & items",
   held_items_cap: "Equipment & items",

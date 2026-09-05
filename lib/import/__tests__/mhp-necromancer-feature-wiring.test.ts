@@ -17,43 +17,55 @@ function featureCharacteristics(feature: Feature | undefined) {
 
 describe("Mage Hand Press Necromancer feature wiring", () => {
   it("wires Dead Space as an action with capacity, item choice, and player notes", () => {
-    const cls = enrichImportContentModifiers({
-      classes: [
-        {
-          name: "Necromancer",
-          features: [
-            {
-              level: 2,
-              name: "Dead Space",
-              description:
-                "The extradimensional space is linked to an item of your choice, such as a bag, a cloak, or a backpack. As a Magic action, you can use the linked item to place a corpse in the extradimensional space. You can link a new item during a Short Rest.",
-              mechanics: [
-                {
-                  kind: "equipment_and_magic_items",
-                  itemOptions: ["Bag", "Cloak", "Backpack"],
-                  choiceCount: 1,
-                  allowCustom: true,
-                  confidence: "high",
-                },
-                {
-                  kind: "uses",
-                  usesFixed: 12,
-                  sourcePhrase: "The space can hold up to 12 corpses.",
-                  confidence: "high",
-                },
-                {
-                  kind: "player_note",
-                  notePrompt: "Dead Space notes",
-                  notePlaceholder: "Record the linked item and contents.",
-                  noteTarget: "feature",
-                  confidence: "high",
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    } as unknown as ImportContent).classes![0]
+    const cls = enrichImportContentModifiers(
+      applyImportEnrichmentPresets({
+        classes: [
+          {
+            name: "Necromancer",
+            features: [
+              {
+                level: 2,
+                name: "Dead Space",
+                description:
+                  "The extradimensional space is linked to an item of your choice, such as a bag, a cloak, or a backpack. As a Magic action, you can use the linked item to place a corpse in the extradimensional space. You can link a new item during a Short Rest.",
+                mechanics: [
+                  {
+                    kind: "equipment_and_magic_items",
+                    itemOptions: ["Bag", "Cloak", "Backpack"],
+                    choiceCount: 1,
+                    allowCustom: true,
+                    confidence: "high",
+                  },
+                  {
+                    kind: "uses",
+                    usesFixed: 12,
+                    sourcePhrase: "The space can hold up to 12 corpses.",
+                    confidence: "high",
+                  },
+                  {
+                    kind: "player_note",
+                    notePrompt: "Dead Space notes",
+                    notePlaceholder: "Record the linked item and contents.",
+                    noteTarget: "feature",
+                    confidence: "high",
+                  },
+                  {
+                    kind: "inventory_container",
+                    containerName: "Dead Space",
+                    capacityMode: "slot_count",
+                    capacityAmount: 12,
+                    contentKinds: ["corpse", "companion", "freeform"],
+                    maxCreatureSize: "Medium",
+                    linkHostItem: true,
+                    confidence: "high",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      } as unknown as ImportContent),
+    ).classes![0]
 
     const feature = (cls.features as Feature[]).find(
       (row) => row.name === "Dead Space",
@@ -74,6 +86,11 @@ describe("Mage Hand Press Necromancer feature wiring", () => {
     ).toMatchObject({
       prompt: "Dead Space notes",
       target: "feature",
+    })
+    expect(characteristics.find((row) => row.type === "inventory_container")).toMatchObject({
+      capacityMode: "slot_count",
+      capacityAmount: 12,
+      linkHostItem: true,
     })
 
     const actions = collectSheetActions({

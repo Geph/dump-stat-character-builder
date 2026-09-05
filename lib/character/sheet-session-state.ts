@@ -71,6 +71,7 @@ export function buildSheetPlayStateFromSheet(params: {
   skillSortMode?: CharacterSheetPlayState["skillSortMode"]
   pinnedSkillNames?: CharacterSheetPlayState["pinnedSkillNames"]
   pinnedEquipmentIds?: CharacterSheetPlayState["pinnedEquipmentIds"]
+  containerInventories?: CharacterSheetPlayState["containerInventories"]
   durationReminders?: CharacterSheetPlayState["durationReminders"]
   skillAbilityOverrides?: CharacterSheetPlayState["skillAbilityOverrides"]
   savedAt?: string | null
@@ -81,6 +82,7 @@ export function buildSheetPlayStateFromSheet(params: {
     mutationDie: params.mutationDie ?? null,
     fleshWarpAllyBenefitCounts: params.fleshWarpAllyBenefitCounts ?? {},
     illusionTokens: params.illusionTokens ?? [],
+    containerInventories: params.containerInventories ?? {},
     savedAt: params.savedAt ?? null,
   })
 }

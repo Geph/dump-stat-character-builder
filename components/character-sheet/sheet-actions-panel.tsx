@@ -212,6 +212,9 @@ const ACTION_DETAIL_TAB_TRIGGER_CLASS =
   "w-full rounded-lg border border-transparent px-2 py-2 text-xs font-semibold"
 
 function attackProfileActionLabel(profile: SpecialAttackCharacteristic): string {
+  if (profile.healFromResourceSpend) {
+    return profile.attackName?.trim() || "Heal"
+  }
   return profile.attackVariant === "explode"
     ? "Explode"
     : profile.attackVariant === "primed"
@@ -442,6 +445,7 @@ function specialAttackDamageLabel(
   ctx: ResolveUsesContext,
 ): string | null {
   if (attack.useWeaponDamage) return "Weapon damage"
+  if (attack.healFromResourceSpend) return "Selected resource spend HP"
   if (attack.damageFromResourceSpend) {
     const type = formatSpecialAttackDamageTypes(attack.damageTypes, attack.chooseDamageType)
     return `Selected resource spend${type ? ` ${type}` : ""}`
@@ -1067,6 +1071,14 @@ function ActionDetailOverlay({
     attackProfiles.find((profile) => profile.id === selectedAttackProfileId) ??
     attackProfiles[0] ??
     null
+  const healTargetCandidates =
+    specialAttack?.healFromResourceSpend && specialAttack.healTarget === "controlled_companion"
+      ? allyCandidates.filter(
+          (candidate) =>
+            candidate.kind === "companion" &&
+            (!characterId || candidate.characterId === characterId),
+        )
+      : allyCandidates
   const allTalentAlerts = action.relatedTalentAlerts ?? []
   const visibleTalentAlerts = allTalentAlerts.filter((alert) =>
     talentAlertAppliesToVariant(alert.appliesToAttackVariants, specialAttack?.attackVariant),
@@ -1137,7 +1149,7 @@ function ActionDetailOverlay({
             ] ?? 0,
           ) * configuredResourceCost
         : // Flat-cost resources still need a selectable range when damage equals spend.
-          specialAttack?.damageFromResourceSpend
+          specialAttack?.damageFromResourceSpend || specialAttack?.healFromResourceSpend
           ? Math.max(1, configuredResourceCost)
           : configuredResourceCost
   // Menu options own their exact cost. A negative cost is a refund operation such as
@@ -1145,7 +1157,8 @@ function ActionDetailOverlay({
   const selectedResourceCost = selectedOption?.resourceCost
   const usesVariableResourceSpend =
     selectedResourceCost == null &&
-    (resourceCostMode !== "fixed" || Boolean(specialAttack?.damageFromResourceSpend))
+    (resourceCostMode !== "fixed" ||
+      Boolean(specialAttack?.damageFromResourceSpend || specialAttack?.healFromResourceSpend))
   const availableResourcePoints = usage ? Math.max(0, usage.max - usage.used) : resourceSpendCap
   const maxSelectableResourceSpend = Math.max(
     1,
@@ -1686,6 +1699,26 @@ function ActionDetailOverlay({
       }
     }
 
+    if (specialAttack?.healFromResourceSpend && useResourceSpend > 0) {
+      setPendingHealEffects([
+        {
+          id: `resource_spend_heal:${action.id}`,
+          kind: "heal_self",
+          healMode: "fixed",
+          healFixed: useResourceSpend,
+          healAmount: useResourceSpend,
+          healTarget: "choose_ally",
+          label: `Restore ${useResourceSpend} HP`,
+        },
+      ])
+      parts.push(
+        `Spend ${useResourceSpend} ${usage?.resourceName ?? "resource"} to heal a thrall`,
+      )
+      setUseFeedback(parts.join(" · ") || null)
+      setStep("target")
+      return
+    }
+
     if (specialAttack && (specialAttack.damageDiceCount > 0 || specialAttack.attackProfile || specialAttack.damageFromResourceSpend)) {
       setStep("roll")
       return
@@ -2211,15 +2244,22 @@ function ActionDetailOverlay({
           </div>
         ) : step === "target" ? (
           <div className="p-4 space-y-3">
-            <p className="text-sm text-muted-foreground">Choose who receives this effect.</p>
-            {allyCandidates.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {specialAttack?.healFromResourceSpend &&
+              specialAttack.healTarget === "controlled_companion"
+                ? "Choose an Undead thrall under your control to restore Hit Points."
+                : "Choose who receives this effect."}
+            </p>
+            {healTargetCandidates.length === 0 ? (
               <p className="text-sm text-destructive">
-                No allies found. Your companions appear here even without a party; add a party on
-                the Characters page to include other characters.
+                {specialAttack?.healFromResourceSpend &&
+                specialAttack.healTarget === "controlled_companion"
+                  ? "No thralls or companions are on this sheet yet."
+                  : "No allies found. Your companions appear here even without a party; add a party on the Characters page to include other characters."}
               </p>
             ) : (
               <div className="grid gap-2 sm:grid-cols-2">
-                {allyCandidates.map((candidate) => {
+                {healTargetCandidates.map((candidate) => {
                   const key =
                     candidate.kind === "companion"
                       ? `${candidate.characterId}:${candidate.companionKey}`
@@ -2668,7 +2708,9 @@ function ActionDetailOverlay({
                 <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="text-[10px] font-bold uppercase tracking-wide text-primary">
-                      {specialAttack?.damageFromResourceSpend
+                      {specialAttack?.healFromResourceSpend
+                        ? "Points to spend · HP restored on thrall"
+                        : specialAttack?.damageFromResourceSpend
                         ? `Points to spend · ${
                             formatSpecialAttackDamageTypes(
                               specialAttack.damageTypes,
@@ -2705,7 +2747,11 @@ function ActionDetailOverlay({
                       )
                     })}
                   </div>
-                  {specialAttack?.damageFromResourceSpend ? (
+                  {specialAttack?.healFromResourceSpend ? (
+                    <p className="text-xs text-muted-foreground">
+                      Touch restores {resourceSpend} HP · no attack roll · points spent now
+                    </p>
+                  ) : specialAttack?.damageFromResourceSpend ? (
                     <p className="text-xs text-muted-foreground">
                       {(() => {
                         const damageType =

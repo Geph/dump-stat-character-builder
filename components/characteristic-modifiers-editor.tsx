@@ -2986,6 +2986,136 @@ function ModifierFields({
         </div>
       )
 
+    case "inventory_container":
+      return (
+        <div className="space-y-3">
+          <label className="block text-xs font-semibold text-foreground">
+            Container name
+            <input
+              type="text"
+              value={mod.containerName ?? ""}
+              onChange={(e) => onChange({ ...mod, containerName: e.target.value || null })}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              placeholder="Dead Space"
+            />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs font-semibold text-foreground">
+              Capacity mode
+              <select
+                value={mod.capacityMode}
+                onChange={(e) =>
+                  onChange({
+                    ...mod,
+                    capacityMode: e.target.value as typeof mod.capacityMode,
+                  })
+                }
+                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              >
+                <option value="slot_count">Slot count</option>
+                <option value="cubic_feet">Cubic feet</option>
+                <option value="weight_lb">Weight (lb)</option>
+                <option value="unbounded">Unbounded</option>
+              </select>
+            </label>
+            <label className="block text-xs font-semibold text-foreground">
+              Capacity amount
+              <input
+                type="number"
+                min={0}
+                value={mod.capacityAmount ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value.trim()
+                  onChange({
+                    ...mod,
+                    capacityAmount: raw ? Math.max(0, Number(raw) || 0) : null,
+                  })
+                }}
+                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                placeholder="12"
+              />
+            </label>
+          </div>
+          <label className="block text-xs font-semibold text-foreground">
+            Capacity label
+            <input
+              type="text"
+              value={mod.capacityLabel ?? ""}
+              onChange={(e) => onChange({ ...mod, capacityLabel: e.target.value || null })}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              placeholder="12 Medium or smaller corpses…"
+            />
+          </label>
+          <label className="block text-xs font-semibold text-foreground">
+            Content kinds (one per line)
+            <textarea
+              value={(mod.contentKinds ?? []).join("\n")}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  contentKinds: e.target.value
+                    .split("\n")
+                    .map((value) => value.trim())
+                    .filter((value): value is typeof mod.contentKinds[number] =>
+                      ["equipment", "corpse", "companion", "freeform"].includes(value),
+                    ),
+                })
+              }
+              rows={3}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              placeholder={"corpse\ncompanion\nfreeform"}
+            />
+          </label>
+          <label className="block text-xs font-semibold text-foreground">
+            Max creature size
+            <select
+              value={mod.maxCreatureSize ?? ""}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  maxCreatureSize: (e.target.value || null) as typeof mod.maxCreatureSize,
+                })
+              }
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Any / not size-limited</option>
+              {["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
+            <input
+              type="checkbox"
+              checked={Boolean(mod.linkHostItem)}
+              onChange={(e) => onChange({ ...mod, linkHostItem: e.target.checked })}
+              className="accent-primary"
+            />
+            Link to player-chosen host item (shows in Gear)
+          </label>
+          <label className="block text-xs font-semibold text-foreground">
+            Attach to equipment names (one per line)
+            <textarea
+              value={(mod.attachToEquipmentNames ?? []).join("\n")}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  attachToEquipmentNames: e.target.value
+                    .split("\n")
+                    .map((value) => value.trim())
+                    .filter(Boolean),
+                })
+              }
+              rows={2}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              placeholder={"Bag of Holding\nPortable Hole"}
+            />
+          </label>
+        </div>
+      )
+
     case "replace_feature":
       return (
         <div className="space-y-3">

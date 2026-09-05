@@ -643,11 +643,15 @@ function buildFromMechanic(
             areaWidthFeet: mechanic.areaWidthFeet ?? null,
             properties: [],
             damageTypes,
-            damageDiceCount: mechanic.damageFromResourceSpend ? 0 : damageDiceCount,
+            damageDiceCount:
+              mechanic.damageFromResourceSpend || mechanic.healFromResourceSpend ? 0 : damageDiceCount,
             damageDieType,
             damageFromResourceSpend: mechanic.damageFromResourceSpend ?? false,
+            healFromResourceSpend: mechanic.healFromResourceSpend ?? false,
+            healTarget: mechanic.healTarget ?? null,
             spendResourceOnHit: mechanic.spendResourceOnHit ?? false,
             criticalDamageMultiplier: mechanic.criticalDamageMultiplier ?? 2,
+            unlocksAtClassLevel: mechanic.unlocksAtClassLevel ?? null,
             saveAbility: mechanic.saveAbility ?? null,
             saveDCBase: attackProfile === "force_save" || attackProfile === "emanation" ? 8 : null,
             saveHalfDamage: mechanic.saveHalfDamage ?? Boolean(mechanic.saveAbility),
@@ -1490,6 +1494,31 @@ function buildFromMechanic(
             prompt: mechanic.notePrompt?.trim() || "Player notes",
             placeholder: mechanic.notePlaceholder?.trim() || "",
             target: mechanic.noteTarget ?? "feature",
+          },
+        ]),
+      }
+    }
+    case "inventory_container": {
+      const contentKinds = (mechanic.contentKinds?.length
+        ? mechanic.contentKinds
+        : ["freeform"]) as Array<"equipment" | "corpse" | "companion" | "freeform">
+      return {
+        ruleId: "ai.inventory_container",
+        confidence: aiConfidence(mechanic),
+        matchedPhrase,
+        instance: charInstance(instanceId, characteristicCatalogRefId("inventory_container"), [
+          {
+            id: modId(instanceKey(ctx, "inventory_container")),
+            type: "inventory_container",
+            containerName: mechanic.containerName?.trim() || null,
+            capacityMode: mechanic.capacityMode ?? "slot_count",
+            capacityAmount: mechanic.capacityAmount ?? null,
+            capacityLabel: mechanic.capacityLabel?.trim() || null,
+            contentKinds,
+            maxCreatureSize: mechanic.maxCreatureSize ?? null,
+            linkHostItem: mechanic.linkHostItem === true,
+            attachToEquipmentNames: mechanic.attachToEquipmentNames ?? [],
+            label: matchedPhrase || mechanic.containerName || ctx.featureName || "Container",
           },
         ]),
       }

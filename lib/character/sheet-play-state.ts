@@ -20,6 +20,7 @@ import {
 } from "@/lib/character/duration-reminders"
 import { normalizeSheetToggleWeaponIds } from "@/lib/character/weapon-spell-buff"
 import { normalizeSkillAbilityOverrides } from "@/lib/character/skill-ability-overrides"
+import { normalizeContainerInventories } from "@/lib/character/inventory-containers"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 
 /** Per-resource banked value with optional real-time decay (Influence, Balance of Power). */
@@ -72,6 +73,14 @@ export type CharacterSheetPlayState = {
   pinnedSkillNames: string[]
   /** Equipment item ids pinned to the top of the equipment list. */
   pinnedEquipmentIds: string[]
+  /**
+   * Nested / extradimensional container contents, keyed by resolveInventoryContainers().key
+   * (feature:… or equipment:…).
+   */
+  containerInventories: Record<
+    string,
+    import("@/lib/character/inventory-containers").ContainerInventoryState
+  >
   /** Timed effect reminders shown near conditions. */
   durationReminders: DurationReminder[]
   /** House-rule remaps of which ability governs a skill check. */
@@ -106,6 +115,7 @@ export function defaultSheetPlayState(): CharacterSheetPlayState {
     skillSortMode: "ability",
     pinnedSkillNames: [],
     pinnedEquipmentIds: [],
+    containerInventories: {},
     durationReminders: [],
     skillAbilityOverrides: {},
     savedAt: null,
@@ -203,6 +213,7 @@ export function normalizeSheetPlayState(
     pinnedEquipmentIds: Array.isArray(raw.pinnedEquipmentIds)
       ? raw.pinnedEquipmentIds.filter((entry): entry is string => typeof entry === "string")
       : base.pinnedEquipmentIds,
+    containerInventories: normalizeContainerInventories(raw.containerInventories),
     durationReminders: normalizeDurationReminders(raw.durationReminders),
     skillAbilityOverrides: normalizeSkillAbilityOverrides(raw.skillAbilityOverrides),
     savedAt: typeof raw.savedAt === "string" ? raw.savedAt : base.savedAt,

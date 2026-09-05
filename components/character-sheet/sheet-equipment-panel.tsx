@@ -1,7 +1,7 @@
 "use client"
 
 import { useDeferredValue, useMemo, useState } from "react"
-import { Coins, Info, Pin, Plus } from "lucide-react"
+import { Coins, Info, PackageOpen, Pin, Plus } from "lucide-react"
 import {
   DEFAULT_ATTUNEMENT_SLOTS,
   isAttunableItem,
@@ -70,6 +70,9 @@ type SheetEquipmentPanelProps = {
   onEquipOffHandWeapon: (id: string | null) => void
   onToggleAttune: (id: string) => void
   onShowDetails: (item: Equipment) => void
+  /** Equipment ids that open a nested / extradimensional container. */
+  containerEquipmentIds?: Set<string> | string[]
+  onOpenContainer?: (item: Equipment) => void
   ownedIds: string[]
   equipmentQuantities?: EquipmentQuantities
   onQuantityChange: (id: string, quantity: number) => void
@@ -133,6 +136,8 @@ export function SheetEquipmentPanel({
   onEquipOffHandWeapon,
   onToggleAttune,
   onShowDetails,
+  containerEquipmentIds,
+  onOpenContainer,
   ownedIds,
   equipmentQuantities,
   onQuantityChange,
@@ -140,6 +145,12 @@ export function SheetEquipmentPanel({
 }: SheetEquipmentPanelProps) {
   const [categoryFilter, setCategoryFilter] = useState<EquipmentSheetFilter>("all")
   const deferredSearchQuery = useDeferredValue(searchQuery)
+  const containerIdSet = useMemo(() => {
+    if (!containerEquipmentIds) return new Set<string>()
+    return containerEquipmentIds instanceof Set
+      ? containerEquipmentIds
+      : new Set(containerEquipmentIds)
+  }, [containerEquipmentIds])
   const mainWeapon = useMemo(() => {
     if (!equippedWeaponId) return null
     const raw = equipment.find((item) => item.id === equippedWeaponId)
@@ -328,14 +339,27 @@ export function SheetEquipmentPanel({
                     <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
                     <MagicEquipmentBadges item={item} />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onShowDetails(item)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/80 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary shrink-0"
-                    aria-label={`Details for ${item.name}`}
-                  >
-                    <Info className="w-4 h-4" />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {containerIdSet.has(item.id) && onOpenContainer ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenContainer(item)}
+                        className="inline-flex h-8 items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 text-[10px] font-bold uppercase tracking-wide text-primary transition-colors hover:bg-primary/15"
+                        aria-label={`Open contents of ${item.name}`}
+                      >
+                        <PackageOpen className="w-3.5 h-3.5" />
+                        Contents
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => onShowDetails(item)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/80 text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                      aria-label={`Details for ${item.name}`}
+                    >
+                      <Info className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
                 {inInventory || isArmor || isShield || isWeapon || attunable ? (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

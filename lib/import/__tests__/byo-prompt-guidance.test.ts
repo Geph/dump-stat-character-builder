@@ -383,6 +383,15 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("spendResourceOnHit")
     expect(prompt).toContain("criticalDamageMultiplier")
     expect(prompt).toContain("classResourceAmount 5")
+    expect(prompt).toContain("healFromResourceSpend")
+    expect(prompt).toContain("controlled_companion")
+  })
+
+  it("documents inventory_container for Dead Space / Bag of Holding style gear", () => {
+    const prompt = buildByoExtractionPrompt("classes")
+    expect(prompt).toContain("inventory_container")
+    expect(prompt).toContain("linkHostItem")
+    expect(prompt).toContain("attachToEquipmentNames")
   })
 
   it("routes optional extra weapon damage to the DMG menu via power_rider", () => {

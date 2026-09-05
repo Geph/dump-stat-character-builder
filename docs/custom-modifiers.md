@@ -189,7 +189,11 @@ panel + persist), not a species-name branch. Do not reuse `held_items_cap`
 The action's variable `limitedUses` chooses and caps the spend; the roll step
 then confirms Miss / Hit / Critical, deducts only on a hit when configured, and
 uses the selected spend as flat damage. Charnel Touch uses this with a 5 × PB
-cap. Keep this generic—do not branch on the feature name in sheet runtime.
+cap. **Heal-from-spend (2026-09-05):** `healFromResourceSpend` + `healTarget`
+(`controlled_companion` | `choose_ally`) + optional `unlocksAtClassLevel` adds a
+second profile that spends the same pool to restore companion HP with no attack
+roll (Healing your Thralls at Necromancer 2). Keep this generic—do not branch on
+the feature name in sheet runtime.
 
 Audit (2026-09-01): **no dead types**. “Unreachable” (applied but neither
 Compendium-authorable nor importable): `catalog_option`, `craftable_items`,
@@ -211,6 +215,7 @@ verbatim.
 
 | Engine | Module | How to author |
 | --- | --- | --- |
+| Inventory containers | `inventory-containers.ts` | CharacteristicModifier `inventory_container` (side-channel). Contents in `sheet_state.containerInventories`. Dead Space uses `linkHostItem` + create_mundane linked item; Bag of Holding / Portable Hole use `attachToEquipmentNames` or magic_effects on the item. Gear shows Contents. |
 | Rampage Die | `rampage-die.ts` | Wording only. Dependants gate with `requiresSheetToggle: "rampage_die_d8_plus"` (derived — not `new_toggles`). Tantrum / Unstoppable Rampage: names + text |
 | Flesh Warp Mutation Die | `mutation-die.ts` | Wording; ally-benefit counts in play state |
 | Mesmerism tokens | `illusion-tokens.ts` | Projected Self / Imaginary Ally names + text |

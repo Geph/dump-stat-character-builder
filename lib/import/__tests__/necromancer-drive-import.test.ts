@@ -166,18 +166,29 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
       classResourceAmount: 5,
       classResourceCostMode: "up_to_proficiency_bonus",
     })
-    const charnelAttack = charnel?.linkedModifiers
+    const charnelAttacks = charnel?.linkedModifiers
       ?.flatMap((modifier) => modifier.characteristics ?? [])
-      .find((characteristic) => characteristic.type === "special_attack")
-    expect(charnelAttack).toMatchObject({
-      type: "special_attack",
-      attackProfile: "melee",
-      damageTypes: ["Necrotic"],
-      damageDiceCount: 0,
-      damageFromResourceSpend: true,
-      spendResourceOnHit: true,
-      criticalDamageMultiplier: 2,
-    })
+      .filter((characteristic) => characteristic.type === "special_attack")
+    expect(charnelAttacks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "special_attack",
+          attackProfile: "melee",
+          damageTypes: ["Necrotic"],
+          damageDiceCount: 0,
+          damageFromResourceSpend: true,
+          spendResourceOnHit: true,
+          criticalDamageMultiplier: 2,
+        }),
+        expect.objectContaining({
+          type: "special_attack",
+          attackName: "Heal Thrall",
+          healFromResourceSpend: true,
+          healTarget: "controlled_companion",
+          unlocksAtClassLevel: 2,
+        }),
+      ]),
+    )
 
     const dark = content.classes?.[0]?.features?.find((f) => f.name === "Dark Arcana") as Feature | undefined
     expect(dark?.activation?.bonusAction).toBe(true)
@@ -220,6 +231,12 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
     expect(characteristics.find((row) => row.type === "player_note")).toMatchObject({
       prompt: "Dead Space notes",
       target: "feature",
+    })
+    expect(characteristics.find((row) => row.type === "inventory_container")).toMatchObject({
+      capacityMode: "slot_count",
+      capacityAmount: 12,
+      linkHostItem: true,
+      contentKinds: expect.arrayContaining(["corpse", "companion", "freeform"]),
     })
     expect(content.equipment?.map((item) => item.name)).toEqual(
       expect.arrayContaining(["Bag", "Cloak"]),

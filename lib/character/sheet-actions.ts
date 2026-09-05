@@ -970,36 +970,37 @@ function resolveSpecialAttacks(
   item: ActivatableItem,
   classLevel?: number,
 ): SpecialAttackCharacteristic[] {
+  const level = classLevel ?? 1
   const attacks: SpecialAttackCharacteristic[] = []
   for (const instance of item.linkedModifiers ?? []) {
     for (const characteristic of instance.characteristics ?? []) {
-      if (characteristic.type === "special_attack") {
-        let attack = characteristic as SpecialAttackCharacteristic
-        // Earthshatter: 5 ft → 10 ft at Warden 14.
-        if (/^earthshatter$/i.test(item.name) && (classLevel ?? 0) >= 14) {
-          attack = {
-            ...attack,
-            areaLengthFeet: 10,
-            rangeFeet: 10,
-            label:
-              attack.label?.replace(/5\s*ft/i, "10 ft") ??
-              "Earthshatter — replace one Attack; 10-foot slam (Warden 14+)",
-          }
+      if (characteristic.type !== "special_attack") continue
+      let attack = characteristic as SpecialAttackCharacteristic
+      if ((attack.unlocksAtClassLevel ?? 0) > level) continue
+      // Earthshatter: 5 ft → 10 ft at Warden 14.
+      if (/^earthshatter$/i.test(item.name) && level >= 14) {
+        attack = {
+          ...attack,
+          areaLengthFeet: 10,
+          rangeFeet: 10,
+          label:
+            attack.label?.replace(/5\s*ft/i, "10 ft") ??
+            "Earthshatter — replace one Attack; 10-foot slam (Warden 14+)",
         }
-        const leveled = resolveSpecialAttackAtLevel(attack, classLevel ?? 1)
-        attacks.push({
-          ...leveled,
-          icon: resolveSpecialAttackIcon({
-            icon: leveled.icon,
-            attackName: leveled.attackName ?? item.name,
-            label: leveled.label ?? item.name,
-            attackVariant: leveled.attackVariant,
-          }),
-        })
       }
+      const leveled = resolveSpecialAttackAtLevel(attack, level)
+      attacks.push({
+        ...leveled,
+        icon: resolveSpecialAttackIcon({
+          icon: leveled.icon,
+          attackName: leveled.attackName ?? item.name,
+          label: leveled.label ?? item.name,
+          attackVariant: leveled.attackVariant,
+        }),
+      })
     }
   }
-  return expandAlchemistBombProfiles(attacks, classLevel ?? 1)
+  return expandAlchemistBombProfiles(attacks, level)
 }
 
 function resolveSpecialAttack(

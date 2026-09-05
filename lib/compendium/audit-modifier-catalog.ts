@@ -30,6 +30,7 @@ const SIDE_CHANNEL_TYPES = new Set([
   "grant_creature",
   "grant_feat",
   "healing_dice_pool",
+  "inventory_container",
   "on_creature_death_trigger",
   "skill_check_alternate_ability",
   "turn_start_trigger",

@@ -179,15 +179,26 @@ export const ImportMechanicSchema = z.object({
   notePrompt: z.string().optional(),
   notePlaceholder: z.string().optional(),
   noteTarget: z.enum(["feature", "equipment"]).optional(),
+  /** inventory_container */
+  containerName: z.string().optional(),
+  capacityMode: z.enum(["slot_count", "weight_lb", "cubic_feet", "unbounded"]).optional(),
+  capacityAmount: z.number().optional(),
+  capacityLabel: z.string().optional(),
+  contentKinds: z.array(z.enum(["equipment", "corpse", "companion", "freeform"])).optional(),
+  maxCreatureSize: z
+    .enum(["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"])
+    .optional(),
+  linkHostItem: z.boolean().optional(),
+  attachToEquipmentNames: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   languageChoiceCount: z.number().optional(),
   choicePool: z.enum(["standard", "standard_and_rare"]).optional(),
   spellNames: z.array(z.string()).optional(),
   /**
-   * Class level when the spellNames on THIS mechanic become always-prepared (subclass spell
-   * tables that emit one mechanic per level tier, e.g. "3 -> Cure Wounds, Moonbeam", "5 ->
-   * Conjure Animals"). Not the same as spellChoiceGrants[].unlocksAtClassLevel, which gates a
-   * player-chosen grant instead of a fixed list.
+   * Class level when this mechanic unlocks: spells_known spellNames become always-prepared
+   * (one mechanic per tier), or a special_attack profile (e.g. thrall heal at Necromancer 2).
+   * Not the same as spellChoiceGrants[].unlocksAtClassLevel, which gates a player-chosen grant
+   * instead of a fixed list.
    */
   unlocksAtClassLevel: z.number().optional(),
   spellChoiceGrants: z
@@ -392,6 +403,10 @@ export const ImportMechanicSchema = z.object({
   damageDice: z.string().optional(),
   /** special_attack damage equals the variable class-resource spend rather than dice. */
   damageFromResourceSpend: z.boolean().optional(),
+  /** special_attack restores HP equal to the chosen class-resource spend (no attack roll). */
+  healFromResourceSpend: z.boolean().optional(),
+  /** special_attack healFromResourceSpend target scope. */
+  healTarget: z.enum(["controlled_companion", "choose_ally"]).optional(),
   /** special_attack deducts the chosen class-resource spend only after a hit. */
   spendResourceOnHit: z.boolean().optional(),
   /** special_attack multiplier for resource-spend damage on a critical hit. */
@@ -1204,10 +1219,10 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Investigator Ritual Level / Finisher / Rushed Incantation / Trinkets:** Ritual Level = special cap; Finisher = special NdM rider with resource_key "finisher" (never "finisher_dice"); Rushed Incantation + Trinkets = spendable short-regain-1 / long-all pools. Finisher / Improved Finisher extra damage is optional — emit power_rider parentPowerNames [\"Attack\", \"Unarmed Strike\"], weaponDamageMenu true, selectable true (Finisher: classResourceKey \"finisher\", defaultSelectedWhenToggle \"below_half_hp\", menuConditionLabel \"Bloodied\"; Improved Finisher: bonusDice \"1d8\"). Do not emit damage_roll_modifiers or on_hit_trigger for those optional dice.
 - **Mage Hand Press Warden Interrupt:** Interrupt column → class_resources.interrupt (short rest regain 1 / long rest all). Do not confuse with KibblesTasty Warden Endurance Dice — if "Warden" already exists in the compendium, keep the source name "Warden" in JSON; the import UI will ask the user what to rename it to (suggestion: "Warden (Mage Hand Press)").
 - **Guardian Tactics:** Block / Challenge / Grasp as a free Bonus Action menu (Dump Stat wires resource_ability_menu); ally/enemy effects stay play-time. Extended Tactics widens ranges to 10 feet.
-- **Necromancer Charnel Touch:** spendable pool equal to 5 × class level — uses must be { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. Do not use uses.type \"multiply_level\". The feature uses classResourceAmount 5 + classResourceCostMode \"up_to_proficiency_bonus\" and a melee special_attack with damageFromResourceSpend true, spendResourceOnHit true, criticalDamageMultiplier 2, and Necrotic damage.
+- **Necromancer Charnel Touch:** spendable pool equal to 5 × class level — uses must be { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. Do not use uses.type \"multiply_level\". The feature uses classResourceAmount 5 + classResourceCostMode \"up_to_proficiency_bonus\" and two melee special_attack profiles: (1) damageFromResourceSpend true, spendResourceOnHit true, criticalDamageMultiplier 2, Necrotic damage; (2) from level 2, Healing your Thralls — healFromResourceSpend true, healTarget \"controlled_companion\", unlocksAtClassLevel 2 (no attack roll; restore HP equal to points spent).
 - **Necromancer Spellcasting:** INT full prepared caster — classes[].spellcasting { ability: \"Intelligence\", caster_progression: \"full\", prepared: true } plus progression[] from the Cantrips / Prepared Spells columns (3 cantrips + 4 prepared at 1st; cantrips 4 at 4th / 5 at 10th; prepared scales to 22 at 20th). Do not put spellChoiceGrants on the Spellcasting feature — cantrips and prepared spells come from progression[] (the class spell picker). Populate spell_list from the official Spell / School / Special tables — Dump Stat keeps that list on the class and stamps matching catalog rows on import. Extra always-prepared grants (Animate Dead) stay on their own features. Do not invent a \"table missing level-10 cantrip\" editorial note — the source table shows 5 cantrips at 10th.
 - **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools and not class_upgrades pickers. Import thrall creatures[] with the class; Thralls → grant_creature with BOTH creatureNames and creatureChoiceOptions (the latter is only the player-pick subset). Deadnaught is a companion (level-scaled HP).
-- **Necromancer Dead Space:** emit equipment_and_magic_items with itemOptions [\"Bag\",\"Cloak\",\"Backpack\"], choiceCount 1, allowCustom true; uses with usesFixed 12 and no rest recharge (the dots track occupied corpse/Undead capacity); and player_note with notePrompt \"Dead Space notes\", a useful contents/linked-item placeholder, and noteTarget \"feature\". Preserve both Magic-action and Short-Rest relinking sentences so it appears in Actions and explains when the linked item can change. Always set activation.action plus sheetDisplay abilitiesActions (utility Magic action), not combatActions.
+- **Necromancer Dead Space:** emit equipment_and_magic_items with itemOptions [\"Bag\",\"Cloak\",\"Backpack\"], choiceCount 1, allowCustom true; uses with usesFixed 12 and no rest recharge (occupancy counter); player_note with notePrompt \"Dead Space notes\"; and inventory_container with capacityMode \"slot_count\", capacityAmount 12, contentKinds [\"corpse\",\"companion\",\"freeform\"], maxCreatureSize \"Medium\", linkHostItem true (linked host appears in Gear with Contents). Preserve Magic-action and Short-Rest relinking sentences. Always set activation.action plus sheetDisplay abilitiesActions (utility Magic action), not combatActions.
 - **Necromancer Thrall Rush:** activation.onInitiative + sheetDisplay combatActions. Do not invent an Action/Bonus Action cost — it fires when Initiative is rolled.
 - **Necromancer Overcharged Thralls:** on_creature_death_trigger with creatureFilter ally (thralls you control, including released). Restore Charnel Touch equal to Necromancer level is play-time; do not emit a spendable uses pool on this feature.
 - **Necromancer Death Knight Extra Attack:** extraAttackCount 1 plus power_rider reminding that one attack can be replaced with an action cantrip. Combat Research already carries Charnel Touch-as-Bonus-Action via power_rider.

@@ -188,6 +188,16 @@ const ImportMechanicAiSchema = z.object({
   notePrompt: z.string().nullable(),
   notePlaceholder: z.string().nullable(),
   noteTarget: z.enum(["feature", "equipment"]).nullable(),
+  containerName: z.string().nullable(),
+  capacityMode: z.enum(["slot_count", "weight_lb", "cubic_feet", "unbounded"]).nullable(),
+  capacityAmount: z.number().nullable(),
+  capacityLabel: z.string().nullable(),
+  contentKinds: z.array(z.enum(["equipment", "corpse", "companion", "freeform"])).nullable(),
+  maxCreatureSize: z
+    .enum(["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"])
+    .nullable(),
+  linkHostItem: z.boolean().nullable(),
+  attachToEquipmentNames: z.array(z.string()).nullable(),
   spellcastingAbility: z
     .enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"])
     .nullable(),
@@ -362,6 +372,8 @@ const ImportMechanicAiSchema = z.object({
   areaWidthFeet: z.number().nullable(),
   damageDice: z.string().nullable(),
   damageFromResourceSpend: z.boolean().nullable(),
+  healFromResourceSpend: z.boolean().nullable(),
+  healTarget: z.enum(["controlled_companion", "choose_ally"]).nullable(),
   spendResourceOnHit: z.boolean().nullable(),
   criticalDamageMultiplier: z.number().min(1).max(4).nullable(),
   saveAbility: z

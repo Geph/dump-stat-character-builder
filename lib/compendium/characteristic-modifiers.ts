@@ -307,6 +307,11 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
     hint: "Editable character-sheet note tied to this feature or equipment item",
   },
   {
+    value: "inventory_container",
+    label: "Inventory Container",
+    hint: "Extradimensional or nested storage opened from Gear (Dead Space, Bag of Holding, Portable Hole)",
+  },
+  {
     value: "catalog_option",
     label: "Catalog Option",
     hint: "Selected entry from a system option catalog (Metamagic, Eldritch Invocation)",
@@ -772,10 +777,22 @@ export interface SpecialAttackCharacteristic extends CharacteristicModifierBase 
   damageByLevel?: BonusByLevelEntry[]
   /** Damage is the selected variable class-resource spend rather than dice. */
   damageFromResourceSpend?: boolean
+  /**
+   * Instead of dealing damage, restore Hit Points equal to the selected resource spend
+   * (Charnel Touch healing Undead thralls). No attack roll — pick a companion target.
+   */
+  healFromResourceSpend?: boolean
+  /**
+   * Who may receive healFromResourceSpend. `controlled_companion` = this character's
+   * companions (thralls); `choose_ally` = any party ally/companion.
+   */
+  healTarget?: "controlled_companion" | "choose_ally" | null
   /** Deduct the selected class-resource spend only after a hit is confirmed. */
   spendResourceOnHit?: boolean
   /** Multiplier for resource-spend damage on a critical hit (default 2). */
   criticalDamageMultiplier?: number | null
+  /** Class level at which this attack profile unlocks (e.g. thrall heal at Necromancer 2). */
+  unlocksAtClassLevel?: number | null
   saveAbility?: string | null
   saveDCBase?: number | null
   /** On a successful save, target takes half damage (area exploits). */
@@ -1354,6 +1371,49 @@ export interface PlayerNoteCharacteristic extends CharacteristicModifierBase {
   target: "feature" | "equipment"
 }
 
+export type InventoryContainerCapacityMode =
+  | "slot_count"
+  | "weight_lb"
+  | "cubic_feet"
+  | "unbounded"
+
+export type InventoryContainerContentKind =
+  | "equipment"
+  | "corpse"
+  | "companion"
+  | "freeform"
+
+export type InventoryContainerCreatureSize =
+  | "Tiny"
+  | "Small"
+  | "Medium"
+  | "Large"
+  | "Huge"
+  | "Gargantuan"
+
+/**
+ * Nested / extradimensional storage opened from the Gear tab (Dead Space linked
+ * item, Bag of Holding, Portable Hole). Side-channel — contents live in play state.
+ */
+export interface InventoryContainerCharacteristic extends CharacteristicModifierBase {
+  type: "inventory_container"
+  /** Display name for the space when it differs from the host item. */
+  containerName?: string | null
+  capacityMode: InventoryContainerCapacityMode
+  capacityAmount?: number | null
+  /** Soft capacity hint shown in UI (e.g. "12 Medium or smaller corpses"). */
+  capacityLabel?: string | null
+  contentKinds: InventoryContainerContentKind[]
+  maxCreatureSize?: InventoryContainerCreatureSize | null
+  /**
+   * When true with a create_mundane linked-item choice, the chosen host appears
+   * in Gear and opens this container (Dead Space bag/cloak/backpack).
+   */
+  linkHostItem?: boolean
+  /** Attach this container to owned equipment matching these names (Bag of Holding). */
+  attachToEquipmentNames?: string[]
+}
+
 export interface CatalogOptionCharacteristic extends CharacteristicModifierBase {
   type: "catalog_option"
   catalogAbilityId: string
@@ -1532,6 +1592,7 @@ export type CharacteristicModifier =
   | GrantCreatureCharacteristic
   | EquipmentAndMagicItemsCharacteristic
   | PlayerNoteCharacteristic
+  | InventoryContainerCharacteristic
   | CatalogOptionCharacteristic
   | PowerRiderCharacteristic
   | ReplaceFeatureCharacteristic
@@ -1769,6 +1830,19 @@ export function createCharacteristicModifier(
       return { id, type, mode: "create_mundane", itemOptions: [], choiceCount: 1 }
     case "player_note":
       return { id, type, prompt: "Player notes", placeholder: "", target: "feature" }
+    case "inventory_container":
+      return {
+        id,
+        type,
+        containerName: null,
+        capacityMode: "slot_count",
+        capacityAmount: 1,
+        capacityLabel: null,
+        contentKinds: ["equipment", "freeform"],
+        maxCreatureSize: null,
+        linkHostItem: false,
+        attachToEquipmentNames: [],
+      }
     case "craftable_items":
       return { id, type, items: [], category: null }
     case "held_items_cap":
@@ -3244,6 +3318,8 @@ export function aggregateCharacteristics(
         result.equipmentMagicItems.push(mod)
         break
       case "player_note":
+        break
+      case "inventory_container":
         break
       case "power_rider":
         result.powerRiders.push(mod)

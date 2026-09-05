@@ -144,12 +144,33 @@ describe("Necromancer free-subclass sheet playthrough", () => {
         criticalDamageMultiplier: 2,
       },
     })
+    expect(action?.specialAttacks).toHaveLength(1)
     const pool = entry.class?.class_resources?.find((row) => row.id === "charnel_touch")
     expect(pool?.uses).toMatchObject({
       type: "at_level",
       atLevelMode: "multiply_level",
       atLevelTable: [expect.objectContaining({ level: 1, count: 5 })],
     })
+  })
+
+  it("level 2: Charnel Touch unlocks Heal Thrall spend-to-heal profile", () => {
+    const action = actionsAt(2).find((row) => row.name === "Charnel Touch")
+    expect(action?.specialAttacks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          attackName: "Charnel Touch",
+          damageFromResourceSpend: true,
+          spendResourceOnHit: true,
+        }),
+        expect.objectContaining({
+          attackName: "Heal Thrall",
+          healFromResourceSpend: true,
+          healTarget: "controlled_companion",
+          unlocksAtClassLevel: 2,
+          spendResourceOnHit: false,
+        }),
+      ]),
+    )
   })
 
   it("level 2: Dead Space is a utility action; Thralls offer companion choices", () => {

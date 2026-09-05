@@ -138,6 +138,33 @@ describe("aiMechanicsToDetections", () => {
     })
   })
 
+  it("builds a thrall heal-from-spend special attack unlocked at class level 2", () => {
+    const detections = aiMechanicsToDetections(
+      [
+        {
+          kind: "special_attack",
+          attackName: "Heal Thrall",
+          attackProfile: "melee",
+          healFromResourceSpend: true,
+          healTarget: "controlled_companion",
+          unlocksAtClassLevel: 2,
+          sourcePhrase:
+            "use Charnel Touch on Undead under your control without making an attack roll; restore Hit Points equal to points expended",
+          confidence: "high",
+        },
+      ],
+      { contentKind: "class_feature", featureName: "Charnel Touch" },
+    )
+    expect(detections[0]?.instance.characteristics?.[0]).toMatchObject({
+      type: "special_attack",
+      attackName: "Heal Thrall",
+      healFromResourceSpend: true,
+      healTarget: "controlled_companion",
+      unlocksAtClassLevel: 2,
+      damageDiceCount: 0,
+    })
+  })
+
   it("builds grant_custom_ability from AI mechanics", () => {
     const detections = aiMechanicsToDetections(
       [

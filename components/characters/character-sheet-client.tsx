@@ -180,6 +180,12 @@ import { SheetActionEconomyTracker } from "@/components/character-sheet/sheet-ac
 import { SheetStandardActionButtons } from "@/components/character-sheet/sheet-standard-action-buttons"
 import { SheetSectionHeading } from "@/components/character-sheet/sheet-section-heading"
 import { SheetEquipmentPanel } from "@/components/character-sheet/sheet-equipment-panel"
+import {
+  containerKeyByEquipmentId,
+  resolveInventoryContainers,
+  syntheticContainerHostEquipment,
+  type ContainerInventoryEntry,
+} from "@/lib/character/inventory-containers"
 import { SheetAddEquipmentOverlay } from "@/components/character-sheet/sheet-add-equipment-overlay"
 import { SheetPdfExportDialog } from "@/components/character-sheet/sheet-pdf-export-dialog"
 import {
@@ -455,6 +461,13 @@ const EquipmentDetailOverlay = dynamic(
   () =>
     import("@/components/character-sheet/equipment-detail-overlay").then((mod) => ({
       default: mod.EquipmentDetailOverlay,
+    })),
+)
+
+const InventoryContainerOverlay = dynamic(
+  () =>
+    import("@/components/character-sheet/inventory-container-overlay").then((mod) => ({
+      default: mod.InventoryContainerOverlay,
     })),
 )
 
@@ -843,6 +856,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [skillSortMode, setSkillSortMode] = useState<SkillSortMode>("ability")
   const [pinnedSkillNames, setPinnedSkillNames] = useState<string[]>([])
   const [pinnedEquipmentIds, setPinnedEquipmentIds] = useState<string[]>([])
+  const [containerInventories, setContainerInventories] = useState<
+    Record<string, { entries: ContainerInventoryEntry[] }>
+  >({})
+  const [selectedContainerKey, setSelectedContainerKey] = useState<string | null>(null)
   const [durationReminders, setDurationReminders] = useState<DurationReminder[]>([])
   const [skillAbilityOverrides, setSkillAbilityOverrides] = useState<Record<string, AbilityScoreKey>>({})
   const { enabled: manualSkillAbilityEnabled } = useManualSkillAbility()
@@ -952,6 +969,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         setSkillSortMode(playState.skillSortMode)
         setPinnedSkillNames(playState.pinnedSkillNames)
         setPinnedEquipmentIds(playState.pinnedEquipmentIds)
+        setContainerInventories(playState.containerInventories ?? {})
         setDurationReminders(playState.durationReminders ?? [])
         setSkillAbilityOverrides(playState.skillAbilityOverrides ?? {})
         setSessionHydrated(true)
@@ -1076,6 +1094,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         skillSortMode,
         pinnedSkillNames,
         pinnedEquipmentIds,
+        containerInventories,
         durationReminders,
         skillAbilityOverrides,
         savedAt: null,
@@ -1108,6 +1127,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     skillSortMode,
     pinnedSkillNames,
     pinnedEquipmentIds,
+    containerInventories,
     durationReminders,
     skillAbilityOverrides,
   ])
@@ -2257,6 +2277,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         skillSortMode,
         pinnedSkillNames,
         pinnedEquipmentIds,
+        containerInventories,
         durationReminders,
         skillAbilityOverrides,
         savedAt,
@@ -2285,6 +2306,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       skillSortMode,
       pinnedSkillNames,
       pinnedEquipmentIds,
+      containerInventories,
       durationReminders,
       skillAbilityOverrides,
     ],
@@ -3054,13 +3076,52 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     )
   }, [character?.tool_proficiencies, equipment, equipmentCatalog])
 
-  const displayedEquipment = useMemo(
-    () =>
-      proficientToolEquipment.length
-        ? [...equipment, ...proficientToolEquipment]
-        : equipment,
-    [equipment, proficientToolEquipment],
+  const inventoryContainers = useMemo(() => {
+    const actionIdByFeatureName: Record<string, string> = {}
+    for (const action of sheetActions) {
+      if (!actionIdByFeatureName[action.name]) actionIdByFeatureName[action.name] = action.id
+    }
+    return resolveInventoryContainers({
+      classDetails,
+      ownedEquipment: equipment,
+      featureChoicePicks,
+      actionIdByFeatureName,
+    })
+  }, [classDetails, equipment, featureChoicePicks, sheetActions])
+
+  const containerEquipmentKeyById = useMemo(
+    () => containerKeyByEquipmentId(inventoryContainers),
+    [inventoryContainers],
   )
+
+  const displayedEquipment = useMemo(() => {
+    const hosts = syntheticContainerHostEquipment(inventoryContainers)
+    const extras = [...proficientToolEquipment, ...hosts]
+    if (!extras.length) return equipment
+    const seen = new Set(equipment.map((item) => item.id))
+    const merged = [...equipment]
+    for (const item of extras) {
+      if (seen.has(item.id)) continue
+      seen.add(item.id)
+      merged.push(item)
+    }
+    return merged
+  }, [equipment, inventoryContainers, proficientToolEquipment])
+
+  const selectedContainer = useMemo(
+    () =>
+      selectedContainerKey
+        ? inventoryContainers.find((row) => row.key === selectedContainerKey) ?? null
+        : null,
+    [inventoryContainers, selectedContainerKey],
+  )
+
+  const persistContainerEntries = useCallback((key: string, entries: ContainerInventoryEntry[]) => {
+    setContainerInventories((prev) => ({
+      ...prev,
+      [key]: { entries },
+    }))
+  }, [])
 
   const effectiveBackgroundFeatGranted = useMemo(
     () =>
@@ -6665,6 +6726,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   extraWieldSlots={derived?.extraWieldSlots ?? 0}
                   pinnedEquipmentIds={pinnedEquipmentIds}
                   onTogglePinnedEquipment={togglePinnedEquipment}
+                  containerEquipmentIds={[...containerEquipmentKeyById.keys()]}
+                  onOpenContainer={(item) => {
+                    const key = containerEquipmentKeyById.get(item.id)
+                    if (key) setSelectedContainerKey(key)
+                  }}
                   onEquipArmor={(id) => {
                     if (id) {
                       const item = equipment.find((entry) => entry.id === id)
@@ -7183,6 +7249,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               void persistFeatureChoicePicks(key, value.trim() ? [value] : [])
             }
             onClose={() => setSelectedEquipment(null)}
+          />
+        ) : null}
+        {selectedContainer ? (
+          <InventoryContainerOverlay
+            key={`container:${selectedContainer.key}`}
+            container={selectedContainer}
+            entries={containerInventories[selectedContainer.key]?.entries ?? []}
+            onChange={(entries) => persistContainerEntries(selectedContainer.key, entries)}
+            onClose={() => setSelectedContainerKey(null)}
           />
         ) : null}
         <SheetAddEquipmentOverlay
