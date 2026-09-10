@@ -73,7 +73,7 @@ import {
   ExtraTurnEditor,
 } from "@/components/compendium/trigger-characteristic-editors"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
-import type { ClassResource } from "@/lib/types"
+import type { ClassResource, UsesAtLevel } from "@/lib/types"
 import { FEAT_PICK_CATEGORIES } from "@/lib/compendium/class-feature-metadata"
 import { formatSpellOptionLabel, type SpellOption } from "@/lib/compendium/spell-options"
 import { mergeToolNameLists } from "@/lib/compendium/tool-options"
@@ -118,6 +118,86 @@ function updateModifier(
   next: CharacteristicModifier,
 ): CharacteristicModifier[] {
   return mods.map((mod) => (mod.id === id ? next : mod))
+}
+
+function GrantCreatureLevelTable({
+  label,
+  rows,
+  onChange,
+  step = "1",
+}: {
+  label: string
+  rows?: UsesAtLevel[]
+  onChange: (rows: UsesAtLevel[] | undefined) => void
+  step?: string
+}) {
+  const table = rows ?? []
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <label className="text-xs font-semibold text-foreground">{label}</label>
+        <button
+          type="button"
+          onClick={() => {
+            const last = table[table.length - 1]
+            onChange([
+              ...table,
+              { level: Math.min((last?.level ?? 1) + 1, 20), count: last?.count ?? 1 },
+            ])
+          }}
+          className="text-[11px] font-semibold text-primary hover:underline"
+        >
+          Add row
+        </button>
+      </div>
+      {table.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground">No table — uses the pick count above.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {table.map((row, index) => (
+            <div key={`${row.level}-${index}`} className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={row.level}
+                onChange={(e) => {
+                  const next = [...table]
+                  next[index] = { ...row, level: Math.max(1, parseInt(e.target.value, 10) || 1) }
+                  onChange(next)
+                }}
+                className="w-16 px-2 py-1.5 bg-background border border-border rounded-lg text-sm"
+                aria-label="Level"
+              />
+              <input
+                type="number"
+                min={0}
+                step={step}
+                value={row.count}
+                onChange={(e) => {
+                  const next = [...table]
+                  next[index] = { ...row, count: Number(e.target.value) || 0 }
+                  onChange(next)
+                }}
+                className="w-20 px-2 py-1.5 bg-background border border-border rounded-lg text-sm"
+                aria-label="Value"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const next = table.filter((_, i) => i !== index)
+                  onChange(next.length ? next : undefined)
+                }}
+                className="text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function TagInput({
@@ -2898,6 +2978,56 @@ function ModifierFields({
               Polymorph form (Wild Shape)
             </label>
           </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Offer pick on rest
+            </label>
+            <select
+              value={mod.pickOnRest ?? ""}
+              onChange={(e) =>
+                onChange({
+                  ...mod,
+                  pickOnRest:
+                    e.target.value === "short_rest" ||
+                    e.target.value === "long_rest" ||
+                    e.target.value === "short_or_long_rest"
+                      ? e.target.value
+                      : undefined,
+                })
+              }
+              className="w-full max-w-xs px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            >
+              <option value="">Companions tab only</option>
+              <option value="short_rest">Short Rest</option>
+              <option value="long_rest">Long Rest</option>
+              <option value="short_or_long_rest">Short or Long Rest</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-foreground mb-1">
+              Picker title (optional)
+            </label>
+            <input
+              type="text"
+              value={mod.pickerTitle ?? ""}
+              onChange={(e) =>
+                onChange({ ...mod, pickerTitle: e.target.value.trim() || undefined })
+              }
+              placeholder="Defaults to the feature name"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+            />
+          </div>
+          <GrantCreatureLevelTable
+            label="Pick count by level"
+            rows={mod.countByLevel}
+            onChange={(countByLevel) => onChange({ ...mod, countByLevel })}
+          />
+          <GrantCreatureLevelTable
+            label="Combined CR cap by level"
+            rows={mod.combinedCrByLevel}
+            step="0.25"
+            onChange={(combinedCrByLevel) => onChange({ ...mod, combinedCrByLevel })}
+          />
         </div>
       )
 

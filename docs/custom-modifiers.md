@@ -216,7 +216,8 @@ verbatim.
 
 | Engine | Module | How to author |
 | --- | --- | --- |
-| Inventory containers | `inventory-containers.ts` | CharacteristicModifier `inventory_container` (side-channel). Contents in `sheet_state.containerInventories`. Dead Space uses `linkHostItem` + create_mundane linked item; Bag of Holding / Portable Hole use `attachToEquipmentNames` or magic_effects on the item. Gear shows Contents. |
+| Inventory containers | `inventory-containers.ts` | CharacteristicModifier `inventory_container` (side-channel). Contents in `sheet_state.containerInventories`. Dead Space uses `linkHostItem` + create_mundane linked item (level-up slot and overlay share the pick); Bag of Holding / Portable Hole use `attachToEquipmentNames` or magic_effects on the item. Gear and the feature action overlay show Contents. |
+| Companion rest pick | `resolve-companions.ts` + rest overlay | CharacteristicModifier `grant_creature` with `choiceOptions` plus `pickOnRest` (`short_rest` / `long_rest` / `short_or_long_rest`) and optional `combinedCrByLevel` (`count` is the CR total, so `0.25` = 1/4). The rest overlay and Companions tab share `knownForms`. Do not name-branch Thralls in sheet runtime. |
 | Rampage Die | `rampage-die.ts` | Wording only. Dependants gate with `requiresSheetToggle: "rampage_die_d8_plus"` (derived — not `new_toggles`). Tantrum / Unstoppable Rampage: names + text |
 | Flesh Warp Mutation Die | `mutation-die.ts` | Wording; ally-benefit counts in play state |
 | Mesmerism tokens | `illusion-tokens.ts` | Projected Self / Imaginary Ally names + text |

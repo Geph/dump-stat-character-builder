@@ -1,4 +1,6 @@
 import { DEFAULT_SPELL_SCHOOL_NAMES } from "@/lib/compendium/schools-of-magic"
+import { spellAliasLookupKeys } from "@/lib/compendium/spell-name-aliases"
+import { searchItems } from "@/lib/search/ranked-search"
 
 /** How a spell is typically used in play, inferred from its description. */
 export const SPELL_USAGE_CATEGORIES = [
@@ -21,8 +23,17 @@ export type SpellUsageSource = {
   higher_levels?: string | null
 }
 
+export type SpellPickFilterable = {
+  id?: string
+  name: string
+  school?: string | null
+  level?: number | null
+  description?: string | null
+  classes?: string[] | null
+}
+
 /** Unique, sorted school names from a spell grant list. */
-export function uniqueSpellSchools(spells: Array<{ school?: string | null }>): string[] {
+export function uniqueSpellSchools(spells: ReadonlyArray<{ school?: string | null }>): string[] {
   const seen = new Set<string>()
   for (const spell of spells) {
     const school = spell.school?.trim()
@@ -58,6 +69,46 @@ export function filterSpellsBySchool<T extends { school?: string | null }>(
 ): T[] {
   if (!schoolFilter || schoolFilter === "all") return [...spells]
   return spells.filter((spell) => spell.school?.trim() === schoolFilter)
+}
+
+/** Distinct spell levels in ascending order (0 = cantrip). */
+export function uniqueSpellLevels(spells: ReadonlyArray<{ level?: number | null }>): number[] {
+  return [...new Set(spells.map((spell) => spell.level ?? 0))].sort((a, b) => a - b)
+}
+
+/** Level, school, and ranked name search — same narrowing as the builder spell step. */
+export function filterSpellPickList<T extends SpellPickFilterable>(
+  spells: readonly T[],
+  filters: { search?: string; school?: string; level?: string },
+): T[] {
+  const level = filters.level ?? "all"
+  const byLevel =
+    !level || level === "all"
+      ? [...spells]
+      : spells.filter((spell) => String(spell.level ?? 0) === level)
+  const bySchool = filterSpellsBySchool(byLevel, filters.school ?? "all")
+  return searchItems(bySchool, filters.search ?? "", {
+    name: (spell) => spell.name,
+    aliases: (spell) => spellAliasLookupKeys(spell.name),
+    fields: [
+      { name: "school", value: (spell) => spell.school, weight: 1.3 },
+      { name: "classes", value: (spell) => spell.classes, weight: 1.1 },
+      { name: "description", value: (spell) => spell.description, weight: 0.35 },
+    ],
+  })
+}
+
+/** Keep already-chosen spells visible when they fall outside the current filter. */
+export function pinSelectedSpells<T extends { id: string }>(
+  pool: readonly T[],
+  filtered: readonly T[],
+  selectedIds: readonly string[],
+): T[] {
+  if (!selectedIds.length) return [...filtered]
+  const selected = new Set(selectedIds)
+  const seen = new Set(filtered.map((spell) => spell.id))
+  const pinned = pool.filter((spell) => selected.has(spell.id) && !seen.has(spell.id))
+  return [...pinned, ...filtered]
 }
 
 /** Keep spells whose school is in the allowlist (empty allowlist = no restriction). */

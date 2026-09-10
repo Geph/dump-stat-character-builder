@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest"
 import { attachClassDetails, type CharacterClassDetail } from "@/lib/character/character-classes"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
-import { resolveCharacterCompanionsDetailed } from "@/lib/character/resolve-companions"
+import {
+  companionFormGroupAppearsOnRest,
+  resolveCharacterCompanionsDetailed,
+} from "@/lib/character/resolve-companions"
 import { collectBuilderModifierRefIds } from "@/lib/compendium/builder-modifier-refs"
 import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { buildCreaturePersistRows } from "@/lib/import/build-creature-persist-rows"
@@ -133,6 +136,12 @@ describe("Necromancer free-subclass sheet playthrough", () => {
       classResourceCostMode: "up_to_proficiency_bonus",
     })
     const action = actionsAt(1).find((row) => row.name === "Charnel Touch")
+    expect(action?.limitedUses).toMatchObject({
+      type: "class_resource",
+      classResourceKey: "charnel_touch",
+      classResourceAmount: 5,
+      classResourceCostMode: "up_to_proficiency_bonus",
+    })
     expect(action).toMatchObject({
       kinds: expect.arrayContaining(["action"]),
       classResourceKey: "charnel_touch",
@@ -189,9 +198,16 @@ describe("Necromancer free-subclass sheet playthrough", () => {
     expect(grant).toMatchObject({
       type: "grant_creature",
       choiceOptions: expect.arrayContaining(["Skeleton", "Spirit", "Zombie"]),
+      pickOnRest: "short_or_long_rest",
+      pickerTitle: "Animate Thralls",
       countByLevel: expect.arrayContaining([
         { level: 2, count: 1 },
+        { level: 3, count: 2 },
         { level: 7, count: 3 },
+      ]),
+      combinedCrByLevel: expect.arrayContaining([
+        { level: 2, count: 0.25 },
+        { level: 3, count: 0.5 },
       ]),
     })
 
@@ -202,7 +218,28 @@ describe("Necromancer free-subclass sheet playthrough", () => {
       formSelections: {},
       ctx: CTX,
     })
-    expect(formGroups.some((group) => /thrall/i.test(group.featureName))).toBe(true)
+    const thrallGroup = formGroups.find((group) => /thrall/i.test(group.featureName))
+    expect(thrallGroup).toMatchObject({
+      pickOnRest: "short_or_long_rest",
+      pickerTitle: "Animate Thralls",
+      maxKnown: 1,
+      maxCombinedCr: 0.25,
+    })
+    expect(companionFormGroupAppearsOnRest(thrallGroup!, "short_rest")).toBe(true)
+    expect(companionFormGroupAppearsOnRest(thrallGroup!, "long_rest")).toBe(true)
+    expect(thrallGroup?.options.every((option) => {
+      if (!option.cr) return true
+      const [num, den] = option.cr.includes("/")
+        ? option.cr.split("/").map(Number)
+        : [Number(option.cr), 1]
+      return num / den <= 0.25 + 1e-6
+    })).toBe(true)
+    expect(thrallGroup?.options.map((option) => option.name)).toEqual(
+      expect.arrayContaining(["Skeleton", "Spirit", "Zombie"]),
+    )
+    expect(thrallGroup?.options.map((option) => option.name)).not.toContain("Deadnaught")
+    expect(thrallGroup?.options.map((option) => option.name)).not.toContain("Bone Beast")
+    expect(thrallGroup?.options.map((option) => option.name)).not.toContain("Bloodlurk")
     expect(companions.length).toBe(0)
   })
 
@@ -228,9 +265,32 @@ describe("Necromancer free-subclass sheet playthrough", () => {
     expect(skeleton?.template.actions?.length).toBeGreaterThan(0)
   })
 
+  it("level 5: CR Total 1 unlocks Deadnaught and two thralls", () => {
+    const entry = detailAt(5)
+    const { formGroups } = resolveCharacterCompanionsDetailed({
+      classDetails: [entry],
+      customAbilities: [],
+      creatures,
+      formSelections: {},
+      ctx: { ...CTX, classLevels: [{ className: "Necromancer", level: 5 }] },
+    })
+    const thrallGroup = formGroups.find((group) => /thrall/i.test(group.featureName))
+    expect(thrallGroup).toMatchObject({ maxKnown: 2, maxCombinedCr: 1 })
+    expect(thrallGroup?.options.map((option) => option.name)).toEqual(
+      expect.arrayContaining(["Skeleton", "Deadnaught", "Bone Beast"]),
+    )
+    expect(thrallGroup?.options.map((option) => option.name)).not.toContain("Bloodlurk")
+  })
+
   it("level 3 Overlord: Dark Arcana and Charnel Aura are combat bonus actions", () => {
     const names = actionsAt(3, "Overlord").map((row) => row.name)
     expect(names).toEqual(expect.arrayContaining(["Dark Arcana", "Charnel Aura", "Charnel Touch"]))
+    const dark = actionsAt(3, "Overlord").find((row) => row.name === "Dark Arcana")
+    expect(dark).toMatchObject({
+      kinds: expect.arrayContaining(["bonus"]),
+      restoreResourceFromSpellSlotOnUse: { resourceKey: "charnel_touch", ability: "INT" },
+      classResourceKey: null,
+    })
     const aura = featureOf(detailAt(3, "Overlord"), "Charnel Aura")
     expect(aura?.activation?.bonusAction).toBe(true)
     expect(chars(aura).some((row) => row.type === "resource_ability_menu")).toBe(true)

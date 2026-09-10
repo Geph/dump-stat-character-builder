@@ -3,9 +3,13 @@
 import { Heart, Shield, Footprints, Sparkles } from "lucide-react"
 import { ABILITY_ORDER } from "@/lib/character/parse-companion-stat-block"
 import type { CompanionNamedBlock, ResolvedCompanion } from "@/lib/character/companion-stat-block"
-import { parseCompanionActionRoll } from "@/lib/character/parse-companion-action-roll"
+import {
+  extractCompanionDamageFormula,
+  parseCompanionActionRoll,
+} from "@/lib/character/parse-companion-action-roll"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
+import { WeaponDamageRollButton } from "@/components/character-sheet/weapon-damage-roll-button"
 import { SRD_CONDITIONS } from "@/lib/srd/condition-descriptions"
 
 const ABILITY_LABEL_SHORT: Record<string, string> = {
@@ -54,26 +58,34 @@ function ActionBlock({
   spellAttackModifier: number | null
 }) {
   const roll = parseCompanionActionRoll(block.name, block.description, spellAttackModifier)
+  const damageFormula = roll?.damageFormula ?? extractCompanionDamageFormula(block.description)
   return (
     <div className="px-2 py-1 bg-muted/30 rounded-md space-y-1">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-bold text-foreground">{block.name}</p>
-        {roll?.attackBonus != null ? (
-          <D20RollButton
-            modifier={roll.attackBonus}
-            title={`Roll ${block.name} attack`}
-            size="sm"
-            rollContext={{ kind: "attack", ability: "dexterity" }}
-          />
+        {roll?.attackBonus != null || damageFormula ? (
+          <div className="flex items-center gap-1 shrink-0">
+            {roll?.attackBonus != null ? (
+              <D20RollButton
+                modifier={roll.attackBonus}
+                title={`Roll ${block.name} attack`}
+                size="sm"
+                rollContext={{ kind: "attack", ability: "dexterity" }}
+              />
+            ) : null}
+            {damageFormula ? (
+              <WeaponDamageRollButton
+                expression={damageFormula}
+                label={`${block.name} damage`}
+              />
+            ) : null}
+          </div>
         ) : null}
       </div>
       <ExpandableDescription
         text={block.description}
         className="text-[10px] leading-snug text-muted-foreground"
       />
-      {roll?.damageFormula ? (
-        <p className="text-[9px] text-muted-foreground">Damage: {roll.damageFormula}</p>
-      ) : null}
     </div>
   )
 }

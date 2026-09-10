@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   createCharacteristicModifier,
   normalizeCharacteristics,
+  resolveUsesConfig,
 } from "@/lib/compendium/characteristic-modifiers"
 import {
   featureHasModifierPreset,
@@ -12,6 +13,35 @@ import { enrichCustomSpeciesRow, speciesHasTraitPresetRegistry } from "@/lib/com
 import type { Feature, Trait } from "@/lib/types"
 
 const PHB_SOURCE = "Player's Handbook"
+
+describe("resolveUsesConfig", () => {
+  it("keeps feature.limitedUses when other characteristics have no uses row", () => {
+    const legacy = {
+      type: "class_resource" as const,
+      classResourceKey: "charnel_touch",
+      classResourceAmount: 5,
+      classResourceCostMode: "up_to_proficiency_bonus" as const,
+    }
+    expect(
+      resolveUsesConfig(
+        [
+          {
+            id: "mod_attack",
+            type: "special_attack",
+            attackName: "Charnel Touch",
+            attackProfile: "melee",
+            properties: ["Spell attack"],
+            damageTypes: ["Necrotic"],
+            damageDiceCount: 0,
+            damageDieType: "d6",
+            damageFromResourceSpend: true,
+          },
+        ],
+        legacy,
+      ),
+    ).toEqual(legacy)
+  })
+})
 
 describe("Tier 1 common modifier types", () => {
   it("includes the Initiative template referenced by import wiring", () => {

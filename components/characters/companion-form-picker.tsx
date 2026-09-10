@@ -1,17 +1,29 @@
 "use client"
 
+import { crToNumber, formatChallengeRating } from "@/lib/character/companion-form-options"
 import type { CompanionFormGroup } from "@/lib/character/resolve-companions"
+
+function selectedCrTotal(group: CompanionFormGroup): number {
+  return group.selected.reduce((sum, name) => {
+    const option = group.options.find((entry) => entry.name.toLowerCase() === name.toLowerCase())
+    return sum + (crToNumber(option?.cr) ?? 0)
+  }, 0)
+}
 
 /**
  * Picker for selectable companion form groups: Wild Shape known Beasts
- * (multi-select up to the tier budget) and Find Familiar forms (single pick).
+ * (multi-select up to the tier budget), Find Familiar forms (single pick),
+ * and grant_creature choices (single or multi, optional combined CR cap).
  */
 export function CompanionFormPicker({
   group,
   onChange,
+  restContext = false,
 }: {
   group: CompanionFormGroup
   onChange: (formNames: string[]) => void
+  /** Rest overlay copy — the ritual happens when you finish the rest. */
+  restContext?: boolean
 }) {
   if (group.kind === "familiar") {
     const selected = group.selected[0] ?? ""
@@ -42,21 +54,29 @@ export function CompanionFormPicker({
   }
 
   if (group.kind === "choice") {
-    const selected = group.selected[0] ?? ""
-    const multi = (group.maxKnown ?? 1) > 1
+    const title = group.pickerTitle?.trim() || group.featureName
+    const maxKnown = group.maxKnown ?? 1
+    const multi = maxKnown > 1
+    const usedCr = selectedCrTotal(group)
+    const remainingCr =
+      group.maxCombinedCr != null ? Math.max(0, group.maxCombinedCr - usedCr) : null
+    const heading = restContext ? title : `${title} — ${multi ? "Choose" : "Choose one"}`
+
     if (!multi) {
       return (
         <div className="bg-card rounded-xl border border-border p-3 space-y-1.5">
-          <p className="text-[10px] uppercase font-bold text-muted-foreground">
-            {group.featureName === "Cohort" ? "Cohort" : group.featureName} — Choose one
+          <p className="text-[10px] uppercase font-bold text-muted-foreground">{heading}</p>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            {restContext
+              ? "Choose a creature now. It appears on the Companions tab."
+              : /^cohort$/i.test(group.featureName)
+                ? "Initiate one Cohort. Only the chosen companion appears on this tab."
+                : group.maxCombinedCr != null
+                  ? `Choose one creature up to CR ${formatChallengeRating(group.maxCombinedCr)}.`
+                  : "Choose the creature that appears on this tab."}
           </p>
-          {/^cohort$/i.test(group.featureName) ? (
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              Initiate one Cohort. Only the chosen companion appears on this tab.
-            </p>
-          ) : null}
           <select
-            value={selected}
+            value={group.selected[0] ?? ""}
             onChange={(event) => onChange(event.target.value ? [event.target.value] : [])}
             className="w-full text-xs bg-muted border border-border rounded-lg px-2 py-1.5 text-foreground"
           >
@@ -71,6 +91,66 @@ export function CompanionFormPicker({
         </div>
       )
     }
+
+    const selectedSet = new Set(group.selected.map((name) => name.toLowerCase()))
+    const atCount = group.selected.length >= maxKnown
+
+    const toggle = (name: string, optionCr: number | null) => {
+      const key = name.toLowerCase()
+      if (selectedSet.has(key)) {
+        onChange(group.selected.filter((entry) => entry.toLowerCase() !== key))
+        return
+      }
+      if (atCount) return
+      if (remainingCr != null && optionCr != null && optionCr > remainingCr + 1e-6) return
+      onChange([...group.selected, name])
+    }
+
+    return (
+      <div className="bg-card rounded-xl border border-border p-3 space-y-1.5">
+        <p className="text-[10px] uppercase font-bold text-muted-foreground">
+          {heading}
+          {` (${group.selected.length}/${maxKnown})`}
+        </p>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          {restContext
+            ? "Choose creatures now. They appear on the Companions tab."
+            : "Choose which creatures appear on this tab."}
+          {group.maxCombinedCr != null
+            ? ` Combined CR up to ${formatChallengeRating(group.maxCombinedCr)}${
+                remainingCr != null ? ` · ${formatChallengeRating(remainingCr)} remaining` : ""
+              }.`
+            : ""}
+        </p>
+        <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
+          {group.options.map((option) => {
+            const active = selectedSet.has(option.name.toLowerCase())
+            const optionCr = crToNumber(option.cr)
+            const overCr =
+              !active && remainingCr != null && optionCr != null && optionCr > remainingCr + 1e-6
+            const disabled = !active && (atCount || overCr)
+            return (
+              <button
+                key={option.name}
+                type="button"
+                onClick={() => toggle(option.name, optionCr)}
+                disabled={disabled}
+                className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : disabled
+                      ? "bg-muted text-muted-foreground/50 border-border cursor-not-allowed"
+                      : "bg-muted text-foreground border-border hover:border-primary"
+                }`}
+              >
+                {option.name}
+                {option.cr ? <span className="font-normal opacity-70"> CR {option.cr}</span> : null}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
   }
 
   const selectedSet = new Set(group.selected.map((name) => name.toLowerCase()))

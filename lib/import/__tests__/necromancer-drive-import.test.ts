@@ -136,8 +136,14 @@ describe("Necromancer import sanitizer (synthetic)", () => {
       kind: "grant_creature",
       choiceCountByLevel: expect.arrayContaining([
         { level: 2, count: 1 },
+        { level: 3, count: 2 },
         { level: 7, count: 3 },
       ]),
+      creatureCombinedCrByLevel: expect.arrayContaining([
+        { level: 2, count: 0.25 },
+        { level: 5, count: 1 },
+      ]),
+      creaturePickOnRest: "short_or_long_rest",
     })
     const improved = cls?.features?.find((row) => row.name === "Improved Thralls")
     expect(improved?.isChoice).toBe(false)
@@ -185,9 +191,15 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
     expect(grant).toMatchObject({
       countByLevel: expect.arrayContaining([
         { level: 2, count: 1 },
+        { level: 3, count: 2 },
         { level: 7, count: 3 },
         { level: 19, count: 6 },
       ]),
+      combinedCrByLevel: expect.arrayContaining([
+        { level: 2, count: 0.25 },
+        { level: 9, count: 2 },
+      ]),
+      pickOnRest: "short_or_long_rest",
     })
     expect(content.classes?.[0]?.card_blurb).toBe(
       "Wields forbidden death magic and commands undead legions, torn between ambition and ethics.",
@@ -234,6 +246,7 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
   it("wires Charnel Touch, Dark Arcana, Undying Servitude, and Lichdom immunities", () => {
     const content = enrich()
     const charnel = content.classes?.[0]?.features?.find((f) => f.name === "Charnel Touch") as Feature | undefined
+    expect(charnel?.description ?? "").not.toMatch(/class_resources\./i)
     expect(charnel?.activation?.action).toBe(true)
     expect(charnel?.limitedUses).toMatchObject({
       type: "class_resource",
@@ -267,6 +280,15 @@ describe.skipIf(!hasDriveFixture)("Necromancer Drive import wiring", () => {
 
     const dark = content.classes?.[0]?.features?.find((f) => f.name === "Dark Arcana") as Feature | undefined
     expect(dark?.activation?.bonusAction).toBe(true)
+    expect(
+      dark?.linkedModifiers
+        ?.flatMap((modifier) => modifier.activation?.effects ?? [])
+        .find((effect) => effect.kind === "class_resource"),
+    ).toMatchObject({
+      classResourceKey: "charnel_touch",
+      classResourceChange: "increase",
+      restoreFromSpellSlot: true,
+    })
 
     const undying = content.classes?.[0]?.features?.find((f) => f.name === "Undying Servitude") as Feature | undefined
     expect(undying?.activation?.reaction).toBe(true)

@@ -79,9 +79,10 @@ const CLASS_PREFIXES = [
   "Warden",
   "Necromancer",
   "Dancer",
+  "Captain",
 ].sort((a, b) => b.length - a.length)
 
-/** Unprefixed drop names (Mage Hand Press Alchemist) → parent class. */
+/** Unprefixed drop names (Mage Hand Press) → parent class. */
 const UNPREFIXED_SUBCLASS_CLASS = {
   Amorist: "Alchemist",
   Apothecary: "Alchemist",
@@ -91,6 +92,12 @@ const UNPREFIXED_SUBCLASS_CLASS = {
   "Slime Rancher": "Alchemist",
   Venomsmith: "Alchemist",
   Xenoalchemist: "Alchemist",
+  "Daggermark": "Captain",
+  "Dragon Banner": "Captain",
+  "Eagle Banner": "Captain",
+  "Holy Icon": "Captain",
+  "Lion Banner": "Captain",
+  "Tower Banner": "Captain",
   Acrobat: "Dancer",
   Cheerleader: "Dancer",
   Contortionist: "Dancer",
@@ -103,6 +110,24 @@ const UNPREFIXED_SUBCLASS_CLASS = {
   Harlequin: "Dancer",
   Marionettist: "Dancer",
   Steelsinger: "Dancer",
+  "Blood Ascendant": "Necromancer",
+  "Death Knight": "Necromancer",
+  Overlord: "Necromancer",
+  "Pale Master": "Necromancer",
+  Pharaoh: "Necromancer",
+  "Plague Lord": "Necromancer",
+  Reanimator: "Necromancer",
+  Reaper: "Necromancer",
+  "Beastblood Guardian": "Warden",
+  "Drake-blooded": "Warden",
+  Godsworn: "Warden",
+  "Gray Watchman": "Warden",
+  "Grey Watchman": "Warden",
+  Nightgaunt: "Warden",
+  Stoneheart: "Warden",
+  "Stoneheart Defender": "Warden",
+  "Storm Sentinel": "Warden",
+  "Verdant Protector": "Warden",
 }
 
 /** Short filename remainder → official display name, keyed by class. */
@@ -215,6 +240,8 @@ const SUBCLASS_SHORT_TO_DISPLAY = {
   Warden: {
     "Dread Wing": "Dreadwing",
     "Time Twister": "Timetwister",
+    "Gray Watchman": "Grey Watchman",
+    Stoneheart: "Stoneheart Defender",
   },
 }
 

@@ -12,12 +12,34 @@ import type { UsesConfig } from "@/lib/types"
  * - Pin the official Necromancer spell list so import can tag matching catalog rows.
  */
 
-const THRALL_COUNT_BY_LEVEL = [
+/** Thralls column — count of animated thralls under control. */
+export const NECROMANCER_THRALL_COUNT_BY_LEVEL = [
   { level: 2, count: 1 },
+  { level: 3, count: 2 },
   { level: 7, count: 3 },
   { level: 11, count: 4 },
   { level: 15, count: 5 },
   { level: 19, count: 6 },
+] as const
+
+/** CR Total column — combined Challenge Rating cap (`count` is the CR number). */
+export const NECROMANCER_THRALL_CR_BY_LEVEL = [
+  { level: 2, count: 0.25 },
+  { level: 3, count: 0.5 },
+  { level: 5, count: 1 },
+  { level: 9, count: 2 },
+  { level: 13, count: 3 },
+  { level: 17, count: 4 },
+] as const
+
+export const NECROMANCER_THRALL_CHOICE_OPTIONS = [
+  "Skeleton",
+  "Spirit",
+  "Zombie",
+  "Bone Beast",
+  "Gorger",
+  "Deadnaught",
+  "Bloodlurk",
 ] as const
 
 const IMPROVED_THRALL_OPTIONS = [
@@ -89,19 +111,34 @@ function stripRedundantSpellcastingChoiceGrants<
 
 function stampThrallsGrantCount<
   T extends {
-    mechanics?: Array<{ kind?: string; choiceCountByLevel?: unknown }>
+    mechanics?: Array<{
+      kind?: string
+      choiceCountByLevel?: unknown
+      creatureCombinedCrByLevel?: unknown
+      creaturePickOnRest?: unknown
+      creaturePickerTitle?: unknown
+    }>
     linkedModifiers?: Array<{
-      characteristics?: Array<{ type?: string; countByLevel?: unknown }>
+      characteristics?: Array<{
+        type?: string
+        countByLevel?: unknown
+        combinedCrByLevel?: unknown
+        pickOnRest?: unknown
+        pickerTitle?: unknown
+      }>
     }>
   },
 >(feature: T): T {
   const mechanics = Array.isArray(feature.mechanics)
     ? feature.mechanics.map((mechanic) => {
         if (mechanic.kind !== "grant_creature") return mechanic
-        if (Array.isArray(mechanic.choiceCountByLevel) && mechanic.choiceCountByLevel.length) {
-          return mechanic
+        return {
+          ...mechanic,
+          choiceCountByLevel: [...NECROMANCER_THRALL_COUNT_BY_LEVEL],
+          creatureCombinedCrByLevel: [...NECROMANCER_THRALL_CR_BY_LEVEL],
+          creaturePickOnRest: "short_or_long_rest",
+          creaturePickerTitle: "Animate Thralls",
         }
-        return { ...mechanic, choiceCountByLevel: [...THRALL_COUNT_BY_LEVEL] }
       })
     : feature.mechanics
   const linkedModifiers = Array.isArray(feature.linkedModifiers)
@@ -111,8 +148,13 @@ function stampThrallsGrantCount<
           ...instance,
           characteristics: instance.characteristics.map((char) => {
             if (char.type !== "grant_creature") return char
-            if (Array.isArray(char.countByLevel) && char.countByLevel.length) return char
-            return { ...char, countByLevel: [...THRALL_COUNT_BY_LEVEL] }
+            return {
+              ...char,
+              countByLevel: [...NECROMANCER_THRALL_COUNT_BY_LEVEL],
+              combinedCrByLevel: [...NECROMANCER_THRALL_CR_BY_LEVEL],
+              pickOnRest: "short_or_long_rest",
+              pickerTitle: "Animate Thralls",
+            }
           }),
         }
       })

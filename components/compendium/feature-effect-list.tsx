@@ -2177,6 +2177,24 @@ function CastSpellEditor({
           <span className="text-muted-foreground">May cast as ritual</span>
         </label>
       </div>
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">
+          Unlocks at character / class level (optional)
+        </label>
+        <input
+          type="number"
+          min={1}
+          value={effect.unlocksAtClassLevel ?? ""}
+          onChange={(e) => {
+            const raw = e.target.value.trim()
+            onChange({
+              unlocksAtClassLevel: raw ? Math.max(1, parseInt(raw, 10) || 1) : null,
+            })
+          }}
+          placeholder="Always available"
+          className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+        />
+      </div>
     </div>
   )
 }

@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest"
 
 import {
   classifySpellUsage,
+  filterSpellPickList,
   filterSpellsByAllowedSchools,
   filterSpellsBySchool,
   filterSpellsByUsage,
+  pinSelectedSpells,
   spellSchoolsFromChoiceLabel,
+  uniqueSpellLevels,
   uniqueSpellSchools,
 } from "@/lib/builder/spell-grant-filters"
 
@@ -146,6 +149,35 @@ describe("classifySpellUsage", () => {
         description: "Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space you can see.",
       }),
     ).toEqual(["utility"])
+  })
+})
+
+describe("filterSpellPickList", () => {
+  const catalog = [
+    { id: "alarm", name: "Alarm", school: "Abjuration", level: 1 },
+    { id: "bane", name: "Bane", school: "Enchantment", level: 1 },
+    { id: "hold", name: "Hold Person", school: "Enchantment", level: 2 },
+  ]
+
+  it("filters by level, school, and name search", () => {
+    expect(uniqueSpellLevels(catalog)).toEqual([1, 2])
+    expect(filterSpellPickList(catalog, { level: "2" }).map((spell) => spell.name)).toEqual([
+      "Hold Person",
+    ])
+    expect(filterSpellPickList(catalog, { school: "Enchantment" }).map((spell) => spell.name)).toEqual(
+      ["Bane", "Hold Person"],
+    )
+    expect(filterSpellPickList(catalog, { search: "alar" }).map((spell) => spell.name)).toEqual([
+      "Alarm",
+    ])
+  })
+
+  it("pins selected spells that the current filter would hide", () => {
+    const filtered = filterSpellPickList(catalog, { school: "Abjuration" })
+    expect(pinSelectedSpells(catalog, filtered, ["bane"]).map((spell) => spell.id)).toEqual([
+      "bane",
+      "alarm",
+    ])
   })
 })
 

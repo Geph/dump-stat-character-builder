@@ -43,4 +43,20 @@ describe("cast spell choice filters", () => {
       ),
     ).toEqual(["Fire Bolt", "Hold Person"])
   })
+
+  it("keeps only the named spells when a feature lists a choice set", () => {
+    const bladeWard = spell({ id: "bw", name: "Blade Ward", level: 0, casting_time: "1 action" })
+    const pass = spell({
+      id: "pwt",
+      name: "Pass without Trace",
+      level: 2,
+      casting_time: "1 action",
+    })
+    const firebolt = spell({ id: "fb", name: "Fire Bolt", level: 0, casting_time: "1 action" })
+    expect(
+      filterSpellsForCastChoice([bladeWard, pass, firebolt], {
+        spellNames: ["Blade Ward", "Pass without Trace"],
+      }).map((row) => row.name),
+    ).toEqual(["Blade Ward", "Pass without Trace"])
+  })
 })

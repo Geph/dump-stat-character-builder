@@ -23,12 +23,12 @@ export const SHEET_STATUS_BADGE = {
 /** Character sheet header chips (species, background, etc.). */
 export const SHEET_BANNER_BADGE = {
   class:
-    "px-2 py-0.5 rounded-full text-xs font-medium bg-primary/14 text-foreground border border-primary/28",
+    "px-2 py-0.5 rounded-full text-xs font-medium bg-background/85 text-foreground border border-primary/35",
   species:
-    "px-2 py-0.5 rounded-full text-xs font-medium bg-lime/12 text-foreground border border-lime/22",
-  size: "px-2 py-0.5 rounded-full text-xs font-medium bg-muted/40 text-foreground border border-border/40",
+    "px-2 py-0.5 rounded-full text-xs font-medium bg-background/85 text-foreground border border-lime/35",
+  size: "px-2 py-0.5 rounded-full text-xs font-medium bg-background/85 text-foreground border border-border/50",
   background:
-    "px-2 py-0.5 rounded-full text-xs font-medium bg-secondary/18 text-foreground border border-secondary/30",
+    "px-2 py-0.5 rounded-full text-xs font-medium bg-background/85 text-foreground border border-secondary/40",
 } as const
 
 /** Status chips in the banner lower row (bloodied, conditions, etc.). */
@@ -43,26 +43,26 @@ export const SHEET_BANNER_CHIP = {
     "inline-flex items-center gap-0.5 rounded-md border border-purple-500/28 bg-purple-500/12 px-1.5 py-1 text-[10px] font-semibold text-purple-800 dark:text-purple-300",
 } as const
 
-/** Banner toolbar buttons — lighter fills over portrait/banner art. */
+/** Banner toolbar buttons — solid enough to read on banner art without a box wash. */
 export const SHEET_BANNER_BUTTON = {
-  icon: "border-border/50 bg-card/45 hover:border-primary hover:text-foreground",
+  icon: "border-border/60 bg-background/85 hover:border-primary hover:text-foreground",
   conditionsDefault:
     "border-destructive/70 bg-destructive/90 text-destructive-foreground hover:border-destructive/80 hover:bg-destructive/95",
   conditionsActive:
     "border-destructive/80 bg-destructive/95 text-destructive-foreground hover:bg-destructive",
-  inspirationActive: "border-amber-500/45 bg-amber-500/12 text-amber-700 dark:text-amber-300",
+  inspirationActive: "border-amber-500/45 bg-background/85 text-amber-700 dark:text-amber-300",
   inspirationIdle:
-    "border-border/50 bg-card/45 text-muted-foreground hover:border-amber-500/30 hover:text-amber-600",
+    "border-border/60 bg-background/85 text-muted-foreground hover:border-amber-500/30 hover:text-amber-600",
   manualRoll:
-    "border-cyan/45 bg-cyan/12 text-cyan hover:border-cyan/65 hover:bg-cyan/18",
+    "border-cyan/45 bg-background/85 text-cyan hover:border-cyan/65 hover:bg-cyan/18",
   durationReminders:
-    "border-border/50 bg-card/45 text-muted-foreground hover:border-primary hover:text-foreground",
+    "border-border/60 bg-background/85 text-muted-foreground hover:border-primary hover:text-foreground",
   durationRemindersActive:
-    "border-primary/45 bg-primary/12 text-primary hover:border-primary/65 hover:bg-primary/18",
-  toggleActive: "border-destructive/35 bg-destructive/10 text-destructive",
-  toggleIdle: "border-border/50 bg-card/45 text-muted-foreground hover:bg-muted/35",
-  rest: "border-border/50 bg-background/45 hover:bg-muted/35 hover:text-foreground",
-  select: "border-border/50 bg-card/45",
+    "border-primary/45 bg-background/85 text-primary hover:border-primary/65 hover:bg-primary/18",
+  toggleActive: "border-destructive/35 bg-background/85 text-destructive",
+  toggleIdle: "border-border/60 bg-background/85 text-muted-foreground hover:bg-muted/35",
+  rest: "border-border/60 bg-background/85 hover:bg-muted/35 hover:text-foreground",
+  select: "border-border/60 bg-background/85",
 } as const
 
 /** Panel fill — opacity = 100% minus transparency percentage. */

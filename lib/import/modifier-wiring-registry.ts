@@ -1007,6 +1007,17 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       'Adds the free cast itself (cast_spell + castSpellWithoutSlot) so the grant is usable on the sheet, not just listed as a known spell. spell.gain_cast_named still makes the spells known. Add "X is your spellcasting ability for these spells" when the feature overrides the class ability, and a uses/rest sentence when the free cast is limited.',
   },
   {
+    ruleId: "spell.cast_named_with_this_trait",
+    trigger: "description",
+    catalog: "cat_fx_cast_spell",
+    examples: [
+      "You can cast the Blade Ward spell as a Bonus Action a number of times equal to your Proficiency Bonus",
+      "Starting at 5th level, you can also cast the Pass without Trace spell with this trait",
+    ],
+    notes:
+      'Innate named casts from a trait or feat. "cast X as a Bonus Action" wires on species/feat/background only; "cast X with this trait/feature" is always safe. Starting-at-Nth-level gates the extra named cast_spell with unlocksAtClassLevel. Pair with a uses/rest sentence and spell.gain_cast_named / spell.can_cast_named so the spells are known.',
+  },
+  {
     ruleId: "spell.cast_via_psi_points",
     trigger: "description",
     catalog: "cat_char_spells_known",
@@ -1663,7 +1674,7 @@ export const HOMEBREW_WIRING_PATTERNS = [
       "Charnel Touch pool: class_resources.charnel_touch with uses { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. NEVER emit type \"multiply_level\" as the uses.type — multiply_level is only atLevelMode.",
       "Charnel Touch feature: Magic action + class_resource limitedUses with classResourceKey \"charnel_touch\", classResourceAmount 5, classResourceCostMode \"up_to_proficiency_bonus\" (cap 5 × PB). Attach two special_attack profiles: (1) melee Necrotic damageFromResourceSpend + spendResourceOnHit + criticalDamageMultiplier 2; (2) from level 2 Healing your Thralls — healFromResourceSpend true, healTarget \"controlled_companion\", unlocksAtClassLevel 2 (no attack roll; restore HP equal to points spent on a thrall). The sheet asks for points, then either Miss/Hit/Critical for the attack or a thrall picker for the heal.",
       "Thralls + CR Total columns → special caps (thralls, thrall_cr_total). Fractions like 1/4 are valid CR Total values. Do NOT wire Thralls as optionsSource class_upgrades / resourceKey thralls (that is a control cap, not a pick catalog).",
-      "Import thrall creatures[] with the class; Thralls feature → grant_creature with creatureChoiceOptions (Skeleton, Spirit, Zombie, Bone Beast, Gorger, Deadnaught, Bloodlurk) and choiceCountByLevel matching the Thralls column (1/3/4/5/6 at 2/7/11/15/19).",
+      "Import thrall creatures[] with the class; Thralls feature → grant_creature with creatureChoiceOptions (Skeleton, Spirit, Zombie, Bone Beast, Gorger, Deadnaught, Bloodlurk), choiceCountByLevel matching the Thralls column (1/2/3/4/5/6 at 2/3/7/11/15/19), creatureCombinedCrByLevel matching CR Total (1/4, 1/2, 1, 2, 3, 4 at 2/3/5/9/13/17), and creaturePickOnRest short_or_long_rest so the rest overlay offers the pick.",
       "Improved Thralls is not a player pick: isChoice false, choices.applyTo companion, applyToCompanionFeature Thralls, plus condition_immunity (Charmed, Frightened) so attached thralls receive Avoidance / Necrotic Damage / Turn Immunity.",
       "Dead Space is a non-combat Magic action (activation.action + sheetDisplay abilitiesActions) with the linked-item choice, 12-corpse uses, player_note, and inventory_container (linkHostItem true so the chosen bag/cloak appears in Gear with Contents). Thrall Rush is onInitiative + combatActions, not an Attack/Bonus Action. Overcharged Thralls is on_creature_death_trigger (ally/thrall) that restores charnel_touch equal to Necromancer level.",
       "Deadnaught: category companion with HP/HD scaling from Necromancer level; keep Necromantic Bond (level 7 exclusive thrall) and Multiattack scaling in the stat block.",
@@ -1982,7 +1993,7 @@ function formatMechanicsCheatsheet(): string {
     "- damage_roll_modifiers: bonusDice \"1d6\", damageType \"fire\"; OR damageBonus 2 + optional damageTarget all|melee|ranged for flat bonuses (Dueling +2); OR die from class resource (classResourceKey + amountScaling class_resource_die) for \"damage equal to a roll of your Bardic Inspiration die\" (note whether the die is expended); plusAbilityModifier true when \"+ your Dexterity modifier\"; targets when allies also benefit.",
     "- extra_attack: (no extra fields)",
     `- grant_feat: featCategories ${JSON.stringify(FEAT_CATEGORIES_FOR_IMPORT)}, featCount 1 — use only when the feature GRANTS another feat pick (Fighting Style, Epic Boon, Origin Feat). Never tag the Ability Score Improvement feat itself as grant_feat; its description is an asi_pool (+2 or +1/+1).`,
-    `- grant_creature: creatureNames ["Wolf", "Basilisk Companion"] — grants Creatures & Companions entries on the sheet Companions tab. Prefer importing the matching creatures[] rows in the same batch. companion_stat_block / companion_stat_blocks on abilities or features are also promoted into creatures[] on import. Optional creaturePolymorph true for Wild Shape forms; creatureChoiceOptions when the player picks from a list.`,
+    `- grant_creature: creatureNames ["Wolf", "Basilisk Companion"] — grants Creatures & Companions entries on the sheet Companions tab. Prefer importing the matching creatures[] rows in the same batch. companion_stat_block / companion_stat_blocks on abilities or features are also promoted into creatures[] on import. Optional creaturePolymorph true for Wild Shape forms; creatureChoiceOptions when the player picks from a list; creatureCombinedCrByLevel when a combined CR cap scales by level; creaturePickOnRest (short_rest / long_rest / short_or_long_rest) to offer the pick on the rest overlay.`,
     "- skill_check_alternate_ability: alternateAbility strength|…; alternateSkills [\"Insight\"]; optional requiresSheetToggle",
     "- saving_throw_alternate_ability: alternateAbility intelligence; alternateSaves [\"Wisdom\"]",
     "- forced_save_ability_remap: fromSaveAbility WIS|any; toSaveAbility INT; forcedSaveScope your_features|your_spells|all",

@@ -1,5 +1,6 @@
 import {
   createModifierId,
+  type CreaturePickOnRest,
   type GrantCreatureCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import { resolveTierCountAtLevel } from "@/lib/compendium/resolve-uses-config"
@@ -22,7 +23,10 @@ export function grantCreatureCharacteristic(
   options?: {
     count?: number
     countByLevel?: UsesAtLevel[]
+    combinedCrByLevel?: UsesAtLevel[]
     choiceOptions?: string[]
+    pickOnRest?: CreaturePickOnRest
+    pickerTitle?: string
     polymorph?: boolean
   },
 ): GrantCreatureCharacteristic {
@@ -33,6 +37,9 @@ export function grantCreatureCharacteristic(
     ...(options?.choiceOptions?.length ? { choiceOptions: [...options.choiceOptions] } : {}),
     ...(options?.count != null ? { count: options.count } : {}),
     ...(options?.countByLevel?.length ? { countByLevel: [...options.countByLevel] } : {}),
+    ...(options?.combinedCrByLevel?.length ? { combinedCrByLevel: [...options.combinedCrByLevel] } : {}),
+    ...(options?.pickOnRest ? { pickOnRest: options.pickOnRest } : {}),
+    ...(options?.pickerTitle?.trim() ? { pickerTitle: options.pickerTitle.trim() } : {}),
     ...(options?.polymorph ? { polymorph: true } : {}),
   }
 }
@@ -48,6 +55,16 @@ export function grantCreatureCountAtLevel(
   return grant.count ?? 1
 }
 
+/** Combined CR cap at a class level (`count` is the CR number, e.g. 0.25). */
+export function grantCreatureCombinedCrAtLevel(
+  grant: { combinedCrByLevel?: UsesAtLevel[] },
+  classLevel: number,
+): number | null {
+  if (!grant.combinedCrByLevel?.length) return null
+  const resolved = resolveTierCountAtLevel(grant.combinedCrByLevel, classLevel)
+  return resolved > 0 ? resolved : null
+}
+
 export type ResolvedGrantCreature = {
   catalogEntryId: string
   label: string
@@ -56,6 +73,9 @@ export type ResolvedGrantCreature = {
   choiceOptions?: string[]
   count: number
   countByLevel?: UsesAtLevel[]
+  combinedCrByLevel?: UsesAtLevel[]
+  pickOnRest?: CreaturePickOnRest
+  pickerTitle?: string
   polymorph?: boolean
 }
 
@@ -87,6 +107,9 @@ export function grantCreaturesFromLinkedModifiers(
         choiceOptions: mod.choiceOptions?.length ? [...mod.choiceOptions] : undefined,
         count: mod.count ?? (mod.choiceOptions?.length ? 1 : names.length),
         countByLevel: mod.countByLevel?.length ? [...mod.countByLevel] : undefined,
+        combinedCrByLevel: mod.combinedCrByLevel?.length ? [...mod.combinedCrByLevel] : undefined,
+        pickOnRest: mod.pickOnRest,
+        pickerTitle: mod.pickerTitle?.trim() || undefined,
         polymorph: mod.polymorph || undefined,
       })
     }

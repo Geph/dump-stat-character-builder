@@ -171,4 +171,38 @@ describe("species lineage spell grants", () => {
       freeCastCount: 1,
     })
   })
+
+  it("wires Merge with Stone to Blade Ward plus Pass without Trace at 5", () => {
+    const enriched = enrichCustomSpeciesRow({
+      name: "Genasi: Earth",
+      source: "motm",
+      traits: [
+        {
+          name: "Merge with Stone",
+          description: "You can cast the Blade Ward spell as a Bonus Action.",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_existing_uses",
+              catalogRefId: "cat_char_uses",
+              characteristics: [
+                {
+                  id: "mod_existing_uses",
+                  type: "uses",
+                  uses: { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+                  label: "Merge with Stone",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+    const trait = (enriched.traits as Trait[]).find((row) => row.name === "Merge with Stone")
+    const json = JSON.stringify(trait?.linkedModifiers)
+    expect(json).toMatch(/Blade Ward/)
+    expect(json).toMatch(/Pass without Trace/)
+    expect(json).toMatch(/cast_spell/)
+    expect(json).toMatch(/"unlocksAtClassLevel":5/)
+    expect(json).toMatch(/uses/)
+  })
 })

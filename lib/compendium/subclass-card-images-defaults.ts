@@ -39,6 +39,8 @@ type SubclassCardImageEntry = {
   name: string
   /** Filename slug under the class folder. */
   slug: string
+  /** Folder under subclasses/; defaults to the slug of className. */
+  imageClassName?: string
 }
 
 const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
@@ -216,6 +218,96 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Dancer", name: "Harlequin", slug: "harlequin" },
   { className: "Dancer", name: "Marionettist", slug: "marionettist" },
   { className: "Dancer", name: "Steelsinger", slug: "steelsinger" },
+
+  // Mage Hand Press Captain (local-only portraits)
+  { className: "Captain", name: "Daggermark", slug: "daggermark" },
+  { className: "Captain", name: "Dragon Banner", slug: "dragon-banner" },
+  { className: "Captain", name: "Eagle Banner", slug: "eagle-banner" },
+  { className: "Captain", name: "Holy Icon", slug: "holy-icon" },
+  { className: "Captain", name: "Lion Banner", slug: "lion-banner" },
+  { className: "Captain", name: "Tower Banner", slug: "tower-banner" },
+
+  // Mage Hand Press Necromancer (local-only portraits)
+  { className: "Necromancer", name: "Blood Ascendant", slug: "blood-ascendant" },
+  { className: "Necromancer", name: "Death Knight", slug: "death-knight" },
+  { className: "Necromancer", name: "Overlord", slug: "overlord" },
+  { className: "Necromancer", name: "Pale Master", slug: "pale-master" },
+  { className: "Necromancer", name: "Pharaoh", slug: "pharaoh" },
+  { className: "Necromancer", name: "Plague Lord", slug: "plague-lord" },
+  { className: "Necromancer", name: "Reanimator", slug: "reanimator" },
+  { className: "Necromancer", name: "Reaper", slug: "reaper" },
+
+  // Mage Hand Press Warden (local-only portraits; folder stays warden/)
+  { className: "Warden", name: "Beastblood Guardian", slug: "beastblood-guardian" },
+  { className: "Warden", name: "Drake-blooded", slug: "drake-blooded" },
+  { className: "Warden", name: "Godsworn", slug: "godsworn" },
+  { className: "Warden", name: "Gray Watchman", slug: "grey-watchman" },
+  { className: "Warden", name: "Grey Watchman", slug: "grey-watchman" },
+  { className: "Warden", name: "Nightgaunt", slug: "nightgaunt" },
+  { className: "Warden", name: "Stoneheart", slug: "stoneheart-defender" },
+  { className: "Warden", name: "Stoneheart Defender", slug: "stoneheart-defender" },
+  { className: "Warden", name: "Storm Sentinel", slug: "storm-sentinel" },
+  { className: "Warden", name: "Verdant Protector", slug: "verdant-protector" },
+  {
+    className: "Warden (Mage Hand Press)",
+    name: "Beastblood Guardian",
+    slug: "beastblood-guardian",
+    imageClassName: "Warden",
+  },
+  {
+    className: "Warden (Mage Hand Press)",
+    name: "Drake-blooded",
+    slug: "drake-blooded",
+    imageClassName: "Warden",
+  },
+  {
+    className: "Warden (Mage Hand Press)",
+    name: "Godsworn",
+    slug: "godsworn",
+    imageClassName: "Warden",
+  },
+  {
+    className: "Warden (Mage Hand Press)",
+    name: "Gray Watchman",
+    slug: "grey-watchman",
+    imageClassName: "Warden",
+  },
+  {
+    className: "Warden (Mage Hand Press)",
+    name: "Grey Watchman",
+    slug: "grey-watchman",
+    imageClassName: "Warden",
+  },
+  {
+    className: "Warden (Mage Hand Press)",
+    name: "Nightgaunt",
+    slug: "nightgaunt",
+    imageClassName: "Warden",
+  },
+  {
+    className: "Warden (Mage Hand Press)",
+    name: "Stoneheart",
+    slug: "stoneheart-defender",
+    imageClassName: "Warden",
+  },
+  {
+    className: "Warden (Mage Hand Press)",
+    name: "Stoneheart Defender",
+    slug: "stoneheart-defender",
+    imageClassName: "Warden",
+  },
+  {
+    className: "Warden (Mage Hand Press)",
+    name: "Storm Sentinel",
+    slug: "storm-sentinel",
+    imageClassName: "Warden",
+  },
+  {
+    className: "Warden (Mage Hand Press)",
+    name: "Verdant Protector",
+    slug: "verdant-protector",
+    imageClassName: "Warden",
+  },
 ]
 
 export function subclassCardImageLookupKey(className: string, subclassName: string): string {
@@ -245,7 +337,7 @@ export function subclassCardParentClassMatches(actual: string, mapped: string): 
 export const SUBCLASS_CARD_IMAGES_BY_CLASS_AND_NAME: Record<string, string> = Object.fromEntries(
   SUBCLASS_CARD_IMAGE_ENTRIES.map((entry) => [
     subclassCardImageLookupKey(entry.className, entry.name),
-    subclassCardImage(entry.className, entry.slug),
+    subclassCardImage(entry.imageClassName ?? entry.className, entry.slug),
   ]),
 )
 
@@ -343,7 +435,7 @@ export function listSubclassCardImageRelativePaths(): string[] {
   return [
     ...new Set(
       SUBCLASS_CARD_IMAGE_ENTRIES.map(
-        (entry) => `${subclassClassSlug(entry.className)}/${entry.slug}.png`,
+        (entry) => `${subclassClassSlug(entry.imageClassName ?? entry.className)}/${entry.slug}.png`,
       ),
     ),
   ].sort()

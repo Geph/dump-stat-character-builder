@@ -252,7 +252,12 @@ describe("import-card-art", () => {
       // Non-bundled Artificer art is omitted on CI / GitHub clones without local optimize.
       expect(artificerArt).toBe("")
     }
-    expect(map[importCardArtTargetKey("subclasses", 1)]).toBe("")
+    const necromancerArt = map[importCardArtTargetKey("subclasses", 1)]
+    if (necromancerArt) {
+      expect(necromancerArt).toMatch(/\/images\/compendium\/subclasses\/necromancer\/reanimator\.png$/)
+    } else {
+      expect(necromancerArt).toBe("")
+    }
   })
 
   it("prefers an explicit import URL over a bundled default", () => {

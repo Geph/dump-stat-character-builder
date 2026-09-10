@@ -672,8 +672,8 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     spendPatterns: [
       /\bexpend\s+(\d+)\s+charnel\s+touch\s+points?\b/i,
       /\bspend\s+(\d+)\s+charnel\s+touch\s+points?\b/i,
-      /\bexpend[^.]{0,40}charnel\s+touch\b/i,
-      /\bcharnel\s+touch\s+points?[^.]{0,40}\bexpend/i,
+      /\bexpend(?![^.]{0,40}spell\s+slots?)[^.]{0,40}charnel\s+touch\b/i,
+      /\bcharnel\s+touch\s+points?[^.]{0,40}\bexpend(?!\s+(?:a\s+)?spell\s+slot)/i,
     ],
   },
   {

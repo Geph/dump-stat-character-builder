@@ -36,6 +36,28 @@ export function canonicalThirdPartyResourceKey(resourceKey: string): string {
 export type InferredClassResourceSpend = {
   resourceKey: string
   amount: number
+  costMode?: UsesConfig["classResourceCostMode"]
+}
+
+const UP_TO_PROFICIENCY_SPEND_RE =
+  /\bup\s+to\s+(?:a\s+maximum\s+of\s+)?(\d+)\s*(?:×|x|times)\s+(?:your\s+)?proficiency\s+bonus\b/i
+
+function inferScaledProficiencySpend(
+  haystack: string,
+  availableKeys: readonly string[],
+): InferredClassResourceSpend | null {
+  const match = haystack.match(UP_TO_PROFICIENCY_SPEND_RE)
+  if (!match) return null
+  const amount = parseInt(match[1], 10)
+  if (!Number.isFinite(amount) || amount < 1) return null
+  for (const key of availableKeys) {
+    const canonical = canonicalThirdPartyResourceKey(key)
+    const pattern = THIRD_PARTY_RESOURCE_PATTERNS.find((entry) => entry.resourceKey === canonical)
+    if (pattern?.namePattern.test(haystack)) {
+      return { resourceKey: key, amount, costMode: "up_to_proficiency_bonus" }
+    }
+  }
+  return null
 }
 
 /**
@@ -48,6 +70,16 @@ export function inferClassResourceSpendFromText(
 ): InferredClassResourceSpend | null {
   const haystack = stripHtml(text)
   if (!haystack || !availableKeys.length) return null
+  // "Expend a spell slot to replenish/restore X" spends a slot, not the named pool.
+  if (
+    /\bexpend(?:s|ed|ing)?\s+(?:a\s+)?spell\s+slot\b/i.test(haystack) &&
+    /\b(?:replenish|restore|regain)\b/i.test(haystack)
+  ) {
+    return null
+  }
+
+  const scaled = inferScaledProficiencySpend(haystack, availableKeys)
+  if (scaled) return scaled
 
   for (const key of availableKeys) {
     const canonical = canonicalThirdPartyResourceKey(key)
@@ -76,6 +108,9 @@ export function inferredSpendToLimitedUses(spend: InferredClassResourceSpend): U
     type: "class_resource",
     classResourceKey: spend.resourceKey,
     classResourceAmount: spend.amount,
+    ...(spend.costMode && spend.costMode !== "fixed"
+      ? { classResourceCostMode: spend.costMode }
+      : {}),
   }
 }
 

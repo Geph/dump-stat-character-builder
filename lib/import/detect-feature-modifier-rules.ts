@@ -472,6 +472,29 @@ function spellsKnownInstance(
   ])
 }
 
+const GAIN_CAST_NAMED_PATTERN =
+  /\byou\s+(?:gain\s+the\s+ability\s+to|can)\s+(?:also\s+)?cast\s+([A-Za-z][A-Za-z'\/ -]{2,80}?)(?=\s+as\s+a\s+bonus\s+action\b|\s+with\s+this\s+(?:trait|feature)\b|\s+with\s+your\s+psionic\s+powers|\s+at\s+will\b|\s+without\s+(?:expending\s+)?(?:a\s+)?spell\s+slot|\s+without\s+components?|\s*[.;])/i
+
+const GAIN_CAST_NAMED_RE = GAIN_CAST_NAMED_PATTERN
+
+const CAST_NAMED_WITH_TRAIT_RE =
+  /\bcast\s+(?:the\s+)?([A-Za-z][A-Za-z'\/ -]{2,40}?)(?:\s+spell)?(?:\s+as\s+a\s+bonus\s+action)?(?:\s*,)?\s+with\s+this\s+(?:trait|feature)\b/gi
+
+const CAST_NAMED_AS_BONUS_RE =
+  /\byou can (?:also )?cast (?:the )?([A-Za-z][A-Za-z'\/ -]{2,40}?)(?: spell)? as a bonus action\b/gi
+
+const KNOWS_NAMED_AS_BONUS_RE =
+  /\bknows\s+([A-Za-z][A-Za-z'\/ -]{2,40}?)(?:\s+spell)?\s+\([^)]*\bbonus action\b/gi
+
+const CAST_NAMED_AT_LEVEL_RE =
+  /\bat\s+(\d+)(?:st|nd|rd|th) level,?\s+cast\s+([A-Z][A-Za-z']+(?:\s+(?:without|with|of|and|the|or|a|an|[A-Z][A-Za-z']+))*)(?:\s+spell)?\b/gi
+
+function unlockLevelNear(text: string, index: number): number | undefined {
+  const window = text.slice(Math.max(0, index - 70), index)
+  const match = window.match(/starting at (\d+)(?:st|nd|rd|th)? level/i)
+  return match ? Number(match[1]) : undefined
+}
+
 function parseSpellNameList(fragment: string): string[] {
   const cleaned = fragment
     .replace(/^the\s+/i, "")
@@ -2812,14 +2835,21 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     // Explicit grants that omit the literal word "spell": "You can cast minor
     // illusion with your psionic powers" / "You gain the ability to cast plane
     // shift and teleport." Stop before "at will" so spell.cast_named_at_will wins,
-    // and before "without" so the slot/component clause never lands in a spell name.
-    test:
-      /\byou\s+(?:gain\s+the\s+ability\s+to|can)\s+cast\s+([A-Za-z][A-Za-z'\/ -]{2,80}?)(?=\s+with\s+your\s+psionic\s+powers|\s+at\s+will\b|\s+without\b|\s*[.;])/i,
-    build: (match, ctx, text) => {
+    // before "without" so the slot/component clause never lands in a spell name,
+    // and before "as a bonus action" / "with this trait" so innate-cast sentences
+    // keep a clean title (Blade Ward, not "Blade Ward spell as a Bonus Action").
+    test: GAIN_CAST_NAMED_RE,
+    build: (_match, ctx, text) => {
       if (/\bat\s+will\b/i.test(text) && /\bcast\s+[A-Za-z][A-Za-z'\/ -]{2,60}?\s+at\s+will\b/i.test(text)) {
         return null
       }
-      const names = parseSpellNameList(match[1])
+      const names = [
+        ...new Set(
+          [...text.matchAll(new RegExp(GAIN_CAST_NAMED_PATTERN.source, "gi"))].flatMap((entry) =>
+            parseSpellNameList(entry[1] ?? ""),
+          ),
+        ),
+      ]
       if (!names.length) return null
       return spellsKnownInstance(ctx, "gain_cast_named", names, names.join(", "))
     },
@@ -2899,6 +2929,71 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           label: withoutComponents
             ? `${name} without a spell slot or components`
             : `${name} without a spell slot`,
+        })),
+      })
+    },
+  },
+  {
+    // Species / feat innate casts: "cast Blade Ward as a Bonus Action" (lineage traits)
+    // and "cast Pass without Trace with this trait, starting at 5th level".
+    id: "spell.cast_named_with_this_trait",
+    confidence: "high",
+    scope: "full",
+    test: /\bcast\s+(?:the\s+)?[A-Za-z][A-Za-z'\/ -]{2,40}?(?:\s+spell)?(?:\s+as\s+a\s+bonus\s+action)?[^.]{0,80}?\s+with\s+this\s+(?:trait|feature)\b|\byou can (?:also )?cast (?:the )?[A-Za-z][A-Za-z'\/ -]{2,40}?(?: spell)? as a bonus action\b|\bknows\s+[A-Za-z][A-Za-z'\/ -]{2,40}?(?:\s+spell)?\s+\([^)]*\bbonus action\b|\bat\s+\d+(?:st|nd|rd|th) level,?\s+cast\s+[A-Za-z]/i,
+    build: (_match, ctx, text) => {
+      const allowBareBonus =
+        ctx.contentKind === "species_trait" ||
+        ctx.contentKind === "feat" ||
+        ctx.contentKind === "background_feature"
+      const seen = new Set<string>()
+      const entries: { name: string; unlocksAtClassLevel?: number; bonus: boolean }[] = []
+      const push = (name: string, index: number, bonus: boolean, unlock?: number) => {
+        const key = name.trim().toLowerCase()
+        if (!key || seen.has(key)) return
+        seen.add(key)
+        entries.push({
+          name,
+          unlocksAtClassLevel: unlock ?? unlockLevelNear(text, index),
+          bonus,
+        })
+      }
+      if (allowBareBonus) {
+        for (const hit of text.matchAll(new RegExp(CAST_NAMED_AS_BONUS_RE.source, "gi"))) {
+          for (const name of parseSpellNameList(hit[1] ?? "")) {
+            push(name, hit.index ?? 0, true)
+          }
+        }
+        for (const hit of text.matchAll(new RegExp(KNOWS_NAMED_AS_BONUS_RE.source, "gi"))) {
+          for (const name of parseSpellNameList(hit[1] ?? "")) {
+            push(name, hit.index ?? 0, true)
+          }
+        }
+      }
+      if (allowBareBonus) {
+        for (const hit of text.matchAll(new RegExp(CAST_NAMED_AT_LEVEL_RE.source, "gi"))) {
+          const level = Number(hit[1])
+          for (const name of parseSpellNameList(hit[2] ?? "")) {
+            push(name, hit.index ?? 0, false, Number.isFinite(level) ? level : undefined)
+          }
+        }
+      }
+      for (const hit of text.matchAll(new RegExp(CAST_NAMED_WITH_TRAIT_RE.source, "gi"))) {
+        for (const name of parseSpellNameList(hit[1] ?? "")) {
+          push(name, hit.index ?? 0, /\bas a bonus action\b/i.test(hit[0]))
+        }
+      }
+      if (!entries.length) return null
+      const asBonus = entries.some((entry) => entry.bonus)
+      return fxInstance(newInstanceId(), effectCatalogRefId("cast_spell"), {
+        action: !asBonus,
+        bonusAction: asBonus,
+        effects: entries.map((entry) => ({
+          id: modId(instanceKey(ctx, `cast_trait_${entry.name}`)),
+          kind: "cast_spell" as const,
+          castSpellName: entry.name,
+          castSpellWithoutSlot: true,
+          castSpellCastingTime: asBonus ? ("bonus_action" as const) : undefined,
+          unlocksAtClassLevel: entry.unlocksAtClassLevel,
         })),
       })
     },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   grantCreatureCharacteristic,
+  grantCreatureCombinedCrAtLevel,
   grantCreaturesFromLinkedModifiers,
   creatureNamesFromFeature,
 } from "@/lib/compendium/grant-creature-catalog"
@@ -27,6 +28,34 @@ describe("grant_creature modifier", () => {
     )
     expect(grants).toHaveLength(1)
     expect(grants[0].creatureNames).toEqual(["Wolf", "Basilisk Companion"])
+  })
+
+  it("resolves combined CR caps and rest-pick metadata", () => {
+    const characteristic = grantCreatureCharacteristic(["Skeleton", "Deadnaught"], {
+      choiceOptions: ["Skeleton", "Deadnaught"],
+      combinedCrByLevel: [
+        { level: 2, count: 0.25 },
+        { level: 5, count: 1 },
+      ],
+      pickOnRest: "short_or_long_rest",
+      pickerTitle: "Animate Thralls",
+    })
+    expect(grantCreatureCombinedCrAtLevel(characteristic, 2)).toBe(0.25)
+    expect(grantCreatureCombinedCrAtLevel(characteristic, 5)).toBe(1)
+    const grants = grantCreaturesFromLinkedModifiers(
+      [],
+      [
+        {
+          instanceId: createModifierInstanceId(),
+          catalogRefId: GRANT_CREATURE_CATALOG_ID,
+          characteristics: [characteristic],
+        },
+      ],
+    )
+    expect(grants[0]).toMatchObject({
+      pickOnRest: "short_or_long_rest",
+      pickerTitle: "Animate Thralls",
+    })
   })
 
   it("merges companion_creature_names and grant_creature modifiers on a feature", () => {

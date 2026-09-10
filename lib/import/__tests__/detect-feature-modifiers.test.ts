@@ -1196,6 +1196,59 @@ describe("detectFeatureModifiers", () => {
     expect(armorInstances).toHaveLength(1)
   })
 
+  it("wires innate named casts from a species trait as slotless bonus-action spells", () => {
+    const detections = detectFeatureModifiers(
+      "You can cast the Blade Ward spell as a Bonus Action a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest. Starting at 5th level, you can also cast the Pass without Trace spell with this trait, without requiring a material component. Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells.",
+      { ...baseCtx, contentKind: "species_trait", featureName: "Merge with Stone" },
+    )
+    const innate = detections.find((row) => row.ruleId === "spell.cast_named_with_this_trait")
+    expect(innate?.instance.activation?.bonusAction).toBe(true)
+    expect(
+      innate?.instance.activation?.effects?.map((effect) => [
+        effect.castSpellName,
+        effect.unlocksAtClassLevel ?? null,
+        effect.castSpellWithoutSlot,
+      ]),
+    ).toEqual([
+      ["Blade Ward", null, true],
+      ["Pass without Trace", 5, true],
+    ])
+    const known = detections
+      .filter((row) => row.ruleId === "spell.gain_cast_named" || row.ruleId === "spell.can_cast_named")
+      .flatMap((row) =>
+        (row.instance.characteristics ?? []).flatMap((char) =>
+          char.type === "spells_known" ? (char.spells ?? []).map((entry) => entry.spellId) : [],
+        ),
+      )
+    expect(known.join(" ")).toMatch(/Blade Ward/)
+    expect(known.join(" ")).toMatch(/Pass without Trace/)
+  })
+
+  it("wires abbreviated Knows / At Nth level cast sentences on species traits", () => {
+    const detections = detectFeatureModifiers(
+      "Knows Blade Ward (also usable as a bonus action, uses equal to proficiency bonus per long rest). At 5th level, cast Pass without Trace (no material component) once per long rest, also castable with a 2nd-level+ slot.",
+      { ...baseCtx, contentKind: "species_trait", featureName: "Merge with Stone" },
+    )
+    const innate = detections.find((row) => row.ruleId === "spell.cast_named_with_this_trait")
+    expect(
+      innate?.instance.activation?.effects?.map((effect) => [
+        effect.castSpellName,
+        effect.unlocksAtClassLevel ?? null,
+      ]),
+    ).toEqual([
+      ["Blade Ward", null],
+      ["Pass without Trace", 5],
+    ])
+  })
+
+  it("does not treat a class bonus-action spell sentence as an innate free cast", () => {
+    const detections = detectFeatureModifiers(
+      "You can cast Healing Word as a bonus action.",
+      baseCtx,
+    )
+    expect(detections.some((row) => row.ruleId === "spell.cast_named_with_this_trait")).toBe(false)
+  })
+
   it("mergeDetectionsIntoFeature preserves existing linked modifiers", () => {
     const feature = {
       name: "Existing",

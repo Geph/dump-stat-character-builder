@@ -314,6 +314,11 @@ export interface FeatureEffect {
   castSpellWithoutSlot?: boolean
   /** cast_spell: may cast as ritual if the spell allows. */
   castSpellRitual?: boolean
+  /**
+   * Gate this effect until the character/class level used to collect the action
+   * (character level for species traits). Same meaning as on special_attack.
+   */
+  unlocksAtClassLevel?: number | null
   /** heal_from_pool / heal_self: also remove conditions from target. */
   removeConditions?: string[]
   /** Blessed Healer: heal self when healing others with a spell slot. */

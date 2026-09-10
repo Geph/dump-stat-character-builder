@@ -18,8 +18,23 @@ import {
   type SheetActionEntry,
   type SheetActionMenuOption,
   type SheetActionTalentAlert,
+  type SheetEquipmentChoice,
 } from "@/lib/character/sheet-actions"
+import {
+  linkedEquipmentChoiceKeys,
+  resolveLinkedEquipmentChoiceName,
+} from "@/lib/character/linked-equipment-choice"
+import type {
+  ContainerInventoryEntry,
+  ResolvedInventoryContainer,
+} from "@/lib/character/inventory-containers"
+import { InventoryContainerContents } from "@/components/character-sheet/inventory-container-contents"
 import { formatActionSpendLabel } from "@/lib/character/action-spend-label"
+import type { RestoreResourceFromSpellSlotSpec } from "@/lib/character/spell-slot-use-effects"
+import {
+  spellSlotLevelLabel,
+  type AvailableSpellSlotLevel,
+} from "@/lib/character/sheet-rest"
 import { formatSheetActionUseBonusLines } from "@/lib/character/action-use-bonuses"
 import {
   isResourceDieBonusConfig,
@@ -50,7 +65,9 @@ import { resolveUsesAtLevel, type ResolveUsesContext } from "@/lib/compendium/re
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
 import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
+  castChoiceNeedsSpellPicker,
   filterSpellsForCastChoice,
+  namedSpellsForCastChoice,
   spellLevelLabel,
   type SheetCastSpellChoice,
 } from "@/lib/character/cast-spell-choice"
@@ -156,6 +173,8 @@ type SheetActionsPanelProps = {
   allyCandidates?: PartyAllyCandidate[]
   /** Known / prepared spells for features that let the player pick one to cast. */
   knownSpells?: Spell[]
+  /** Catalog fallback when a named feature cast is not yet on the prepared list. */
+  spellCatalog?: Spell[]
   /** Open the spell overlay to cast through a feature (Reactive Spell, etc.). */
   onCastSpellChoice?: (spell: Spell, choice: SheetCastSpellChoice) => void
   healContext?: HealResolveContext | null
@@ -167,17 +186,18 @@ type SheetActionsPanelProps = {
   onRestoreSpellSlotsByCombinedLevel?: (classLevel: number, maxSlotLevel: number) => void
   /** Divine Respite and similar: regain expended Hit Point Dice. */
   onRestoreHitDice?: (amount: number, classId?: string | null) => number
-  /** Dark Arcana: spend a slot to refill a class resource. */
-  onRestoreResourceFromSpellSlot?: (spec: {
-    resourceKey: string
-    classId?: string | null
-    ability: "INT" | "WIS" | "CHA" | "STR" | "DEX" | "CON"
-  }) => string | null
+  /** Convert a chosen spell slot into a class-resource refill. */
+  onRestoreResourceFromSpellSlot?: (spec: RestoreResourceFromSpellSlotSpec) => string | null
+  /** Remaining slots the restore/spend pickers can offer. */
+  availableSpellSlots?: AvailableSpellSlotLevel[]
   /** Traditional Expertise: expend a spell slot for Advantage on a Wisdom check. */
   onSpendSpellSlot?: (minSpellLevel: number) => string | null
   playerNoteValues?: Record<string, string[]>
   onPlayerNoteChange?: (key: string, value: string) => void
-  onEquipmentChoiceChange?: (key: string, value: string) => void
+  onEquipmentChoiceChange?: (keys: string[], value: string) => void
+  inventoryContainers?: ResolvedInventoryContainer[]
+  containerInventories?: Record<string, { entries: ContainerInventoryEntry[] }>
+  onContainerEntriesChange?: (key: string, entries: ContainerInventoryEntry[]) => void
   /** One Primed Bomb per Attack action; Extra Attack still allows extra regular bombs. */
   primedBombUsedThisTurn?: boolean
   onPrimedBombUsed?: () => void
@@ -204,8 +224,96 @@ function actionPlayerNoteKey(action: SheetActionEntry, noteId: string): string {
   return `player-note:${action.id}:${noteId}`
 }
 
-function actionEquipmentChoiceKey(action: SheetActionEntry, choiceId: string): string {
-  return `player-equipment:${action.id}:${choiceId}`
+function actionLinkedEquipmentKeys(
+  action: SheetActionEntry,
+  choice: SheetEquipmentChoice,
+): string[] {
+  return linkedEquipmentChoiceKeys({
+    actionId: action.id,
+    classId: action.classId,
+    featureName: choice.featureName ?? action.name,
+    featureLevel: choice.featureLevel ?? null,
+    choiceId: choice.id,
+  })
+}
+
+function containerForAction(
+  action: SheetActionEntry,
+  containers: ResolvedInventoryContainer[],
+): ResolvedInventoryContainer | undefined {
+  const needle = action.name.trim().toLowerCase()
+  return containers.find((row) => row.sourceFeatureName?.trim().toLowerCase() === needle)
+}
+
+function ActionLinkedStorageFields({
+  action,
+  playerNoteValues,
+  onEquipmentChoiceChange,
+  inventoryContainer,
+  containerEntries,
+  onContainerEntriesChange,
+}: {
+  action: SheetActionEntry
+  playerNoteValues: Record<string, string[]>
+  onEquipmentChoiceChange?: (keys: string[], value: string) => void
+  inventoryContainer?: ResolvedInventoryContainer | null
+  containerEntries?: ContainerInventoryEntry[]
+  onContainerEntriesChange?: (entries: ContainerInventoryEntry[]) => void
+}) {
+  return (
+    <>
+      {action.equipmentChoices?.map((choice) => {
+        const keys = actionLinkedEquipmentKeys(action, choice)
+        const displayKey = keys[0] ?? choice.id
+        const value =
+          resolveLinkedEquipmentChoiceName({
+            picks: playerNoteValues,
+            choiceId: choice.id,
+            actionId: action.id,
+            classId: action.classId,
+            featureName: choice.featureName ?? action.name,
+            featureLevel: choice.featureLevel ?? null,
+          }) ?? ""
+        const listId = `${displayKey}:options`
+        return (
+          <label key={displayKey} className="block space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              {choice.label}
+            </span>
+            <input
+              key={`${displayKey}:${value}`}
+              type="text"
+              list={choice.options.length ? listId : undefined}
+              defaultValue={value}
+              onBlur={(event) => onEquipmentChoiceChange?.(keys, event.target.value.trim())}
+              placeholder={
+                choice.allowCustom ? "Choose an item or enter another name…" : "Choose an item…"
+              }
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            />
+            {choice.options.length ? (
+              <datalist id={listId}>
+                {choice.options.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+            ) : null}
+            <span className="block text-[11px] text-muted-foreground">
+              Bound at level-up. Change this after completing the relinking rest or ritual
+              described above.
+            </span>
+          </label>
+        )
+      })}
+      {inventoryContainer && onContainerEntriesChange ? (
+        <InventoryContainerContents
+          container={inventoryContainer}
+          entries={containerEntries ?? []}
+          onChange={onContainerEntriesChange}
+        />
+      ) : null}
+    </>
+  )
 }
 
 const ACTION_DETAIL_TAB_TRIGGER_CLASS =
@@ -934,10 +1042,14 @@ function ActionDetailOverlay({
   playerNoteValues = {},
   onPlayerNoteChange,
   onEquipmentChoiceChange,
+  inventoryContainer = null,
+  containerEntries = [],
+  onContainerEntriesChange,
   onRestorePactSlots,
   onRestoreSpellSlotsByCombinedLevel,
   onRestoreHitDice,
   onRestoreResourceFromSpellSlot,
+  availableSpellSlots = [],
   onSpendSpellSlot,
   primedBombUsedThisTurn = false,
   onPrimedBombUsed,
@@ -945,6 +1057,7 @@ function ActionDetailOverlay({
   onFirstUseNoActionUsed,
   initialEconomyKind = null,
   knownSpells = [],
+  spellCatalog = [],
   onCastSpellChoice,
   siblingActions = [],
 }: {
@@ -989,15 +1102,15 @@ function ActionDetailOverlay({
   healContext?: HealResolveContext | null
   playerNoteValues?: Record<string, string[]>
   onPlayerNoteChange?: (key: string, value: string) => void
-  onEquipmentChoiceChange?: (key: string, value: string) => void
+  onEquipmentChoiceChange?: (keys: string[], value: string) => void
+  inventoryContainer?: ResolvedInventoryContainer | null
+  containerEntries?: ContainerInventoryEntry[]
+  onContainerEntriesChange?: (entries: ContainerInventoryEntry[]) => void
   onRestorePactSlots?: (mode: "half_round_up" | "all") => void
   onRestoreSpellSlotsByCombinedLevel?: (classLevel: number, maxSlotLevel: number) => void
   onRestoreHitDice?: (amount: number, classId?: string | null) => number
-  onRestoreResourceFromSpellSlot?: (spec: {
-    resourceKey: string
-    classId?: string | null
-    ability: "INT" | "WIS" | "CHA" | "STR" | "DEX" | "CON"
-  }) => string | null
+  onRestoreResourceFromSpellSlot?: (spec: RestoreResourceFromSpellSlotSpec) => string | null
+  availableSpellSlots?: AvailableSpellSlotLevel[]
   onSpendSpellSlot?: (minSpellLevel: number) => string | null
   primedBombUsedThisTurn?: boolean
   onPrimedBombUsed?: () => void
@@ -1005,9 +1118,11 @@ function ActionDetailOverlay({
   onFirstUseNoActionUsed?: (actionId: string) => void
   initialEconomyKind?: ActionEconomyKind | null
   knownSpells?: Spell[]
+  spellCatalog?: Spell[]
   onCastSpellChoice?: (spell: Spell, choice: SheetCastSpellChoice) => void
   siblingActions?: SheetActionEntry[]
 }) {
+  const castableSpells = [...knownSpells, ...spellCatalog]
   const [augmentSelections, setAugmentSelections] = useState<PsionicAugmentSelection[]>([])
   const [step, setStep] = useState<"detail" | "roll" | "target" | "spell" | "style" | "active">(
     "detail",
@@ -1023,6 +1138,7 @@ function ActionDetailOverlay({
   const [parentUsedThisOpen, setParentUsedThisOpen] = useState(false)
   const [lastSpentHitPoints, setLastSpentHitPoints] = useState(0)
   const [resourceSpendAmount, setResourceSpendAmount] = useState(1)
+  const [selectedSpellSlotLevel, setSelectedSpellSlotLevel] = useState<number | null>(null)
   const [empowerSpend, setEmpowerSpend] = useState(0)
   const [overloadedChargeActive, setOverloadedChargeActive] = useState(false)
   const [selectedRiderNames, setSelectedRiderNames] = useState<string[]>([])
@@ -1170,8 +1286,17 @@ function ActionDetailOverlay({
       : usesVariableResourceSpend
         ? Math.max(1, Math.min(resourceSpendAmount, maxSelectableResourceSpend))
         : configuredResourceCost
+  const restoreFromSlot = action.restoreResourceFromSpellSlotOnUse
+  const slotChoices = restoreFromSlot ? availableSpellSlots : []
+  const defaultSlotLevel = slotChoices.find((slot) => slot.remaining > 0)?.level ?? null
+  const chosenSlotLevel = selectedSpellSlotLevel ?? defaultSlotLevel
+  const chosenSlot = slotChoices.find((slot) => slot.level === chosenSlotLevel) ?? null
+  const canAffordChosenSlot = Boolean(chosenSlot && chosenSlot.remaining > 0)
   const chargeExhausted =
-    usage != null && resourceSpend > 0 && usage.max - usage.used < resourceSpend
+    !restoreFromSlot &&
+    usage != null &&
+    resourceSpend > 0 &&
+    usage.max - usage.used < resourceSpend
 
   const empower = resolveSpecialAttackEmpower(specialAttack, action.classLevel)
   // The rider spends its own pool (Reagents, for a Bomb), which is usually not the pool the action
@@ -1223,7 +1348,8 @@ function ActionDetailOverlay({
     (hitDiceNeeded === 0 || Boolean(onSpendHitDice)) &&
     (!overloadedChargeActive || overloadedChargeAffordable) &&
     (menuOptions.length === 0 || Boolean(selectedMenuOption)) &&
-    !primedBlocked
+    !primedBlocked &&
+    (!restoreFromSlot || canAffordChosenSlot)
 
   const optionUseAffordable = (option: SheetActionMenuOption) => {
     const optionHd = option.hitDiceCost != null && option.hitDiceCost > 0 ? option.hitDiceCost : 0
@@ -1265,7 +1391,9 @@ function ActionDetailOverlay({
     const extras: string[] = []
     if (option?.actionKind) extras.push(ACTION_KIND_LABELS[option.actionKind])
     else if (showEconomyPicker) extras.push(ACTION_KIND_LABELS[selectedEconomyKind])
-    if (usage && action.classResourceKey) {
+    if (restoreFromSlot && chosenSlotLevel) {
+      extras.push(`${spellSlotLevelLabel(chosenSlotLevel)} slot`)
+    } else if (usage && action.classResourceKey) {
       const spend = formatActionSpendLabel(
         optionResource,
         usage.resourceName ?? "resource",
@@ -1292,6 +1420,7 @@ function ActionDetailOverlay({
     setParentUsedThisOpen(false)
     setLastSpentHitPoints(0)
     setResourceSpendAmount(1)
+    setSelectedSpellSlotLevel(null)
     setEmpowerSpend(attackProfiles[0]?.attackVariant === "primed" ? 1 : 0)
     setOverloadedChargeActive(false)
     setSelectedRiderNames([])
@@ -1327,7 +1456,10 @@ function ActionDetailOverlay({
           ? Math.max(1, Math.min(resourceSpendAmount, maxSelectableResourceSpend))
           : configuredResourceCost
     const useChargeExhausted =
-      usage != null && useResourceSpend > 0 && usage.max - usage.used < useResourceSpend
+      !restoreFromSlot &&
+      usage != null &&
+      useResourceSpend > 0 &&
+      usage.max - usage.used < useResourceSpend
     const useCanAffordHitDice = useHitDiceNeeded <= 0 || useHitDiceNeeded <= hitDiceRemaining
     const useCanUse =
       !incapacitated &&
@@ -1339,7 +1471,8 @@ function ActionDetailOverlay({
       (useHitDiceNeeded === 0 || Boolean(onSpendHitDice)) &&
       (!overloadedChargeActive || overloadedChargeAffordable) &&
       (menuOptions.length === 0 || Boolean(option)) &&
-      !primedBlocked
+      !primedBlocked &&
+      (!restoreFromSlot || canAffordChosenSlot)
     if (!useCanUse) return
 
     const pickedStyles = activationNames ?? selectedActivationNames
@@ -1351,12 +1484,18 @@ function ActionDetailOverlay({
 
     if (action.castSpellChoice && onCastSpellChoice) {
       const choice = action.castSpellChoice
-      const matches = filterSpellsForCastChoice(knownSpells, choice)
-      if (choice.spellName) {
+      const matches = filterSpellsForCastChoice(castableSpells, choice)
+      if (!castChoiceNeedsSpellPicker(choice)) {
         const named = matches[0]
+        const wanted = namedSpellsForCastChoice(choice)[0]
         if (!named) {
-          setUseFeedback(`You do not have ${choice.spellName} prepared.`)
+          setUseFeedback(
+            wanted ? `You do not have ${wanted} prepared.` : "No matching spell is available.",
+          )
           return
+        }
+        if (usage && useResourceSpend > 0) {
+          usage.setUsed(usage.used + useResourceSpend)
         }
         onCastSpellChoice(named, choice)
         onClose()
@@ -1388,10 +1527,11 @@ function ActionDetailOverlay({
 
     const spendViaAugments = psiCost > 0
     const deferResourceSpendUntilHit = Boolean(
-      specialAttack?.spendResourceOnHit &&
-        usage &&
-        !spendViaAugments &&
-        useResourceSpend > 0,
+      restoreFromSlot ||
+        (specialAttack?.spendResourceOnHit &&
+          usage &&
+          !spendViaAugments &&
+          useResourceSpend > 0),
     )
     const sharesEmpowerPool =
       empowerPool != null && usage != null && empowerPool.resourceId === usage.resourceId
@@ -1440,12 +1580,21 @@ function ActionDetailOverlay({
       )
     }
     if (action.restoreResourceFromSpellSlotOnUse && onRestoreResourceFromSpellSlot) {
+      if (!chosenSlotLevel || !canAffordChosenSlot) {
+        setUseFeedback("No spell slot available")
+        return
+      }
       const restored = onRestoreResourceFromSpellSlot({
         resourceKey: action.restoreResourceFromSpellSlotOnUse.resourceKey,
         classId: action.classId,
         ability: action.restoreResourceFromSpellSlotOnUse.ability,
+        slotLevel: chosenSlotLevel,
       })
-      parts.push(restored ?? "No expended spell slot to convert")
+      if (!restored) {
+        setUseFeedback("No spell slot available")
+        return
+      }
+      parts.push(restored)
     }
     if (spentSlotMessage) {
       parts.push(spentSlotMessage)
@@ -2085,19 +2234,26 @@ function ActionDetailOverlay({
         ) : step === "spell" && action.castSpellChoice ? (
           <div className="p-4 space-y-3">
             <p className="text-sm text-muted-foreground">
-              Choose a spell with a casting time of one action.
+              {namedSpellsForCastChoice(action.castSpellChoice).length
+                ? "Choose which spell to cast."
+                : "Choose a spell with a casting time of one action."}
             </p>
-            {filterSpellsForCastChoice(knownSpells, action.castSpellChoice).length === 0 ? (
+            {filterSpellsForCastChoice(castableSpells, action.castSpellChoice).length === 0 ? (
               <p className="text-sm text-destructive">
-                No one-action spells are prepared. Add a 1-action spell on this sheet first.
+                {namedSpellsForCastChoice(action.castSpellChoice).length
+                  ? "None of those spells are available on this sheet yet."
+                  : "No one-action spells are prepared. Add a 1-action spell on this sheet first."}
               </p>
             ) : (
               <div className="grid gap-2">
-                {filterSpellsForCastChoice(knownSpells, action.castSpellChoice).map((spell) => (
+                {filterSpellsForCastChoice(castableSpells, action.castSpellChoice).map((spell) => (
                   <button
                     key={spell.id}
                     type="button"
                     onClick={() => {
+                      if (usage && configuredResourceCost > 0) {
+                        usage.setUsed(usage.used + configuredResourceCost)
+                      }
                       onCastSpellChoice?.(spell, action.castSpellChoice!)
                       onClose()
                     }}
@@ -2335,42 +2491,14 @@ function ActionDetailOverlay({
                     html={action.description}
                     className="text-sm text-foreground/90 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
                   />
-                  {action.equipmentChoices?.map((choice) => {
-                    const key = actionEquipmentChoiceKey(action, choice.id)
-                    const listId = `${key}:options`
-                    return (
-                      <label key={key} className="block space-y-1">
-                        <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                          {choice.label}
-                        </span>
-                        <input
-                          key={`${key}:${playerNoteValues[key]?.[0] ?? ""}`}
-                          type="text"
-                          list={choice.options.length ? listId : undefined}
-                          defaultValue={playerNoteValues[key]?.[0] ?? ""}
-                          onBlur={(event) =>
-                            onEquipmentChoiceChange?.(key, event.target.value.trim())
-                          }
-                          placeholder={
-                            choice.allowCustom
-                              ? "Choose an item or enter another name…"
-                              : "Choose an item…"
-                          }
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                        />
-                        {choice.options.length ? (
-                          <datalist id={listId}>
-                            {choice.options.map((option) => (
-                              <option key={option} value={option} />
-                            ))}
-                          </datalist>
-                        ) : null}
-                        <span className="block text-[11px] text-muted-foreground">
-                          Change this after completing the relinking rest or ritual described above.
-                        </span>
-                      </label>
-                    )
-                  })}
+                  <ActionLinkedStorageFields
+                    action={action}
+                    playerNoteValues={playerNoteValues}
+                    onEquipmentChoiceChange={onEquipmentChoiceChange}
+                    inventoryContainer={inventoryContainer}
+                    containerEntries={containerEntries}
+                    onContainerEntriesChange={onContainerEntriesChange}
+                  />
                   {action.playerNotes?.map((note) => {
                     const key = actionPlayerNoteKey(action, note.id)
                     return (
@@ -2632,38 +2760,14 @@ function ActionDetailOverlay({
                 html={action.description}
                 className="text-sm text-foreground/90 leading-relaxed [&_p]:mb-2 [&_p:last-child]:mb-0"
               />
-              {action.equipmentChoices?.map((choice) => {
-                const key = actionEquipmentChoiceKey(action, choice.id)
-                const listId = `${key}:options`
-                return (
-                  <label key={key} className="block space-y-1">
-                    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                      {choice.label}
-                    </span>
-                    <input
-                      key={`${key}:${playerNoteValues[key]?.[0] ?? ""}`}
-                      type="text"
-                      list={choice.options.length ? listId : undefined}
-                      defaultValue={playerNoteValues[key]?.[0] ?? ""}
-                      onBlur={(event) => onEquipmentChoiceChange?.(key, event.target.value.trim())}
-                      placeholder={
-                        choice.allowCustom ? "Choose an item or enter another name…" : "Choose an item…"
-                      }
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                    />
-                    {choice.options.length ? (
-                      <datalist id={listId}>
-                        {choice.options.map((option) => (
-                          <option key={option} value={option} />
-                        ))}
-                      </datalist>
-                    ) : null}
-                    <span className="block text-[11px] text-muted-foreground">
-                      Change this after completing the relinking rest or ritual described above.
-                    </span>
-                  </label>
-                )
-              })}
+              <ActionLinkedStorageFields
+                action={action}
+                playerNoteValues={playerNoteValues}
+                onEquipmentChoiceChange={onEquipmentChoiceChange}
+                inventoryContainer={inventoryContainer}
+                containerEntries={containerEntries}
+                onContainerEntriesChange={onContainerEntriesChange}
+              />
               {action.playerNotes?.map((note) => {
                 const key = actionPlayerNoteKey(action, note.id)
                 return (
@@ -2701,7 +2805,44 @@ function ActionDetailOverlay({
                   </ul>
                 </div>
               ) : null}
-              {usage &&
+              {restoreFromSlot ? (
+                <div className="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-primary">
+                      Spell slot to expend
+                    </p>
+                    <p className="text-[10px] tabular-nums text-muted-foreground">
+                      Restores {restoreFromSlot.ability} + {chosenSlotLevel ?? 1}d8{" "}
+                      {restoreFromSlot.resourceKey.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  {slotChoices.length ? (
+                    <select
+                      aria-label="Spell slot level to expend"
+                      value={chosenSlotLevel ?? ""}
+                      onChange={(event) =>
+                        setSelectedSpellSlotLevel(Number(event.target.value))
+                      }
+                      className="w-full rounded-md border border-border bg-card px-2.5 py-2 text-sm font-semibold tabular-nums"
+                    >
+                      {slotChoices.map((slot) => (
+                        <option
+                          key={slot.level}
+                          value={slot.level}
+                          disabled={slot.remaining <= 0}
+                        >
+                          {spellSlotLevelLabel(slot.level)} slot
+                          {slot.remaining <= 0
+                            ? " · none remaining"
+                            : ` · ${slot.remaining} remaining`}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No spell slots available.</p>
+                  )}
+                </div>
+              ) : usage &&
               action.classResourceKey &&
               selectedResourceCost == null &&
               usesVariableResourceSpend ? (
@@ -2724,29 +2865,27 @@ function ActionDetailOverlay({
                       {resourceCostMode !== "fixed" ? ` · max ${resourceSpendCap}` : ""}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <select
+                    aria-label={
+                      specialAttack?.healFromResourceSpend
+                        ? "Points to spend to restore HP"
+                        : "Points to spend"
+                    }
+                    value={resourceSpend}
+                    onChange={(event) => setResourceSpendAmount(Number(event.target.value))}
+                    className="w-full rounded-md border border-border bg-card px-2.5 py-2 text-sm font-semibold tabular-nums"
+                  >
                     {Array.from({ length: maxSelectableResourceSpend }, (_, index) => {
                       const spend = index + 1
                       const affordable = spend <= availableResourcePoints
                       return (
-                        <button
-                          key={spend}
-                          type="button"
-                          disabled={!affordable}
-                          onClick={() => setResourceSpendAmount(spend)}
-                          className={cn(
-                            "min-w-9 rounded-lg border px-2 py-1.5 text-xs font-semibold tabular-nums transition-colors",
-                            spend === resourceSpend
-                              ? "border-primary bg-primary/15 text-foreground"
-                              : "border-border hover:border-primary/40",
-                            !affordable && "opacity-40",
-                          )}
-                        >
-                          {spend}
-                        </button>
+                        <option key={spend} value={spend} disabled={!affordable}>
+                          {spend} {spend === 1 ? "point" : "points"}
+                          {!affordable ? " · not enough remaining" : ""}
+                        </option>
                       )
                     })}
-                  </div>
+                  </select>
                   {specialAttack?.healFromResourceSpend ? (
                     <p className="text-xs text-muted-foreground">
                       Touch restores {resourceSpend} HP · no attack roll · points spent now
@@ -2873,6 +3012,8 @@ function ActionDetailOverlay({
                 </p>
               ) : chargeExhausted ? (
                 <p className="text-xs text-muted-foreground">No uses remaining.</p>
+              ) : restoreFromSlot && !canAffordChosenSlot ? (
+                <p className="text-xs text-muted-foreground">No spell slots remaining.</p>
               ) : !canAffordHitDice ? (
                 <p className="text-xs text-muted-foreground">
                   Not enough Hit Dice (need {hitDiceNeeded}).
@@ -2934,7 +3075,7 @@ function ActionDetailOverlay({
                   onClick={() => handleUse()}
                   className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {action.castSpellChoice && !action.castSpellChoice.spellName
+                  {action.castSpellChoice && castChoiceNeedsSpellPicker(action.castSpellChoice)
                     ? "Choose a spell"
                     : `Use ${action.name}`}
                   {useActionTabs && specialAttack
@@ -3021,16 +3162,21 @@ export function SheetActionsPanel({
   onBankBalanceOfPower,
   allyCandidates = [],
   knownSpells = [],
+  spellCatalog = [],
   onCastSpellChoice,
   healContext = null,
   singleColumn = true,
   playerNoteValues = {},
   onPlayerNoteChange,
   onEquipmentChoiceChange,
+  inventoryContainers = [],
+  containerInventories = {},
+  onContainerEntriesChange,
   onRestorePactSlots,
   onRestoreSpellSlotsByCombinedLevel,
   onRestoreHitDice,
   onRestoreResourceFromSpellSlot,
+  availableSpellSlots = [],
   onSpendSpellSlot,
   primedBombUsedThisTurn = false,
   onPrimedBombUsed,
@@ -3704,15 +3850,30 @@ export function SheetActionsPanel({
             resolveResourcePool={resolveResourcePool}
             allyCandidates={allyCandidates}
             knownSpells={knownSpells}
+            spellCatalog={spellCatalog}
             onCastSpellChoice={onCastSpellChoice}
             healContext={healContext}
             playerNoteValues={playerNoteValues}
             onPlayerNoteChange={onPlayerNoteChange}
             onEquipmentChoiceChange={onEquipmentChoiceChange}
+            inventoryContainer={containerForAction(openAction, inventoryContainers)}
+            containerEntries={
+              containerInventories[containerForAction(openAction, inventoryContainers)?.key ?? ""]
+                ?.entries ?? []
+            }
+            onContainerEntriesChange={
+              onContainerEntriesChange
+                ? (entries) => {
+                    const container = containerForAction(openAction, inventoryContainers)
+                    if (container) onContainerEntriesChange(container.key, entries)
+                  }
+                : undefined
+            }
             onRestorePactSlots={onRestorePactSlots}
             onRestoreSpellSlotsByCombinedLevel={onRestoreSpellSlotsByCombinedLevel}
             onRestoreHitDice={onRestoreHitDice}
             onRestoreResourceFromSpellSlot={onRestoreResourceFromSpellSlot}
+            availableSpellSlots={availableSpellSlots}
             onSpendSpellSlot={onSpendSpellSlot}
             primedBombUsedThisTurn={primedBombUsedThisTurn}
             onPrimedBombUsed={onPrimedBombUsed}

@@ -68,6 +68,20 @@ export function crToNumber(cr: string | null | undefined): number | null {
   return Number.isFinite(num) ? num : null
 }
 
+/** Display a numeric CR the way tables write it (0.25 → 1/4). */
+export function formatChallengeRating(cr: number): string {
+  const fractions: [number, string][] = [
+    [0.125, "1/8"],
+    [0.25, "1/4"],
+    [0.5, "1/2"],
+  ]
+  for (const [value, label] of fractions) {
+    if (Math.abs(cr - value) < 0.0001) return label
+  }
+  if (Number.isInteger(cr)) return String(cr)
+  return String(cr)
+}
+
 export function wildShapeTierForLevel(druidLevel: number): WildShapeTier | null {
   return WILD_SHAPE_TIERS.find((tier) => druidLevel >= tier.minLevel) ?? null
 }

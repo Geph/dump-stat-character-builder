@@ -97,6 +97,35 @@ describe("inventory containers", () => {
     expect(containerKeyByEquipmentId(containers).get("eq_bag")).toBe(containers[0]?.key)
   })
 
+  it("attaches Contents from the level-up equipment slot when the overlay key is empty", () => {
+    const feature = deadSpaceFeature()
+    const classId = "class-necromancer"
+    const bag = {
+      id: "eq_bag",
+      name: "Bag",
+      category: "Adventuring Gear",
+      subcategory: null,
+      cost: null,
+      weight: 1,
+      properties: null,
+      description: null,
+      icon: null,
+      source: "srd",
+      creator_url: null,
+      created_at: new Date(0).toISOString(),
+    }
+    const containers = resolveInventoryContainers({
+      features: [feature],
+      ownedEquipment: [bag],
+      featureChoicePicks: {
+        [`${classId}:L2:Dead Space::mod_link::equipment`]: ["Bag"],
+      },
+    })
+    expect(containers[0]?.linkedHostName).toBe("Bag")
+    expect(containers[0]?.linkedHostEquipmentId).toBe("eq_bag")
+    expect(containerKeyByEquipmentId(containers).get("eq_bag")).toBe(containers[0]?.key)
+  })
+
   it("tracks slot capacity from entries", () => {
     expect(
       containerCapacityRemaining(deadSpaceContainer, [

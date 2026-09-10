@@ -14,6 +14,9 @@ import {
   restoreExpendedSpellSlots,
   restoreSpellSlotsByCombinedLevel,
   spendLowestAvailableSpellSlot,
+  spendSpellSlotAtLevel,
+  availableSpellSlotLevels,
+  spellSlotLevelLabel,
 } from "@/lib/character/sheet-rest"
 import { enrichClassFeatureWithResource } from "@/lib/compendium/class-resource-features"
 import { buildDefaultMetamagicOptions } from "@/lib/compendium/system-option-catalogs"
@@ -646,6 +649,22 @@ describe("remaining SRD and MHP spend hooks", () => {
     expect(
       inferClassResourceSpendFromText("Expend 10 Charnel Touch points.", ["charnel_touch"]),
     ).toEqual({ resourceKey: "charnel_touch", amount: 10 })
+    expect(
+      inferClassResourceSpendFromText(
+        "You can expend a number of Charnel Touch points up to a maximum of 5 × your Proficiency Bonus.",
+        ["charnel_touch"],
+      ),
+    ).toEqual({
+      resourceKey: "charnel_touch",
+      amount: 5,
+      costMode: "up_to_proficiency_bonus",
+    })
+    expect(
+      inferClassResourceSpendFromText(
+        "As a Bonus Action, you can expend a spell slot to replenish your Charnel Touch pool.",
+        ["charnel_touch"],
+      ),
+    ).toBeNull()
     expect(charnelTouchRestoreFromSlot(3, 2)).toBe(11)
   })
 
@@ -727,6 +746,19 @@ describe("remaining SRD and MHP spend hooks", () => {
       spentLevel: 3,
     })
     expect(spendLowestAvailableSpellSlot([4, 3, 2], [4, 3, 2], 1)).toBeNull()
+    expect(spendSpellSlotAtLevel([0, 0, 0], [4, 3, 2], 2)).toEqual({
+      nextUsed: [0, 1, 0],
+      spentLevel: 2,
+    })
+    expect(spendSpellSlotAtLevel([4, 3, 0], [4, 3, 2], 2)).toBeNull()
+    expect(availableSpellSlotLevels([1, 3, 0], [4, 3, 2])).toEqual([
+      { level: 1, remaining: 3 },
+      { level: 2, remaining: 0 },
+      { level: 3, remaining: 2 },
+    ])
+    expect(spellSlotLevelLabel(1)).toBe("1st-level")
+    expect(spellSlotLevelLabel(2)).toBe("2nd-level")
+    expect(spellSlotLevelLabel(3)).toBe("3rd-level")
     const actions = collectSheetActions({
       classDetails: [
         {
@@ -755,7 +787,11 @@ describe("remaining SRD and MHP spend hooks", () => {
 })
 
 describe("spell-slot hooks come from class_resource effects, not feature names", () => {
-  function slotEffectClass(featureName: string, effect: Record<string, unknown>) {
+  function slotEffectClass(
+    featureName: string,
+    effect: Record<string, unknown>,
+    extras: { description?: string; activation?: Record<string, unknown> } = {},
+  ) {
     return {
       row: { class_id: "homebrew-1", level: 12, subclass_id: null, order: 0 },
       class: {
@@ -765,8 +801,8 @@ describe("spell-slot hooks come from class_resource effects, not feature names",
           {
             name: featureName,
             level: 1,
-            description: "Wired through the Compendium row.",
-            activation: { action: true, noEconomyCost: true },
+            description: extras.description ?? "Wired through the Compendium row.",
+            activation: extras.activation ?? { action: true, noEconomyCost: true },
             linkedModifiers: [
               {
                 instanceId: `modinst_${featureName.toLowerCase().replace(/\W+/g, "_")}`,
@@ -878,6 +914,37 @@ describe("spell-slot hooks come from class_resource effects, not feature names",
     expect(
       actions.find((action) => action.name === "Grave Bargain")?.restoreResourceFromSpellSlotOnUse,
     ).toEqual({ resourceKey: "charnel_touch", ability: "INT" })
+    expect(actions.find((action) => action.name === "Grave Bargain")?.classResourceKey).toBeNull()
+  })
+
+  it("does not treat Dark Arcana prose as a Charnel Touch spend", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        slotEffectClass(
+          "Dark Arcana",
+          {
+            kind: "class_resource",
+            classResourceKey: "charnel_touch",
+            classResourceChange: "increase",
+            restoreFromSpellSlot: true,
+            classResourceAmountConfig: { mode: "ability_modifier", ability: "INT" },
+          },
+          {
+            description:
+              "As a Bonus Action, you can expend a spell slot to replenish your Charnel Touch pool. The pool regains points equal to your Intelligence modifier plus 1d8 for each level of the spell slot expended.",
+            activation: { bonusAction: true },
+          },
+        ),
+      ],
+      species: null,
+    })
+    const dark = actions.find((action) => action.name === "Dark Arcana")
+    expect(dark?.restoreResourceFromSpellSlotOnUse).toEqual({
+      resourceKey: "charnel_touch",
+      ability: "INT",
+    })
+    expect(dark?.classResourceKey).toBeNull()
+    expect(dark?.limitedUses?.type).not.toBe("class_resource")
   })
 
   it("wires the SRD Warlock and Wizard rows through the catalog rather than the legacy names", () => {

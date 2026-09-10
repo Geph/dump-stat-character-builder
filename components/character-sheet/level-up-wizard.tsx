@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useDeferredValue, useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowUp, Check, ChevronLeft, ChevronRight, Dices, X } from "lucide-react"
 import { AsiAllocator } from "@/components/builder/asi-allocator"
 import { FeatModifierChoicePicker } from "@/components/builder/feat-modifier-choice-picker"
 import { ModifierPlayerChoicePanel } from "@/components/builder/modifier-player-choice-panel"
 import { MultiSelectChoices } from "@/components/builder/multi-select-choices"
+import { SpellListFilters } from "@/components/builder/spell-list-filters"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 import { createClient } from "@/lib/db/client"
@@ -99,8 +100,15 @@ import { LevelUpSubclassPicker } from "@/components/character-sheet/level-up-sub
 import { CompendiumDetailOverlay } from "@/components/compendium/compendium-detail-overlay"
 import { spellCastingDetailRows, spellDetailOverlayTags } from "@/lib/compendium/spell-detail-tags"
 import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
+import {
+  filterSpellPickList,
+  pinSelectedSpells,
+  uniqueSpellLevels,
+  uniqueSpellSchools,
+} from "@/lib/builder/spell-grant-filters"
+import { formatSpellListGroupLabel } from "@/lib/compendium/spell-slots"
 import { useBuilderLayout } from "@/components/settings/use-builder-layout"
-import { useIsPhonePickerScreen } from "@/hooks/use-picker-page-size"
+import { useIsPhonePickerScreen, useSpellPickerPageSize } from "@/hooks/use-picker-page-size"
 import { cn } from "@/lib/utils"
 
 type LevelUpWizardProps = {
@@ -1173,6 +1181,14 @@ function SpellPickStep({
   onSpellsChange: (ids: string[]) => void
 }) {
   const [detailSpell, setDetailSpell] = useState<Spell | null>(null)
+  const [cantripSearch, setCantripSearch] = useState("")
+  const [cantripSchool, setCantripSchool] = useState("all")
+  const [spellSearch, setSpellSearch] = useState("")
+  const [spellSchool, setSpellSchool] = useState("all")
+  const [spellLevel, setSpellLevel] = useState("all")
+  const deferredCantripSearch = useDeferredValue(cantripSearch)
+  const deferredSpellSearch = useDeferredValue(spellSearch)
+  const pageSize = useSpellPickerPageSize()
   const eligible = useMemo(
     () =>
       spellsEligibleForLevelUp(
@@ -1184,8 +1200,40 @@ function SpellPickStep({
       ),
     [alreadyKnown, current.className, current.maxSpellLevel, current.spellList, spells],
   )
-  const cantrips = eligible.filter((spell) => (spell.level ?? 0) === 0)
-  const leveled = eligible.filter((spell) => (spell.level ?? 0) > 0)
+  const cantrips = useMemo(
+    () => eligible.filter((spell) => (spell.level ?? 0) === 0),
+    [eligible],
+  )
+  const leveled = useMemo(
+    () => eligible.filter((spell) => (spell.level ?? 0) > 0),
+    [eligible],
+  )
+  const visibleCantrips = pinSelectedSpells(
+    cantrips,
+    filterSpellPickList(cantrips, { search: deferredCantripSearch, school: cantripSchool }),
+    cantripIds,
+  )
+  const visibleLeveled = pinSelectedSpells(
+    leveled,
+    filterSpellPickList(leveled, {
+      search: deferredSpellSearch,
+      school: spellSchool,
+      level: spellLevel,
+    }),
+    spellIds,
+  )
+
+  useEffect(() => {
+    const schools = uniqueSpellSchools(cantrips)
+    if (cantripSchool !== "all" && !schools.includes(cantripSchool)) setCantripSchool("all")
+  }, [cantrips, cantripSchool])
+
+  useEffect(() => {
+    const schools = uniqueSpellSchools(leveled)
+    const levels = uniqueSpellLevels(leveled).map(String)
+    if (spellSchool !== "all" && !schools.includes(spellSchool)) setSpellSchool("all")
+    if (spellLevel !== "all" && !levels.includes(spellLevel)) setSpellLevel("all")
+  }, [leveled, spellSchool, spellLevel])
 
   const openSpellInfo = (pool: Spell[], name: string) => {
     const match = pool.find((spell) => spell.name === name) ?? null
@@ -1201,7 +1249,7 @@ function SpellPickStep({
       {current.extraCantrips > 0 ? (
         <MultiSelectChoices
           title={`Cantrips (${current.extraCantrips})`}
-          options={cantrips.map((spell) => ({ name: spell.name }))}
+          options={visibleCantrips.map((spell) => ({ name: spell.name }))}
           maxCount={current.extraCantrips}
           selected={cantrips
             .filter((spell) => cantripIds.includes(spell.id))
@@ -1213,6 +1261,19 @@ function SpellPickStep({
           }
           showOptionInfo
           onOptionInfo={(option) => openSpellInfo(cantrips, option.name)}
+          paginate
+          pageSize={pageSize}
+          toolbar={
+            <SpellListFilters
+              spells={cantrips}
+              search={cantripSearch}
+              onSearchChange={setCantripSearch}
+              school={cantripSchool}
+              onSchoolChange={setCantripSchool}
+              searchScope={`level-up:cantrips:${current.className}`}
+              searchAriaLabel={`Search ${current.className} cantrips`}
+            />
+          }
         />
       ) : null}
       {current.extraPrepared > 0 ? (
@@ -1224,9 +1285,9 @@ function SpellPickStep({
                 ? "Prepared"
                 : "Known"
           } spells (${current.extraPrepared})`}
-          options={leveled.map((spell) => ({
+          options={visibleLeveled.map((spell) => ({
             name: spell.name,
-            sourceLabel: spell.level === 0 ? "Cantrip" : `Level ${spell.level}`,
+            sourceLabel: formatSpellListGroupLabel(spell.level ?? 0),
           }))}
           maxCount={current.extraPrepared}
           selected={leveled
@@ -1239,6 +1300,22 @@ function SpellPickStep({
           }
           showOptionInfo
           onOptionInfo={(option) => openSpellInfo(leveled, option.name)}
+          paginate
+          pageSize={pageSize}
+          toolbar={
+            <SpellListFilters
+              spells={leveled}
+              search={spellSearch}
+              onSearchChange={setSpellSearch}
+              school={spellSchool}
+              onSchoolChange={setSpellSchool}
+              level={spellLevel}
+              onLevelChange={setSpellLevel}
+              showLevelFilter
+              searchScope={`level-up:spells:${current.className}`}
+              searchAriaLabel={`Search ${current.className} spells`}
+            />
+          }
         />
       ) : null}
 

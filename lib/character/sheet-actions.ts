@@ -225,6 +225,8 @@ export type SheetEquipmentChoice = {
   label: string
   options: string[]
   allowCustom: boolean
+  featureName?: string
+  featureLevel?: number
 }
 
 export type SheetAlsoActivateAction = {
@@ -518,6 +520,8 @@ function resolveEquipmentChoices(item: ActivatableItem): SheetEquipmentChoice[] 
         label: characteristic.label || "Linked item",
         options: characteristic.itemOptions ?? [],
         allowCustom: characteristic.allowCustom === true,
+        featureName: item.name,
+        featureLevel: item.level,
       })
     }
   }
@@ -577,6 +581,7 @@ function resolveLimitedUsesWithInference(
 ): UsesConfig | null | undefined {
   const existing = resolveItemLimitedUses(item)
   if (existing) return existing
+  if (resolveSpellSlotUseEffects(item).restoreResourceFromSpellSlotOnUse) return existing
   const fromTrigger = limitedUsesFromTriggerSpend(item)
   if (fromTrigger) return fromTrigger
   const spend = inferClassResourceSpendFromText(
@@ -1170,18 +1175,45 @@ function collectCastSpellEffectsFromItem(item: ActivatableItem): FeatureEffect[]
 function resolveCastSpellChoice(
   item: ActivatableItem,
   kinds: ActionEconomyKind[],
+  classLevel: number,
 ): SheetCastSpellChoice | undefined {
-  const effect = collectCastSpellEffectsFromItem(item)[0]
-  if (!effect) return undefined
+  const effects = collectCastSpellEffectsFromItem(item).filter(
+    (effect) => (effect.unlocksAtClassLevel ?? 0) <= classLevel,
+  )
+  if (!effects.length) return undefined
+  const named = [
+    ...new Set(
+      effects
+        .map((effect) => effect.castSpellName?.trim())
+        .filter((name): name is string => Boolean(name)),
+    ),
+  ]
+  const withoutSlot = effects.some((effect) => effect.castSpellWithoutSlot)
+  const economyKind = kinds.includes("reaction")
+    ? "reaction"
+    : kinds.includes("bonus")
+      ? "bonus"
+      : kinds[0]
+  if (named.length === 1) {
+    return {
+      spellName: named[0],
+      withoutSlot,
+      economyKind,
+    }
+  }
+  if (named.length > 1) {
+    return {
+      spellNames: named,
+      withoutSlot,
+      economyKind,
+    }
+  }
+  const effect = effects[0]!
   return {
     castingTime: effect.castSpellCastingTime ?? null,
     spellName: effect.castSpellName ?? null,
-    withoutSlot: Boolean(effect.castSpellWithoutSlot),
-    economyKind: kinds.includes("reaction")
-      ? "reaction"
-      : kinds.includes("bonus")
-        ? "bonus"
-        : kinds[0],
+    withoutSlot,
+    economyKind,
   }
 }
 
@@ -1907,7 +1939,7 @@ function pushActivatableItemActions(
         const playerNotes = resolvePlayerNotes(feature)
         const equipmentChoices = resolveEquipmentChoices(feature)
         const specialAttacks = resolveSpecialAttacks(feature, levelCap)
-        const castSpellChoice = resolveCastSpellChoice(feature, kinds)
+        const castSpellChoice = resolveCastSpellChoice(feature, kinds, levelCap)
         actions.push({
           id: `${idPrefix}:${feature.level ?? 1}:${feature.name}`,
           name: resolveSheetActionName(feature),

@@ -21,6 +21,12 @@ describe("aiMechanicsToDetections", () => {
             { level: 2, count: 1 },
             { level: 7, count: 3 },
           ],
+          creatureCombinedCrByLevel: [
+            { level: 2, count: 0.25 },
+            { level: 3, count: 0.5 },
+          ],
+          creaturePickOnRest: "short_or_long_rest",
+          creaturePickerTitle: "Animate Thralls",
           sourcePhrase: "These Undead become your thralls",
           confidence: "high",
         },
@@ -34,6 +40,12 @@ describe("aiMechanicsToDetections", () => {
         { level: 2, count: 1 },
         { level: 7, count: 3 },
       ],
+      combinedCrByLevel: [
+        { level: 2, count: 0.25 },
+        { level: 3, count: 0.5 },
+      ],
+      pickOnRest: "short_or_long_rest",
+      pickerTitle: "Animate Thralls",
     })
   })
 

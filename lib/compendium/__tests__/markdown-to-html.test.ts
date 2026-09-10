@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { markdownInlineToHtml, markdownToHtml } from "@/lib/compendium/markdown-to-html"
+import {
+  humanizeCatalogResourceRefs,
+  markdownInlineToHtml,
+  markdownToHtml,
+} from "@/lib/compendium/markdown-to-html"
 import { isHtml } from "@/lib/compendium/html-utils"
 
 describe("markdownToHtml", () => {
@@ -27,6 +31,24 @@ describe("markdownToHtml", () => {
     expect(html).toContain("<em>Colossus Slayer.</em>")
     expect(html).toContain("<em>Horde Breaker.</em>")
     expect(html).not.toContain("_Colossus")
+  })
+
+  it("does not italicize snake_case catalog keys", () => {
+    expect(markdownInlineToHtml("Spend from class_resources.charnel_touch.")).toBe(
+      "Spend from class_resources.charnel_touch.",
+    )
+  })
+
+  it("humanizes class_resources keys before render", () => {
+    expect(humanizeCatalogResourceRefs("Spend from class_resources.charnel_touch.")).toBe(
+      "Spend from Charnel Touch.",
+    )
+    expect(markdownToHtml("Spend from class_resources.charnel_touch.")).toContain(
+      "Spend from Charnel Touch.",
+    )
+    expect(markdownToHtml("Spend from class_resources.charnel_touch.")).not.toContain(
+      "class_resources",
+    )
   })
 
   it("converts bold headings that sit next to HTML tables", () => {

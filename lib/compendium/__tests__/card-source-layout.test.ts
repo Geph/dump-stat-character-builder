@@ -85,6 +85,31 @@ describe("card source layout", () => {
       itemSlug: "danseur-macabre",
       displayName: "Danseur Macabre",
     })
+    expect(parseSubclassSourceBasename("Death Knight")).toMatchObject({
+      classSlug: "necromancer",
+      itemSlug: "death-knight",
+      displayName: "Death Knight",
+    })
+    expect(parseSubclassSourceBasename("Reanimator")).toMatchObject({
+      classSlug: "necromancer",
+      itemSlug: "reanimator",
+      displayName: "Reanimator",
+    })
+    expect(parseSubclassSourceBasename("Plague Lord")).toMatchObject({
+      classSlug: "necromancer",
+      itemSlug: "plague-lord",
+      displayName: "Plague Lord",
+    })
+    expect(parseSubclassSourceBasename("Gray Watchman")).toMatchObject({
+      classSlug: "warden",
+      itemSlug: "grey-watchman",
+      displayName: "Grey Watchman",
+    })
+    expect(parseSubclassSourceBasename("Lion Banner")).toMatchObject({
+      classSlug: "captain",
+      itemSlug: "lion-banner",
+      displayName: "Lion Banner",
+    })
   })
 
   it("flattens Title Case, Drive copies, and typo aliases", () => {

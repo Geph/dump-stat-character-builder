@@ -4,6 +4,7 @@ import type {
 } from "@/lib/compendium/characteristic-modifiers"
 import { readMagicEffects } from "@/lib/compendium/equipment-magic"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import { resolveLinkedEquipmentChoiceName } from "@/lib/character/linked-equipment-choice"
 import type { Equipment, Feature } from "@/lib/types"
 
 export type ContainerInventoryEntryKind = InventoryContainerContentKind
@@ -78,7 +79,7 @@ function equipmentChoiceLinkedName(
   feature: Feature,
   characteristic: InventoryContainerCharacteristic,
   featureChoicePicks: Record<string, string[]>,
-  actionId?: string | null,
+  context: { actionId?: string | null; classId?: string | null },
 ): string | null {
   if (!characteristic.linkHostItem) return null
   for (const instance of feature.linkedModifiers ?? []) {
@@ -86,14 +87,15 @@ function equipmentChoiceLinkedName(
       if (choice.type !== "equipment_and_magic_items" || choice.mode !== "create_mundane") {
         continue
       }
-      const pickKeys = [
-        actionId ? `player-equipment:${actionId}:${choice.id}` : null,
-        choice.id,
-      ].filter((entry): entry is string => Boolean(entry))
-      for (const key of pickKeys) {
-        const picked = featureChoicePicks[key]?.[0]?.trim()
-        if (picked) return picked
-      }
+      const picked = resolveLinkedEquipmentChoiceName({
+        picks: featureChoicePicks,
+        choiceId: choice.id,
+        actionId: context.actionId,
+        classId: context.classId,
+        featureName: feature.name,
+        featureLevel: feature.level ?? null,
+      })
+      if (picked) return picked
     }
   }
   return null
@@ -162,30 +164,35 @@ export function resolveInventoryContainers(input: {
 }): ResolvedInventoryContainer[] {
   const picks = input.featureChoicePicks ?? {}
   const actionIds = input.actionIdByFeatureName ?? {}
-  const features: Feature[] = [...(input.features ?? [])]
+  const sourcedFeatures: { feature: Feature; classId?: string | null }[] = [
+    ...(input.features ?? []).map((feature) => ({ feature })),
+  ]
   for (const detail of input.classDetails ?? []) {
+    const classId = detail.row.class_id
     for (const feature of detail.class?.features ?? []) {
-      if ((feature.level ?? 0) <= (detail.row.level ?? 0)) features.push(feature)
+      if ((feature.level ?? 0) <= (detail.row.level ?? 0)) {
+        sourcedFeatures.push({ feature, classId })
+      }
     }
     for (const feature of detail.subclass?.features ?? []) {
-      if ((feature.level ?? 0) <= (detail.row.level ?? 0)) features.push(feature)
+      if ((feature.level ?? 0) <= (detail.row.level ?? 0)) {
+        sourcedFeatures.push({ feature, classId })
+      }
     }
   }
 
   const resolved: ResolvedInventoryContainer[] = []
   const seenKeys = new Set<string>()
 
-  for (const feature of features) {
+  for (const { feature, classId } of sourcedFeatures) {
     for (const { characteristic } of featureContainers(feature)) {
       const key = `feature:${normalizeName(feature.name)}:${characteristic.id}`
       if (seenKeys.has(key)) continue
       seenKeys.add(key)
-      const linkedHostName = equipmentChoiceLinkedName(
-        feature,
-        characteristic,
-        picks,
-        actionIds[feature.name] ?? null,
-      )
+      const linkedHostName = equipmentChoiceLinkedName(feature, characteristic, picks, {
+        actionId: actionIds[feature.name] ?? null,
+        classId,
+      })
       const linkedHost = linkedHostName
         ? findOwnedByName(linkedHostName, input.ownedEquipment)
         : undefined

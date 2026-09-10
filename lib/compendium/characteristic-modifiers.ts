@@ -244,7 +244,7 @@ export const CHARACTERISTIC_MODIFIER_TYPE_OPTIONS = [
   {
     value: "grant_creature",
     label: "Grant Creature / Companion",
-    hint: "Adds a Creatures & Companions entry to the character sheet Companions tab (by name)",
+    hint: "Adds a Creatures & Companions entry to the Companions tab; optional rest picker and combined CR cap",
   },
   {
     value: "power_rider",
@@ -1329,6 +1329,8 @@ export interface GrantFeatCharacteristic extends CharacteristicModifierBase {
   alsoFeatNames?: string[]
 }
 
+export type CreaturePickOnRest = "short_rest" | "long_rest" | "short_or_long_rest"
+
 /**
  * Grants one or more Creatures & Companions entries on the character sheet.
  * Names resolve against the creatures table (exact / case-insensitive match).
@@ -1345,6 +1347,15 @@ export interface GrantCreatureCharacteristic extends CharacteristicModifierBase 
   count?: number
   /** Level-scaled pick totals (Thralls column, etc.). Overrides `count` when present. */
   countByLevel?: UsesAtLevel[]
+  /**
+   * Combined Challenge Rating cap for all chosen creatures at once
+   * (`count` is the CR total, so 0.25 = CR 1/4).
+   */
+  combinedCrByLevel?: UsesAtLevel[]
+  /** Offer the choice on the matching rest overlay (same pick feeds Companions). */
+  pickOnRest?: CreaturePickOnRest
+  /** Heading on the picker (e.g. Animate Thralls). Defaults to the feature name. */
+  pickerTitle?: string
   /** When true, the form uses polymorph rules (Wild Shape). */
   polymorph?: boolean
 }
@@ -1868,6 +1879,17 @@ function isCharacteristicModifier(value: unknown): value is CharacteristicModifi
   )
 }
 
+function coerceUsesAtLevelTable(value: unknown): UsesAtLevel[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const rows = value.filter((row): row is UsesAtLevel => {
+    if (!row || typeof row !== "object") return false
+    const level = (row as UsesAtLevel).level
+    const count = (row as UsesAtLevel).count
+    return typeof level === "number" && Number.isFinite(level) && typeof count === "number" && Number.isFinite(count)
+  })
+  return rows.length ? rows : undefined
+}
+
 function coerceStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
@@ -2224,6 +2246,27 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
     }
   }
 
+  if (value.type === "grant_creature") {
+    const raw = value as GrantCreatureCharacteristic
+    const pickOnRest =
+      raw.pickOnRest === "short_rest" ||
+      raw.pickOnRest === "long_rest" ||
+      raw.pickOnRest === "short_or_long_rest"
+        ? raw.pickOnRest
+        : undefined
+    return {
+      ...raw,
+      creatureNames: coerceStringArray(raw.creatureNames),
+      choiceOptions: raw.choiceOptions?.length ? coerceStringArray(raw.choiceOptions) : undefined,
+      count: raw.count ?? 1,
+      countByLevel: coerceUsesAtLevelTable(raw.countByLevel),
+      combinedCrByLevel: coerceUsesAtLevelTable(raw.combinedCrByLevel),
+      pickOnRest,
+      pickerTitle: raw.pickerTitle?.trim() || undefined,
+      polymorph: raw.polymorph || undefined,
+    }
+  }
+
   if (
     value.type === "tool_proficiencies" ||
     value.type === "languages" ||
@@ -2440,7 +2483,11 @@ export function resolveUsesConfig(
   characteristics: CharacteristicModifier[] | null | undefined,
   legacyUses: UsesConfig | null | undefined,
 ): UsesConfig | null {
-  return extractUsesConfig(normalizeCharacteristics(characteristics, legacyUses))
+  // Characteristics win when they include a uses row. Other types (special_attack, etc.)
+  // must not drop feature.limitedUses — that is how variable spends like 5 × PB are authored.
+  const fromCharacteristics = extractUsesConfig(normalizeCharacteristics(characteristics, null))
+  if (fromCharacteristics) return fromCharacteristics
+  return legacyUses ?? null
 }
 
 export function getSkillEntries(mod: SkillsCharacteristic): SkillEntry[] {

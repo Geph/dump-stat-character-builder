@@ -371,4 +371,42 @@ describe("attachClassDetails class-feature presets", () => {
       .find((char) => char.type === "languages") as { choiceCount?: number } | undefined
     expect(langs?.choiceCount).toBe(2)
   })
+
+  it("wires Thralls grant_creature rest pick and CR cap on a stored Necromancer row", () => {
+    const necro = {
+      id: "cls_necromancer",
+      name: "Necromancer",
+      features: [
+        {
+          name: "Thralls",
+          level: 2,
+          description: "You animate Undead thralls during a Short Rest.",
+        },
+      ],
+    } as DndClass
+
+    const [detail] = attachClassDetails(
+      [{ class_id: "cls_necromancer", level: 2, order: 0 }],
+      [necro],
+      [],
+    )
+    const thralls = (detail.class?.features ?? []).find((feature) => feature.name === "Thralls") as
+      | Feature
+      | undefined
+    expect(thralls?.sheetDisplay).toMatchObject({ restDialogues: true })
+    const grant = thralls?.linkedModifiers
+      ?.flatMap((instance) => instance.characteristics ?? [])
+      .find((char) => char.type === "grant_creature")
+    expect(grant).toMatchObject({
+      type: "grant_creature",
+      pickOnRest: "short_or_long_rest",
+      pickerTitle: "Animate Thralls",
+      choiceOptions: expect.arrayContaining(["Skeleton", "Spirit", "Zombie"]),
+      countByLevel: expect.arrayContaining([
+        { level: 2, count: 1 },
+        { level: 3, count: 2 },
+      ]),
+      combinedCrByLevel: expect.arrayContaining([{ level: 2, count: 0.25 }]),
+    })
+  })
 })

@@ -365,8 +365,10 @@ import {
   pactSlotRestoreCount,
   restoreExpendedSpellSlots,
   restoreSpellSlotsByCombinedLevel,
-  charnelTouchRestoreFromSlot,
+  availableSpellSlotLevels,
+  rollRestoreFromSpellSlot,
   spendLowestAvailableSpellSlot,
+  spendSpellSlotAtLevel,
   type RestHitDiceRestoreActivity,
 } from "@/lib/character/sheet-rest"
 import {
@@ -384,6 +386,7 @@ import {
 } from "@/lib/character/weapon-mastery-picks"
 import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
+  companionFormGroupAppearsOnRest,
   formSelectionsFromState,
   mergeCompanionState,
   resolveCharacterCompanionsDetailed,
@@ -813,6 +816,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [bannerRestOpen, setBannerRestOpen] = useState(false)
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null)
   const [spellCastEconomyOverride, setSpellCastEconomyOverride] = useState<ActionEconomyKind | null>(null)
+  const [spellCastWithoutSlotOverride, setSpellCastWithoutSlotOverride] = useState(false)
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
   const [equipmentSearchQuery, setEquipmentSearchQuery] = useState("")
   const [characterGold, setCharacterGold] = useState(0)
@@ -1454,15 +1458,26 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [character],
   )
 
-  const persistFeatureChoicePicks = useCallback(
-    async (key: string, picks: string[]) => {
+  const persistFeatureChoicePickUpdates = useCallback(
+    async (updates: Record<string, string[]>) => {
       if (!character) return
-      const next = { ...featureChoicePicks, [key]: picks }
+      const next = { ...featureChoicePicks }
+      for (const [key, picks] of Object.entries(updates)) {
+        if (picks.length) next[key] = picks
+        else delete next[key]
+      }
       setFeatureChoicePicks(next)
       const db = createClient()
       await db.from("characters").update({ feature_choice_picks: next }).eq("id", character.id)
     },
     [character, featureChoicePicks],
+  )
+
+  const persistFeatureChoicePicks = useCallback(
+    async (key: string, picks: string[]) => {
+      await persistFeatureChoicePickUpdates({ [key]: picks })
+    },
+    [persistFeatureChoicePickUpdates],
   )
 
   const persistBaseSelection = useCallback(
@@ -1583,8 +1598,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   }, [character, derived?.grantedEquipment, equipmentCatalog])
 
   const persistLinkedEquipmentChoice = useCallback(
-    async (key: string, value: string) => {
-      await persistFeatureChoicePicks(key, value ? [value] : [])
+    async (keys: string[], value: string) => {
+      const updates: Record<string, string[]> = {}
+      for (const key of keys) {
+        updates[key] = value ? [value] : []
+      }
+      await persistFeatureChoicePickUpdates(updates)
       if (!value) return
       const item = (equipmentCatalog.length ? equipmentCatalog : equipment).find(
         (entry) => entry.name.trim().toLowerCase() === value.toLowerCase(),
@@ -1598,7 +1617,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       equipment,
       equipmentCatalog,
       handleAddEquipmentFromCatalog,
-      persistFeatureChoicePicks,
+      persistFeatureChoicePickUpdates,
     ],
   )
 
@@ -2352,6 +2371,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   }, [classDetails])
 
   const primarySpellSlotTable = spellSlotTables[0] ?? null
+  const availableSpellSlots = useMemo(() => {
+    const table = spellSlotTables.find((row) => row.type !== "pact") ?? spellSlotTables[0]
+    if (!table) return []
+    const key = spellSlotTableKey(table)
+    const used = usedSpellSlotsByKey[key] ?? table.slotsByLevel.map(() => 0)
+    return availableSpellSlotLevels(used, table.slotsByLevel)
+  }, [spellSlotTables, usedSpellSlotsByKey])
 
   useEffect(() => {
     if (!spellSlotTables.length) return
@@ -2787,7 +2813,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     () =>
       collectSheetActions({
         classDetails,
-        species: character?.species ?? null,
+        species: characterBuildInputs?.species ?? character?.species ?? null,
         backgroundFeature: character?.backgrounds?.feature ?? null,
         customAbilities: sheetCustomAbilities,
         feats: [...characterFeats, ...(originFeat ? [originFeat] : [])],
@@ -2796,6 +2822,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       }),
     [
       classDetails,
+      characterBuildInputs?.species,
       character?.species,
       character?.backgrounds?.feature,
       sheetCustomAbilities,
@@ -3858,21 +3885,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       resourceKey: string
       classId?: string | null
       ability: "INT" | "WIS" | "CHA" | "STR" | "DEX" | "CON"
+      slotLevel?: number
     }) => {
       const table = spellSlotTables.find((row) => row.type !== "pact") ?? spellSlotTables[0]
       if (!table) return null
       const key = spellSlotTableKey(table)
       const usedSlots = usedSpellSlotsByKey[key] ?? table.slotsByLevel.map(() => 0)
-      let spentLevel: number | null = null
-      const nextUsedSlots = [...usedSlots]
-      for (let index = 0; index < table.slotsByLevel.length; index += 1) {
-        if ((nextUsedSlots[index] ?? 0) < (table.slotsByLevel[index] ?? 0)) {
-          nextUsedSlots[index] = (nextUsedSlots[index] ?? 0) + 1
-          spentLevel = index + 1
-          break
-        }
-      }
-      if (spentLevel == null) return null
+      const spent =
+        spec.slotLevel != null
+          ? spendSpellSlotAtLevel(usedSlots, table.slotsByLevel, spec.slotLevel)
+          : spendLowestAvailableSpellSlot(usedSlots, table.slotsByLevel, 1)
+      if (!spent) return null
       const resource = resourceEntries.find(
         (entry) =>
           entry.id === spec.resourceKey ||
@@ -3881,13 +3904,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       )
       if (!resource) return null
       const abilityMod = usesResolveContext.abilityModifiers?.[spec.ability] ?? 0
-      const restore = charnelTouchRestoreFromSlot(abilityMod, spentLevel)
-      setUsedSpellSlotsByKey((prev) => ({ ...prev, [key]: nextUsedSlots }))
+      const rolled = rollRestoreFromSpellSlot(abilityMod, spent.spentLevel)
+      setUsedSpellSlotsByKey((prev) => ({ ...prev, [key]: spent.nextUsed }))
       setUsedResourcesById((prev) => {
         const used = prev[resource.id] ?? 0
-        return { ...prev, [resource.id]: Math.max(0, used - restore) }
+        return { ...prev, [resource.id]: Math.max(0, used - rolled.amount) }
       })
-      return `Spent a ${spentLevel}-level slot; restored ${restore} ${resource.name}`
+      const dice = `${rolled.rolls.length}d8 [${rolled.rolls.join(", ")}]`
+      return `Spent a ${spent.spentLevel}-level slot; restored ${rolled.amount} ${resource.name} (${spec.ability} ${abilityMod >= 0 ? "+" : ""}${abilityMod} + ${dice})`
     },
     [spellSlotTables, usedSpellSlotsByKey, resourceEntries, usesResolveContext],
   )
@@ -4925,7 +4949,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           <div
             className={`relative flex flex-col gap-2 p-4 max-sm:gap-1.5 max-sm:p-2.5 ${
               character.banner_url
-                ? "bg-gradient-to-br from-primary/20 to-secondary/20 sm:bg-gradient-to-r sm:from-background/90 sm:via-background/75 sm:to-background/60"
+                ? "max-sm:bg-gradient-to-br max-sm:from-primary/20 max-sm:to-secondary/20"
                 : "bg-gradient-to-br from-primary/20 to-secondary/20"
             }`}
           >
@@ -4954,7 +4978,15 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               )}
 
               <div className="min-w-0 flex-1">
-                <h1 className="text-lg font-black leading-tight text-foreground sm:text-2xl">{character.name}</h1>
+                <h1
+                  className={`text-lg font-black leading-tight text-foreground sm:text-2xl ${
+                    character.banner_url
+                      ? "sm:w-fit sm:max-w-full sm:rounded-md sm:bg-background/85 sm:px-2 sm:py-0.5"
+                      : ""
+                  }`}
+                >
+                  {character.name}
+                </h1>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   {classDetails.length > 0
                     ? classDetails.map((entry) => (
@@ -6009,9 +6041,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     onPlayerNoteChange={(key, value) =>
                       void persistFeatureChoicePicks(key, value.trim() ? [value] : [])
                     }
-                    onEquipmentChoiceChange={(key, value) =>
-                      void persistLinkedEquipmentChoice(key, value)
+                    onEquipmentChoiceChange={(keys, value) =>
+                      void persistLinkedEquipmentChoice(keys, value)
                     }
+                    inventoryContainers={inventoryContainers}
+                    containerInventories={containerInventories}
+                    onContainerEntriesChange={persistContainerEntries}
                     resolveContext={usesResolveContext}
                     resourceEntries={resourceEntries}
                     usedResourcesById={usedResourcesById}
@@ -6045,9 +6080,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                       hasBalanceOfPowerMechanic ? bankIntoBalanceOfPower : undefined
                     }
                     allyCandidates={allyCandidates}
-                    knownSpells={spells}
+                    knownSpells={displayedSpells}
+                    spellCatalog={spellCatalog}
                     onCastSpellChoice={(spell, choice) => {
                       setSpellCastEconomyOverride(choice.economyKind ?? "reaction")
+                      setSpellCastWithoutSlotOverride(Boolean(choice.withoutSlot))
                       setSelectedSpell(spell)
                     }}
                     healContext={healContext}
@@ -6055,6 +6092,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
                     onRestoreHitDice={handleRestoreHitDice}
                     onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
+                    availableSpellSlots={availableSpellSlots}
                     onSpendSpellSlot={handleSpendSpellSlot}
                     primedBombUsedThisTurn={primedBombUsedThisTurn}
                     onPrimedBombUsed={() => setPrimedBombUsedThisTurn(true)}
@@ -6264,9 +6302,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         onPlayerNoteChange={(key: string, value: string) =>
                           void persistFeatureChoicePicks(key, value.trim() ? [value] : [])
                         }
-                        onEquipmentChoiceChange={(key: string, value: string) =>
-                          void persistLinkedEquipmentChoice(key, value)
+                        onEquipmentChoiceChange={(keys: string[], value: string) =>
+                          void persistLinkedEquipmentChoice(keys, value)
                         }
+                        inventoryContainers={inventoryContainers}
+                        containerInventories={containerInventories}
+                        onContainerEntriesChange={persistContainerEntries}
                         resolveContext={usesResolveContext}
                         resourceEntries={resourceEntries}
                         usedResourcesById={usedResourcesById}
@@ -6300,9 +6341,11 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           hasBalanceOfPowerMechanic ? bankIntoBalanceOfPower : undefined
                         }
                         allyCandidates={allyCandidates}
-                        knownSpells={spells}
+                        knownSpells={displayedSpells}
+                        spellCatalog={spellCatalog}
                         onCastSpellChoice={(spell, choice) => {
                           setSpellCastEconomyOverride(choice.economyKind ?? "reaction")
+                          setSpellCastWithoutSlotOverride(Boolean(choice.withoutSlot))
                           setSelectedSpell(spell)
                         }}
                         healContext={healContext}
@@ -6350,6 +6393,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         onRestoreSpellSlotsByCombinedLevel={handleRestoreSpellSlotsByCombinedLevel}
                         onRestoreHitDice={handleRestoreHitDice}
                         onRestoreResourceFromSpellSlot={handleRestoreResourceFromSpellSlot}
+                        availableSpellSlots={availableSpellSlots}
                         onSpendSpellSlot={handleSpendSpellSlot}
                         primedBombUsedThisTurn={primedBombUsedThisTurn}
                         onPrimedBombUsed={() => setPrimedBombUsedThisTurn(true)}
@@ -7229,6 +7273,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               restOverlay.rest === "long_rest" ? extraWeaponMasteryRestChoices : []
             }
             onExtraWeaponMasteryChange={persistExtraWeaponMasteries}
+            companionFormGroups={companionFormGroups.filter((group) =>
+              companionFormGroupAppearsOnRest(group, restOverlay.rest),
+            )}
+            onCompanionFormsChange={setCompanionGroupForms}
           />
         ) : null}
         {defaultActionsContext ? (
@@ -7298,6 +7346,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             onClose={() => {
               setSelectedSpell(null)
               setSpellCastEconomyOverride(null)
+              setSpellCastWithoutSlotOverride(false)
             }}
             psiLimit={psiLimit}
             castCost={spellCastCost}
@@ -7319,6 +7368,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   }),
               )
               setSpellCastEconomyOverride(null)
+              setSpellCastWithoutSlotOverride(false)
               if (result.concentrationApplied) {
                 applyConcentration(result.concentrationApplied)
               }
@@ -7393,7 +7443,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               selectedSpellSlotLevel != null
             }
             freeCast={selectedSpellFreeCast}
-            slotlessCast={isFreeCastSpell(slotlessCastSpellKeys, selectedSpell.name)}
+            slotlessCast={
+              spellCastWithoutSlotOverride ||
+              isFreeCastSpell(slotlessCastSpellKeys, selectedSpell.name)
+            }
           />
         ) : null}
         {portraitZoomOpen && character.portrait_url ? (

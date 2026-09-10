@@ -11,6 +11,7 @@ import {
 import { isCompanionFeatureName, isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import { looksLikeChoicePickId } from "@/lib/character/chosen-option-label"
 import {
+  crToNumber,
   familiarFormOptions,
   familiarTemplateForForm,
   wildShapeEligibleForms,
@@ -22,15 +23,17 @@ import { templateFromFeature } from "@/lib/character/parse-companion-stat-block"
 import { SRD_BEAST_FORMS, isDruidWildShapeFeature } from "@/lib/character/srd-beast-forms"
 import { SRD_FAMILIAR, isFamiliarFeature, isFindFamiliarSpell } from "@/lib/character/srd-familiar"
 import { featureChoiceKey } from "@/lib/builder/choices"
+import type { CreaturePickOnRest } from "@/lib/compendium/characteristic-modifiers"
 import {
   creatureNamesFromAbility,
   creatureNamesFromFeature,
+  grantCreatureCombinedCrAtLevel,
   grantCreatureCountAtLevel,
   grantCreaturesFromLinkedModifiers,
   grantCreaturesFromSpell,
 } from "@/lib/compendium/grant-creature-catalog"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
-import type { Creature, CustomAbility, Equipment, Feature, Spell } from "@/lib/types"
+import type { Creature, CustomAbility, Equipment, Feature, RestType, Spell } from "@/lib/types"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 
 type FeatureCarrier = {
@@ -42,6 +45,7 @@ type FeatureCarrier = {
   companion_creature_names?: string[] | null
   linkedModifiers?: LinkedModifierInstance[] | null
   modifierRefs?: string[] | null
+  sheetDisplay?: { restDialogues?: boolean } | null
 }
 
 function normalizeCreatureName(name: string): string {
@@ -126,6 +130,23 @@ export type CompanionFormGroup = {
   selected: string[]
   /** Known-form budget (Wild Shape tiers); null when unlimited swaps (familiar). */
   maxKnown: number | null
+  /** Combined CR cap for all selected forms; null when uncapped. */
+  maxCombinedCr?: number | null
+  /** When set, the rest overlay offers this picker. */
+  pickOnRest?: CreaturePickOnRest | null
+  /** Optional heading override (e.g. Animate Thralls). */
+  pickerTitle?: string | null
+}
+
+export function companionFormGroupAppearsOnRest(
+  group: CompanionFormGroup,
+  rest: RestType,
+): boolean {
+  const pick = group.pickOnRest
+  if (!pick) return false
+  if (rest !== "short_rest" && rest !== "long_rest") return false
+  if (pick === "short_or_long_rest") return true
+  return pick === rest
 }
 
 export function formSelectionsFromState(
@@ -203,7 +224,11 @@ export function buildCreatureTemplateLookup(
   for (const creature of creatures ?? []) {
     const template = creature.stat_block
     if (!template || !creature.name?.trim()) continue
-    lookup.set(normalizeCreatureName(creature.name), { ...template, name: creature.name })
+    lookup.set(normalizeCreatureName(creature.name), {
+      ...template,
+      name: creature.name,
+      cr: template.cr ?? creature.cr ?? null,
+    })
   }
   return lookup
 }
@@ -261,6 +286,9 @@ function scanFeatures(
           source: baseSource(feature.name, feature.level),
           optionNames: grant.choiceOptions ?? grant.creatureNames,
           maxKnown: grantCreatureCountAtLevel(grant, ctx.maxLevel),
+          maxCombinedCr: grantCreatureCombinedCrAtLevel(grant, ctx.maxLevel),
+          pickOnRest: grant.pickOnRest ?? (feature.sheetDisplay?.restDialogues ? "short_or_long_rest" : undefined),
+          pickerTitle: grant.pickerTitle,
           creatureLookup,
           formSelections: extras.formSelections,
           formGroups,
@@ -575,6 +603,9 @@ function pushChoiceGrant(params: {
   source: CompanionSource
   optionNames: string[]
   maxKnown: number
+  maxCombinedCr?: number | null
+  pickOnRest?: CreaturePickOnRest | null
+  pickerTitle?: string | null
   creatureLookup?: Map<string, CompanionStatBlockTemplate>
   formSelections?: CompanionFormSelections
   formGroups: CompanionFormGroup[]
@@ -582,13 +613,26 @@ function pushChoiceGrant(params: {
 }) {
   const groupKey = companionKey(params.source)
   const options = params.optionNames
-    .map((name) => params.creatureLookup?.get(normalizeCreatureName(name)))
-    .filter((template): template is CompanionStatBlockTemplate => Boolean(template))
+    .map((name) => {
+      const template = params.creatureLookup?.get(normalizeCreatureName(name))
+      return {
+        name: template?.name ?? name,
+        cr: template?.cr ?? null,
+        template: template ?? null,
+      }
+    })
+    .filter((option) => option.name.trim())
+    .filter((option) => {
+      if (params.maxCombinedCr == null) return true
+      const cr = crToNumber(option.cr)
+      if (cr == null) return true
+      return cr <= params.maxCombinedCr + 1e-6
+    })
   if (!options.length) return
 
   const selectedNames =
     params.formSelections?.[groupKey] ??
-    (options.length === 1 ? [options[0].name] : [])
+    (options.length === 1 && options[0].template ? [options[0].name] : [])
   const selectedSet = new Set(selectedNames.map(normalizeCreatureName))
   const chosen = options.filter((form) => selectedSet.has(normalizeCreatureName(form.name)))
 
@@ -600,12 +644,16 @@ function pushChoiceGrant(params: {
     options: options.map((form) => ({ name: form.name, cr: form.cr ?? null })),
     selected: chosen.map((form) => form.name),
     maxKnown: params.maxKnown,
+    maxCombinedCr: params.maxCombinedCr ?? null,
+    pickOnRest: params.pickOnRest ?? null,
+    pickerTitle: params.pickerTitle ?? null,
   })
 
-  for (const template of chosen) {
+  for (const option of chosen) {
+    if (!option.template) continue
     params.into.push({
-      source: { ...params.source, formName: template.name },
-      template,
+      source: { ...params.source, formName: option.template.name },
+      template: option.template,
     })
   }
 }
@@ -674,6 +722,12 @@ export function collectCompanionCandidatesFromSpells(
             grant,
             Math.max(1, ...(extras.classDetails ?? []).map((entry) => entry.row.level), source.featureLevel),
           ),
+          maxCombinedCr: grantCreatureCombinedCrAtLevel(
+            grant,
+            Math.max(1, ...(extras.classDetails ?? []).map((entry) => entry.row.level), source.featureLevel),
+          ),
+          pickOnRest: grant.pickOnRest,
+          pickerTitle: grant.pickerTitle,
           creatureLookup,
           formSelections: extras.formSelections,
           formGroups,
@@ -719,6 +773,9 @@ export function collectCompanionCandidatesFromEquipment(
           source,
           optionNames: grant.choiceOptions,
           maxKnown: grantCreatureCountAtLevel(grant, 1),
+          maxCombinedCr: grantCreatureCombinedCrAtLevel(grant, 1),
+          pickOnRest: grant.pickOnRest,
+          pickerTitle: grant.pickerTitle,
           creatureLookup,
           formSelections: extras.formSelections,
           formGroups,

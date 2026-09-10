@@ -176,6 +176,14 @@ export const ImportMechanicSchema = z.object({
   creatureChoiceOptions: z.array(z.string()).optional(),
   /** grant_creature: Wild Shape / polymorph form. */
   creaturePolymorph: z.boolean().optional(),
+  /** grant_creature: combined CR cap table (`count` is the CR number, 0.25 = 1/4). */
+  creatureCombinedCrByLevel: z
+    .array(z.object({ level: z.number(), count: z.number() }))
+    .optional(),
+  /** grant_creature: offer the choice on a rest overlay. */
+  creaturePickOnRest: z.enum(["short_rest", "long_rest", "short_or_long_rest"]).optional(),
+  /** grant_creature: picker heading (e.g. Animate Thralls). */
+  creaturePickerTitle: z.string().optional(),
   /** equipment_and_magic_items: named mundane items the player may select. */
   itemOptions: z.array(z.string()).optional(),
   /** equipment_and_magic_items: permit a free-text item name. */
@@ -1246,7 +1254,7 @@ export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class poo
 - **Guardian Tactics:** Block / Challenge / Grasp as a free Bonus Action menu (Dump Stat wires resource_ability_menu); ally/enemy effects stay play-time. Extended Tactics widens ranges to 10 feet.
 - **Necromancer Charnel Touch:** spendable pool equal to 5 × class level — uses must be { type: \"at_level\", atLevelMode: \"multiply_level\", atLevelTable: [{ level: 1, count: 5 }], recharges: [{ rest: \"long_rest\" }] }. Do not use uses.type \"multiply_level\". The feature uses classResourceAmount 5 + classResourceCostMode \"up_to_proficiency_bonus\" and two melee special_attack profiles: (1) damageFromResourceSpend true, spendResourceOnHit true, criticalDamageMultiplier 2, Necrotic damage; (2) from level 2, Healing your Thralls — healFromResourceSpend true, healTarget \"controlled_companion\", unlocksAtClassLevel 2 (no attack roll; restore HP equal to points spent).
 - **Necromancer Spellcasting:** INT full prepared caster — classes[].spellcasting { ability: \"Intelligence\", caster_progression: \"full\", prepared: true } plus progression[] from the Cantrips / Prepared Spells columns (3 cantrips + 4 prepared at 1st; cantrips 4 at 4th / 5 at 10th; prepared scales to 22 at 20th). Do not put spellChoiceGrants on the Spellcasting feature — cantrips and prepared spells come from progression[] (the class spell picker). Populate spell_list from the official Spell / School / Special tables — Dump Stat keeps that list on the class and stamps matching catalog rows on import. Extra always-prepared grants (Animate Dead) stay on their own features. Do not invent a \"table missing level-10 cantrip\" editorial note — the source table shows 5 cantrips at 10th.
-- **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools and not class_upgrades pickers. Import thrall creatures[] with the class; Thralls → grant_creature with BOTH creatureNames and creatureChoiceOptions (the latter is only the player-pick subset). Deadnaught is a companion (level-scaled HP).
+- **Necromancer Thralls / CR Total:** special caps (count + combined CR, fractions like 1/4 allowed), not spendable pools and not class_upgrades pickers. Import thrall creatures[] with the class; Thralls → grant_creature with BOTH creatureNames and creatureChoiceOptions (the latter is only the player-pick subset), choiceCountByLevel matching the Thralls column (1/2/3/4/5/6 at 2/3/7/11/15/19), creatureCombinedCrByLevel matching CR Total (1/4, 1/2, 1, 2, 3, 4 at 2/3/5/9/13/17), creaturePickOnRest short_or_long_rest, and sheetDisplay restDialogues so the rest overlay offers Animate Thralls. Deadnaught is a companion (level-scaled HP).
 - **Necromancer Dead Space:** emit equipment_and_magic_items with itemOptions [\"Bag\",\"Cloak\",\"Backpack\"], choiceCount 1, allowCustom true; uses with usesFixed 12 and no rest recharge (occupancy counter); player_note with notePrompt \"Dead Space notes\"; and inventory_container with capacityMode \"slot_count\", capacityAmount 12, contentKinds [\"corpse\",\"companion\",\"freeform\"], maxCreatureSize \"Medium\", linkHostItem true (linked host appears in Gear with Contents). Preserve Magic-action and Short-Rest relinking sentences. Always set activation.action plus sheetDisplay abilitiesActions (utility Magic action), not combatActions.
 - **Necromancer Thrall Rush:** activation.onInitiative + sheetDisplay combatActions. Do not invent an Action/Bonus Action cost — it fires when Initiative is rolled.
 - **Necromancer Overcharged Thralls:** on_creature_death_trigger with creatureFilter ally (thralls you control, including released). Restore Charnel Touch equal to Necromancer level is play-time; do not emit a spendable uses pool on this feature.

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { Info, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -102,6 +102,15 @@ type MultiSelectChoicesProps = {
   allowCustom?: boolean
   /** Placeholder for the custom-entry input. */
   customPlaceholder?: string
+  /** Extra controls under the hint (search / school / level for spell picks). */
+  toolbar?: ReactNode
+  /**
+   * Paginate on desktop too (phone and compact layouts already paginate).
+   * Use for long spell lists in the level-up wizard.
+   */
+  paginate?: boolean
+  /** Items per page when pagination is on. Defaults to MULTI_SELECT_CHOICE_PAGE_SIZE. */
+  pageSize?: number
 }
 
 function normalizeKey(value: string): string {
@@ -171,6 +180,9 @@ export function MultiSelectChoices({
   allowCustom = false,
   customPlaceholder = "Add a custom entry...",
   skillIconByName = {},
+  toolbar,
+  paginate = false,
+  pageSize,
 }: MultiSelectChoicesProps) {
   const unavailableKeys = new Set(unavailableOptions.map(normalizeKey).filter(Boolean))
   const isUnavailableName = (name: string) => unavailableKeys.has(normalizeKey(name))
@@ -256,7 +268,7 @@ export function MultiSelectChoices({
   useEffect(() => {
     setFlatPage(0)
     setGroupPages({})
-  }, [options, isPhone, compact, title, kindFilter])
+  }, [options, isPhone, compact, title, kindFilter, paginate, pageSize])
 
   useEffect(() => {
     if (kindFilter === "all") return
@@ -436,10 +448,12 @@ export function MultiSelectChoices({
     setPage: (next: number) => void,
     paginationLabel: string,
   ) => {
-    // Phone and compact builder: paginate at 10. Default/desktop visual lists stay unpaginated.
-    const shouldPaginate = isPhone || compact
-    const pageSize = shouldPaginate ? MULTI_SELECT_CHOICE_PAGE_SIZE : Math.max(list.length, 1)
-    const { pageItems, pageCount, safePage } = paginateList(list, page, pageSize)
+    // Phone and compact builder paginate at 10. Long spell lists opt in on desktop too.
+    const shouldPaginate = isPhone || compact || paginate
+    const resolvedPageSize = shouldPaginate
+      ? (pageSize ?? MULTI_SELECT_CHOICE_PAGE_SIZE)
+      : Math.max(list.length, 1)
+    const { pageItems, pageCount, safePage } = paginateList(list, page, resolvedPageSize)
     const visible = shouldPaginate ? pageItems : list
     return (
       <>
@@ -488,6 +502,7 @@ export function MultiSelectChoices({
             {hint}
           </p>
         ) : null}
+        {toolbar}
         {showKindFilter ? (
           <div
             className="mb-3 flex flex-wrap gap-1.5"

@@ -1577,7 +1577,12 @@ function buildFromMechanic(
         countByLevel: mechanic.choiceCountByLevel?.filter(
           (row) => Number.isFinite(row.level) && Number.isFinite(row.count),
         ),
+        combinedCrByLevel: mechanic.creatureCombinedCrByLevel?.filter(
+          (row) => Number.isFinite(row.level) && Number.isFinite(row.count),
+        ),
         choiceOptions: mechanic.creatureChoiceOptions?.filter((n) => n.trim()),
+        pickOnRest: mechanic.creaturePickOnRest,
+        pickerTitle: mechanic.creaturePickerTitle,
         polymorph: mechanic.creaturePolymorph === true,
       })
       return {

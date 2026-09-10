@@ -3,6 +3,7 @@ import {
   crToNumber,
   familiarFormOptions,
   familiarTemplateForForm,
+  formatChallengeRating,
   wildShapeEligibleForms,
   wildShapeTierForLevel,
 } from "@/lib/character/companion-form-options"
@@ -21,6 +22,14 @@ describe("crToNumber", () => {
     expect(crToNumber("0")).toBe(0)
     expect(crToNumber(null)).toBeNull()
     expect(crToNumber("None")).toBeNull()
+  })
+})
+
+describe("formatChallengeRating", () => {
+  it("prints table-style fractions", () => {
+    expect(formatChallengeRating(0.25)).toBe("1/4")
+    expect(formatChallengeRating(0.5)).toBe("1/2")
+    expect(formatChallengeRating(2)).toBe("2")
   })
 })
 

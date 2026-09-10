@@ -19,6 +19,7 @@ import {
   isShortRestActivityText,
 } from "@/lib/character/alchemist-bomb-sheet"
 import { resolveActionUsesTrackingKey } from "@/lib/character/action-uses-key"
+import { rollDie } from "@/lib/dice/roll-die"
 import {
   applyFeatureResourceRefresh,
   type ResourceRefreshEffect,
@@ -170,6 +171,59 @@ export function spendLowestAvailableSpellSlot(
   return null
 }
 
+export type AvailableSpellSlotLevel = {
+  level: number
+  remaining: number
+}
+
+/** Remaining slots at each level that exists on the table (including emptied levels). */
+export function availableSpellSlotLevels(
+  usedByLevel: number[],
+  slotsByLevel: number[],
+  minSpellLevel = 1,
+): AvailableSpellSlotLevel[] {
+  const floor = Math.max(1, minSpellLevel)
+  const levels: AvailableSpellSlotLevel[] = []
+  for (let index = floor - 1; index < slotsByLevel.length; index += 1) {
+    const max = slotsByLevel[index] ?? 0
+    if (max <= 0) continue
+    levels.push({
+      level: index + 1,
+      remaining: Math.max(0, max - (usedByLevel[index] ?? 0)),
+    })
+  }
+  return levels
+}
+
+/** Spend one slot of an exact level. */
+export function spendSpellSlotAtLevel(
+  usedByLevel: number[],
+  slotsByLevel: number[],
+  slotLevel: number,
+): { nextUsed: number[]; spentLevel: number } | null {
+  const index = Math.trunc(slotLevel) - 1
+  if (index < 0 || index >= slotsByLevel.length) return null
+  const max = slotsByLevel[index] ?? 0
+  const used = usedByLevel[index] ?? 0
+  if (used >= max) return null
+  const nextUsed = [...usedByLevel]
+  while (nextUsed.length <= index) nextUsed.push(0)
+  nextUsed[index] = used + 1
+  return { nextUsed, spentLevel: index + 1 }
+}
+
+export function spellSlotLevelLabel(level: number): string {
+  const suffix =
+    level % 10 === 1 && level % 100 !== 11
+      ? "st"
+      : level % 10 === 2 && level % 100 !== 12
+        ? "nd"
+        : level % 10 === 3 && level % 100 !== 13
+          ? "rd"
+          : "th"
+  return `${level}${suffix}-level`
+}
+
 /** Restore expended spell slots, preferring lower levels first. */
 export function restoreExpendedSpellSlots(
   usedByLevel: number[],
@@ -210,6 +264,20 @@ export function restoreSpellSlotsByCombinedLevel(
 /** Dark Arcana expected value: INT modifier + 4 (average d8) per slot level. */
 export function charnelTouchRestoreFromSlot(intMod: number, slotLevel: number): number {
   return Math.max(1, intMod + 4 * Math.max(1, slotLevel))
+}
+
+/** Official Dark Arcana restore: ability modifier + 1d8 per slot level. */
+export function rollRestoreFromSpellSlot(
+  abilityMod: number,
+  slotLevel: number,
+  dieSides = 8,
+): { amount: number; rolls: number[] } {
+  const count = Math.max(1, slotLevel)
+  const rolls = Array.from({ length: count }, () => rollDie(dieSides))
+  return {
+    amount: Math.max(1, abilityMod + rolls.reduce((sum, roll) => sum + roll, 0)),
+    rolls,
+  }
 }
 
 /** Magical Cunning restores half of max Pact slots (rounded up), or all with Eldritch Master. */

@@ -26,6 +26,14 @@ export type SpellSlotUseEffects = {
   spendSpellSlotOnUse?: { minSpellLevel: number }
 }
 
+/** Payload for converting a chosen spell slot into a class-resource refill. */
+export type RestoreResourceFromSpellSlotSpec = {
+  resourceKey: string
+  classId?: string | null
+  ability: "INT" | "WIS" | "CHA" | "STR" | "DEX" | "CON"
+  slotLevel?: number
+}
+
 type SlotEffectSource = {
   name?: string
   activation?: { effects?: FeatureEffect[] | null } | null

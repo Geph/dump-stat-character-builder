@@ -8,6 +8,11 @@ import { characteristicCatalogRefId, effectCatalogRefId } from "@/lib/compendium
 import { requiresActiveToggleLimitation } from "@/lib/compendium/modifier-limitations"
 import { fxInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import type { Feature, FeatureChoice } from "@/lib/types"
+import {
+  NECROMANCER_THRALL_CHOICE_OPTIONS,
+  NECROMANCER_THRALL_COUNT_BY_LEVEL,
+  NECROMANCER_THRALL_CR_BY_LEVEL,
+} from "@/lib/import/enrichment-presets/packs/necromancer"
 
 const DEFERRED_MECHANICS_NOTE =
   "Mechanic not fully modeled on sheet — see feature description (Dark Lurker check reduction)."
@@ -1841,11 +1846,34 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
     operations: [
       {
         op: "appendDescription",
-        text: "Import Undead Thralls as creatures[] first. Prefer mechanics grant_creature with creatureChoiceOptions for Skeleton, Zombie, Spirit, and other thrall names. Thralls / CR Total columns are control caps (special), not spendable pools — never optionsSource class_upgrades.",
+        text: "Import Undead Thralls as creatures[] first. Prefer mechanics grant_creature with creatureChoiceOptions for Skeleton, Zombie, Spirit, and other thrall names. Thralls / CR Total columns are control caps (special), not spendable pools — never optionsSource class_upgrades. Animate during a Short or Long Rest via grant_creature pickOnRest + combinedCrByLevel.",
       },
       {
         op: "setSheetDisplay",
         sheetDisplay: { featuresTab: true, restDialogues: true },
+      },
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["grant_creature"],
+        preset: {
+          kind: "char_instance",
+          idKey: "thralls_grant_creature",
+          catalogRefId: "cat_char_grant_creature",
+          characteristics: [
+            {
+              id: "mod_thralls_grant_creature",
+              type: "grant_creature",
+              creatureNames: [...NECROMANCER_THRALL_CHOICE_OPTIONS],
+              choiceOptions: [...NECROMANCER_THRALL_CHOICE_OPTIONS],
+              count: 1,
+              countByLevel: [...NECROMANCER_THRALL_COUNT_BY_LEVEL],
+              combinedCrByLevel: [...NECROMANCER_THRALL_CR_BY_LEVEL],
+              pickOnRest: "short_or_long_rest",
+              pickerTitle: "Animate Thralls",
+              label: "Choose thralls on a Short or Long Rest (combined CR cap)",
+            },
+          ],
+        },
       },
     ],
   },
@@ -1904,6 +1932,28 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
       },
       {
         op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["uses"],
+        preset: {
+          kind: "char_instance",
+          idKey: "charnel_touch_uses",
+          catalogRefId: characteristicCatalogRefId("uses"),
+          characteristics: [
+            {
+              id: "mod_charnel_touch_uses",
+              type: "uses",
+              uses: {
+                type: "class_resource",
+                classResourceKey: "charnel_touch",
+                classResourceAmount: 5,
+                classResourceCostMode: "up_to_proficiency_bonus",
+              },
+              label: "Spend Charnel Touch points (up to 5 × Proficiency Bonus)",
+            },
+          ],
+        },
+      },
+      {
+        op: "attachNamedPreset",
         replaceCharacteristicTypes: ["special_attack"],
         preset: {
           kind: "char_instance",
@@ -1950,7 +2000,7 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
       },
       {
         op: "appendDescription",
-        text: "Spend from class_resources.charnel_touch (5 × Necromancer level, long rest). Per-use cap is 5 × Proficiency Bonus; points are spent only on a hit, damage equals points spent, and a Critical Hit doubles that damage. From 2nd level, Healing your Thralls: touch an Undead under your control with no attack roll to restore HP equal to the points spent.",
+        text: "Spend Charnel Touch points (5 × Necromancer level, long rest). Per-use cap is 5 × Proficiency Bonus; points are spent only on a hit, damage equals points spent, and a Critical Hit doubles that damage. From 2nd level, Healing your Thralls: touch an Undead under your control with no attack roll to restore HP equal to the points spent.",
       },
     ],
   },
@@ -1983,7 +2033,7 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
       },
       {
         op: "appendDescription",
-        text: "Expend a spell slot to restore Charnel Touch points (INT mod + 1d8 per slot level) — play-time restore into the charnel_touch pool.",
+        text: "Expend a spell slot to restore Charnel Touch points (INT mod + 1d8 per slot level).",
       },
     ],
   },
@@ -2289,7 +2339,7 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
       },
       {
         op: "appendDescription",
-        text: "When a thrall dies or is released, restore Charnel Touch points equal to your Necromancer level (play-time restore into the charnel_touch pool).",
+        text: "When a thrall dies or is released, restore Charnel Touch points equal to your Necromancer level.",
       },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
     ],

@@ -165,12 +165,13 @@ export function CardImageField({
             >
               {preview ? "Replace image" : "Choose file"}
             </button>
-            <span className={pageOverlayPanelMetaClass}>or paste URL:</span>
+            <span className={pageOverlayPanelMetaClass}>or paste path or URL:</span>
             <input
-              type="url"
+              type="text"
+              inputMode="url"
               value={value?.startsWith("data:") ? "" : value ?? ""}
               onChange={(e) => onChange(normalizeCardImageUrl(e.target.value))}
-              placeholder="https://…"
+              placeholder="/images/… or https://…"
               className={cn(
                 "px-3 py-1.5 bg-background/90 border border-border rounded-lg text-sm text-foreground",
                 layout === "sidebar" || layout === "paired" ? "w-full" : "flex-1 min-w-[200px]",

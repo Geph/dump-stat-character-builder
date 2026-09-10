@@ -3,7 +3,9 @@
 import { motion } from "framer-motion"
 import { Flame, Moon, Sun, X } from "lucide-react"
 import { ShortRestHitDiceBox } from "@/components/character-sheet/short-rest-hit-dice-box"
+import { CompanionFormPicker } from "@/components/characters/companion-form-picker"
 import type { HitDicePoolEntry } from "@/lib/character/hit-dice"
+import type { CompanionFormGroup } from "@/lib/character/resolve-companions"
 import type { RestHitDiceRestoreActivity } from "@/lib/character/sheet-rest"
 import { weaponMasteryLabelForOption } from "@/lib/compendium/weapon-mastery-choice"
 import type { Equipment, Feature, RestType } from "@/lib/types"
@@ -45,6 +47,9 @@ type SheetRestOverlayProps = {
     options: { name: string }[]
   }[]
   onExtraWeaponMasteryChange?: (equipmentId: string, next: string[]) => void
+  /** grant_creature choices that pick on this rest (same persist as Companions). */
+  companionFormGroups?: CompanionFormGroup[]
+  onCompanionFormsChange?: (groupKey: string, next: string[]) => void
 }
 
 export function SheetRestOverlay({
@@ -65,6 +70,8 @@ export function SheetRestOverlay({
   weaponMasteryEquipment = [],
   extraWeaponMasteryChoices = [],
   onExtraWeaponMasteryChange,
+  companionFormGroups = [],
+  onCompanionFormsChange,
 }: SheetRestOverlayProps) {
   const isShort = rest === "short_rest"
   const title = isShort ? "Short Rest" : "Long Rest"
@@ -233,6 +240,20 @@ export function SheetRestOverlay({
                 </div>
               )
             })}
+          </div>
+        ) : null}
+
+        {companionFormGroups.length > 0 && onCompanionFormsChange ? (
+          <div className="mb-4 space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-primary">Companions</p>
+            {companionFormGroups.map((group) => (
+              <CompanionFormPicker
+                key={group.key}
+                group={group}
+                restContext
+                onChange={(formNames) => onCompanionFormsChange(group.key, formNames)}
+              />
+            ))}
           </div>
         ) : null}
 

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { parseCompanionActionRoll } from "@/lib/character/parse-companion-action-roll"
+import {
+  extractCompanionDamageFormula,
+  parseCompanionActionRoll,
+} from "@/lib/character/parse-companion-action-roll"
 
 describe("parseCompanionActionRoll", () => {
   it("parses spell attack modifier attacks", () => {
@@ -29,5 +32,23 @@ describe("parseCompanionActionRoll", () => {
 
   it("returns null for non-attack actions", () => {
     expect(parseCompanionActionRoll("Help", "The companion takes the Help action.", 5)).toBeNull()
+  })
+
+  it("parses parenthetical average damage on SRD-style attacks", () => {
+    const roll = parseCompanionActionRoll(
+      "Shortsword",
+      "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage.",
+      5,
+    )
+    expect(roll?.attackBonus).toBe(5)
+    expect(roll?.damageFormula).toBe("1d6+3")
+  })
+})
+
+describe("extractCompanionDamageFormula", () => {
+  it("finds dice on non-attack traits", () => {
+    expect(
+      extractCompanionDamageFormula("When a creature starts its turn here, it takes 2d6 Necrotic damage."),
+    ).toBe("2d6")
   })
 })

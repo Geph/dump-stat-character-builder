@@ -12,6 +12,7 @@ import {
 } from "@/lib/compendium/enrich-srd-species"
 import { FEAT_MODIFIER_CATALOG } from "@/lib/compendium/enrich-srd-feats"
 import { enrichFeatureWithMechanicalDetection } from "@/lib/compendium/enrich-feature-mechanical-detection"
+import { isModifierRedundantAgainst } from "@/lib/import/detect-feature-modifiers"
 import { syncModifierRefs, type LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { mergeOptionPresetModifiers } from "@/lib/compendium/merge-species-option-presets"
 import {
@@ -364,6 +365,51 @@ function spellsKnownFixed(
   ])
 }
 
+function innateNamedCasts(
+  instanceKey: string,
+  spells: { name: string; unlocksAtLevel?: number }[],
+  activation: FeatureActivation,
+) {
+  return fxInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.castSpell, {
+    ...activation,
+    effects: spells.map((spell) => ({
+      id: modId(`${instanceKey}_${spell.name.replace(/\s+/g, "_").toLowerCase()}`),
+      kind: "cast_spell" as const,
+      castSpellName: spell.name,
+      castSpellWithoutSlot: true,
+      castSpellCastingTime: activation.bonusAction ? "bonus_action" : "action",
+      unlocksAtClassLevel: spell.unlocksAtLevel,
+    })),
+  })
+}
+
+function namedCastSpellNames(instances: LinkedModifierInstance[] | undefined): Set<string> {
+  const names = new Set<string>()
+  for (const instance of instances ?? []) {
+    for (const effect of instance.activation?.effects ?? []) {
+      const name = effect.kind === "cast_spell" ? effect.castSpellName?.trim().toLowerCase() : ""
+      if (name) names.add(name)
+    }
+  }
+  return names
+}
+
+function mergePresetModifiers(
+  existing: LinkedModifierInstance[] | undefined,
+  preset: LinkedModifierInstance[],
+): LinkedModifierInstance[] {
+  const current = existing ?? []
+  const existingCasts = namedCastSpellNames(current)
+  const extras: LinkedModifierInstance[] = []
+  for (const instance of preset) {
+    if (isModifierRedundantAgainst(instance, [...current, ...extras])) continue
+    const presetCasts = namedCastSpellNames([instance])
+    if (presetCasts.size && [...presetCasts].every((name) => existingCasts.has(name))) continue
+    extras.push(instance)
+  }
+  return extras.length ? [...current, ...extras] : current
+}
+
 function spellcastingAbilityChoice(instanceKey: string, label?: string) {
   return charInstance(`modinst_${instanceKey}`, FEAT_MODIFIER_CATALOG.spellcastingAbility, [
     {
@@ -595,6 +641,27 @@ const SHARED_TRAIT_PRESETS: Record<string, TraitPreset> = {
       specialNote(
         "You can move across difficult terrain made of earth or stone without spending extra movement",
         "Earth Walk",
+      ),
+    ],
+  },
+  "Merge with Stone": {
+    linkedModifiers: [
+      spellcastingAbilityChoice("merge_with_stone_ability", "Merge with Stone spellcasting ability"),
+      spellsKnownFixed(
+        "merge_with_stone_spells",
+        [
+          { name: "Blade Ward", unlocksAtLevel: 1, freeCastPerLongRest: 0 },
+          { name: "Pass without Trace", unlocksAtLevel: 5, freeCastPerLongRest: 0 },
+        ],
+        "Merge with Stone spells",
+      ),
+      innateNamedCasts(
+        "merge_with_stone_cast",
+        [
+          { name: "Blade Ward" },
+          { name: "Pass without Trace", unlocksAtLevel: 5 },
+        ],
+        { bonusAction: true },
       ),
     ],
   },
@@ -1630,15 +1697,19 @@ function applyPresetToTrait(
   const preset = lookupTraitPreset(speciesName, trait.name)
   let next = { ...trait }
 
-  if (
-    preset?.linkedModifiers?.length &&
-    (!traitHasModifierConfig(trait) || (preferExactPresets && exactPreset === preset))
-  ) {
-    const synced = syncModifierRefs({ linkedModifiers: preset.linkedModifiers })
-    next = {
-      ...next,
-      linkedModifiers: synced.linkedModifiers,
-      modifierRefs: synced.modifierRefs,
+  if (preset?.linkedModifiers?.length) {
+    const replace =
+      !traitHasModifierConfig(trait) || (preferExactPresets && exactPreset === preset)
+    const merged = replace
+      ? preset.linkedModifiers
+      : mergePresetModifiers(trait.linkedModifiers, preset.linkedModifiers)
+    if (replace || merged !== trait.linkedModifiers) {
+      const synced = syncModifierRefs({ linkedModifiers: merged })
+      next = {
+        ...next,
+        linkedModifiers: synced.linkedModifiers,
+        modifierRefs: synced.modifierRefs,
+      }
     }
   }
 

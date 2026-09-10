@@ -1,11 +1,25 @@
 import { escapeHtml, isHtml } from "@/lib/compendium/html-utils"
 
+/** `class_resources.charnel_touch` → `Charnel Touch` so catalog keys never show on the sheet. */
+export function humanizeCatalogResourceRefs(text: string): string {
+  return text.replace(
+    /\b(?:class_resources|class_resource)\.([a-z][a-z0-9]*(?:_[a-z0-9]+)*)\b/gi,
+    (_, key: string) =>
+      key
+        .split(/[_\s]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" "),
+  )
+}
+
 /** Apply **bold** / _italic_ (and *italic*) markers. Optionally escape HTML first. */
 export function applyInlineMarkdown(text: string, escape: boolean): string {
   let out = escape ? escapeHtml(text) : text
   out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
   out = out.replace(/__([^_]+)__/g, "<strong>$1</strong>")
-  out = out.replace(/_([^_\n]+)_/g, "<em>$1</em>")
+  // Mid-word underscores are identifiers (class_resources), not italic.
+  out = out.replace(/(^|[^A-Za-z0-9])_([^_\n]+)_/g, "$1<em>$2</em>")
   out = out.replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
   return out
 }
@@ -33,9 +47,10 @@ function markdownInlineInHtmlDocument(value: string): string {
  */
 export function markdownToHtml(value: string): string {
   if (!value?.trim()) return ""
-  if (isHtml(value)) return markdownInlineInHtmlDocument(value)
+  const prepared = humanizeCatalogResourceRefs(value)
+  if (isHtml(prepared)) return markdownInlineInHtmlDocument(prepared)
 
-  return value
+  return prepared
     .split(/\n{2,}/)
     .map((block) => {
       const trimmed = block.trim()

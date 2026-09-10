@@ -8,6 +8,7 @@ import {
 import { attachClassDetails, type CharacterClassDetail } from "@/lib/character/character-classes"
 import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
 import classes from "@/lib/srd/seed-data/classes.json"
+import { enrichCustomSpeciesRow } from "@/lib/compendium/enrich-custom-species"
 import type { DndClass, Feat, Feature, Species } from "@/lib/types"
 
 function classDetail(
@@ -25,6 +26,59 @@ function classDetail(
 }
 
 describe("collectSheetActions", () => {
+  it("keeps feature.limitedUses when other characteristics are present", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              name: "Charnel Touch",
+              level: 1,
+              description: "Melee spell attack. Damage equals the points spent.",
+              activation: { action: true },
+              sheetDisplay: { combatActions: true },
+              limitedUses: {
+                type: "class_resource",
+                classResourceKey: "charnel_touch",
+                classResourceAmount: 5,
+                classResourceCostMode: "up_to_proficiency_bonus",
+              },
+              linkedModifiers: [
+                {
+                  instanceId: "charnel_attack",
+                  catalogRefId: "cat_char_special_attack",
+                  characteristics: [
+                    {
+                      id: "mod_charnel_attack",
+                      type: "special_attack",
+                      attackName: "Charnel Touch",
+                      attackProfile: "melee",
+                      properties: ["Spell attack"],
+                      damageTypes: ["Necrotic"],
+                      damageDiceCount: 0,
+                      damageDieType: "d6",
+                      damageFromResourceSpend: true,
+                      spendResourceOnHit: true,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+          1,
+        ),
+      ],
+      species: null,
+    })
+    const action = actions.find((row) => row.name === "Charnel Touch")
+    expect(action?.limitedUses).toMatchObject({
+      type: "class_resource",
+      classResourceKey: "charnel_touch",
+      classResourceAmount: 5,
+      classResourceCostMode: "up_to_proficiency_bonus",
+    })
+  })
+
   it("shows Sacrifice Foe as a notice on Sacrificial Strike and Skill", () => {
     const [detail] = attachClassDetails(
       [{ class_id: "cls_martyr", level: 7, order: 0 }],
@@ -355,6 +409,110 @@ describe("collectSheetActions", () => {
       },
     })
     expect(reactive?.healEffects ?? []).toEqual([])
+  })
+
+  it("opens a named innate cast, then a picker once a later named cast unlocks", () => {
+    const trait = (level: number) =>
+      collectSheetActions({
+        classDetails: [classDetail([], level)],
+        species: {
+          id: "earth-genasi",
+          name: "Genasi: Earth",
+          traits: [
+            {
+              name: "Merge with Stone",
+              level: 1,
+              description: "Cast granted spells as a Bonus Action.",
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_merge_stone_cast",
+                  catalogRefId: "cat_fx_cast_spell",
+                  activation: {
+                    bonusAction: true,
+                    effects: [
+                      {
+                        id: "mod_merge_blade_ward",
+                        kind: "cast_spell",
+                        castSpellName: "Blade Ward",
+                        castSpellWithoutSlot: true,
+                      },
+                      {
+                        id: "mod_merge_pwt",
+                        kind: "cast_spell",
+                        castSpellName: "Pass without Trace",
+                        castSpellWithoutSlot: true,
+                        unlocksAtClassLevel: 5,
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+        } as unknown as Species,
+      }).find((action) => action.name === "Merge with Stone")
+
+    expect(trait(3)?.castSpellChoice).toMatchObject({
+      spellName: "Blade Ward",
+      withoutSlot: true,
+      economyKind: "bonus",
+    })
+    expect(trait(5)?.castSpellChoice).toMatchObject({
+      spellNames: ["Blade Ward", "Pass without Trace"],
+      withoutSlot: true,
+      economyKind: "bonus",
+    })
+  })
+
+  it("enriches a stored Merge with Stone trait into a named Blade Ward cast", () => {
+    const species = enrichCustomSpeciesRow({
+      id: "earth-genasi",
+      name: "Genasi: Earth",
+      source: "motm",
+      traits: [
+        {
+          name: "Merge with Stone",
+          level: 1,
+          description:
+            "Knows Blade Ward (also usable as a bonus action, uses equal to proficiency bonus per long rest). At 5th level, cast Pass without Trace (no material component) once per long rest.",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_existing_uses",
+              catalogRefId: "cat_char_uses",
+              characteristics: [
+                {
+                  id: "mod_existing_uses",
+                  type: "uses",
+                  uses: { type: "proficiency", recharges: [{ rest: "long_rest" }] },
+                  label: "Merge with Stone",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }) as unknown as Species
+
+    expect(
+      collectSheetActions({
+        classDetails: [classDetail([], 3)],
+        species,
+      }).find((action) => action.name === "Merge with Stone")?.castSpellChoice,
+    ).toMatchObject({
+      spellName: "Blade Ward",
+      withoutSlot: true,
+      economyKind: "bonus",
+    })
+    expect(
+      collectSheetActions({
+        classDetails: [classDetail([], 5)],
+        species,
+      }).find((action) => action.name === "Merge with Stone")?.castSpellChoice,
+    ).toMatchObject({
+      spellNames: ["Blade Ward", "Pass without Trace"],
+      withoutSlot: true,
+      economyKind: "bonus",
+    })
   })
 
   it("names an unlabeled War Caster cast from the Reactive Spell benefit heading", () => {

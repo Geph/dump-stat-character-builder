@@ -198,13 +198,17 @@ describe("subclass card images", () => {
     )
   })
 
-  it("scopes Reanimator to Artificer and skips unmapped names", () => {
+  it("scopes Reanimator to Artificer and Necromancer separately", () => {
     expectDefaultSubclassCardImage(
       "Reanimator",
       "Artificer",
       /\/images\/compendium\/subclasses\/artificer\/reanimator\.png$/,
     )
-    expectDefaultSubclassCardImage("Reanimator", "Necromancer", null)
+    expectDefaultSubclassCardImage(
+      "Reanimator",
+      "Necromancer",
+      /\/images\/compendium\/subclasses\/necromancer\/reanimator\.png$/,
+    )
     expectDefaultSubclassCardImage("Phantom", "Rogue", /\/images\/compendium\/subclasses\/rogue\/phantom\.png$/)
     expectDefaultSubclassCardImage(
       "Undead Patron",
@@ -306,6 +310,37 @@ describe("subclass card images", () => {
     ).toBe(false)
   })
 
+  it("maps Mage Hand Press Necromancer, Warden, and Captain art locally", () => {
+    expectDefaultSubclassCardImage(
+      "Death Knight",
+      "Necromancer",
+      /\/images\/compendium\/subclasses\/necromancer\/death-knight\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Plague Lord",
+      "Necromancer",
+      /\/images\/compendium\/subclasses\/necromancer\/plague-lord\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Verdant Protector",
+      "Warden",
+      /\/images\/compendium\/subclasses\/warden\/verdant-protector\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Grey Watchman",
+      "Warden (Mage Hand Press)",
+      /\/images\/compendium\/subclasses\/warden\/grey-watchman\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Lion Banner",
+      "Captain",
+      /\/images\/compendium\/subclasses\/captain\/lion-banner\.png$/,
+    )
+    expect(
+      isBundledPublicCardArtPath("public/images/compendium/subclasses/necromancer/death-knight.png"),
+    ).toBe(false)
+  })
+
   it("applies named card art on non-SRD imports (Inventor / Psion / Occultist / Warden)", () => {
     const gadgetsmith = enrichSrdSubclassRow(
       { name: "Gadgetsmith", source: "KibblesTasty Inventor", features: [] },
@@ -334,7 +369,16 @@ describe("subclass card images", () => {
       { name: "Reanimator", source: "Mage Hand Press", features: [] },
       "Necromancer",
     )
-    expect(row.card_image_url).toBeUndefined()
+    if (typeof row.card_image_url === "string") {
+      expect(row.card_image_url).not.toMatch(/\/artificer\/reanimator\.png$/)
+      expect(row.card_image_url).toMatch(/\/necromancer\/reanimator\.png$/)
+    } else {
+      expectDefaultSubclassCardImage(
+        "Reanimator",
+        "Necromancer",
+        /\/images\/compendium\/subclasses\/necromancer\/reanimator\.png$/,
+      )
+    }
   })
 
   it("preserves custom card art when already set", () => {

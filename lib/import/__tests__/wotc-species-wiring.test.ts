@@ -311,4 +311,17 @@ describe("WOTC species wiring", () => {
       )
     }
   })
+
+  it.skipIf(skip)("wires Earth Genasi Merge with Stone to Blade Ward and Pass without Trace", () => {
+    const path = homebrewFixturePath(FIXTURE)!
+    const enriched = enrichImportContentModifiers(parseImportContentJson(readFileSync(path, "utf8"))!)
+    const earth =
+      enriched.species?.find((row) => row.name === "Genasi: Earth") ??
+      enriched.species?.find((row) => /earth genasi/i.test(row.name ?? ""))
+    const trait = (earth?.traits as TraitRow[] | undefined)?.find((row) => row.name === "Merge with Stone")
+    const json = JSON.stringify(trait?.linkedModifiers)
+    expect(json).toMatch(/Blade Ward/)
+    expect(json).toMatch(/Pass without Trace/)
+    expect(json).toMatch(/cast_spell/)
+  })
 })

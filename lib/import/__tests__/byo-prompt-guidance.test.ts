@@ -386,6 +386,8 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("healFromResourceSpend")
     expect(prompt).toContain("controlled_companion")
     expect(prompt).toContain("choiceCountByLevel matching the Thralls column")
+    expect(prompt).toContain("creatureCombinedCrByLevel")
+    expect(prompt).toContain("creaturePickOnRest")
     expect(prompt).toContain("applyToCompanionFeature Thralls")
   })
 

@@ -22,13 +22,29 @@ function stripHtml(text: string): string {
     .trim()
 }
 
+function normalizeDiceExpression(raw: string): string {
+  return raw.replace(/\s+/g, "")
+}
+
 function extractDamageFormula(hitClause: string): string | null {
   const cleaned = hitClause
     .replace(/\s+plus\s+your\s+\w+\s+modifier/gi, "")
     .replace(/\s+\w+\s+damage\.?$/i, "")
     .trim()
   const diceMatch = cleaned.match(/(\d+d\d+(?:\s*[+-]\s*\d+)?)/i)
-  return diceMatch ? diceMatch[1].replace(/\s+/g, "") : null
+  return diceMatch ? normalizeDiceExpression(diceMatch[1]) : null
+}
+
+/** Damage dice from a Hit: clause, or the first NdM[+/-N] in the block. */
+export function extractCompanionDamageFormula(description: string): string | null {
+  const text = stripHtml(description)
+  const hitMatch = text.match(HIT_DAMAGE_RE)
+  if (hitMatch) {
+    const fromHit = extractDamageFormula(hitMatch[1])
+    if (fromHit) return fromHit
+  }
+  const diceMatch = text.match(/(\d+d\d+(?:\s*[+-]\s*\d+)?)/i)
+  return diceMatch ? normalizeDiceExpression(diceMatch[1]) : null
 }
 
 /**
@@ -52,8 +68,7 @@ export function parseCompanionActionRoll(
     attackBonus = parseInt(attackMatch[1], 10)
   }
 
-  const hitMatch = text.match(HIT_DAMAGE_RE)
-  const damageFormula = hitMatch ? extractDamageFormula(hitMatch[1]) : null
+  const damageFormula = extractCompanionDamageFormula(text)
   const reachMatch = text.match(REACH_RANGE_RE)
 
   return {
