@@ -1732,6 +1732,68 @@ describe("triggered activations", () => {
     })
   })
 
+  it("spends scaled Hit Dice from reserved hit_dice reduce plus healMode", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        classDetail(
+          [
+            {
+              level: 2,
+              name: "Miraculous Healing",
+              description: "As a Bonus Action, roll Hit Point Dice to heal.",
+              activation: { bonusAction: true },
+              linkedModifiers: [
+                {
+                  instanceId: "modinst_mh_heal",
+                  catalogRefId: "cat_fx_heal_self",
+                  activation: {
+                    bonusAction: true,
+                    effects: [
+                      {
+                        id: "mod_mh",
+                        kind: "heal_self",
+                        healMode: "hit_dice",
+                        healDiceCount: 1,
+                        healAbility: "CON",
+                        bonusByLevel: [
+                          { level: 1, mode: "fixed", fixed: 1 },
+                          { level: 5, mode: "fixed", fixed: 2 },
+                          { level: 11, mode: "fixed", fixed: 3 },
+                          { level: 17, mode: "fixed", fixed: 4 },
+                        ],
+                      },
+                    ],
+                  },
+                },
+                {
+                  instanceId: "modinst_mh_hd",
+                  catalogRefId: "cat_fx_class_resource",
+                  activation: {
+                    bonusAction: true,
+                    effects: [
+                      {
+                        id: "mod_mh_hd",
+                        kind: "class_resource",
+                        classResourceKey: "hit_dice",
+                        classResourceChange: "reduce",
+                      },
+                    ],
+                  },
+                },
+              ],
+            } as unknown as Feature,
+          ],
+          11,
+        ),
+      ],
+      species: null,
+    })
+    const heal = actions.find((action) => action.name === "Miraculous Healing")
+    expect(heal?.spendHitDice).toBe(3)
+    expect(heal?.classResourceKey).toBeNull()
+    expect(heal?.healEffects?.[0]).toMatchObject({ healMode: "hit_dice", healAbility: "CON" })
+  })
+
   it("leaves features with a real action cost out of the triggered bucket", () => {
     const actions = collectSheetActions({
       classDetails: [

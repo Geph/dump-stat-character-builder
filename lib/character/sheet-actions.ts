@@ -24,6 +24,12 @@ import {
   mergeActivationModeRidersIntoFeature,
 } from "@/lib/character/activation-mode-riders"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import {
+  HIT_DICE_RESOURCE_KEY,
+  isHitDiceResourceKey,
+  limitedUsesSpendHitDice,
+  resolveHitDiceUseEffects,
+} from "@/lib/character/hit-dice-use-effects"
 import { isHitPointsResourceKey } from "@/lib/character/hit-point-spend"
 import { resolveHitDiceHealCount } from "@/lib/character/resolve-feature-effect-heal"
 import {
@@ -140,7 +146,7 @@ export type SheetActionEntry = {
   relatedTalentAlerts?: SheetActionTalentAlert[]
   /** Menu options from resource_ability_menu (for HD spend pickers and rider matching). */
   menuOptions?: SheetActionMenuOption[]
-  /** Hit Dice spent when this action is used (feature activation.spendHitDice). */
+  /** Hit Dice spent when this action is used (`class_resource` hit_dice reduce, healMode, or activation.spendHitDice). */
   spendHitDice?: number | null
   /** Current HP spent when this action is used (bypass temp HP). */
   spendHitPoints?: number | null
@@ -538,8 +544,9 @@ function resolveItemLimitedUses(item: ActivatableItem): UsesConfig | null | unde
 function classResourceKeysForClass(
   cls: CharacterClassDetail["class"] | null | undefined,
 ): string[] {
-  if (!cls) return []
-  return resolveClassResourcesForClass(cls).map((row) => row.id)
+  const keys = cls ? resolveClassResourcesForClass(cls).map((row) => row.id) : []
+  if (!keys.some((key) => isHitDiceResourceKey(key))) keys.push(HIT_DICE_RESOURCE_KEY)
+  return keys
 }
 
 /** Trigger characteristics that declare their own class-resource spend (Stunning Strike, Quivering Palm). */
@@ -1153,8 +1160,13 @@ function resolveRefundHitPointsOnStillFailed(item: ActivatableItem): boolean {
 }
 
 function resolveSpendHitDice(item: ActivatableItem, classLevel?: number): number | null {
+  // limitedUses.classResourceKey = hit_dice spends through the shared HD pool, not this field.
+  if (limitedUsesSpendHitDice(item)) return null
+  const level = classLevel ?? 1
   const hitDiceHeal = resolveHitDiceHealEffect(item)
-  if (hitDiceHeal) return resolveHitDiceHealCount(hitDiceHeal, classLevel ?? 1)
+  if (hitDiceHeal) return resolveHitDiceHealCount(hitDiceHeal, level)
+  const reserved = resolveHitDiceUseEffects(item, level).spendHitDiceOnUse
+  if (reserved != null && reserved > 0) return reserved
   const fromActivation = item.activation?.spendHitDice
   if (fromActivation != null && fromActivation > 0) return fromActivation
   for (const instance of item.linkedModifiers ?? []) {
@@ -1704,6 +1716,9 @@ function resolveHitDiceRestoreOnUse(
       }
     }
   }
+  const reserved = resolveHitDiceUseEffects(item, classLevel).restoreHitDiceOnUse
+  if (reserved === "all") return { amount: Number.MAX_SAFE_INTEGER }
+  if (typeof reserved === "number" && reserved > 0) return { amount: reserved }
   return undefined
 }
 

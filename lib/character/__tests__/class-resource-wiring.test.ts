@@ -55,6 +55,15 @@ describe("inferClassResourceSpendFromText", () => {
       ]),
     ).toBeNull()
   })
+
+  it("detects reserved Hit Dice spend when that key is available", () => {
+    expect(
+      inferClassResourceSpendFromText("As a Bonus Action, you expend a Hit Die.", ["hit_dice"]),
+    ).toEqual({ resourceKey: "hit_dice", amount: 1 })
+    expect(
+      inferClassResourceSpendFromText("As a Bonus Action, you expend a Hit Die.", ["ki"]),
+    ).toBeNull()
+  })
 })
 
 describe("maneuver spend hooks", () => {
@@ -970,5 +979,133 @@ describe("spell-slot hooks come from class_resource effects, not feature names",
         spellSlotMaxLevel: 5,
       }),
     )
+  })
+})
+
+describe("hit_dice reserved class_resource key", () => {
+  function hdEffectClass(
+    featureName: string,
+    extras: {
+      effect?: Record<string, unknown>
+      limitedUses?: Feature["limitedUses"]
+      description?: string
+      activation?: Record<string, unknown>
+    } = {},
+  ): CharacterClassDetail {
+    return {
+      row: { class_id: "homebrew-1", level: 12, subclass_id: null, order: 0 },
+      class: {
+        id: "homebrew-1",
+        name: "Homebrew",
+        features: [
+          {
+            name: featureName,
+            level: 1,
+            description: extras.description ?? "Wired through the Compendium row.",
+            activation: extras.activation ?? { action: true },
+            limitedUses: extras.limitedUses,
+            linkedModifiers: extras.effect
+              ? [
+                  {
+                    instanceId: `modinst_${featureName.toLowerCase().replace(/\W+/g, "_")}`,
+                    catalogRefId: "cat_fx_class_resource",
+                    activation: { effects: [{ id: "mod_hd_effect", ...extras.effect }] },
+                  },
+                ]
+              : [],
+          },
+        ],
+      } as unknown as CharacterClassDetail["class"],
+      subclass: null,
+    }
+  }
+
+  it("spends Hit Dice from a hit_dice reduce effect", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        hdEffectClass("Blood Tithe", {
+          effect: {
+            kind: "class_resource",
+            classResourceKey: "hit_dice",
+            classResourceChange: "reduce",
+            classResourceAmount: 2,
+          },
+        }),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Blood Tithe")?.spendHitDice).toBe(2)
+    expect(actions.find((action) => action.name === "Blood Tithe")?.classResourceKey).toBeNull()
+  })
+
+  it("restores Hit Dice from a hit_dice increase effect", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        hdEffectClass("Second Wind Dice", {
+          effect: {
+            kind: "class_resource",
+            classResourceKey: "hit_dice",
+            classResourceChange: "increase",
+            classResourceAmount: 2,
+          },
+        }),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Second Wind Dice")?.restoreHitDiceOnUse).toEqual(
+      { amount: 2 },
+    )
+  })
+
+  it("restores all Hit Dice from a hit_dice reset effect", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        hdEffectClass("Full Recovery", {
+          effect: {
+            kind: "class_resource",
+            classResourceKey: "hit_dice",
+            classResourceChange: "reset",
+          },
+        }),
+      ],
+      species: null,
+    })
+    expect(actions.find((action) => action.name === "Full Recovery")?.restoreHitDiceOnUse).toEqual({
+      amount: Number.MAX_SAFE_INTEGER,
+    })
+  })
+
+  it("shares the sheet Hit Dice tracker from limitedUses without a spendHitDice hook", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        hdEffectClass("Mortal Surge", {
+          limitedUses: { type: "class_resource", classResourceKey: "hit_dice", classResourceAmount: 1 },
+          effect: {
+            kind: "class_resource",
+            classResourceKey: "hit_dice",
+            classResourceChange: "reduce",
+          },
+        }),
+      ],
+      species: null,
+    })
+    const surge = actions.find((action) => action.name === "Mortal Surge")
+    expect(surge?.classResourceKey).toBe("hit_dice")
+    expect(surge?.spendHitDice).toBeNull()
+  })
+
+  it("infers a Hit Dice pool from expend-a-Hit-Die prose", () => {
+    const actions = collectSheetActions({
+      classDetails: [
+        hdEffectClass("MotM Gift", {
+          description: "As a Bonus Action, you expend a Hit Die.",
+          activation: { bonusAction: true },
+        }),
+      ],
+      species: null,
+    })
+    const gift = actions.find((action) => action.name === "MotM Gift")
+    expect(gift?.classResourceKey).toBe("hit_dice")
+    expect(gift?.spendHitDice).toBeNull()
   })
 })

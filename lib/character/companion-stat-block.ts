@@ -102,6 +102,11 @@ export type CompanionSource = {
   subclassId?: string | null
   /** Discriminator when a single feature provides multiple forms (e.g. Druid Beast forms). */
   formName?: string | null
+  /**
+   * 1-based copy index when the same form is summoned more than once (Animate Dead
+   * skeletons). Omitted or `1` keeps the historical key so existing HP is preserved.
+   */
+  formInstance?: number | null
 }
 
 export type ResolvedCompanion = {
@@ -172,7 +177,10 @@ const ABILITY_KEY_MAP: Record<string, AbilityScoreKey> = {
 export function companionKey(source: CompanionSource): string {
   const subclass = source.subclassId ?? "none"
   const base = `${source.classId}:${subclass}:${slugify(source.featureName)}`
-  return source.formName ? `${base}:${slugify(source.formName)}` : base
+  const form = source.formName ? `:${slugify(source.formName)}` : ""
+  const instance =
+    source.formInstance != null && source.formInstance > 1 ? `:${source.formInstance}` : ""
+  return `${base}${form}${instance}`
 }
 
 export function slugify(value: string): string {

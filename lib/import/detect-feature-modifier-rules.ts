@@ -2224,6 +2224,29 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     },
   },
   {
+    id: "resource.expend_hit_dice",
+    confidence: "high",
+    scope: "full",
+    test: /\b(?:expend|spend)(?:s|ing)?\s+(?:up\s+to\s+)?(\d+|one|a|an)\s+hit\s+(?:point\s+)?dic?e\b/i,
+    build: (match, ctx) => {
+      const raw = (match[1] ?? "1").toLowerCase()
+      const amount = raw === "one" || raw === "a" || raw === "an" ? 1 : parseInt(raw, 10)
+      if (!Number.isFinite(amount) || amount < 1) return null
+      return fxInstance(newInstanceId(), effectCatalogRefId("class_resource"), {
+        effects: [
+          {
+            id: modId(instanceKey(ctx, "hit_dice_spend")),
+            kind: "class_resource" as const,
+            classResourceKey: "hit_dice",
+            classResourceChange: "reduce",
+            classResourceAmount: amount,
+            label: amount === 1 ? "Spend 1 Hit Die" : `Spend ${amount} Hit Dice`,
+          },
+        ],
+      })
+    },
+  },
+  {
     id: "uses.fixed_rest",
     confidence: "high",
     test:

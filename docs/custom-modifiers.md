@@ -1,6 +1,6 @@
 # Custom modifiers — agent map
 
-Last reviewed: 2026-09-01.
+Last reviewed: 2026-09-10.
 
 A new chat has **no prior transcript**. Read this before adding a modifier type, a
 `if (name === "…")` sheet branch, or a play-state field. Decision rule for
@@ -282,6 +282,28 @@ Two caveats before you extend this:
   import time — neither runs on load. Delete the table once the Seed button and
   `scripts/refresh-class-import-modifiers.ts` have been re-run everywhere. Do
   not add entries to it.
+
+The Compendium `class_resource` dropdown always lists reserved keys (Hit Dice,
+spell slots, Pact Magic slots) even when the class has no matching
+`class_resources` row.
+
+### Hit Dice ride on `class_resource` (2026-09-10)
+
+Same reserved-key pattern. `hit_dice` (aliases `hit_point_dice`, `hit_point_die`)
+routes to the sheet HD tracker — do not add a `class_resources.hit_dice` row.
+
+| Key | `classResourceChange` | Sheet hook |
+| --- | --- | --- |
+| `hit_dice` | `reduce` (or omitted) | `spendHitDice` / HD pool on Use |
+| `hit_dice` | `increase` | `restoreHitDiceOnUse` (fixed amount) |
+| `hit_dice` | `reset` | `restoreHitDiceOnUse` (all remaining) |
+| `limitedUses.type: class_resource` + `classResourceKey: hit_dice` | — | Shared HD pool (`up_to_proficiency_bonus` etc. work) |
+
+`activation.spendHitDice` and menu `hitDiceCost` still work. When a feature also
+has `healMode: "hit_dice"`, the heal dice count is the spend (Martyr Miraculous
+Healing 1/2/3/4). Rest restore stays `hit_dice_restore` (Divine Respite).
+
+Reader: `lib/character/hit-dice-use-effects.ts`.
 
 ## Efficiency and dependency hazards
 

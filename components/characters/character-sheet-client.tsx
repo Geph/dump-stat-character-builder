@@ -387,6 +387,7 @@ import {
 import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
   companionFormGroupAppearsOnRest,
+  companionDefaultDisplayName,
   formSelectionsFromState,
   mergeCompanionState,
   resolveCharacterCompanionsDetailed,
@@ -4086,7 +4087,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           currentHp: row.currentHp,
           tempHp: row.tempHp > 0 ? row.tempHp : null,
           ferocity: row.ferocity > 0 ? row.ferocity : null,
-          customName: row.displayName !== row.template.name ? row.displayName : null,
+          customName:
+            row.displayName !== companionDefaultDisplayName(row) ? row.displayName : null,
           activeConditions: row.activeConditions.length ? row.activeConditions : null,
           polymorphActive: row.polymorphActive ? true : null,
           knownForms: knownFormsByKey.get(row.key) ?? null,
@@ -6054,6 +6056,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     incapacitated={incapacitated}
                     psiLimit={psiLimit}
                     hitDiceRemaining={hitDiceRemainingTotal}
+                    hitDiceTotal={hitDicePool.reduce((sum, entry) => sum + entry.total, 0)}
                     onSpendHitDice={spendHitDiceForAction}
                     onSpendHitPoints={spendHitPointsForAction}
                     onRefundHitPoints={refundHitPointsForAction}
@@ -6315,6 +6318,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         incapacitated={incapacitated}
                         psiLimit={psiLimit}
                         hitDiceRemaining={hitDiceRemainingTotal}
+                        hitDiceTotal={hitDicePool.reduce((sum, entry) => sum + entry.total, 0)}
                         onSpendHitDice={spendHitDiceForAction}
                         onSpendHitPoints={spendHitPointsForAction}
                         onRefundHitPoints={refundHitPointsForAction}
@@ -7085,6 +7089,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           }
                           onPolymorphActiveChange={(active) =>
                             patchCompanionState(companion.key, { polymorphActive: active })
+                          }
+                          onNameChange={(name) =>
+                            patchCompanionState(companion.key, { customName: name })
                           }
                         />
                         {hasFerocityMechanic && !companion.polymorph ? (

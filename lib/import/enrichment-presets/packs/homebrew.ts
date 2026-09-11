@@ -1483,7 +1483,7 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
     target: "class_feature",
     match: { className: /martyr/i, name: /^miraculous healing$/i },
     operations: [
-      { op: "setActivation", activation: { bonusAction: true, spendHitDice: 1 } },
+      { op: "setActivation", activation: { bonusAction: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
         op: "attachNamedPreset",
@@ -1492,7 +1492,7 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
           kind: "fx_instance",
           idKey: "miraculous_healing",
           catalogRefId: "cat_fx_heal_self",
-          activation: { bonusAction: true, spendHitDice: 1 },
+          activation: { bonusAction: true },
           effects: [
             {
               id: "mod_miraculous_healing",
@@ -1508,6 +1508,25 @@ export const MARTYR_PRESETS: EnrichmentPreset[] = [
                 { level: 17, mode: "fixed", fixed: 4 },
               ],
               label: "Hit Point Dice + CON",
+            },
+          ],
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        skipIfEffectKinds: ["class_resource"],
+        preset: {
+          kind: "fx_instance",
+          idKey: "miraculous_healing_hd",
+          catalogRefId: "cat_fx_class_resource",
+          activation: { bonusAction: true },
+          effects: [
+            {
+              id: "mod_miraculous_healing_hd",
+              kind: "class_resource",
+              classResourceKey: "hit_dice",
+              classResourceChange: "reduce",
+              label: "Spend Hit Dice",
             },
           ],
         },

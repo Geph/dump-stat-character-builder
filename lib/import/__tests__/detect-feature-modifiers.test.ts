@@ -172,6 +172,22 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "expend a Hit Die",
+      text: "As a Bonus Action, you expend a Hit Die.",
+      ruleId: "resource.expend_hit_dice",
+      assert: (detections) => {
+        const effect = detections
+          .find((entry) => entry.ruleId === "resource.expend_hit_dice")
+          ?.instance.activation?.effects?.find((row) => row.kind === "class_resource")
+        expect(effect).toMatchObject({
+          kind: "class_resource",
+          classResourceKey: "hit_dice",
+          classResourceChange: "reduce",
+          classResourceAmount: 1,
+        })
+      },
+    },
+    {
       label: "fixed uses per long rest",
       text: "You can use this feature 3 times, regaining all expended uses when you finish a long rest.",
       ruleId: "uses.fixed_rest",
@@ -870,6 +886,14 @@ describe("detectFeatureModifiers", () => {
 
   it.each(negativeCases)("does not invent modifiers from: %s", (text) => {
     expect(detectFeatureModifiers(text, baseCtx)).toEqual([])
+  })
+
+  it("does not treat rolling unexpended Hit Point Dice as a Hit Dice spend", () => {
+    const detections = detectFeatureModifiers(
+      "As a Bonus Action, roll one of your unexpended Hit Point Dice and add your Constitution modifier to the roll.",
+      baseCtx,
+    )
+    expect(detections.some((entry) => entry.ruleId === "resource.expend_hit_dice")).toBe(false)
   })
 
   it("does not treat maneuver this-turn climb as a standing Speed grant", () => {

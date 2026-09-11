@@ -1,8 +1,12 @@
+import { HIT_DICE_RESOURCE_KEY, isHitDiceResourceKey } from "@/lib/character/hit-dice-use-effects"
 import {
   detectThirdPartyResourceSpend,
   THIRD_PARTY_RESOURCE_PATTERNS,
 } from "@/lib/import/third-party-resources"
 import type { UsesConfig } from "@/lib/types"
+
+const HIT_DICE_SPEND_RE =
+  /\b(?:expend|spend)(?:s|ing)?\s+(?:up\s+to\s+)?(\d+|one|a|an)\s+hit\s+(?:point\s+)?dic?e\b/i
 
 const PSI_COST_RE =
   /\b(?:expend|spend|costs?|pay|use)\s+(?:up\s+to\s+)?(\d+)\s+psi\s+points?\b/i
@@ -89,6 +93,17 @@ export function inferClassResourceSpendFromText(
     if (amount != null) return { resourceKey: key, amount }
   }
 
+  const hitDiceSpend = haystack.match(HIT_DICE_SPEND_RE)
+  if (hitDiceSpend) {
+    const raw = hitDiceSpend[1]?.toLowerCase() ?? "1"
+    const amount = raw === "one" || raw === "a" || raw === "an" ? 1 : parseInt(raw, 10)
+    const hdKey =
+      availableKeys.find((key) => isHitDiceResourceKey(key)) ?? HIT_DICE_RESOURCE_KEY
+    if (Number.isFinite(amount) && amount > 0 && availableKeys.includes(hdKey)) {
+      return { resourceKey: hdKey, amount }
+    }
+  }
+
   const psiCost = detectPsiPointCost(haystack)
   if (psiCost != null) {
     const psiKey = availableKeys.find(
@@ -122,6 +137,7 @@ export function hasManeuverSpendText(text: string): boolean {
     /\broll\s+(?:an?|one|1)\s+endurance\s+(?:die|dice)\b/i.test(text) ||
     /\bexpend\s+(?:one|an?|1|\d+)\s+(?:arcane\s+surge|dance)s?\b/i.test(text) ||
     /\bexpend\s+\d+\s+charnel\s+touch\s+points?\b/i.test(text) ||
-    /\bexpend\s+(?:one|an?|1|\d+)\s+remedy\s+(?:die|dice)\b/i.test(text)
+    /\bexpend\s+(?:one|an?|1|\d+)\s+remedy\s+(?:die|dice)\b/i.test(text) ||
+    HIT_DICE_SPEND_RE.test(text)
   )
 }

@@ -1,8 +1,13 @@
 "use client"
 
-import { Heart, Shield, Footprints, Sparkles } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Heart, Pencil, Shield, Footprints, Sparkles } from "lucide-react"
 import { ABILITY_ORDER } from "@/lib/character/parse-companion-stat-block"
 import type { CompanionNamedBlock, ResolvedCompanion } from "@/lib/character/companion-stat-block"
+import {
+  companionDefaultDisplayName,
+  companionHasCustomName,
+} from "@/lib/character/resolve-companions"
 import {
   extractCompanionDamageFormula,
   parseCompanionActionRoll,
@@ -39,6 +44,7 @@ type CompanionStatPanelProps = {
   onHpChange: (hp: number) => void
   onConditionsChange?: (conditions: string[]) => void
   onPolymorphActiveChange?: (active: boolean) => void
+  onNameChange?: (name: string | null) => void
 }
 
 function MetaLine({ label, value }: { label: string; value: string }) {
@@ -120,11 +126,47 @@ export function CompanionStatPanel({
   onHpChange,
   onConditionsChange,
   onPolymorphActiveChange,
+  onNameChange,
 }: CompanionStatPanelProps) {
   const { template, ac, maxHp, currentHp, tempHp = 0, source, polymorph, activeConditions, polymorphActive } =
     companion
   const abilityScores = companion.abilityScores ?? template.abilityScores
   const hasAbilities = abilityScores && Object.keys(abilityScores).length > 0
+  const [renaming, setRenaming] = useState(false)
+  const [draftName, setDraftName] = useState(companion.displayName)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const skipBlurCommit = useRef(false)
+
+  useEffect(() => {
+    if (renaming) nameInputRef.current?.focus()
+  }, [renaming])
+
+  const startRename = () => {
+    if (!onNameChange) return
+    skipBlurCommit.current = false
+    setDraftName(companion.displayName)
+    setRenaming(true)
+  }
+
+  const commitRename = () => {
+    if (!onNameChange) return
+    if (skipBlurCommit.current) {
+      skipBlurCommit.current = false
+      return
+    }
+    const next = draftName.trim()
+    const defaultName = companionDefaultDisplayName(companion)
+    onNameChange(next && next !== defaultName ? next : null)
+    setRenaming(false)
+  }
+
+  const cancelRename = () => {
+    skipBlurCommit.current = true
+    setDraftName(companion.displayName)
+    setRenaming(false)
+  }
+
+  const renamed = companionHasCustomName(companion)
 
   const metaLines: { label: string; value: string }[] = []
   if (template.resistances?.length) metaLines.push({ label: "Resistances", value: template.resistances.join(", ") })
@@ -153,8 +195,51 @@ export function CompanionStatPanel({
   return (
     <section className="bg-card rounded-xl border border-border overflow-hidden flex flex-col">
       <div className="px-3 py-2 border-b border-border bg-muted/30">
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="text-sm font-bold text-foreground truncate">{companion.displayName}</h3>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 min-w-0">
+            {renaming ? (
+              <input
+                ref={nameInputRef}
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    commitRename()
+                  }
+                  if (event.key === "Escape") {
+                    event.preventDefault()
+                    cancelRename()
+                  }
+                }}
+                aria-label="Companion name"
+                className="min-w-0 w-full bg-background border border-border rounded px-1.5 py-0.5 text-sm font-bold text-foreground"
+              />
+            ) : (
+              <h3 className="text-sm font-bold text-foreground truncate">
+                {renamed ? (
+                  <>
+                    {companion.displayName}{" "}
+                    <span className="font-semibold text-muted-foreground">({template.name})</span>
+                  </>
+                ) : (
+                  companion.displayName
+                )}
+              </h3>
+            )}
+            {onNameChange && !renaming ? (
+              <button
+                type="button"
+                onClick={startRename}
+                title="Rename companion"
+                aria-label={`Rename ${companion.displayName}`}
+                className="shrink-0 p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            ) : null}
+          </div>
           {template.cr ? (
             <span className="text-[9px] text-muted-foreground shrink-0">CR {template.cr}</span>
           ) : null}

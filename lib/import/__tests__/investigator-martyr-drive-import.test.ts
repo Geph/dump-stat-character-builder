@@ -107,11 +107,16 @@ describe.skipIf(!hasMartyr)("Martyr Drive import wiring", () => {
 
     const heal = content.classes?.[0]?.features?.find((f) => f.name === "Miraculous Healing") as Feature | undefined
     expect(heal?.activation?.bonusAction).toBe(true)
-    expect(heal?.activation?.spendHitDice).toBe(1)
-    const healFx = heal?.linkedModifiers
-      ?.flatMap((instance) => instance.activation?.effects ?? [])
-      .find((effect) => effect.kind === "heal_self")
-    expect(healFx).toMatchObject({ healMode: "hit_dice", healAbility: "CON" })
+    expect(heal?.activation?.spendHitDice).toBeUndefined()
+    const healEffects = heal?.linkedModifiers?.flatMap((instance) => instance.activation?.effects ?? []) ?? []
+    expect(healEffects.find((effect) => effect.kind === "heal_self")).toMatchObject({
+      healMode: "hit_dice",
+      healAbility: "CON",
+    })
+    expect(healEffects.find((effect) => effect.kind === "class_resource")).toMatchObject({
+      classResourceKey: "hit_dice",
+      classResourceChange: "reduce",
+    })
 
     const reprisal = content.classes?.[0]?.features?.find((f) => f.name === "Reprisal") as Feature | undefined
     expect(reprisal?.activation?.reaction).toBe(true)

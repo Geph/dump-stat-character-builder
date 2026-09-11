@@ -64,14 +64,16 @@ describe("attachClassDetails class-feature presets", () => {
     const heal = (detail.class?.features ?? []).find((feature) => feature.name === "Miraculous Healing") as
       | Feature
       | undefined
-    expect(heal?.activation?.spendHitDice).toBe(1)
-    const effect = heal?.linkedModifiers
-      ?.flatMap((instance) => instance.activation?.effects ?? [])
-      .find((row) => row.kind === "heal_self")
-    expect(effect).toMatchObject({
+    expect(heal?.activation?.spendHitDice).toBeUndefined()
+    const effects = heal?.linkedModifiers?.flatMap((instance) => instance.activation?.effects ?? []) ?? []
+    expect(effects.find((row) => row.kind === "heal_self")).toMatchObject({
       healMode: "hit_dice",
       healAbility: "CON",
       healDiceCount: 1,
+    })
+    expect(effects.find((row) => row.kind === "class_resource")).toMatchObject({
+      classResourceKey: "hit_dice",
+      classResourceChange: "reduce",
     })
   })
 

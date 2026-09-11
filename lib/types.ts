@@ -194,9 +194,10 @@ export interface FeatureEffect {
   /** @deprecated Implicit when kind is check_disadvantage */
   grantDisadvantage?: boolean
   /**
-   * `resource_key` from the class_resources table. Two keys are reserved and route to the
-   * spell-slot trackers instead of a resource row: `spell_slots` and `pact_magic_slots`.
-   * See `lib/character/spell-slot-use-effects.ts`.
+   * `resource_key` from the class_resources table. Reserved keys route to sheet trackers
+   * instead of a resource row: `spell_slots`, `pact_magic_slots`, and `hit_dice`
+   * (aliases `hit_point_dice` / `hit_point_die`).
+   * See `lib/character/spell-slot-use-effects.ts` and `lib/character/hit-dice-use-effects.ts`.
    */
   classResourceKey?: string | null
   /** How a class_resource effect modifies the pool. */

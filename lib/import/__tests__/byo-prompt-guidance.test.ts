@@ -151,6 +151,8 @@ describe("BYO prompt guidance (Psion audit follow-up)", () => {
     expect(prompt).toContain("power_rider")
     expect(prompt).toContain("hit_dice_restore")
     expect(prompt).toContain("hitDiceRestoreAmount")
+    expect(prompt).toContain('classResourceKey "hit_dice"')
+    expect(prompt).toContain("do not emit class_resources.hit_dice")
     expect(prompt).toContain("Divine Respite")
     expect(prompt).toContain("restDialogues")
     expect(prompt).toContain("immediately use your")

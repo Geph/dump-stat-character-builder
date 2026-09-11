@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
 import {
+  formatCompanionHeading,
   formSelectionsFromState,
+  mergeCompanionState,
   resolveCharacterCompanionsDetailed,
 } from "@/lib/character/resolve-companions"
 import { buildSrdCreatureSeedRows } from "@/lib/compendium/seed-srd-creatures"
@@ -226,6 +228,60 @@ describe("Find Familiar form selection", () => {
     expect(formGroups.some((g) => g.kind === "choice" && g.featureName === "Animate Dead")).toBe(
       true,
     )
+  })
+
+  it("keeps duplicate form picks as separate companions with their own HP", () => {
+    const { companions, formGroups } = resolveCharacterCompanionsDetailed({
+      classDetails: [],
+      ctx: CTX,
+      creatures: SEED_CREATURES,
+      knownSpells: [
+        {
+          ...findFamiliarSpell,
+          id: "spell-animate",
+          name: "Animate Dead",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_animate",
+              catalogRefId: "cat_char_grant_creature",
+              characteristics: [
+                {
+                  id: "mod_animate",
+                  type: "grant_creature",
+                  creatureNames: ["Skeleton", "Zombie"],
+                  choiceOptions: ["Skeleton", "Zombie"],
+                  count: 2,
+                },
+              ],
+            },
+          ],
+        } as never,
+      ],
+      formSelections: { "spellcaster:none:animate_dead": ["Skeleton", "Skeleton"] },
+    })
+    const skeletons = companions.filter((c) => c.template.name === "Skeleton")
+    expect(skeletons).toHaveLength(2)
+    expect(skeletons[0]!.key).not.toBe(skeletons[1]!.key)
+    expect(skeletons[0]!.key.endsWith(":skeleton")).toBe(true)
+    expect(skeletons[1]!.key.endsWith(":skeleton:2")).toBe(true)
+    expect(formGroups.find((g) => g.featureName === "Animate Dead")?.selected).toEqual([
+      "Skeleton",
+      "Skeleton",
+    ])
+
+    const merged = mergeCompanionState(companions, [
+      { key: skeletons[0]!.key, currentHp: 4 },
+      { key: skeletons[1]!.key, currentHp: 7 },
+    ])
+    const mergedSkeletons = merged.filter((c) => c.template.name === "Skeleton")
+    expect(mergedSkeletons.map((c) => c.currentHp)).toEqual([4, 7])
+    expect(mergedSkeletons.map((c) => c.displayName)).toEqual(["Skeleton", "Skeleton 2"])
+
+    const renamed = mergeCompanionState(companions, [
+      { key: skeletons[0]!.key, currentHp: 4, customName: "Bones" },
+    ])
+    expect(formatCompanionHeading(renamed[0]!)).toBe("Bones (Skeleton)")
+    expect(formatCompanionHeading(mergedSkeletons[1]!)).toBe("Skeleton 2")
   })
 })
 

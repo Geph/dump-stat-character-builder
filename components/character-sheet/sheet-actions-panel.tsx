@@ -30,6 +30,7 @@ import type {
 } from "@/lib/character/inventory-containers"
 import { InventoryContainerContents } from "@/components/character-sheet/inventory-container-contents"
 import { formatActionSpendLabel } from "@/lib/character/action-spend-label"
+import { HIT_DICE_RESOURCE_KEY, isHitDiceResourceKey } from "@/lib/character/hit-dice-use-effects"
 import type { RestoreResourceFromSpellSlotSpec } from "@/lib/character/spell-slot-use-effects"
 import {
   spellSlotLevelLabel,
@@ -131,6 +132,8 @@ type SheetActionsPanelProps = {
   psiLimit?: number | null
   /** Remaining Hit Dice for the preferred class (or total). */
   hitDiceRemaining?: number
+  /** Total Hit Dice (remaining + spent) so `classResourceKey: "hit_dice"` can resolve a pool. */
+  hitDiceTotal?: number
   /** Spend Hit Dice when an action/menu option requires them. Returns false if unaffordable. */
   onSpendHitDice?: (amount: number, preferClassId?: string | null) => boolean
   /** Spend current HP (bypasses Temporary Hit Points). */
@@ -1505,7 +1508,11 @@ function ActionDetailOverlay({
       return
     }
 
-    if (useHitDiceNeeded > 0 && onSpendHitDice) {
+    if (
+      useHitDiceNeeded > 0 &&
+      onSpendHitDice &&
+      !isHitDiceResourceKey(action.classResourceKey)
+    ) {
       const ok = onSpendHitDice(useHitDiceNeeded, action.classId)
       if (!ok) {
         setUseFeedback("Not enough Hit Dice")
@@ -3141,6 +3148,7 @@ export function SheetActionsPanel({
   incapacitated = false,
   psiLimit = null,
   hitDiceRemaining = 0,
+  hitDiceTotal = 0,
   onSpendHitDice,
   onSpendHitPoints,
   onRefundHitPoints,
@@ -3267,6 +3275,23 @@ export function SheetActionsPanel({
     resourceKey: string,
     classId?: string | null,
   ): ActionUsage | null => {
+    if (isHitDiceResourceKey(resourceKey) && (onSpendHitDice || onRestoreHitDice)) {
+      const max = Math.max(hitDiceTotal, hitDiceRemaining, 0)
+      if (max <= 0) return null
+      const used = Math.max(0, max - hitDiceRemaining)
+      return {
+        max,
+        used,
+        resourceName: "Hit Dice",
+        resourceId: HIT_DICE_RESOURCE_KEY,
+        setUsed: (next) => {
+          const clamped = Math.min(max, Math.max(0, next))
+          const delta = clamped - used
+          if (delta > 0) onSpendHitDice?.(delta, classId)
+          else if (delta < 0) onRestoreHitDice?.(-delta, classId)
+        },
+      }
+    }
     if (!onResourceUsedChange) return null
     // Keyed by class so a multiclass character's same-named pools stay distinct; the unprefixed
     // search is only a fallback for actions that carry no class (e.g. standalone abilities).
@@ -3295,7 +3320,7 @@ export function SheetActionsPanel({
   const usageFor = (action: SheetActionEntry): ActionUsage | null => {
     // Class-resource spends must hit the shared pool even when classId is missing
     // (subclass-attached custom abilities, multiclass edge cases).
-    if (action.classResourceKey && onResourceUsedChange) {
+    if (action.classResourceKey) {
       const pool = resolveResourcePool(action.classResourceKey, action.classId)
       if (pool) return pool
     }

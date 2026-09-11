@@ -52,6 +52,47 @@ function normalizeCreatureName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
+/** Keep pick order and duplicates; map each name onto a catalog option. */
+function canonicalizeSelectedFormNames(
+  selectedNames: string[],
+  options: { name: string }[],
+): string[] {
+  const out: string[] = []
+  for (const name of selectedNames) {
+    const match = options.find(
+      (option) => normalizeCreatureName(option.name) === normalizeCreatureName(name),
+    )
+    if (match) out.push(match.name)
+  }
+  return out
+}
+
+export function companionDefaultDisplayName(
+  companion: Pick<ResolvedCompanion, "template" | "source">,
+): string {
+  const instance = companion.source.formInstance
+  if (instance != null && instance > 1) return `${companion.template.name} ${instance}`
+  return companion.template.name
+}
+
+export function companionHasCustomName(
+  companion: Pick<ResolvedCompanion, "template" | "source"> & { displayName: string },
+): boolean {
+  const custom = companion.displayName.trim()
+  return Boolean(custom) && custom !== companionDefaultDisplayName(companion)
+}
+
+/** Sheet heading: `Bones (Skeleton)` after a rename; otherwise the default label. */
+export function formatCompanionHeading(
+  companion: Pick<ResolvedCompanion, "template" | "source"> & { displayName: string },
+): string {
+  const custom = companion.displayName.trim()
+  if (!companionHasCustomName(companion)) {
+    return custom || companionDefaultDisplayName(companion)
+  }
+  return `${custom} (${companion.template.name})`
+}
+
 function abilityAttachedToClassEntry(
   ability: CustomAbility,
   entry: CharacterClassDetail,
@@ -630,11 +671,11 @@ function pushChoiceGrant(params: {
     })
   if (!options.length) return
 
-  const selectedNames =
+  const selectedNames = canonicalizeSelectedFormNames(
     params.formSelections?.[groupKey] ??
-    (options.length === 1 && options[0].template ? [options[0].name] : [])
-  const selectedSet = new Set(selectedNames.map(normalizeCreatureName))
-  const chosen = options.filter((form) => selectedSet.has(normalizeCreatureName(form.name)))
+      (options.length === 1 && options[0].template ? [options[0].name] : []),
+    options,
+  )
 
   params.formGroups.push({
     key: groupKey,
@@ -642,17 +683,28 @@ function pushChoiceGrant(params: {
     className: params.source.className,
     kind: "choice",
     options: options.map((form) => ({ name: form.name, cr: form.cr ?? null })),
-    selected: chosen.map((form) => form.name),
+    selected: selectedNames,
     maxKnown: params.maxKnown,
     maxCombinedCr: params.maxCombinedCr ?? null,
     pickOnRest: params.pickOnRest ?? null,
     pickerTitle: params.pickerTitle ?? null,
   })
 
-  for (const option of chosen) {
-    if (!option.template) continue
+  const instanceByForm = new Map<string, number>()
+  for (const name of selectedNames) {
+    const option = options.find(
+      (entry) => normalizeCreatureName(entry.name) === normalizeCreatureName(name),
+    )
+    if (!option?.template) continue
+    const formKey = normalizeCreatureName(option.template.name)
+    const formInstance = (instanceByForm.get(formKey) ?? 0) + 1
+    instanceByForm.set(formKey, formInstance)
     params.into.push({
-      source: { ...params.source, formName: option.template.name },
+      source: {
+        ...params.source,
+        formName: option.template.name,
+        formInstance,
+      },
       template: option.template,
     })
   }
@@ -910,7 +962,7 @@ export function mergeCompanionState(
       currentHp: Math.min(Math.max(0, currentHp), companion.maxHp),
       tempHp,
       ferocity: Math.max(0, Math.floor(state?.ferocity ?? 0)),
-      displayName: state?.customName?.trim() || companion.template.name,
+      displayName: state?.customName?.trim() || companionDefaultDisplayName(companion),
       activeConditions: state?.activeConditions ?? [],
       polymorphActive: state?.polymorphActive ?? false,
     }
@@ -934,7 +986,7 @@ export function companionStateFromResolved(
     currentHp: c.currentHp,
     tempHp: (c.tempHp ?? 0) > 0 ? c.tempHp : null,
     ferocity: (c.ferocity ?? 0) > 0 ? c.ferocity : null,
-    customName: c.displayName !== c.template.name ? c.displayName : null,
+    customName: c.displayName !== companionDefaultDisplayName(c) ? c.displayName : null,
     activeConditions: c.activeConditions?.length ? c.activeConditions : null,
     polymorphActive: c.polymorphActive ? true : null,
   }))

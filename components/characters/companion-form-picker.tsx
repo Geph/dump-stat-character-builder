@@ -92,18 +92,29 @@ export function CompanionFormPicker({
       )
     }
 
-    const selectedSet = new Set(group.selected.map((name) => name.toLowerCase()))
+    const countByName = new Map<string, number>()
+    for (const name of group.selected) {
+      const key = name.toLowerCase()
+      countByName.set(key, (countByName.get(key) ?? 0) + 1)
+    }
     const atCount = group.selected.length >= maxKnown
 
-    const toggle = (name: string, optionCr: number | null) => {
-      const key = name.toLowerCase()
-      if (selectedSet.has(key)) {
-        onChange(group.selected.filter((entry) => entry.toLowerCase() !== key))
-        return
-      }
+    const add = (name: string, optionCr: number | null) => {
       if (atCount) return
       if (remainingCr != null && optionCr != null && optionCr > remainingCr + 1e-6) return
       onChange([...group.selected, name])
+    }
+
+    const removeOne = (name: string) => {
+      let idx = -1
+      for (let i = group.selected.length - 1; i >= 0; i -= 1) {
+        if (group.selected[i].toLowerCase() === name.toLowerCase()) {
+          idx = i
+          break
+        }
+      }
+      if (idx < 0) return
+      onChange(group.selected.filter((_, index) => index !== idx))
     }
 
     return (
@@ -115,7 +126,8 @@ export function CompanionFormPicker({
         <p className="text-[11px] leading-snug text-muted-foreground">
           {restContext
             ? "Choose creatures now. They appear on the Companions tab."
-            : "Choose which creatures appear on this tab."}
+            : "Choose which creatures appear on this tab."}{" "}
+          You can pick the same creature more than once.
           {group.maxCombinedCr != null
             ? ` Combined CR up to ${formatChallengeRating(group.maxCombinedCr)}${
                 remainingCr != null ? ` · ${formatChallengeRating(remainingCr)} remaining` : ""
@@ -124,28 +136,43 @@ export function CompanionFormPicker({
         </p>
         <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
           {group.options.map((option) => {
-            const active = selectedSet.has(option.name.toLowerCase())
+            const count = countByName.get(option.name.toLowerCase()) ?? 0
             const optionCr = crToNumber(option.cr)
-            const overCr =
-              !active && remainingCr != null && optionCr != null && optionCr > remainingCr + 1e-6
-            const disabled = !active && (atCount || overCr)
+            const overCr = remainingCr != null && optionCr != null && optionCr > remainingCr + 1e-6
+            const canAdd = !atCount && !overCr
+            const active = count > 0
             return (
-              <button
+              <div
                 key={option.name}
-                type="button"
-                onClick={() => toggle(option.name, optionCr)}
-                disabled={disabled}
-                className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-colors ${
+                className={`inline-flex items-stretch rounded-lg border text-[11px] font-semibold overflow-hidden ${
                   active
                     ? "bg-primary text-primary-foreground border-primary"
-                    : disabled
-                      ? "bg-muted text-muted-foreground/50 border-border cursor-not-allowed"
-                      : "bg-muted text-foreground border-border hover:border-primary"
+                    : "bg-muted text-foreground border-border"
                 }`}
               >
-                {option.name}
-                {option.cr ? <span className="font-normal opacity-70"> CR {option.cr}</span> : null}
-              </button>
+                {count > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => removeOne(option.name)}
+                    aria-label={`Remove one ${option.name}`}
+                    className="px-1.5 hover:bg-black/10"
+                  >
+                    −
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => add(option.name, optionCr)}
+                  disabled={!canAdd}
+                  className={`px-2 py-1 ${
+                    canAdd ? "hover:bg-black/10" : "opacity-50 cursor-not-allowed"
+                  }`}
+                >
+                  {option.name}
+                  {option.cr ? <span className="font-normal opacity-70"> CR {option.cr}</span> : null}
+                  {count > 0 ? <span className="font-normal opacity-80"> ×{count}</span> : null}
+                </button>
+              </div>
             )
           })}
         </div>

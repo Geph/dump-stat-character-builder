@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { parseCompanionStatBlock } from "@/lib/character/parse-companion-stat-block"
-import { resolveCompanionScaledValue } from "@/lib/character/companion-stat-block"
+import { companionKey, resolveCompanionScaledValue } from "@/lib/character/companion-stat-block"
 import { isCompanionStatBlockFeature } from "@/lib/character/companion-recognition"
 import {
   collectCompanionCandidatesFromClasses,
@@ -216,5 +216,24 @@ describe("Find Familiar companion", () => {
       findFamiliarSpellSource: { className: "Druid", classId: "druid" },
     })
     expect(deduped.filter((c) => c.template.name === "Familiar")).toHaveLength(1)
+  })
+})
+
+describe("companionKey", () => {
+  const source = {
+    featureName: "Animate Dead",
+    featureLevel: 3,
+    className: "Wizard",
+    classId: "wizard",
+    formName: "Skeleton",
+  }
+
+  it("keeps the first copy on the historical form key", () => {
+    expect(companionKey(source)).toBe("wizard:none:animate_dead:skeleton")
+    expect(companionKey({ ...source, formInstance: 1 })).toBe("wizard:none:animate_dead:skeleton")
+  })
+
+  it("suffixes the second copy so each instance can store its own HP", () => {
+    expect(companionKey({ ...source, formInstance: 2 })).toBe("wizard:none:animate_dead:skeleton:2")
   })
 })
