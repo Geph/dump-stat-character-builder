@@ -37,6 +37,18 @@ const EXPECTED_CLASS_NAMES = [
   "Wizard",
   "Warden",
   "Warden (Kibbles Tasty)",
+  "Alchemist",
+  "Captain",
+  "Craftsman",
+  "Dancer",
+  "Gunslinger",
+  "Investigator",
+  "Martyr",
+  "Necromancer",
+  "Vagabond",
+  "Warmage",
+  "Witch",
+  "Warden (Mage Hand Press)",
 ]
 
 describe("class card images", () => {

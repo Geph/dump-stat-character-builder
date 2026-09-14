@@ -84,9 +84,9 @@ export function getCompendiumItemIcon(
 ): string {
   const record = item as Record<string, unknown>
   const icon = typeof record.icon === "string" ? record.icon.trim() : ""
-  // `gunshot` was stamped on Gunslinger content, but the SVG is not shipped.
-  // Treat it as unset so name / class defaults can fill in.
-  if (icon && icon !== "gunshot") return icon
+  // Abilities may still carry a class-wide `gunshot` stamp; let ability defaults
+  // prefer curated per-name icons before treating it as an intentional assignment.
+  if (icon && !(tab === "abilities" && icon === "gunshot")) return icon
   if (tab === "classes") {
     const classIcon = defaultClassIconForName(String(record.name ?? ""))
     if (classIcon) return classIcon

@@ -110,6 +110,101 @@ describe("card source layout", () => {
       itemSlug: "lion-banner",
       displayName: "Lion Banner",
     })
+    expect(parseSubclassSourceBasename("Alchemist Mad Bomber")).toMatchObject({
+      classSlug: "alchemist",
+      itemSlug: "mad-bomber",
+      displayName: "Mad Bomber",
+    })
+    expect(parseSubclassSourceBasename("Captain Jolly Roger")).toMatchObject({
+      classSlug: "captain",
+      itemSlug: "jolly-roger",
+      displayName: "Jolly Roger",
+    })
+    expect(parseSubclassSourceBasename("Dancer Moonwalker")).toMatchObject({
+      classSlug: "dancer",
+      itemSlug: "moonwalker",
+      displayName: "Moonwalker",
+    })
+    expect(parseSubclassSourceBasename("Dancer Mime")).toMatchObject({
+      classSlug: "dancer",
+      itemSlug: "mime",
+      displayName: "Mime",
+    })
+    expect(parseSubclassSourceBasename("Dancer Shadow Dancer")).toMatchObject({
+      classSlug: "dancer",
+      itemSlug: "shadow-dancer",
+      displayName: "Shadow Dancer",
+    })
+    expect(parseSubclassSourceBasename("Warmage House of Darts")).toMatchObject({
+      classSlug: "warmage",
+      itemSlug: "house-of-darts",
+      displayName: "House of Darts",
+    })
+    expect(parseSubclassSourceBasename("Witch Black Magic")).toMatchObject({
+      classSlug: "witch",
+      itemSlug: "black-magic",
+      displayName: "Black Magic",
+    })
+    expect(parseSubclassSourceBasename("Witch Technicolor")).toMatchObject({
+      classSlug: "witch",
+      itemSlug: "technicolor-magic",
+      displayName: "Technicolor Magic",
+    })
+    expect(parseSubclassSourceBasename("Witch Black")).toMatchObject({
+      classSlug: "witch",
+      itemSlug: "black-magic",
+      displayName: "Black Magic",
+    })
+    expect(parseSubclassSourceBasename("Craftsman Armigers")).toMatchObject({
+      classSlug: "craftsman",
+      itemSlug: "armigers-guild",
+      displayName: "Armigers' Guild",
+    })
+    expect(parseSubclassSourceBasename("Gunslinger Trick Shot")).toMatchObject({
+      classSlug: "gunslinger",
+      itemSlug: "trick-shot",
+      displayName: "Trick Shot",
+    })
+    expect(parseSubclassSourceBasename("Gunslinger Gun Ko Master")).toMatchObject({
+      classSlug: "gunslinger",
+      itemSlug: "gun-ko-master",
+      displayName: "Gun-Ko Master",
+    })
+    expect(parseSubclassSourceBasename("Martyr Tyranny")).toMatchObject({
+      classSlug: "martyr",
+      itemSlug: "burden-of-tyranny",
+      displayName: "Burden of Tyranny",
+    })
+    expect(parseSubclassSourceBasename("Investigator Occultist")).toMatchObject({
+      classSlug: "investigator",
+      itemSlug: "occultist",
+      displayName: "Occultist",
+    })
+    expect(parseSubclassSourceBasename("Martyr The End")).toMatchObject({
+      classSlug: "martyr",
+      itemSlug: "burden-of-the-end",
+      displayName: "Burden of the End",
+    })
+    expect(parseSubclassSourceBasename("Warmage House of Bishops")).toMatchObject({
+      classSlug: "warmage",
+      itemSlug: "house-of-bishops",
+      displayName: "House of Bishops",
+    })
+    expect(parseSubclassSourceBasename("Craftsman Bladeworkers")).toMatchObject({
+      classSlug: "craftsman",
+      itemSlug: "bladeworkers-guild",
+      displayName: "Bladeworkers' Guild",
+    })
+    expect(parseSubclassSourceBasename("Vagabond Experiment-x")).toMatchObject({
+      classSlug: "vagabond",
+      itemSlug: "experiment-x",
+      displayName: "Experiment X",
+    })
+    expect(parseSubclassSourceBasename("Vagabond Ronin")).toMatchObject({
+      classSlug: "vagabond",
+      itemSlug: "ronin",
+      displayName: "Rōnin",
+    })
   })
 
   it("flattens Title Case, Drive copies, and typo aliases", () => {
@@ -120,6 +215,9 @@ describe("card source layout", () => {
     expect(flattenSourceBasenameToSlug("House Tharashk")).toBe("house-tharashk-heir")
     expect(flattenSourceBasenameToSlug("Gate Guardian")).toBe("gate-warden")
     expect(flattenSourceBasenameToSlug("Dhakanni Golin'dar")).toBe("dhakaani-golindar")
+    // Bare warden = Mage Hand Press; Kibbles masters must use Warden-Kibbles.
+    expect(flattenSourceBasenameToSlug("warden")).toBe("warden")
+    expect(flattenSourceBasenameToSlug("Warden-Kibbles")).toBe("warden-kibbles")
   })
 
   it("collapses spell version/Front suffixes and typo aliases", () => {

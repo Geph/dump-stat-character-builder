@@ -1,11 +1,12 @@
 /**
- * Card art that may be committed / pushed: SRD only, plus original species
+ * Card art that may be committed / pushed: SRD, Mage Hand Press class portraits,
+ * Mage Hand Press free-subclass portraits (seed allowlist), plus original species
  * portraits already on GitHub. Keep in sync with `scripts/bundled-card-art.mjs`
  * (optimizer / gitignore source of truth).
  *
- * Mage Hand Press and Kibbles Tasty art are local-only — import assigns them
- * when the PNG is present. Do not add new local portraits. Leftover copies
- * may remain in git history.
+ * Kibbles, paid MHP subclasses, PHB, and setting portraits are local-only — import
+ * assigns them when the PNG is present. Do not add new local-only portraits.
+ * Leftover copies may remain in git history.
  */
 
 const BUNDLED_CLASS_FILES = new Set([
@@ -21,6 +22,19 @@ const BUNDLED_CLASS_FILES = new Set([
   "sorcerer.png",
   "warlock.png",
   "wizard.png",
+  // Mage Hand Press base classes (seed pack)
+  "alchemist.png",
+  "captain.png",
+  "craftsman.png",
+  "dancer.png",
+  "gunslinger.png",
+  "investigator.png",
+  "martyr.png",
+  "necromancer.png",
+  "vagabond.png",
+  "warden.png",
+  "warmage.png",
+  "witch.png",
 ])
 
 const BUNDLED_BACKGROUND_FILES = new Set([
@@ -107,6 +121,46 @@ const BUNDLED_SUBCLASS_FILES = new Set([
   "sorcerer/draconic-sorcery.png",
   "warlock/fiend-patron.png",
   "wizard/evoker.png",
+  // Mage Hand Press free subclasses only (see mage-hand-press-free-subclasses.ts).
+  "alchemist/apothecary.png",
+  "alchemist/mad-bomber.png",
+  "alchemist/mutagenist.png",
+  "captain/eagle-banner.png",
+  "captain/jolly-roger.png",
+  "captain/lion-banner.png",
+  "craftsman/armigers-guild.png",
+  "craftsman/bladeworkers-guild.png",
+  "craftsman/calibarons-guild.png",
+  "dancer/acrobat.png",
+  "dancer/courtesan.png",
+  "dancer/fencer.png",
+  "gunslinger/deadeye.png",
+  "gunslinger/gun-tank.png",
+  "gunslinger/pistolero.png",
+  "investigator/detective.png",
+  "investigator/exterminator.png",
+  "investigator/occultist.png",
+  "martyr/burden-of-mercy.png",
+  "martyr/burden-of-revolution.png",
+  "martyr/burden-of-truth.png",
+  "necromancer/death-knight.png",
+  "necromancer/overlord.png",
+  "necromancer/pale-master.png",
+  "vagabond/houndmaster.png",
+  "vagabond/mage-brand.png",
+  "vagabond/ronin.png",
+  "warden/beastblood-guardian.png",
+  "warden/grey-watchman.png",
+  "warden/verdant-protector.png",
+  "warmage/house-of-bishops.png",
+  "warmage/house-of-kings.png",
+  "warmage/house-of-knights.png",
+  "warmage/house-of-pawns.png",
+  "warmage/house-of-rooks.png",
+  "witch/black-magic.png",
+  "witch/green-magic.png",
+  "witch/red-magic.png",
+  "witch/white-magic.png",
 ])
 
 /** SRD cantrips already on GitHub. Kibbles spells stay local-only. */

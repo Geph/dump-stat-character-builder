@@ -126,17 +126,16 @@ export const ABILITY_ICON_BY_NAME: Record<string, string> = {
 }
 
 /**
- * Assigned icon wins unless it is the missing Gunslinger stamp (`gunshot`)
+ * Assigned icon wins unless it is a bare Gunslinger class stamp (`gunshot`)
  * and a curated name default exists. Otherwise owning-class icon.
  * Unowned disciplines fall back to psychic-waves; owned ones use the class icon.
  */
 export function defaultAbilityIconForItem(item: Record<string, unknown>): string | null {
-  const rawAssigned = trimString(item.icon)
-  // `gunshot` was stamped on Gunslinger rows, but the SVG is not shipped.
-  const assigned = rawAssigned === "gunshot" ? "" : rawAssigned
+  const assigned = trimString(item.icon)
   const name = trimString(item.name)
   const named = name ? ABILITY_ICON_BY_NAME[name] : undefined
-  if (named && !assigned) return named
+  // Prefer curated maneuver icons over a leftover class-wide gunshot stamp.
+  if (named && (!assigned || assigned === "gunshot")) return named
   if (assigned) return assigned
 
   const className = inferAbilityOwnerClassName(item)

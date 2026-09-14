@@ -195,17 +195,18 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Warden", name: "Timetwister", slug: "timetwister" },
   { className: "Warden", name: "Time Twister", slug: "timetwister" },
 
-  // Mage Hand Press Alchemist (local-only portraits)
+  // Mage Hand Press Alchemist (free subclasses ship; others local-only)
   { className: "Alchemist", name: "Amorist", slug: "amorist" },
   { className: "Alchemist", name: "Apothecary", slug: "apothecary" },
   { className: "Alchemist", name: "Dynamo Engineer", slug: "dynamo-engineer" },
+  { className: "Alchemist", name: "Mad Bomber", slug: "mad-bomber" },
   { className: "Alchemist", name: "Mutagenist", slug: "mutagenist" },
   { className: "Alchemist", name: "Ooze Rancher", slug: "ooze-rancher" },
   { className: "Alchemist", name: "Slime Rancher", slug: "ooze-rancher" },
   { className: "Alchemist", name: "Venomsmith", slug: "venomsmith" },
   { className: "Alchemist", name: "Xenoalchemist", slug: "xenoalchemist" },
 
-  // Mage Hand Press Dancer (local-only portraits)
+  // Mage Hand Press Dancer (free: Acrobat / Courtesan / Fencer ship)
   { className: "Dancer", name: "Acrobat", slug: "acrobat" },
   { className: "Dancer", name: "Cheerleader", slug: "cheerleader" },
   { className: "Dancer", name: "Contortionist", slug: "contortionist" },
@@ -217,17 +218,99 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Dancer", name: "Fire Dancer", slug: "fire-dancer" },
   { className: "Dancer", name: "Harlequin", slug: "harlequin" },
   { className: "Dancer", name: "Marionettist", slug: "marionettist" },
+  { className: "Dancer", name: "Mime", slug: "mime" },
+  { className: "Dancer", name: "Moonwalker", slug: "moonwalker" },
+  { className: "Dancer", name: "Shadow Dancer", slug: "shadow-dancer" },
   { className: "Dancer", name: "Steelsinger", slug: "steelsinger" },
 
-  // Mage Hand Press Captain (local-only portraits)
+  // Mage Hand Press Captain (free: Lion / Jolly Roger / Eagle Banner ship)
   { className: "Captain", name: "Daggermark", slug: "daggermark" },
   { className: "Captain", name: "Dragon Banner", slug: "dragon-banner" },
   { className: "Captain", name: "Eagle Banner", slug: "eagle-banner" },
   { className: "Captain", name: "Holy Icon", slug: "holy-icon" },
+  { className: "Captain", name: "Jolly Roger", slug: "jolly-roger" },
   { className: "Captain", name: "Lion Banner", slug: "lion-banner" },
   { className: "Captain", name: "Tower Banner", slug: "tower-banner" },
 
-  // Mage Hand Press Necromancer (local-only portraits)
+  // Mage Hand Press Warmage (free houses ship; Cards / Dice / Darts local-only)
+  { className: "Warmage", name: "House of Bishops", slug: "house-of-bishops" },
+  { className: "Warmage", name: "House of Cards", slug: "house-of-cards" },
+  { className: "Warmage", name: "House of Darts", slug: "house-of-darts" },
+  { className: "Warmage", name: "House of Dice", slug: "house-of-dice" },
+  { className: "Warmage", name: "House of Kings", slug: "house-of-kings" },
+  { className: "Warmage", name: "House of Knights", slug: "house-of-knights" },
+  { className: "Warmage", name: "House of Pawns", slug: "house-of-pawns" },
+  { className: "Warmage", name: "House of Rooks", slug: "house-of-rooks" },
+
+  // Mage Hand Press Craftsman (free guilds ship)
+  { className: "Craftsman", name: "Arcane Maesters' Guild", slug: "arcane-maesters-guild" },
+  { className: "Craftsman", name: "Armigers' Guild", slug: "armigers-guild" },
+  { className: "Craftsman", name: "Bladeworkers' Guild", slug: "bladeworkers-guild" },
+  { className: "Craftsman", name: "Calibarons' Guild", slug: "calibarons-guild" },
+  { className: "Craftsman", name: "Forgeknights' Guild", slug: "forgeknights-guild" },
+  { className: "Craftsman", name: "Mechanauts' Guild", slug: "mechanauts-guild" },
+  { className: "Craftsman", name: "Thunderlords' Guild", slug: "thunderlords-guild" },
+  { className: "Craftsman", name: "Trappers' Guild", slug: "trappers-guild" },
+
+  // Mage Hand Press Gunslinger (free: Pistolero / Gun Tank / Deadeye ship)
+  { className: "Gunslinger", name: "Deadeye", slug: "deadeye" },
+  { className: "Gunslinger", name: "Gun Ko Master", slug: "gun-ko-master" },
+  { className: "Gunslinger", name: "Gun-Ko Master", slug: "gun-ko-master" },
+  { className: "Gunslinger", name: "Gun Tank", slug: "gun-tank" },
+  { className: "Gunslinger", name: "High Roller", slug: "high-roller" },
+  { className: "Gunslinger", name: "Musketeer", slug: "musketeer" },
+  { className: "Gunslinger", name: "Pistolero", slug: "pistolero" },
+  { className: "Gunslinger", name: "Spellslinger", slug: "spellslinger" },
+  { className: "Gunslinger", name: "Trick Shot", slug: "trick-shot" },
+  { className: "Gunslinger", name: "White Hat", slug: "white-hat" },
+
+  // Mage Hand Press Investigator (free: Occultist / Exterminator / Detective ship)
+  { className: "Investigator", name: "Antiquarian", slug: "antiquarian" },
+  { className: "Investigator", name: "Archivist", slug: "archivist" },
+  { className: "Investigator", name: "Detective", slug: "detective" },
+  { className: "Investigator", name: "Exterminator", slug: "exterminator" },
+  { className: "Investigator", name: "Inquisitor", slug: "inquisitor" },
+  { className: "Investigator", name: "Medium", slug: "medium" },
+  { className: "Investigator", name: "Occultist", slug: "occultist" },
+  { className: "Investigator", name: "Spy", slug: "spy" },
+
+  // Mage Hand Press Martyr (free burdens ship)
+  { className: "Martyr", name: "Burden of Atonement", slug: "burden-of-atonement" },
+  { className: "Martyr", name: "Burden of Discord", slug: "burden-of-discord" },
+  { className: "Martyr", name: "Burden of Mercy", slug: "burden-of-mercy" },
+  { className: "Martyr", name: "Burden of Rebirth", slug: "burden-of-rebirth" },
+  { className: "Martyr", name: "Burden of Revolution", slug: "burden-of-revolution" },
+  { className: "Martyr", name: "Burden of the End", slug: "burden-of-the-end" },
+  { className: "Martyr", name: "Burden of Truth", slug: "burden-of-truth" },
+  { className: "Martyr", name: "Burden of Tyranny", slug: "burden-of-tyranny" },
+
+  // Mage Hand Press Vagabond (free: Ronin / Mage Brand / Houndmaster ship)
+  { className: "Vagabond", name: "Adrenaline Junkie", slug: "adrenaline-junkie" },
+  { className: "Vagabond", name: "Brigand", slug: "brigand" },
+  { className: "Vagabond", name: "Experiment X", slug: "experiment-x" },
+  { className: "Vagabond", name: "Feylost", slug: "feylost" },
+  { className: "Vagabond", name: "Gourmand", slug: "gourmand" },
+  { className: "Vagabond", name: "Houndmaster", slug: "houndmaster" },
+  { className: "Vagabond", name: "Knight Errant", slug: "knight-errant" },
+  { className: "Vagabond", name: "Mage Brand", slug: "mage-brand" },
+  { className: "Vagabond", name: "Plague Doctor", slug: "plague-doctor" },
+  { className: "Vagabond", name: "Pugilist", slug: "pugilist" },
+  { className: "Vagabond", name: "Ronin", slug: "ronin" },
+  { className: "Vagabond", name: "Rōnin", slug: "ronin" },
+  { className: "Vagabond", name: "Troubadour", slug: "troubadour" },
+
+  // Mage Hand Press Witch (free colors ship)
+  { className: "Witch", name: "Black Magic", slug: "black-magic" },
+  { className: "Witch", name: "Blood Magic", slug: "blood-magic" },
+  { className: "Witch", name: "Green Magic", slug: "green-magic" },
+  { className: "Witch", name: "Purple Magic", slug: "purple-magic" },
+  { className: "Witch", name: "Red Magic", slug: "red-magic" },
+  { className: "Witch", name: "Steel Magic", slug: "steel-magic" },
+  { className: "Witch", name: "Tea Magic", slug: "tea-magic" },
+  { className: "Witch", name: "Technicolor Magic", slug: "technicolor-magic" },
+  { className: "Witch", name: "White Magic", slug: "white-magic" },
+
+  // Mage Hand Press Necromancer (free ship except Cyberghoul — no art yet)
   { className: "Necromancer", name: "Blood Ascendant", slug: "blood-ascendant" },
   { className: "Necromancer", name: "Death Knight", slug: "death-knight" },
   { className: "Necromancer", name: "Overlord", slug: "overlord" },
@@ -237,7 +320,7 @@ const SUBCLASS_CARD_IMAGE_ENTRIES: SubclassCardImageEntry[] = [
   { className: "Necromancer", name: "Reanimator", slug: "reanimator" },
   { className: "Necromancer", name: "Reaper", slug: "reaper" },
 
-  // Mage Hand Press Warden (local-only portraits; folder stays warden/)
+  // Mage Hand Press Warden (free: Verdant / Grey Watchman / Beastblood ship)
   { className: "Warden", name: "Beastblood Guardian", slug: "beastblood-guardian" },
   { className: "Warden", name: "Drake-blooded", slug: "drake-blooded" },
   { className: "Warden", name: "Godsworn", slug: "godsworn" },

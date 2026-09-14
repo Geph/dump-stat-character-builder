@@ -6,7 +6,8 @@ Static images for the Dump Stat marketing UI. Served at `/images/...` from Next.
 
 | Path | Used for |
 |------|----------|
-| `hero/rotating-01.webp` … `rotating-08.webp` | Home page hero — random background on each visit |
+| `hero/rotating-01.webp` … | Home page hero — random background on each visit |
+| `sheet-banners/*.webp` | Builder / sheet landscape banners (Randomly generate) |
 | `backgrounds/library-stats.jpeg` | Home page “library stats” section background |
 | `features/hero.webp` | GitHub README hero graphic (source: `scripts/page-bg-sources/hero.png`) |
 | `features/*.webp` | Home feature cards — run `pnpm images:optimize` from sources in `scripts/page-bg-sources/` |
@@ -19,4 +20,4 @@ Static images for the Dump Stat marketing UI. Served at `/images/...` from Next.
 
 Game icons for the compendium live separately in `public/icons/` (SVGs).
 
-Compendium portraits under `compendium/` follow the same rule as the optimizer: **only SRD, Kibbles Tasty, and Mage Hand Press** files are committed. Other setting-book art can live here on your machine after `pnpm images:optimize` and is gitignored.
+Compendium portraits under `compendium/` follow the same rule as the optimizer: **SRD**, **Mage Hand Press class** portraits, and **Mage Hand Press free-subclass** portraits may be committed. Kibbles, paid MHP subclasses, and other setting-book art can live here on your machine after `pnpm images:optimize` and are gitignored.

@@ -138,7 +138,7 @@ Vercel is **not recommended** (no persistent MySQL on the same project).
 
 ## Local card art (optional)
 
-In visual mode the public repo ships Midjourney-created card art for **SRD 5.2.1** and the original species portraits already in git. **Mage Hand Press** and **Kibbles Tasty** portraits are local-only: drop masters under `scripts/*-card-sources/magehandpress/` or `kibbles/`, run `pnpm images:optimize`, and import will attach the URL when the PNG is present. They are not part of Seed Example Content. Leftover files may still exist in git history — do not add new ones. Player’s Handbook / setting-book art works the same way on *your* copy; you can also import JSONs of art sources from external URLs.
+In visual mode the public repo ships Midjourney-created card art for **SRD 5.2.1**, the original species portraits already in git, **Mage Hand Press class** portraits, and **Mage Hand Press free-subclass** portraits (the same allowlist as Seed Example Content). **Paid** Mage Hand Press subclasses and **Kibbles Tasty** portraits are local-only: drop masters under `scripts/*-card-sources/magehandpress/` or `kibbles/`, run `pnpm images:optimize`, and import will attach the URL when the PNG is present. Leftover files may still exist in git history — do not add new local-only ones. Player’s Handbook / setting-book art works the same way on *your* copy; you can also import JSONs of art sources from external URLs.
 
 **What is safe to commit** is documented in [CONTRIBUTING.md](CONTRIBUTING.md#what-not-to-commit). Drop-folder notes live next to the masters:
 

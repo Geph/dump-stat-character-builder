@@ -9,6 +9,7 @@ Sources are matched by slug basename. When the same slug appears in more than on
 | Output slug | Class |
 |-------------|-------|
 | `barbarian` … `wizard` | 2024 PHB / SRD classes |
+| `alchemist` … `witch`, `warden` | Mage Hand Press base classes (ship with seed) |
 | `artificer` | Eberron: Forge of the Artificer |
 | `inventor` | KibblesTasty Inventor |
 | `occultist` | KibblesTasty Occultist |

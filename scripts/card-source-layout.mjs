@@ -3,8 +3,10 @@
 export function kebabSlug(value) {
   return String(value ?? "")
     .trim()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
-    .replace(/['\u2019]/g, "")
+    .replace(/['\u2019']/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
 }
@@ -20,7 +22,8 @@ export const CARD_OUTPUT_SLUG_ALIASES = {
   "aasimar-2024": "aasimar",
   "changeling-2024": "changeling",
   "changeling-2026": "changeling",
-  warden: "warden-kibbles",
+  // Kibbles Warden masters must be named `Warden-Kibbles.png` (not bare `warden.png`)
+  // so Mage Hand Press `magehandpress/warden.png` can ship as `warden.png`.
   archeaeologist: "archaeologist",
   "house-thurani-heir": "house-thuranni-heir",
   "house-tharashk": "house-tharashk-heir",
@@ -80,6 +83,13 @@ const CLASS_PREFIXES = [
   "Necromancer",
   "Dancer",
   "Captain",
+  "Warmage",
+  "Witch",
+  "Craftsman",
+  "Gunslinger",
+  "Investigator",
+  "Martyr",
+  "Vagabond",
 ].sort((a, b) => b.length - a.length)
 
 /** Unprefixed drop names (Mage Hand Press) → parent class. */
@@ -88,6 +98,7 @@ const UNPREFIXED_SUBCLASS_CLASS = {
   Apothecary: "Alchemist",
   "Dynamo Engineer": "Alchemist",
   Mutagenist: "Alchemist",
+  "Mad Bomber": "Alchemist",
   "Ooze Rancher": "Alchemist",
   "Slime Rancher": "Alchemist",
   Venomsmith: "Alchemist",
@@ -96,6 +107,7 @@ const UNPREFIXED_SUBCLASS_CLASS = {
   "Dragon Banner": "Captain",
   "Eagle Banner": "Captain",
   "Holy Icon": "Captain",
+  "Jolly Roger": "Captain",
   "Lion Banner": "Captain",
   "Tower Banner": "Captain",
   Acrobat: "Dancer",
@@ -109,6 +121,9 @@ const UNPREFIXED_SUBCLASS_CLASS = {
   "Fire Dancer": "Dancer",
   Harlequin: "Dancer",
   Marionettist: "Dancer",
+  Mime: "Dancer",
+  Moonwalker: "Dancer",
+  "Shadow Dancer": "Dancer",
   Steelsinger: "Dancer",
   "Blood Ascendant": "Necromancer",
   "Death Knight": "Necromancer",
@@ -242,6 +257,47 @@ const SUBCLASS_SHORT_TO_DISPLAY = {
     "Time Twister": "Timetwister",
     "Gray Watchman": "Grey Watchman",
     Stoneheart: "Stoneheart Defender",
+  },
+  Craftsman: {
+    "Arcane Maesters": "Arcane Maesters' Guild",
+    Armigers: "Armigers' Guild",
+    Bladeworkers: "Bladeworkers' Guild",
+    Calibarons: "Calibarons' Guild",
+    Forgeknights: "Forgeknights' Guild",
+    Mechanauts: "Mechanauts' Guild",
+    Thunderlords: "Thunderlords' Guild",
+    Trappers: "Trappers' Guild",
+  },
+  Martyr: {
+    Atonement: "Burden of Atonement",
+    Discord: "Burden of Discord",
+    Mercy: "Burden of Mercy",
+    Rebirth: "Burden of Rebirth",
+    Revolution: "Burden of Revolution",
+    "The End": "Burden of the End",
+    Truth: "Burden of Truth",
+    Tyranny: "Burden of Tyranny",
+  },
+  Gunslinger: {
+    "Gun Ko Master": "Gun-Ko Master",
+    "Gun-Ko Master": "Gun-Ko Master",
+  },
+  Vagabond: {
+    "Experiment-x": "Experiment X",
+    "Experiment-X": "Experiment X",
+    Ronin: "Rōnin",
+    "Rōnin": "Rōnin",
+  },
+  Witch: {
+    Black: "Black Magic",
+    Blood: "Blood Magic",
+    Green: "Green Magic",
+    Purple: "Purple Magic",
+    Red: "Red Magic",
+    Steel: "Steel Magic",
+    Tea: "Tea Magic",
+    Technicolor: "Technicolor Magic",
+    White: "White Magic",
   },
 }
 

@@ -16,13 +16,13 @@ pnpm images:optimize
 
 **1792×2688** exports are ideal. Output: `public/images/page-backgrounds/*.webp` at 1200×1800.
 
-## Home hero rotating banners (2:1 wide)
+## Home hero rotating banners
 
 | File | Output |
 |------|--------|
-| `rotating (1).png` … `rotating (8).png` | `public/images/hero/rotating-01.webp` … `rotating-08.webp` |
+| `rotating (1).png` … `rotating (8).png` | `public/images/hero/rotating-01.webp` … |
 
-Also accepts `rotating-01.jpg`, etc. Output at **2560×1280** WebP.
+Also accepts `rotating-01.jpg`, etc. Encoded as WebP with a **2560×1280** cap (`fit: inside`, never upscaled). Native aspect is kept — smaller sources stay at their pixel size.
 
 ## Home feature cards (16:9)
 

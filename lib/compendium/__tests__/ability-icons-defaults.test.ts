@@ -157,7 +157,8 @@ describe("ability icon defaults", () => {
         name: "Gunslinger",
         icon: "gunshot",
       }),
-    ).toBe("pistol-gun")
+    ).toBe("gunshot")
+    expect(getCompendiumItemIcon("classes", { name: "Gunslinger" })).toBe("gunshot")
   })
 
   it("does not guess a class icon for shared multi-class libraries", () => {

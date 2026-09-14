@@ -316,6 +316,7 @@ import {
   withCombinedMilestoneAsiAllocation,
 } from "@/lib/builder/asi-allocation"
 import { generateRandomCharacterDetails } from "@/lib/builder/random-character-details"
+import { pickRandomSheetBannerUrl } from "@/lib/site-images"
 import {
   CINEMATIC_TWO_COL_PAGE_SIZE,
   getCinematicPickerContainerClass,
@@ -1153,10 +1154,13 @@ export default function BuilderPageClient() {
 
   const applyRandomCharacterDetails = () => {
     const generated = generateRandomCharacterDetails()
+    const stockBanner = isCompactOnly ? null : pickRandomSheetBannerUrl()
     setCharacter((prev) => ({
       ...prev,
       ...generated,
       name: prev.name.trim() ? prev.name : generated.name,
+      // Always assign in visual mode so the landscape slot updates on each click.
+      banner_url: stockBanner ?? prev.banner_url,
     }))
   }
 

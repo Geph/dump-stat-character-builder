@@ -36,6 +36,11 @@ scripts/page-bg-sources/*
 !scripts/page-bg-sources/README.md
 !scripts/page-bg-sources/.gitkeep
 
+# Full-res sheet landscape banner masters (WebP outputs in public/images/sheet-banners/)
+scripts/sheet-banner-sources/*
+!scripts/sheet-banner-sources/README.md
+!scripts/sheet-banner-sources/.gitkeep
+
 # Full-res compendium card sources (optimized outputs: only SRD / Kibbles / Mage Hand Press)
 scripts/class-card-sources/*
 !scripts/class-card-sources/README.md
@@ -82,8 +87,9 @@ public/images/compendium/local-available-card-art.json
 # New local spell portraits stay off GitHub. Tracked SRD cantrips remain in the index.
 public/images/compendium/spells/*
 
-# Optimized card art: ignore local-only portraits, then re-include bundled SRD.
-# Kibbles files already in git stay tracked; do not add new ones.
+# Optimized card art: ignore local-only portraits, then re-include bundled SRD +
+# Mage Hand Press class / free-subclass portraits. Kibbles files already in git
+# stay tracked; do not add new Kibbles / paid-MHP / setting portraits.
 public/images/compendium/classes/*
 !public/images/compendium/classes/barbarian.png
 !public/images/compendium/classes/bard.png
@@ -97,6 +103,18 @@ public/images/compendium/classes/*
 !public/images/compendium/classes/sorcerer.png
 !public/images/compendium/classes/warlock.png
 !public/images/compendium/classes/wizard.png
+!public/images/compendium/classes/alchemist.png
+!public/images/compendium/classes/captain.png
+!public/images/compendium/classes/craftsman.png
+!public/images/compendium/classes/dancer.png
+!public/images/compendium/classes/gunslinger.png
+!public/images/compendium/classes/investigator.png
+!public/images/compendium/classes/martyr.png
+!public/images/compendium/classes/necromancer.png
+!public/images/compendium/classes/vagabond.png
+!public/images/compendium/classes/warden.png
+!public/images/compendium/classes/warmage.png
+!public/images/compendium/classes/witch.png
 
 public/images/compendium/backgrounds/*
 !public/images/compendium/backgrounds/acolyte.png
@@ -182,6 +200,45 @@ public/images/compendium/subclasses/**
 !public/images/compendium/subclasses/sorcerer/draconic-sorcery.png
 !public/images/compendium/subclasses/warlock/fiend-patron.png
 !public/images/compendium/subclasses/wizard/evoker.png
+!public/images/compendium/subclasses/alchemist/apothecary.png
+!public/images/compendium/subclasses/alchemist/mad-bomber.png
+!public/images/compendium/subclasses/alchemist/mutagenist.png
+!public/images/compendium/subclasses/captain/eagle-banner.png
+!public/images/compendium/subclasses/captain/jolly-roger.png
+!public/images/compendium/subclasses/captain/lion-banner.png
+!public/images/compendium/subclasses/craftsman/armigers-guild.png
+!public/images/compendium/subclasses/craftsman/bladeworkers-guild.png
+!public/images/compendium/subclasses/craftsman/calibarons-guild.png
+!public/images/compendium/subclasses/dancer/acrobat.png
+!public/images/compendium/subclasses/dancer/courtesan.png
+!public/images/compendium/subclasses/dancer/fencer.png
+!public/images/compendium/subclasses/gunslinger/deadeye.png
+!public/images/compendium/subclasses/gunslinger/gun-tank.png
+!public/images/compendium/subclasses/gunslinger/pistolero.png
+!public/images/compendium/subclasses/investigator/detective.png
+!public/images/compendium/subclasses/investigator/exterminator.png
+!public/images/compendium/subclasses/investigator/occultist.png
+!public/images/compendium/subclasses/martyr/burden-of-mercy.png
+!public/images/compendium/subclasses/martyr/burden-of-revolution.png
+!public/images/compendium/subclasses/martyr/burden-of-truth.png
+!public/images/compendium/subclasses/necromancer/death-knight.png
+!public/images/compendium/subclasses/necromancer/overlord.png
+!public/images/compendium/subclasses/necromancer/pale-master.png
+!public/images/compendium/subclasses/vagabond/houndmaster.png
+!public/images/compendium/subclasses/vagabond/mage-brand.png
+!public/images/compendium/subclasses/vagabond/ronin.png
+!public/images/compendium/subclasses/warden/beastblood-guardian.png
+!public/images/compendium/subclasses/warden/grey-watchman.png
+!public/images/compendium/subclasses/warden/verdant-protector.png
+!public/images/compendium/subclasses/warmage/house-of-bishops.png
+!public/images/compendium/subclasses/warmage/house-of-kings.png
+!public/images/compendium/subclasses/warmage/house-of-knights.png
+!public/images/compendium/subclasses/warmage/house-of-pawns.png
+!public/images/compendium/subclasses/warmage/house-of-rooks.png
+!public/images/compendium/subclasses/witch/black-magic.png
+!public/images/compendium/subclasses/witch/green-magic.png
+!public/images/compendium/subclasses/witch/red-magic.png
+!public/images/compendium/subclasses/witch/white-magic.png
 # Local third-party / copyrighted import extracts (dev-only; never commit)
 lib/import/__tests__/fixtures/*eberron*
 lib/import/__tests__/fixtures/*homebrew*

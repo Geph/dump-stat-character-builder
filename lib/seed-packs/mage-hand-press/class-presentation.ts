@@ -1,4 +1,6 @@
 import { MHP_SUBCLASS_FLAVOR } from "@/lib/seed-packs/mage-hand-press/subclass-flavor"
+import { defaultSubclassCardImageUrl } from "@/lib/compendium/subclass-card-images-defaults"
+import { withBasePath } from "@/lib/config/deploy-mode"
 
 /**
  * Curated Mage Hand Press class card presentation (icons, blurbs, source details,
@@ -11,13 +13,13 @@ export type MhpClassPresentation = {
   creator_url: string
   /** Rules-only class description (no flavor paragraphs). */
   description: string
-  /** Local filename slug when the user later attaches card art. Not a hosted URL. */
+  /** Filename slug under public/images/compendium/classes/. */
   card_image_slug: string
 }
 
-/** Bundled packs leave card art blank. Users overwrite with local `/images/compendium/…`. */
-export function mhpClassCardImageUrl(_slug: string): null {
-  return null
+/** Bundled MHP class card art path (ships with the seed pack). */
+export function mhpClassCardImageUrl(slug: string): string {
+  return withBasePath(`/images/compendium/classes/${slug}.png`)
 }
 
 function classNameBase(name: string): string {
@@ -26,14 +28,29 @@ function classNameBase(name: string): string {
 
 /** Drive JSON often omits subclass blurbs; keep the curated overlay text on seed rebuild. */
 export function applyMhpSubclassCardBlurbs<
-  T extends { name?: string | null; class_name?: string | null; card_blurb?: string | null },
+  T extends {
+    name?: string | null
+    class_name?: string | null
+    card_blurb?: string | null
+    card_image_url?: string | null
+  },
 >(subclasses: T[] | undefined): T[] | undefined {
   if (!subclasses?.length) return subclasses
   return subclasses.map((row) => {
-    if (row.card_blurb?.trim()) return row
     const key = `${classNameBase(String(row.class_name ?? ""))}::${String(row.name ?? "").trim()}`
-    const blurb = MHP_SUBCLASS_FLAVOR[key]
-    return blurb ? { ...row, card_blurb: blurb } : row
+    const blurb = row.card_blurb?.trim() ? row.card_blurb : (MHP_SUBCLASS_FLAVOR[key] ?? row.card_blurb)
+    const existingArt = typeof row.card_image_url === "string" ? row.card_image_url.trim() : ""
+    const stockArt =
+      existingArt ||
+      defaultSubclassCardImageUrl(String(row.name ?? ""), String(row.class_name ?? ""), {
+        requireAvailable: false,
+      }) ||
+      null
+    return {
+      ...row,
+      ...(blurb ? { card_blurb: blurb } : {}),
+      ...(stockArt ? { card_image_url: stockArt } : {}),
+    }
   })
 }
 
@@ -79,7 +96,7 @@ export const MHP_CLASS_PRESENTATION: Record<string, MhpClassPresentation> = {
     card_image_slug: "dancer",
   },
   Gunslinger: {
-    icon: "pistol-gun",
+    icon: "gunshot",
     card_blurb:
       "Wagers hit points on risk dice for devastating critical shots, backed by an arsenal of guns.",
     creator_url:

@@ -26,7 +26,7 @@ export const HOMEBREW_CLASS_ICONS_BY_NAME: Record<string, string> = {
   Alchemist: "potion-of-madness",
   Captain: "captain-hat-profile",
   Craftsman: "blacksmith",
-  Gunslinger: "pistol-gun",
+  Gunslinger: "gunshot",
   Investigator: "magnifying-glass",
   Martyr: "bleeding-heart",
   Necromancer: "stoned-skull",

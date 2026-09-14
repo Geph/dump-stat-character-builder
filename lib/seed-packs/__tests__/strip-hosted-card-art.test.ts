@@ -5,8 +5,10 @@ import { mhpClassCardImageUrl } from "@/lib/seed-packs/mage-hand-press/class-pre
 import { stripBlockedHostedCardArt } from "@/lib/seed-packs/strip-hosted-card-art"
 
 describe("stripBlockedHostedCardArt", () => {
-  it("does not emit hosted jeffginger class portraits", () => {
-    expect(mhpClassCardImageUrl("alchemist")).toBeNull()
+  it("maps Mage Hand Press class portraits to bundled seed paths", () => {
+    expect(mhpClassCardImageUrl("alchemist")).toMatch(
+      /\/images\/compendium\/classes\/alchemist\.png$/,
+    )
   })
 
   it("clears jeffginger image fields and leaves other URLs alone", () => {

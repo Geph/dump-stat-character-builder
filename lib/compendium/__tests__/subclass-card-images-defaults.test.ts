@@ -273,7 +273,7 @@ describe("subclass card images", () => {
     )
   })
 
-  it("maps Mage Hand Press Alchemist art locally, including Slime Rancher → Ooze Rancher", () => {
+  it("maps Mage Hand Press Alchemist art, including Slime Rancher → Ooze Rancher", () => {
     expectDefaultSubclassCardImage(
       "Amorist",
       "Alchemist",
@@ -289,12 +289,20 @@ describe("subclass card images", () => {
       "Alchemist",
       /\/images\/compendium\/subclasses\/alchemist\/ooze-rancher\.png$/,
     )
+    expectDefaultSubclassCardImage(
+      "Mad Bomber",
+      "Alchemist",
+      /\/images\/compendium\/subclasses\/alchemist\/mad-bomber\.png$/,
+    )
+    expect(
+      isBundledPublicCardArtPath("public/images/compendium/subclasses/alchemist/mad-bomber.png"),
+    ).toBe(true)
     expect(
       isBundledPublicCardArtPath("public/images/compendium/subclasses/alchemist/ooze-rancher.png"),
     ).toBe(false)
   })
 
-  it("maps Mage Hand Press Dancer art locally", () => {
+  it("maps Mage Hand Press Dancer art (free Acrobat ships; paid stay local)", () => {
     expectDefaultSubclassCardImage(
       "Acrobat",
       "Dancer",
@@ -305,12 +313,30 @@ describe("subclass card images", () => {
       "Dancer",
       /\/images\/compendium\/subclasses\/dancer\/fire-dancer\.png$/,
     )
+    expectDefaultSubclassCardImage(
+      "Moonwalker",
+      "Dancer",
+      /\/images\/compendium\/subclasses\/dancer\/moonwalker\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Mime",
+      "Dancer",
+      /\/images\/compendium\/subclasses\/dancer\/mime\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Shadow Dancer",
+      "Dancer",
+      /\/images\/compendium\/subclasses\/dancer\/shadow-dancer\.png$/,
+    )
     expect(
       isBundledPublicCardArtPath("public/images/compendium/subclasses/dancer/acrobat.png"),
+    ).toBe(true)
+    expect(
+      isBundledPublicCardArtPath("public/images/compendium/subclasses/dancer/fire-dancer.png"),
     ).toBe(false)
   })
 
-  it("maps Mage Hand Press Necromancer, Warden, and Captain art locally", () => {
+  it("maps Mage Hand Press Necromancer, Warden, Captain, Warmage, and Witch art", () => {
     expectDefaultSubclassCardImage(
       "Death Knight",
       "Necromancer",
@@ -336,8 +362,96 @@ describe("subclass card images", () => {
       "Captain",
       /\/images\/compendium\/subclasses\/captain\/lion-banner\.png$/,
     )
+    expectDefaultSubclassCardImage(
+      "Jolly Roger",
+      "Captain",
+      /\/images\/compendium\/subclasses\/captain\/jolly-roger\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "House of Darts",
+      "Warmage",
+      /\/images\/compendium\/subclasses\/warmage\/house-of-darts\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "House of Kings",
+      "Warmage",
+      /\/images\/compendium\/subclasses\/warmage\/house-of-kings\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Black Magic",
+      "Witch",
+      /\/images\/compendium\/subclasses\/witch\/black-magic\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Technicolor Magic",
+      "Witch",
+      /\/images\/compendium\/subclasses\/witch\/technicolor-magic\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Armigers' Guild",
+      "Craftsman",
+      /\/images\/compendium\/subclasses\/craftsman\/armigers-guild\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Bladeworkers' Guild",
+      "Craftsman",
+      /\/images\/compendium\/subclasses\/craftsman\/bladeworkers-guild\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Rōnin",
+      "Vagabond",
+      /\/images\/compendium\/subclasses\/vagabond\/ronin\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Experiment X",
+      "Vagabond",
+      /\/images\/compendium\/subclasses\/vagabond\/experiment-x\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Trick Shot",
+      "Gunslinger",
+      /\/images\/compendium\/subclasses\/gunslinger\/trick-shot\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Gun-Ko Master",
+      "Gunslinger",
+      /\/images\/compendium\/subclasses\/gunslinger\/gun-ko-master\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "White Hat",
+      "Gunslinger",
+      /\/images\/compendium\/subclasses\/gunslinger\/white-hat\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Spellslinger",
+      "Gunslinger",
+      /\/images\/compendium\/subclasses\/gunslinger\/spellslinger\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Antiquarian",
+      "Investigator",
+      /\/images\/compendium\/subclasses\/investigator\/antiquarian\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Burden of the End",
+      "Martyr",
+      /\/images\/compendium\/subclasses\/martyr\/burden-of-the-end\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "Burden of Tyranny",
+      "Martyr",
+      /\/images\/compendium\/subclasses\/martyr\/burden-of-tyranny\.png$/,
+    )
+    expectDefaultSubclassCardImage(
+      "House of Bishops",
+      "Warmage",
+      /\/images\/compendium\/subclasses\/warmage\/house-of-bishops\.png$/,
+    )
     expect(
       isBundledPublicCardArtPath("public/images/compendium/subclasses/necromancer/death-knight.png"),
+    ).toBe(true)
+    expect(
+      isBundledPublicCardArtPath("public/images/compendium/subclasses/warmage/house-of-darts.png"),
     ).toBe(false)
   })
 

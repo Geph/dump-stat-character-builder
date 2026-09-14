@@ -22,10 +22,13 @@ const SPECIES_CARD_SOURCES =
   process.env.SPECIES_CARD_SOURCES ?? path.join(ROOT, "scripts", "species-card-sources")
 const SPELL_CARD_SOURCES =
   process.env.SPELL_CARD_SOURCES ?? path.join(ROOT, "scripts", "spell-card-sources")
+const SHEET_BANNER_SOURCES =
+  process.env.SHEET_BANNER_SOURCES ?? path.join(ROOT, "scripts", "sheet-banner-sources")
 const PAGE_BG_OUT = path.join(ROOT, "public", "images", "page-backgrounds")
 const HERO_OUT = path.join(ROOT, "public", "images", "hero")
 const FEATURE_OUT = path.join(ROOT, "public", "images", "features")
 const SPLASH_OUT = path.join(ROOT, "public", "images", "welcome-splash")
+const SHEET_BANNER_OUT = path.join(ROOT, "public", "images", "sheet-banners")
 const CLASS_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "classes")
 const SUBCLASS_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "subclasses")
 const BACKGROUND_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "backgrounds")
@@ -39,9 +42,13 @@ const CARD_JPEG_QUALITY = Number(process.env.CARD_JPEG_QUALITY ?? 82)
 const PAGE_BG_WIDTH = Number(process.env.PAGE_BG_WIDTH ?? 1200)
 const PAGE_BG_HEIGHT = Number(process.env.PAGE_BG_HEIGHT ?? 1800)
 
-/** Home hero rotating art — wide 2:1 cinematic banners. */
+/** Home hero rotating art — wide cinematic banners (cap 2560×1280, never upscale). */
 const HERO_WIDTH = Number(process.env.HERO_WIDTH ?? 2560)
 const HERO_HEIGHT = Number(process.env.HERO_HEIGHT ?? 1280)
+
+/** Character sheet / builder landscape banners — wide cinematic (cap, never upscale). */
+const SHEET_BANNER_WIDTH = Number(process.env.SHEET_BANNER_WIDTH ?? 2172)
+const SHEET_BANNER_HEIGHT = Number(process.env.SHEET_BANNER_HEIGHT ?? 724)
 
 /** Home feature cards — 16:9 thumbnails (object-cover in UI). */
 const FEATURE_WIDTH = Number(process.env.FEATURE_WIDTH ?? 1200)
@@ -451,7 +458,8 @@ for (const [basename, candidates] of Object.entries(HERO_SOURCES)) {
     continue
   }
 
-  const { inputMeta, outMeta, inputKb, outKb, action } = await encodeWebp(
+  // fit:inside — preserve source aspect (no forced 2:1 crop); never upscale.
+  const { inputMeta, outMeta, inputKb, outKb, action } = await encodeWebpFitInside(
     input,
     output,
     HERO_WIDTH,
@@ -552,6 +560,33 @@ missing += await encodeCardBatch(
   CARD_HEIGHT,
   discoverSpellCardSlugs,
 )
+
+console.log(`\nSheet banners → ${path.relative(ROOT, SHEET_BANNER_OUT)}/ (≤${SHEET_BANNER_WIDTH}×${SHEET_BANNER_HEIGHT})`)
+fs.mkdirSync(SHEET_BANNER_OUT, { recursive: true })
+{
+  const entries = discoverFlatCardSlugs(SHEET_BANNER_SOURCES)
+  if (entries.length === 0) {
+    console.log("  − no sources (keeping existing outputs if any)")
+  } else {
+    for (const [slug, input] of entries) {
+      const output = path.join(SHEET_BANNER_OUT, `${slug}.webp`)
+      try {
+        const { inputMeta, outMeta, inputKb, outKb, action } = await encodeWebpFitInside(
+          input,
+          output,
+          SHEET_BANNER_WIDTH,
+          SHEET_BANNER_HEIGHT,
+        )
+        console.log(
+          `  ${slug}.webp  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]`,
+        )
+      } catch (error) {
+        console.error(`  ✗ ${slug}: ${error instanceof Error ? error.message : error}`)
+        missing += 1
+      }
+    }
+  }
+}
 
 writeLocalAvailableCardArtManifest()
 
