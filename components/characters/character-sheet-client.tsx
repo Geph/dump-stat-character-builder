@@ -4937,10 +4937,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative mb-3 overflow-hidden rounded-2xl max-sm:min-h-0 min-h-[140px]"
+          className="relative mb-3 overflow-hidden rounded-2xl min-h-[140px] max-sm:min-h-[120px]"
         >
           {character.banner_url ? (
-            <div className="absolute inset-0 overflow-hidden rounded-2xl max-sm:hidden">
+            <div className="absolute inset-0 overflow-hidden rounded-2xl">
               <img
                 src={character.banner_url}
                 alt=""
@@ -4951,7 +4951,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           <div
             className={`relative flex flex-col gap-2 p-4 max-sm:gap-1.5 max-sm:p-2.5 ${
               character.banner_url
-                ? "max-sm:bg-gradient-to-br max-sm:from-primary/20 max-sm:to-secondary/20"
+                ? ""
                 : "bg-gradient-to-br from-primary/20 to-secondary/20"
             }`}
           >
@@ -4983,7 +4983,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 <h1
                   className={`text-lg font-black leading-tight text-foreground sm:text-2xl ${
                     character.banner_url
-                      ? "sm:w-fit sm:max-w-full sm:rounded-md sm:bg-background/85 sm:px-2 sm:py-0.5"
+                      ? "w-fit max-w-full rounded-md bg-background/85 px-2 py-0.5"
                       : ""
                   }`}
                 >

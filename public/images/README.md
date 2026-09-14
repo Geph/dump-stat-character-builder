@@ -8,7 +8,8 @@ Static images for the Dump Stat marketing UI. Served at `/images/...` from Next.
 |------|----------|
 | `hero/rotating-01.webp` … | Home page hero — random background on each visit |
 | `sheet-banners/*.webp` | Builder / sheet landscape banners (Randomly generate) |
-| `backgrounds/library-stats.jpeg` | Home page “library stats” section background |
+| `backgrounds/library-stats.jpeg` | Home page “library stats” section background (`library-stats-section` in page-bg-sources) |
+| `builder/starting-equipment-*.png` | Builder Gear step package edge art (`gear` / `gold-coins` in page-bg-sources) |
 | `features/hero.webp` | GitHub README hero graphic (source: `scripts/page-bg-sources/hero.png`) |
 | `features/*.webp` | Home feature cards — run `pnpm images:optimize` from sources in `scripts/page-bg-sources/` |
 

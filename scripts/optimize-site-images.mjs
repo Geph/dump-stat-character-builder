@@ -29,6 +29,8 @@ const HERO_OUT = path.join(ROOT, "public", "images", "hero")
 const FEATURE_OUT = path.join(ROOT, "public", "images", "features")
 const SPLASH_OUT = path.join(ROOT, "public", "images", "welcome-splash")
 const SHEET_BANNER_OUT = path.join(ROOT, "public", "images", "sheet-banners")
+const BUILDER_OUT = path.join(ROOT, "public", "images", "builder")
+const BACKGROUNDS_OUT = path.join(ROOT, "public", "images", "backgrounds")
 const CLASS_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "classes")
 const SUBCLASS_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "subclasses")
 const BACKGROUND_CARD_OUT = path.join(ROOT, "public", "images", "compendium", "backgrounds")
@@ -61,6 +63,10 @@ const SPLASH_HEIGHT = Number(process.env.SPLASH_HEIGHT ?? 900)
 /** GitHub README hero — preserve aspect, cap max dimensions. */
 const README_HERO_MAX_WIDTH = Number(process.env.README_HERO_MAX_WIDTH ?? 1400)
 const README_HERO_MAX_HEIGHT = Number(process.env.README_HERO_MAX_HEIGHT ?? 1200)
+
+/** Home library-stats section background — wide cinematic (cap, never upscale). */
+const LIBRARY_STATS_MAX_WIDTH = Number(process.env.LIBRARY_STATS_MAX_WIDTH ?? 1920)
+const LIBRARY_STATS_MAX_HEIGHT = Number(process.env.LIBRARY_STATS_MAX_HEIGHT ?? 960)
 
 /** Compendium portrait card art (classes / subclasses / species / spells) — 3:4. */
 const CARD_WIDTH = Number(process.env.CARD_WIDTH ?? 771)
@@ -108,6 +114,12 @@ const SPLASH_SOURCES = {
   "visual-compact": ["dual-mode", "visual-compact", "Visual-Compact"],
   "compact-interface": ["compact-interface", "Compact-Interface"],
   "no-ai": ["no-ai", "No-AI"],
+}
+
+/** Builder starting-equipment edge art (JPEG bytes under .png, same as class cards). */
+const STARTING_EQUIPMENT_SOURCES = {
+  "starting-equipment-gear": ["gear", "starting-equipment-gear", "backpack"],
+  "starting-equipment-gold": ["gold-coins", "starting-equipment-gold", "gold", "coins"],
 }
 
 function resolveSourcePath(basenames, assetsDir = ASSETS) {
@@ -345,6 +357,30 @@ async function encodeCardJpeg(input, output, width, height) {
   return { inputMeta, outMeta, inputKb, outKb, action }
 }
 
+/** Landscape JPEG (library stats) — fit inside, never upscale. */
+async function encodeJpegFitInside(input, output, maxWidth, maxHeight) {
+  const inputMeta = await sharp(input).metadata()
+  const inputKb = (fs.statSync(input).size / 1024).toFixed(1)
+
+  await sharp(input)
+    .resize(maxWidth, maxHeight, {
+      fit: "inside",
+      kernel: sharp.kernel.lanczos3,
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: CARD_JPEG_QUALITY, mozjpeg: true })
+    .toFile(output)
+
+  const outMeta = await sharp(output).metadata()
+  const outKb = (fs.statSync(output).size / 1024).toFixed(1)
+  const action =
+    (inputMeta.width ?? 0) > maxWidth || (inputMeta.height ?? 0) > maxHeight
+      ? "downscaled"
+      : "encoded"
+
+  return { inputMeta, outMeta, inputKb, outKb, action }
+}
+
 async function encodeCardBatch(
   label,
   sourcesDir,
@@ -525,6 +561,48 @@ if (readmeHeroInput) {
   )
 } else {
   console.log("  − hero: no source (keeping existing output if any)")
+}
+
+console.log("\nLibrary stats background → public/images/backgrounds/")
+const libraryStatsInput = resolveSourcePath([
+  "library-stats-section",
+  "library-stats",
+  "library",
+])
+if (libraryStatsInput) {
+  fs.mkdirSync(BACKGROUNDS_OUT, { recursive: true })
+  const output = path.join(BACKGROUNDS_OUT, "library-stats.jpeg")
+  const { inputMeta, outMeta, inputKb, outKb, action } = await encodeJpegFitInside(
+    libraryStatsInput,
+    output,
+    LIBRARY_STATS_MAX_WIDTH,
+    LIBRARY_STATS_MAX_HEIGHT,
+  )
+  console.log(
+    `  library-stats.jpeg  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]`,
+  )
+} else {
+  console.log("  − library-stats: no source (keeping existing output if any)")
+}
+
+console.log("\nStarting equipment cards → public/images/builder/")
+fs.mkdirSync(BUILDER_OUT, { recursive: true })
+for (const [basename, candidates] of Object.entries(STARTING_EQUIPMENT_SOURCES)) {
+  const input = resolveSourcePath(candidates)
+  const output = path.join(BUILDER_OUT, `${basename}.png`)
+  if (!input) {
+    console.log(`  − ${basename}: no source (keeping existing output if any)`)
+    continue
+  }
+  const { inputMeta, outMeta, inputKb, outKb, action } = await encodeCardJpeg(
+    input,
+    output,
+    CARD_WIDTH,
+    CARD_HEIGHT,
+  )
+  console.log(
+    `  ${basename}.png  ${inputMeta.width}x${inputMeta.height} (${inputKb} KB) → ${outMeta.width}x${outMeta.height} (${outKb} KB) [${action}]`,
+  )
 }
 
 missing += await encodeCardBatch("Class card art", CLASS_CARD_SOURCES, CLASS_CARD_OUT)

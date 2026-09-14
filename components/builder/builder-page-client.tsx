@@ -3118,7 +3118,7 @@ export default function BuilderPageClient() {
     const groups: ReactNode[] = []
     const speciesAccent = "border-secondary bg-secondary/10"
 
-    if (character.size) {
+    if ((selectedSpecies.size_options?.length ?? 0) > 1 && character.size) {
       groups.push(
         <BuilderSelectedChoiceChips
           key="species-size"
@@ -3130,13 +3130,21 @@ export default function BuilderPageClient() {
       )
     }
 
-    for (const [index, picks] of Object.entries(speciesTraitPicks)) {
-      if (!picks?.length) continue
-      const trait = selectedSpecies.traits?.[Number(index)]
+    for (const [index, trait] of (selectedSpecies.traits ?? []).entries()) {
+      if (!trait.isChoice || !(trait.choices?.options?.length ?? 0)) continue
+      // Dedicated size_options control is the only Size summary chip.
+      if (
+        (selectedSpecies.size_options?.length ?? 0) > 1 &&
+        isSpeciesSizeChoiceTrait(trait)
+      ) {
+        continue
+      }
+      const picks = resolveSpeciesTraitPicks(speciesTraitPicks, trait, index)
+      if (!picks.length) continue
       groups.push(
         <BuilderSelectedChoiceChips
-          key={`species-trait-${index}`}
-          title={trait?.name ?? "Trait"}
+          key={`species-trait-${speciesTraitPickKey(trait, index)}`}
+          title={trait.name?.trim() || "Trait"}
           names={picks}
           layout={chipLayout}
           showSkillIcons={showIcons}

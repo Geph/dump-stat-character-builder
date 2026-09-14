@@ -210,10 +210,7 @@ export default function HomePage() {
           }
         >
           {heroBackgroundUrl ? (
-            <>
-              <div className="absolute inset-0 bg-background/50 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
-            </>
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
           ) : (
             <div className="absolute inset-0 bg-card/30 pointer-events-none" />
           )}
@@ -369,9 +366,6 @@ export default function HomePage() {
               : undefined
           }
         >
-          {libraryBackgroundUrl ? (
-            <div className="absolute inset-0 bg-background/55 pointer-events-none" />
-          ) : null}
           <div className="max-w-5xl mx-auto relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}

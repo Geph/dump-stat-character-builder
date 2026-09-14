@@ -55,6 +55,23 @@ Output at **1200×900** WebP. Missing sources keep any existing output.
 
 Output capped at **1400×1200** WebP (aspect preserved).
 
+## Home library stats background
+
+| Source file | Output |
+|-------------|--------|
+| `library-stats-section.png` (or `library-stats.*`) | `public/images/backgrounds/library-stats.jpeg` |
+
+Encoded as JPEG with a **1920×960** cap (`fit: inside`, never upscaled).
+
+## Builder starting-equipment cards (3:4)
+
+| Source file | Output |
+|-------------|--------|
+| `gear.png` (or `backpack.*`) | `public/images/builder/starting-equipment-gear.png` |
+| `gold-coins.png` (or `gold.*` / `coins.*`) | `public/images/builder/starting-equipment-gold.png` |
+
+Output at **771×1024** (JPEG bytes under a `.png` extension, same as class cards).
+
 ## Why not attach in chat?
 
 Cursor compresses and downsizes images pasted into chat. Copy originals into this folder instead.
