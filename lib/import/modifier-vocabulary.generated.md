@@ -58,7 +58,7 @@ char = CharacteristicModifier `type`. fx = FeatureEffect `kind`.
 
 ## companion
 
-- `grant_creature` (char) Grant Creature / Companion — Adds a Creatures & Companions entry to the character sheet Companions tab (by name) · req: creatureNames · opt: choiceOptions, count, polymorph · `{"type":"grant_creature","creatureNames":[]}`
+- `grant_creature` (char) Grant Creature / Companion — Adds a Creatures & Companions entry to the Companions tab; optional rest picker and combined CR cap · req: creatureNames · opt: choiceOptions, count, countByLevel, combinedCrByLevel, pickOnRest, pickerTitle, polymorph · `{"type":"grant_creature","creatureNames":[]}`
 - `transform` (fx) Transform — Wild Shape · req: — · opt: — · `{"kind":"transform"}`
 
 ## equipment

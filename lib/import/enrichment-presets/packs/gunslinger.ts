@@ -18,6 +18,72 @@ const SKIN_OF_YOUR_TEETH_DESCRIPTION =
 const DODGE_ROLL_DESCRIPTION =
   "<p>You can expend one Risk Die as a Bonus Action to move up to 15 feet and reload any Ranged weapon you are holding. This movement doesn’t provoke Opportunity Attacks and is unaffected by Difficult Terrain.</p>"
 
+/** Non-SRD starting firearm — must live in the same import JSON as Gunslinger starting gear. */
+export const GUNSLINGER_REVOLVER_EQUIPMENT = {
+  name: "Revolver",
+  category: "Weapon",
+  subcategory: "Martial Ranged Weapons",
+  description: null,
+  weight: 3,
+  cost: { amount: 125, unit: "GP" },
+  properties: {
+    damage: "2d6 Piercing",
+    mastery: "Slow",
+    properties: [
+      "Ammunition (Range 30/120; Bullet)",
+      "Firearm",
+      "Recoil",
+      "Reload (6)",
+    ],
+  },
+  source: "Mage Hand Press",
+} as const
+
+const BARE_BULLET_AMMO = /^(?:firearm\s+)?bullets?$/i
+
+function renameGunslingerAmmoName(name: string): string {
+  return BARE_BULLET_AMMO.test(name.trim()) ? "Bullets, Firearm" : name
+}
+
+function mapStartingEquipmentItems(
+  items: { name: string; quantity: number }[] | null | undefined,
+): { name: string; quantity: number }[] | null | undefined {
+  if (!items?.length) return items
+  let changed = false
+  const next = items.map((item) => {
+    const name = renameGunslingerAmmoName(item.name)
+    if (name === item.name) return item
+    changed = true
+    return { ...item, name }
+  })
+  return changed ? next : items
+}
+
+function ensureGunslingerStartingGear(content: ImportContent): ImportContent {
+  const equipment = [...(content.equipment ?? [])]
+  if (!equipment.some((item) => /^revolver$/i.test(item.name ?? ""))) {
+    equipment.push({ ...GUNSLINGER_REVOLVER_EQUIPMENT })
+  }
+
+  const classes = (content.classes ?? []).map((cls) => {
+    if (!/gunslinger/i.test(cls.name ?? "")) return cls
+    const starting_equipment_groups = cls.starting_equipment_groups?.map((group) => ({
+      ...group,
+      options: group.options.map((option) => ({
+        ...option,
+        items: mapStartingEquipmentItems(option.items) ?? option.items,
+      })),
+    }))
+    return { ...cls, starting_equipment_groups }
+  })
+
+  return {
+    ...content,
+    classes,
+    equipment,
+  }
+}
+
 function grantBaseManeuvers() {
   return {
     op: "attachNamedPreset" as const,
@@ -89,6 +155,7 @@ export function sanitizeGunslingerImportContent(content: ImportContent): ImportC
       }
     }),
   }
+  content = ensureGunslingerStartingGear(content)
 
   const proposals = content.import_proposals?.custom_abilities
   if (!proposals?.length && !content.import_proposals) return content

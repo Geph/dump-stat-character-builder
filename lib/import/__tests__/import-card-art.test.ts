@@ -14,7 +14,7 @@ import {
 
 describe("import-card-art", () => {
   const content: ImportContent = {
-    classes: [{ name: "Witch", description: null, hit_die: 8, primary_ability: ["INT"], features: [] }],
+    classes: [{ name: "Hexwright", description: null, hit_die: 8, primary_ability: ["INT"], features: [] }],
     species: [
       {
         name: "Catfolk",

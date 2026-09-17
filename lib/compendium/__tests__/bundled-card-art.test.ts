@@ -36,7 +36,7 @@ describe("bundled card art allowlist", () => {
     expect(isBundledPublicCardArtPath("public/images/compendium/species/aasimar-eberron.png")).toBe(true)
     expect(isBundledPublicCardArtPath("public/images/compendium/species/augmented.png")).toBe(false)
     expect(isBundledPublicCardArtPath("public/images/compendium/species/minotaur.png")).toBe(false)
-    expect(isBundledPublicCardArtPath("public/images/compendium/classes/gunslinger.png")).toBe(false)
+    expect(isBundledPublicCardArtPath("public/images/compendium/classes/gunslinger.png")).toBe(true)
     expect(isBundledPublicCardArtPath("public/images/compendium/backgrounds/noble.png")).toBe(false)
     expect(isBundledPublicCardArtPath("public/images/compendium/backgrounds/apothecary.png")).toBe(false)
     expect(isBundledPublicCardArtPath("public/images/compendium/backgrounds/acolyte.png")).toBe(true)

@@ -417,6 +417,44 @@ describe("Gunslinger enrichment", () => {
     ).toBe(true)
   })
 
+  it("injects a Revolver catalog row and maps Bullet ammo to Bullets, Firearm", () => {
+    const next = sanitizeGunslingerImportContent({
+      classes: [
+        {
+          name: "Gunslinger",
+          description: "",
+          hit_die: 8,
+          primary_ability: ["Dexterity"],
+          features: [],
+          starting_equipment_groups: [
+            {
+              description: "Choose A or B:",
+              options: [
+                {
+                  label: "A",
+                  items: [
+                    { name: "Revolver", quantity: 1 },
+                    { name: "Bullet", quantity: 50 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown as ImportContent)
+
+    expect(next.equipment?.find((item) => item.name === "Revolver")).toMatchObject({
+      category: "Weapon",
+      subcategory: "Martial Ranged Weapons",
+      weight: 3,
+      cost: { amount: 125, unit: "GP" },
+    })
+    expect(
+      next.classes?.[0]?.starting_equipment_groups?.[0]?.options[0]?.items.map((item) => item.name),
+    ).toEqual(["Revolver", "Bullets, Firearm"])
+  })
+
   it("ships Revolver as a catalog equipment row so starting gear is not flagged", () => {
     const content = gunslingerSeed as ImportContent
     const revolver = content.equipment?.find((item) => item.name === "Revolver")

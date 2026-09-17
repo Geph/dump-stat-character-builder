@@ -66,6 +66,28 @@ describe("Captain enrichment", () => {
     expect(bolster?.ability_role).toBe("knack")
   })
 
+  it("fills Captain Battle Dice short/long rest when the pool only has initiative", () => {
+    const next = sanitizeCaptainImportContent({
+      classes: [{ name: "Captain", description: "", hit_die: 8, primary_ability: ["Charisma"], features: [] }],
+      class_resources: [
+        {
+          class_name: "Captain",
+          resource_key: "battle_dice",
+          name: "Battle Dice",
+          uses: {
+            type: "at_level",
+            rechargeOnInitiative: true,
+          },
+        },
+      ],
+    } as unknown as ImportContent)
+
+    expect(next.class_resources?.[0]?.uses).toMatchObject({
+      rechargeOnInitiative: true,
+      recharges: expect.arrayContaining([{ rest: "short_rest" }, { rest: "long_rest" }]),
+    })
+  })
+
   it("keeps subclass [Maneuver] features as combat cards, not knack picks", () => {
     const enriched = applyImportEnrichmentPresets({
       classes: [{ name: "Captain", description: "", hit_die: 8, primary_ability: ["Charisma"], features: [] }],

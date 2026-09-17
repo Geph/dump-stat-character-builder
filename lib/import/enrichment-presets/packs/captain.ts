@@ -99,6 +99,38 @@ function collectManeuverNames(abilities: Record<string, unknown>[]): string[] {
   return [...names]
 }
 
+const CAPTAIN_BATTLE_DICE_REST = [
+  { rest: "short_rest" as const },
+  { rest: "long_rest" as const },
+]
+
+function withCaptainBattleDiceRestRecharge(content: ImportContent): ImportContent {
+  if (!content.class_resources?.length) return content
+  let changed = false
+  const class_resources = content.class_resources.map((row) => {
+    if (row.resource_key !== "battle_dice") return row
+    if (!/captain/i.test(row.class_name ?? "")) return row
+    const uses = row.uses
+    if (!uses) return row
+    const existing = uses.recharges ?? []
+    const missing = CAPTAIN_BATTLE_DICE_REST.filter(
+      (needed) => !existing.some((entry) => entry.rest === needed.rest),
+    )
+    const needsInitiative = uses.rechargeOnInitiative !== true && uses.rechargeOnInitiative !== 1
+    if (!missing.length && !needsInitiative) return row
+    changed = true
+    return {
+      ...row,
+      uses: {
+        ...uses,
+        ...(needsInitiative ? { rechargeOnInitiative: true as const } : {}),
+        ...(missing.length ? { recharges: [...existing, ...missing] } : {}),
+      },
+    }
+  })
+  return changed ? { ...content, class_resources } : content
+}
+
 /**
  * Sanitize Captain imports:
  * - Battle Tactics auto-grants base maneuvers (not a Maneuvers Known / class_knacks picker).
@@ -145,7 +177,7 @@ export function sanitizeCaptainImportContent(content: ImportContent): ImportCont
   const shouldWriteProposals =
     Boolean(content.import_proposals) || missingFallbacks.length > 0
 
-  return {
+  return withCaptainBattleDiceRestRecharge({
     ...content,
     classes,
     ...(content.subclasses ? { subclasses } : {}),
@@ -162,7 +194,7 @@ export function sanitizeCaptainImportContent(content: ImportContent): ImportCont
           },
         }
       : {}),
-  }
+  })
 }
 
 export const CAPTAIN_PRESETS: EnrichmentPreset[] = [
