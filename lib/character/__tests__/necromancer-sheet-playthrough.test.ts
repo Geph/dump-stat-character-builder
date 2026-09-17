@@ -282,6 +282,89 @@ describe("Necromancer free-subclass sheet playthrough", () => {
     expect(thrallGroup?.options.map((option) => option.name)).not.toContain("Bloodlurk")
   })
 
+  it("level 5: Animate Dead is a combat action that casts the spell", () => {
+    const entry = detailAt(5)
+    const feature = featureOf(entry, "Animate Dead")
+    expect(feature?.activation?.action).toBe(true)
+    expect(feature?.sheetDisplay?.combatActions).toBe(true)
+    const action = actionsAt(5).find((row) => row.name === "Animate Dead")
+    expect(action).toMatchObject({
+      kinds: expect.arrayContaining(["action"]),
+      category: "combat",
+      castSpellChoice: {
+        spellName: "Animate Dead",
+        withoutSlot: false,
+        economyKind: "action",
+      },
+    })
+    expect(actionsAt(4).some((row) => row.name === "Animate Dead")).toBe(false)
+  })
+
+  it("level 5: Animate Dead offers Skeleton, Spirit, and Zombie stat blocks", () => {
+    const entry = detailAt(5)
+    const resolved = resolveCharacterCompanionsDetailed({
+      classDetails: [entry],
+      customAbilities: [],
+      creatures,
+      formSelections: {},
+      ctx: { ...CTX, classLevels: [{ className: "Necromancer", level: 5 }] },
+    })
+    const animateGroups = resolved.formGroups.filter((group) => group.featureName === "Animate Dead")
+    expect(animateGroups).toHaveLength(1)
+    expect(animateGroups[0]?.options.map((option) => option.name).sort()).toEqual(
+      ["Skeleton", "Spirit", "Zombie"].sort(),
+    )
+
+    const groupKey = animateGroups[0]?.key
+    const { companions } = resolveCharacterCompanionsDetailed({
+      classDetails: [entry],
+      customAbilities: [],
+      creatures,
+      formSelections: groupKey ? { [groupKey]: ["Spirit"] } : {},
+      ctx: { ...CTX, classLevels: [{ className: "Necromancer", level: 5 }] },
+    })
+    const spirit = companions.find((row) => row.template.name === "Spirit")
+    expect(spirit?.template.actions?.length).toBeGreaterThan(0)
+  })
+
+  it("level 5: class Animate Dead grant replaces the spell's Skeleton/Zombie-only list", () => {
+    const entry = detailAt(5)
+    const { formGroups } = resolveCharacterCompanionsDetailed({
+      classDetails: [entry],
+      customAbilities: [],
+      creatures,
+      knownSpells: [
+        {
+          id: "spell-animate-dead",
+          name: "Animate Dead",
+          level: 3,
+          linkedModifiers: [
+            {
+              instanceId: "modinst_spell_animate",
+              catalogRefId: "cat_char_grant_creature",
+              characteristics: [
+                {
+                  id: "mod_spell_animate",
+                  type: "grant_creature",
+                  creatureNames: ["Skeleton", "Zombie"],
+                  choiceOptions: ["Skeleton", "Zombie"],
+                  count: 1,
+                },
+              ],
+            },
+          ],
+        } as never,
+      ],
+      formSelections: {},
+      ctx: { ...CTX, classLevels: [{ className: "Necromancer", level: 5 }] },
+    })
+    const animateGroups = formGroups.filter((group) => group.featureName === "Animate Dead")
+    expect(animateGroups).toHaveLength(1)
+    expect(animateGroups[0]?.options.map((option) => option.name)).toEqual(
+      expect.arrayContaining(["Skeleton", "Spirit", "Zombie"]),
+    )
+  })
+
   it("level 3 Overlord: Dark Arcana and Charnel Aura are combat bonus actions", () => {
     const names = actionsAt(3, "Overlord").map((row) => row.name)
     expect(names).toEqual(expect.arrayContaining(["Dark Arcana", "Charnel Aura", "Charnel Touch"]))
@@ -329,6 +412,11 @@ describe("Necromancer free-subclass sheet playthrough", () => {
       .find((row) => row.kind === "check_roll_modifier")
     expect(effect).toMatchObject({
       checkCategory: "skill",
+      checkSkills: expect.arrayContaining(["Deception", "Intimidation", "Persuasion"]),
+      bonusConfig: {
+        mode: "ability_modifier",
+        ability: "INT",
+      },
     })
   })
 

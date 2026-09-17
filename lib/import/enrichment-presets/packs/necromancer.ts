@@ -42,6 +42,9 @@ export const NECROMANCER_THRALL_CHOICE_OPTIONS = [
   "Bloodlurk",
 ] as const
 
+/** Animate Dead class feature — Skeleton, Spirit, or Zombie stat blocks. */
+export const NECROMANCER_ANIMATE_DEAD_FORMS = ["Skeleton", "Spirit", "Zombie"] as const
+
 const IMPROVED_THRALL_OPTIONS = [
   {
     name: "Avoidance",

@@ -834,6 +834,35 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "always-prepared named spell",
+      text: "You always have the Animate Dead spell prepared.",
+      ruleId: "spell.always_prepared",
+      assert: (detections) => {
+        const char = modOf(
+          detections.find((d) => d.ruleId === "spell.always_prepared")?.instance.characteristics?.[0],
+          "spells_known",
+        )
+        expect(char?.alwaysPrepared).toBe(true)
+        expect(char?.spells?.[0]?.spellId).toContain("Animate Dead")
+        expect(char?.spells?.[0]?.alwaysPrepared).toBe(true)
+      },
+    },
+    {
+      label: "cast named spell as an action instead of 1 minute",
+      text: "You always have the Animate Dead spell prepared. When you cast this spell, its casting time is an action instead of 1 minute.",
+      ruleId: "spell.cast_as_action",
+      assert: (detections) => {
+        const effect = detections.find((d) => d.ruleId === "spell.cast_as_action")?.instance
+          .activation?.effects?.[0]
+        expect(effect).toMatchObject({
+          kind: "cast_spell",
+          castSpellName: "Animate Dead",
+          castSpellCastingTime: "action",
+        })
+        expect(effect?.castSpellWithoutSlot).toBeFalsy()
+      },
+    },
+    {
       label: "secondary arms that can wield a light weapon",
       text: "Two smaller arms that can manipulate objects/open-close/pick-up or wield a light weapon.",
       ruleId: "wield.extra_slots.secondary_arms",

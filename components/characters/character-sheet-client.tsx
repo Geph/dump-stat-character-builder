@@ -48,6 +48,8 @@ import {
 } from "@/lib/character/character-export-format"
 import { collectPartyAllyCandidates } from "@/lib/character/party-ally-candidates"
 import { formatClassIdentityLabel } from "@/lib/character/class-identity-label"
+import { NameFontPicker, nameFontStyle } from "@/components/character-sheet/name-font-picker"
+import { readNameFontId, withNameFont, type NameFontId } from "@/lib/character/name-fonts"
 import { applyIncomingHeal } from "@/lib/character/apply-heal-modifiers"
 import {
   normalizePartyCharacterIds,
@@ -405,6 +407,7 @@ import { SheetTabNav, type SheetTab } from "@/components/character-sheet/sheet-t
 import { SheetTabSectionNav } from "@/components/character-sheet/sheet-tab-section-nav"
 import { DurationRemindersPanel } from "@/components/character-sheet/duration-reminders-panel"
 import { SkillAbilityLabel } from "@/components/character-sheet/skill-ability-label"
+import { SkillFeatureBonusIndicator } from "@/components/character-sheet/skill-feature-bonus-indicator"
 import { useManualSkillAbility } from "@/components/settings/use-manual-skill-ability"
 import { setSkillAbilityOverride } from "@/lib/character/skill-ability-overrides"
 import { FeatureCardMenu } from "@/components/character-sheet/feature-card-menu"
@@ -424,6 +427,14 @@ import {
   togglePinnedFeature,
   type FeatureLayoutState,
 } from "@/lib/character/feature-layout"
+import {
+  defaultSpellActionPins,
+  isSpellPinnedToAbilities,
+  loadSpellActionPins,
+  saveSpellActionPins,
+  toggleSpellPinnedToAbilities,
+  type SpellActionPinsState,
+} from "@/lib/character/spell-action-pins"
 import {
   buildChoiceDescriptionLookup,
   buildFeatureTabSections,
@@ -869,6 +880,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   const [skillAbilityOverrides, setSkillAbilityOverrides] = useState<Record<string, AbilityScoreKey>>({})
   const { enabled: manualSkillAbilityEnabled } = useManualSkillAbility()
   const [featureLayout, setFeatureLayout] = useState<FeatureLayoutState>(defaultFeatureLayout)
+  const [spellActionPins, setSpellActionPins] = useState<SpellActionPinsState>(defaultSpellActionPins)
   const [levelUpOpen, setLevelUpOpen] = useState(false)
   const [sheetReloadKey, setSheetReloadKey] = useState(0)
   const [featureDrag, setFeatureDrag] = useState<{ kind: "section" | "item"; id: string; sectionId?: string } | null>(
@@ -1069,6 +1081,14 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   useEffect(() => {
     if (id) saveFeatureLayout(id, featureLayout)
   }, [id, featureLayout])
+
+  useEffect(() => {
+    if (id) setSpellActionPins(loadSpellActionPins(id))
+  }, [id])
+
+  useEffect(() => {
+    if (id) saveSpellActionPins(id, spellActionPins)
+  }, [id, spellActionPins])
 
   useEffect(() => {
     if (!sessionHydrated) return
@@ -1497,6 +1517,24 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       if (!error && row) setCharacter(row)
     },
     [character, equipmentBaseSelections],
+  )
+
+  const persistNameFont = useCallback(
+    async (fontId: NameFontId) => {
+      if (!character) return
+      const nextAppearance = withNameFont(character.appearance, fontId)
+      setCharacter({ ...character, appearance: nextAppearance })
+      const db = createClient()
+      const { data, error } = await db
+        .from("characters")
+        .update({ appearance: nextAppearance })
+        .eq("id", character.id)
+        .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
+        .single()
+      const row = parseCharacterQueryRow(data)
+      if (!error && row) setCharacter(row)
+    },
+    [character],
   )
 
   const openAddEquipmentOverlay = useCallback(async () => {
@@ -3295,6 +3333,43 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     return actions
   }, [featureLayout.actionPins, character?.level, featureTabSections])
 
+  const pinnedSpellActions = useMemo((): SheetActionEntry[] => {
+    if (!spellActionPins.utilitySpellIds.length) return []
+    const catalog = spellCatalog.length ? spellCatalog : spells
+    const byId = new Map<string, Spell>()
+    for (const spell of [...catalog, ...spells]) {
+      if (spell.id) byId.set(spell.id, spell)
+    }
+    const actions: SheetActionEntry[] = []
+    for (const spellId of spellActionPins.utilitySpellIds) {
+      const spell = byId.get(spellId)
+      if (!spell) continue
+      const economy = actionEconomyKindFromCastingTime(spell.casting_time)
+      actions.push({
+        id: `spell-pin:utility:${spell.id}`,
+        name: spell.name,
+        sourceLabel: "Pinned spell",
+        kinds: [economy],
+        category: "utility",
+        showOnAbilitiesTab: true,
+        limitedUses: null,
+        classLevel: character?.level ?? 1,
+        description: spell.description ?? null,
+        castingTime: spell.casting_time ?? null,
+        range: spell.range ?? null,
+        components: spell.components ?? null,
+        duration: spell.duration ?? null,
+        concentration: spell.concentration ?? false,
+        icon: spell.icon ?? null,
+        castSpellChoice: {
+          spellName: spell.name,
+          economyKind: economy,
+        },
+      })
+    }
+    return actions
+  }, [spellActionPins.utilitySpellIds, spellCatalog, spells, character?.level])
+
   const combatActions = useMemo(
     () => [
       ...sheetActions.filter((action) => action.showOnCombatTab ?? action.category !== "utility"),
@@ -3306,8 +3381,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     () => [
       ...sheetActions.filter((action) => action.showOnAbilitiesTab ?? action.category === "utility"),
       ...pinnedSheetActions.filter((action) => action.category === "utility"),
+      ...pinnedSpellActions,
     ],
-    [sheetActions, pinnedSheetActions],
+    [sheetActions, pinnedSheetActions, pinnedSpellActions],
   )
 
   const toggleEffectsSections = useMemo(() => {
@@ -4655,12 +4731,17 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     const ids = new Set<string>()
     const catalog = spellCatalog.length ? spellCatalog : spells
     for (const detail of classDetails) {
-      const features = (detail.subclass?.features as import("@/lib/types").Feature[] | undefined) ?? []
-      for (const grant of collectSubclassAlwaysPreparedSpells(features, detail.row.level, catalog, {
-        classId: detail.row.class_id,
-        featureChoicePicks,
-      })) {
-        ids.add(grant.spellId)
+      const lists = [
+        (detail.class?.features as import("@/lib/types").Feature[] | undefined) ?? [],
+        (detail.subclass?.features as import("@/lib/types").Feature[] | undefined) ?? [],
+      ]
+      for (const features of lists) {
+        for (const grant of collectSubclassAlwaysPreparedSpells(features, detail.row.level, catalog, {
+          classId: detail.row.class_id,
+          featureChoicePicks,
+        })) {
+          ids.add(grant.spellId)
+        }
       }
     }
     for (const id of resourceCastSpellIds) ids.add(id)
@@ -4980,15 +5061,24 @@ export default function CharacterSheetClient({ id }: { id: string }) {
               )}
 
               <div className="min-w-0 flex-1">
-                <h1
-                  className={`text-lg font-black leading-tight text-foreground sm:text-2xl ${
-                    character.banner_url
-                      ? "w-fit max-w-full rounded-md bg-background/85 px-2 py-0.5"
-                      : ""
-                  }`}
-                >
-                  {character.name}
-                </h1>
+                <div className="flex min-w-0 items-start gap-1">
+                  <h1
+                    className={`min-w-0 max-w-full text-lg font-black leading-tight text-foreground sm:text-2xl ${
+                      character.banner_url
+                        ? "w-fit rounded-md bg-background/85 px-2 py-0.5"
+                        : ""
+                    }`}
+                    style={nameFontStyle(readNameFontId(character.appearance))}
+                  >
+                    {character.name}
+                  </h1>
+                  <NameFontPicker
+                    name={character.name}
+                    selectedId={readNameFontId(character.appearance)}
+                    onSelect={persistNameFont}
+                    onBanner={Boolean(character.banner_url)}
+                  />
+                </div>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   {classDetails.length > 0
                     ? classDetails.map((entry) => (
@@ -5562,6 +5652,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           </div>
                           <span className="flex items-center gap-1 shrink-0">
                             {hasExpertise && <SkillExpertiseIndicator />}
+                            <SkillFeatureBonusIndicator
+                              contributions={
+                                statBreakdowns
+                                  ? breakdownLines(statBreakdowns, `skill:${skill.name}`)
+                                  : []
+                              }
+                            />
                             <span className="font-bold tabular-nums w-7 text-right max-md:text-sm">
                               {formatMod(mod)}
                             </span>
@@ -5624,6 +5721,13 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                         </div>
                         <span className="flex items-center gap-1 shrink-0">
                           {skill.expertise && <SkillExpertiseIndicator />}
+                          <SkillFeatureBonusIndicator
+                            contributions={
+                              statBreakdowns
+                                ? breakdownLines(statBreakdowns, `skill:${skill.name}`)
+                                : []
+                            }
+                          />
                           <span className="font-bold tabular-nums w-7 text-right max-md:text-sm">
                             {formatMod(skill.bonus)}
                           </span>
@@ -7364,6 +7468,19 @@ export default function CharacterSheetClient({ id }: { id: string }) {
             spellcastingMod={spellAbilityMod}
             spellHealingModifiers={derived?.spellHealingModifiers ?? []}
             onApplySelfHeal={(amount) => applySelfHeal(amount, "heal")}
+            pinnedToAbilities={
+              selectedSpell.id
+                ? isSpellPinnedToAbilities(spellActionPins, selectedSpell.id)
+                : false
+            }
+            onTogglePinToAbilities={
+              selectedSpell.id
+                ? () =>
+                    setSpellActionPins((prev) =>
+                      toggleSpellPinnedToAbilities(prev, selectedSpell.id),
+                    )
+                : undefined
+            }
             onCast={(result) => {
               markActionEconomy(
                 spellCastEconomyOverride ??

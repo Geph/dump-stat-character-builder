@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronDown, ChevronUp, X } from "lucide-react"
 import { GameIcon } from "@/components/game-icon-picker"
@@ -118,6 +119,11 @@ export function CompendiumDetailOverlay({
   const isBalancedHero = heroLayout === "balanced"
   const isWidescreenHero = heroLayout === "widescreen" || panelWidth === "widescreen"
   const [portraitDetailSheetOpen, setPortraitDetailSheetOpen] = useState(false)
+  const [portalReady, setPortalReady] = useState(false)
+
+  useEffect(() => {
+    setPortalReady(true)
+  }, [])
 
   useEffect(() => {
     if (!open) setPortraitDetailSheetOpen(false)
@@ -127,7 +133,7 @@ export function CompendiumDetailOverlay({
     ? "max-h-[min(80vh,36rem)]"
     : "h-[min(92vh,900px)] max-h-[min(92vh,900px)]"
 
-  return (
+  const overlay = (
     <AnimatePresence>
       {open && (
         <motion.div
@@ -413,4 +419,7 @@ export function CompendiumDetailOverlay({
       )}
     </AnimatePresence>
   )
+
+  if (!portalReady) return overlay
+  return createPortal(overlay, document.body)
 }

@@ -996,7 +996,15 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     catalog: "cat_char_spells_known",
     examples: ["You always have the Detect Magic spell prepared"],
     mechanicsKind: "spells_known",
-    notes: "alwaysPrepared: true",
+    notes: "alwaysPrepared: true; spells[] is the captured name so the sheet can collect it",
+  },
+  {
+    ruleId: "spell.cast_as_action",
+    trigger: "description",
+    catalog: "cat_fx_cast_spell",
+    examples: ["When you cast this spell, its casting time is an action instead of 1 minute"],
+    notes:
+      "cast_spell with castSpellCastingTime action; still spends a slot. Pair with spell.always_prepared when the same feature also grants the named spell.",
   },
   {
     ruleId: "spell.at_will_no_slot",

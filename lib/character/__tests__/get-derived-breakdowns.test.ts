@@ -118,4 +118,51 @@ describe("getDerivedCharacterBreakdowns", () => {
       derived.passivePerception,
     )
   })
+
+  it("lists named feature bonuses on skill check breakdowns", () => {
+    const base = barbarianShieldFixture()
+    const withBonus = {
+      ...base,
+      resolvedFeatures: [
+        {
+          name: "Despotic Discourse",
+          level: 6,
+          description: "",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_discourse",
+              catalogRefId: "cat_fx_check_roll_modifier",
+              activation: {
+                effects: [
+                  {
+                    id: "fx_discourse",
+                    kind: "check_roll_modifier",
+                    checkRollMode: "bonus",
+                    checkCategory: "skill",
+                    checkSkills: ["Persuasion", "Intimidation"],
+                    bonusConfig: {
+                      mode: "ability_modifier",
+                      ability: "INT",
+                      resultFloor: { mode: "fixed", fixed: 1 },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    } as CharacterBuildInputs
+
+    const derived = computeDerivedCharacter(withBonus)
+    const breakdowns = getDerivedCharacterBreakdowns(withBonus)
+    const persuasion = breakdownLines(breakdowns, "skill:Persuasion")
+    const athletics = breakdownLines(breakdowns, "skill:Athletics")
+
+    expect(persuasion.some((line) => line.label === "Despotic Discourse")).toBe(true)
+    expect(sumContributions(persuasion)).toBe(
+      derived.skills.find((skill) => skill.name === "Persuasion")?.bonus,
+    )
+    expect(athletics.some((line) => line.label === "Despotic Discourse")).toBe(false)
+  })
 })

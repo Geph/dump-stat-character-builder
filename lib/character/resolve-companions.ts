@@ -751,6 +751,16 @@ export function collectCompanionCandidatesFromSpells(
       continue
     }
 
+    // Class/subclass features of the same name already registered a picker (e.g. Necromancer
+    // Animate Dead adding Spirit). Keep the feature grant instead of a second spell group.
+    if (
+      formGroups.some(
+        (group) => group.featureName.trim().toLowerCase() === spell.name.trim().toLowerCase(),
+      )
+    ) {
+      continue
+    }
+
     const grants = grantCreaturesFromSpell(spell, modifierCatalog)
     if (!grants.length) {
       // Fall back to flat name list when no structured grant metadata.

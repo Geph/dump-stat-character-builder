@@ -159,11 +159,16 @@ export function resolveBonusByLevelAtCharacterLevel(
   return resolveFixedValueAtLevel(normalizeBonusByLevel(rows), characterLevel, 0) ?? 0
 }
 
+export type FeatureRollBonusEntry = {
+  featureName: string
+  amount: number
+}
+
 export function collectFeatureRollBonuses(
   features: Feature[],
   context: RollContext,
   ctx: FeatureEffectCollectContext,
-): { total: number; sources: string[] } {
+): { total: number; sources: string[]; entries: FeatureRollBonusEntry[] } {
   const active = collectActiveFeatureEffects(
     features,
     { ...ctx, rollContext: context },
@@ -171,6 +176,7 @@ export function collectFeatureRollBonuses(
   )
   let total = 0
   const sources: string[] = []
+  const entries: FeatureRollBonusEntry[] = []
   const params = {
     proficiencyBonus: ctx.proficiencyBonus ?? 2,
     abilityMods: ctx.abilityMods ?? {
@@ -201,8 +207,9 @@ export function collectFeatureRollBonuses(
     if (amount === 0) continue
     total += amount
     sources.push(featureName)
+    entries.push({ featureName, amount })
   }
-  return { total, sources }
+  return { total, sources, entries }
 }
 
 export function collectFeatureDamageBonuses(

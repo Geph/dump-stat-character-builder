@@ -8,6 +8,8 @@ import {
   aggregateCharacteristics,
   applyHpCharacteristics,
   computeInitiative,
+  type AbilityScoreKey,
+  type CharacteristicModifier,
   type SpeedCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
 import { resolveFixedValueAtLevel } from "@/lib/compendium/bonus-by-level"
@@ -25,8 +27,8 @@ import { getExhaustionDerivedEffects } from "@/lib/srd/exhaustion-effects"
 import { resolveSpellcastingAbilityKey } from "@/lib/compendium/spell-slots"
 import { readModifierSource } from "@/lib/character/tag-modifier-source"
 import { resolveCheckRollMode } from "@/lib/compendium/class-feature-metadata"
-import type { CharacteristicModifier } from "@/lib/compendium/characteristic-modifiers"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
+import { collectFeatureRollBonuses } from "@/lib/character/collect-limited-feature-effects"
 
 function featureEffectGrantsInitiativeProficiency(
   linkedModifiers: LinkedModifierInstance[] | null | undefined,
@@ -428,6 +430,19 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
 
   recordSpeedBreakdown(inputs, derived, allMods, aggregated, recorder)
 
+  const resolvedFeatures = inputs.resolvedFeatures ?? []
+  const featureLimitationCtx = {
+    activeConditions: inputs.activeConditions,
+    activeSheetToggles: inputs.activeSheetToggles,
+    equippedArmor: inputs.equippedArmorId
+      ? inputs.equipment.find((item) => item.id === inputs.equippedArmorId) ?? null
+      : null,
+    equippedShield: inputs.equippedShieldId
+      ? inputs.equipment.find((item) => item.id === inputs.equippedShieldId) ?? null
+      : null,
+    currentHp: inputs.currentHp,
+  }
+
   for (const skill of derived.skills) {
     const key = `skill:${skill.name}` as const
     recorder.addSimple(
@@ -449,6 +464,34 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
         },
         derived.proficiencyBonus * (skill.expertise ? 2 : 1),
       )
+    }
+    if (resolvedFeatures.length) {
+      const { entries } = collectFeatureRollBonuses(
+        resolvedFeatures,
+        {
+          kind: "skill",
+          skillName: skill.name,
+          ability: skill.ability as AbilityScoreKey,
+        },
+        {
+          ...featureLimitationCtx,
+          proficiencyBonus: derived.proficiencyBonus,
+          abilityMods: derived.abilityMods,
+          characterLevel: derived.totalLevel,
+          skillProficient: skill.proficient,
+        },
+      )
+      for (const entry of entries) {
+        recorder.addSimple(
+          key,
+          {
+            sourceType: "feature",
+            source: entry.featureName,
+            label: entry.featureName,
+          },
+          entry.amount,
+        )
+      }
     }
   }
 
@@ -500,6 +543,13 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
       amount: 10,
     })
     for (const line of recorder.snapshot()[`skill:Perception`] ?? []) {
+      // Passive scores still use ability + proficiency only; feature check bonuses stay on the skill row.
+      if (
+        line.sourceType === "feature" &&
+        !/^(proficiency|expertise)$/i.test(line.label.trim())
+      ) {
+        continue
+      }
       recorder.add("passivePerception", line)
     }
   }
@@ -513,6 +563,12 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
       amount: 10,
     })
     for (const line of recorder.snapshot()[`skill:Insight`] ?? []) {
+      if (
+        line.sourceType === "feature" &&
+        !/^(proficiency|expertise)$/i.test(line.label.trim())
+      ) {
+        continue
+      }
       recorder.add("passiveInsight", line)
     }
   }
@@ -526,6 +582,12 @@ export function getDerivedCharacterBreakdowns(inputs: CharacterBuildInputs): Der
       amount: 10,
     })
     for (const line of recorder.snapshot()[`skill:Investigation`] ?? []) {
+      if (
+        line.sourceType === "feature" &&
+        !/^(proficiency|expertise)$/i.test(line.label.trim())
+      ) {
+        continue
+      }
       recorder.add("passiveInvestigation", line)
     }
   }

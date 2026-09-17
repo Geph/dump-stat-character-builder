@@ -532,4 +532,93 @@ describe("buildWeaponSheetContext", () => {
     expect(concentration?.description).toMatch(/Disadvantage on Concentration save/i)
     expect(concentration?.description).toMatch(/On a hit/)
   })
+
+  it("surfaces Tavern Brawler chips on Unarmed Strike", () => {
+    const unarmed = {
+      id: "unarmed-strike",
+      name: "Unarmed Strike",
+      category: "Weapon",
+      subcategory: "Simple Melee Weapons",
+      damage: "1",
+      damage_type: "Bludgeoning",
+      properties: [],
+    } as unknown as Equipment
+
+    const dagger = {
+      id: "dagger",
+      name: "Dagger",
+      category: "Weapon",
+      subcategory: "Simple Melee Weapons",
+      damage: "1d4",
+      damage_type: "Piercing",
+      properties: ["Finesse"],
+    } as unknown as Equipment
+
+    const inputs = {
+      ...baseInputs,
+      modifierCatalog: [],
+      feats: [
+        {
+          id: "feat_tavern_brawler",
+          name: "Tavern Brawler",
+          linkedModifiers: [
+            {
+              instanceId: "modinst_tavern_brawler_unarmed",
+              catalogRefId: "cat_char_unarmed_strike_damage",
+              characteristics: [
+                {
+                  id: "mod_tavern_brawler_unarmed",
+                  type: "unarmed_strike_damage",
+                  die: "1d4",
+                  label: "Enhanced Unarmed Strike: 1d4 + STR",
+                },
+              ],
+            },
+            {
+              instanceId: "modinst_tavern_brawler_reroll",
+              catalogRefId: "cat_char_weapon_sheet_badge",
+              characteristics: [
+                {
+                  id: "mod_tavern_brawler_reroll",
+                  type: "weapon_sheet_badge",
+                  label: "Damage Rerolls",
+                  description: "Reroll Unarmed Strike damage die on a 1 (must use new roll).",
+                  appliesTo: "specific",
+                  weaponNames: ["Unarmed Strike"],
+                  includeUnarmed: true,
+                },
+              ],
+            },
+            {
+              instanceId: "modinst_tavern_brawler_push",
+              catalogRefId: "cat_char_on_hit_trigger",
+              characteristics: [
+                {
+                  id: "mod_tavern_brawler_push",
+                  type: "on_hit_trigger",
+                  appliesTo: "unarmed",
+                  oncePerTurn: true,
+                  label: "Push: on Unarmed Strike hit as part of Attack, also push 5 ft (once/turn)",
+                },
+              ],
+            },
+          ],
+        } as never,
+      ],
+      selectedFeatIds: ["feat_tavern_brawler"],
+    } as CharacterBuildInputs
+
+    const unarmedContext = buildWeaponSheetContext(unarmed, inputs, ["Simple weapons"])
+    const names = unarmedContext.appliedModifiers.map((row) => row.name)
+    expect(names).toEqual(expect.arrayContaining(["Enhanced Unarmed Strike", "Damage Rerolls", "Push"]))
+    expect(
+      unarmedContext.appliedModifiers.find((row) => row.name === "Push")?.sourceLabel,
+    ).toBe("Tavern Brawler")
+
+    const daggerContext = buildWeaponSheetContext(dagger, inputs, ["Simple weapons"])
+    expect(daggerContext.appliedModifiers.some((row) => row.name === "Push")).toBe(false)
+    expect(daggerContext.appliedModifiers.some((row) => row.name === "Enhanced Unarmed Strike")).toBe(
+      false,
+    )
+  })
 })

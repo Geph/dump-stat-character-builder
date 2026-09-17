@@ -33,7 +33,6 @@ import {
   movementFx,
   onHitTrigger,
   reactionAttackFx,
-  riderFx,
   savingThrowChoice,
   savingThrowTrigger,
   skillChoice,
@@ -50,6 +49,7 @@ import {
   uses,
   visionMod,
   weaponProf,
+  weaponSheetBadge,
   FEAT_MODIFIER_CATALOG,
 } from "@/lib/compendium/feat-modifier-presets"
 import { charInstance, modId } from "@/lib/compendium/modifier-instance-builders"
@@ -178,7 +178,12 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
 
   "Savage Attacker": {
     linkedModifiers: [
-      riderFx("savage_attacker", { bonusDice: "reroll weapon damage once per turn" }),
+      weaponSheetBadge("savage_attacker", {
+        label: "Savage Attacker",
+        description: "Once per turn, reroll weapon damage dice and use either total.",
+        appliesTo: "all",
+        includeUnarmed: false,
+      }),
     ],
   },
 
@@ -207,8 +212,12 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
   "Tavern Brawler": {
     linkedModifiers: [
       unarmedDie("tavern_brawler_unarmed", "1d4", "Enhanced Unarmed Strike: 1d4 + STR"),
-      riderFx("tavern_brawler_reroll", {
-        bonusDice: "Damage Rerolls: reroll Unarmed Strike damage die on a 1 (must use new roll)",
+      weaponSheetBadge("tavern_brawler_reroll", {
+        label: "Damage Rerolls",
+        description: "Reroll Unarmed Strike damage die on a 1 (must use new roll).",
+        appliesTo: "specific",
+        weaponNames: ["Unarmed Strike"],
+        includeUnarmed: true,
       }),
       weaponProf("tavern_brawler_improvised", "specific", ["Improvised Weapons"], "Improvised Weaponry"),
       onHitTrigger("tavern_brawler_push", {
@@ -263,7 +272,12 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
     linkedModifiers: [
       asiOne("charger_asi", "+1 Strength or Dexterity", ["strength", "dexterity"]),
       speedMod("charger_dash", "walk", "add", 10, "Improved Dash: +10 Speed when you take the Dash action"),
-      riderFx("charger_attack", { bonusDice: "1d8 bonus damage or push 10 ft. after 10 ft. charge (once/turn)" }),
+      weaponSheetBadge("charger_attack", {
+        label: "Charge",
+        description: "Once per turn after moving 10 ft. straight toward a target, deal 1d8 bonus damage or push 10 ft. on a hit.",
+        appliesTo: "melee",
+        includeUnarmed: true,
+      }),
     ],
   },
 

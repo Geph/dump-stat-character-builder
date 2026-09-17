@@ -251,6 +251,7 @@ export function buildSheetFieldValues(input: SheetPdfCharacterInput): SheetField
   set("backstory", input.backstory)
 
   const appearance = input.appearance ?? {}
+  // Skip reserved keys such as name_font — only physical description boxes exist on the PDF.
   for (const key of ["age", "height", "weight", "eyes", "skin", "hair"] as const) {
     set(key, appearance[key])
   }

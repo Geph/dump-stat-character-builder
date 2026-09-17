@@ -9,6 +9,8 @@ import {
   type DamageRollModifiersCharacteristic,
   type OnHitTriggerCharacteristic,
   type RollModifierEntry,
+  type UnarmedStrikeDamageCharacteristic,
+  type WeaponAbilityOverrideCharacteristic,
   type WeaponReachModifierCharacteristic,
   type WeaponSheetBadgeCharacteristic,
 } from "@/lib/compendium/characteristic-modifiers"
@@ -212,6 +214,107 @@ function weaponMatchesSheetBadge(weapon: Equipment, badge: WeaponSheetBadgeChara
   return true
 }
 
+function weaponMatchesAbilityOverride(
+  weapon: Equipment,
+  override: WeaponAbilityOverrideCharacteristic,
+): boolean {
+  const isRanged = weapon.subcategory?.toLowerCase().includes("ranged") ?? false
+  const isMelee = weapon.subcategory?.toLowerCase().includes("melee") ?? !isRanged
+  const weaponName = weapon.name.trim().toLowerCase()
+  let matches = false
+  switch (override.scope) {
+    case "all":
+      matches = true
+      break
+    case "melee":
+      matches = isMelee
+      break
+    case "ranged":
+      matches = isRanged
+      break
+    case "finesse":
+      matches = hasWeaponProperty(weapon, "finesse")
+      break
+    case "specific": {
+      const names = (override.weaponNames ?? []).map((name) => name.trim().toLowerCase()).filter(Boolean)
+      matches = names.some((name) => name === weaponName)
+      break
+    }
+  }
+  if (!matches) return false
+  if (override.whenDamageDice?.length) {
+    if (isUnarmedStrikeWeapon(weapon)) return false
+    return weaponDamageDiceMatches(weapon, override.whenDamageDice)
+  }
+  return true
+}
+
+function describeWeaponAbilityOverride(override: WeaponAbilityOverrideCharacteristic): {
+  name: string
+  description: string
+} {
+  const abilityLabels: Record<string, string> = {
+    strength: "Strength",
+    dexterity: "Dexterity",
+    constitution: "Constitution",
+    intelligence: "Intelligence",
+    wisdom: "Wisdom",
+    charisma: "Charisma",
+  }
+  const abilityName = abilityLabels[override.ability] ?? override.ability
+  const applies =
+    override.appliesTo === "attack"
+      ? "attack rolls"
+      : override.appliesTo === "damage"
+        ? "damage rolls"
+        : "attack and damage rolls"
+  if (override.treatAsFinesse) {
+    return {
+      name: override.label?.trim() || "Extra Finesse",
+      description:
+        override.conditionLabel?.trim() ||
+        `Treat as Finesse for ${applies} (use the higher of Strength or Dexterity).`,
+    }
+  }
+  const rawLabel = override.label?.trim() ?? ""
+  const colon = rawLabel.indexOf(":")
+  const name = colon > 0 ? rawLabel.slice(0, colon).trim() : rawLabel || `Use ${abilityName}`
+  const detail =
+    colon > 0
+      ? rawLabel.slice(colon + 1).trim()
+      : override.conditionLabel?.trim() || `Use ${abilityName} for ${applies}.`
+  return { name, description: detail }
+}
+
+function describeUnarmedStrikeDamageBadge(mod: UnarmedStrikeDamageCharacteristic): {
+  name: string
+  description: string
+} {
+  const rawLabel = mod.label?.trim() ?? ""
+  const colon = rawLabel.indexOf(":")
+  const name = colon > 0 ? rawLabel.slice(0, colon).trim() : rawLabel || "Unarmed Strike"
+  const bits: string[] = []
+  if (colon > 0) bits.push(rawLabel.slice(colon + 1).trim())
+  else if (mod.die) bits.push(`${mod.die} damage`)
+  if (mod.emptyHandedDie) bits.push(`${mod.emptyHandedDie} while empty-handed`)
+  if (mod.damageType) bits.push(mod.damageType)
+  if (mod.ability) {
+    const labels: Record<string, string> = {
+      strength: "Strength",
+      dexterity: "Dexterity",
+      constitution: "Constitution",
+      intelligence: "Intelligence",
+      wisdom: "Wisdom",
+      charisma: "Charisma",
+    }
+    bits.push(`uses ${labels[mod.ability] ?? mod.ability}`)
+  }
+  return {
+    name,
+    description: bits.filter(Boolean).join(" · ") || name,
+  }
+}
+
 function collectAppliedModifiers(
   weapon: Equipment,
   mods: CharacteristicModifier[],
@@ -347,6 +450,27 @@ function collectAppliedModifiers(
       applied.push({
         name,
         description: badge.description?.trim() || name,
+        ...appliedModifierSource(mod),
+      })
+    }
+
+    if (mod.type === "unarmed_strike_damage") {
+      if (!isUnarmedStrikeWeapon(weapon)) continue
+      const badge = describeUnarmedStrikeDamageBadge(mod as UnarmedStrikeDamageCharacteristic)
+      applied.push({
+        name: badge.name,
+        description: badge.description,
+        ...appliedModifierSource(mod),
+      })
+    }
+
+    if (mod.type === "weapon_ability_override") {
+      const override = mod as WeaponAbilityOverrideCharacteristic
+      if (!weaponMatchesAbilityOverride(weapon, override)) continue
+      const badge = describeWeaponAbilityOverride(override)
+      applied.push({
+        name: badge.name,
+        description: badge.description,
         ...appliedModifierSource(mod),
       })
     }

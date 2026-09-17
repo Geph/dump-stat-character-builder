@@ -2904,16 +2904,35 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "spell.always_prepared",
     confidence: "high",
     test: /\balways have the ([A-Za-z' ]+?) spell prepared\b/i,
-    build: (match, ctx) =>
-      charInstance(newInstanceId(), characteristicCatalogRefId("spells_known"), [
-        {
-          id: modId(instanceKey(ctx, "always_prepared")),
-          type: "spells_known",
-          spells: [],
-          alwaysPrepared: true,
-          label: match[1].trim(),
-        },
-      ]),
+    build: (match, ctx) => {
+      const spellName = match[1].trim()
+      if (!spellName || !looksLikeNamedSpell(spellName)) return null
+      return spellsKnownInstance(ctx, "always_prepared", [spellName], spellName)
+    },
+  },
+  {
+    // "When you cast this spell, its casting time is an action instead of 1 minute."
+    // Named always-prepared grants (Animate Dead) still spend a slot — they just change economy.
+    id: "spell.cast_as_action",
+    confidence: "high",
+    scope: "full",
+    test: /\b(?:its )?casting time is an action instead of\b/i,
+    build: (_match, ctx, text) => {
+      const named = /\balways have the ([A-Za-z' ]+?) spell prepared\b/i.exec(text)
+      const spellName = (named?.[1] ?? ctx.featureName ?? "").trim()
+      if (!spellName || !looksLikeNamedSpell(spellName)) return null
+      return fxInstance(newInstanceId(), effectCatalogRefId("cast_spell"), {
+        action: true,
+        effects: [
+          {
+            id: modId(instanceKey(ctx, "cast_as_action")),
+            kind: "cast_spell" as const,
+            castSpellName: spellName,
+            castSpellCastingTime: "action" as const,
+          },
+        ],
+      })
+    },
   },
   {
     id: "spell.at_will_no_slot",

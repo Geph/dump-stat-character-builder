@@ -671,7 +671,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
           exit={{ opacity: 0, y: 12 }}
           className={cn(
             "relative max-h-[90vh] w-full overflow-y-auto rounded-2xl border-2 border-primary/40 bg-card p-5 shadow-2xl",
-            visualSubclassScreen ? "max-w-6xl" : "max-w-lg",
+            visualSubclassScreen ? "max-w-6xl" : "max-w-lg sm:max-w-3xl",
           )}
           onClick={(event) => event.stopPropagation()}
         >
@@ -1236,7 +1236,11 @@ function SpellPickStep({
   }, [leveled, spellSchool, spellLevel])
 
   const openSpellInfo = (pool: Spell[], name: string) => {
-    const match = pool.find((spell) => spell.name === name) ?? null
+    const match =
+      pool.find((spell) => spell.name === name) ??
+      eligible.find((spell) => spell.name === name) ??
+      spells.find((spell) => spell.name === name) ??
+      null
     setDetailSpell(match)
   }
 

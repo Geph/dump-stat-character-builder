@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist_Mono } from 'next/font/google'
+import { nameDisplayFontVariables } from './fonts/name-display'
 import { solberaFontVariables } from './fonts/solbera'
 import { AppThemeProvider } from '@/components/providers/app-theme-provider'
 import { StaticDataProvider } from '@/components/providers/static-data-provider'
@@ -41,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`bg-background ${solberaFontVariables}`} data-theme="parchment" suppressHydrationWarning>
+    <html lang="en" className={`bg-background ${solberaFontVariables} ${nameDisplayFontVariables}`} data-theme="parchment" suppressHydrationWarning>
       <body className={`${geistMono.variable} font-sans antialiased`}>
         <AppThemeProvider>
           <StaticDataProvider>{children}</StaticDataProvider>

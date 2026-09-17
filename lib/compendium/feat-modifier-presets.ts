@@ -61,6 +61,7 @@ export const FEAT_MODIFIER_CATALOG = {
   equipmentAndMagicItems: "cat_char_equipment_and_magic_items",
   /** Passive flat / proficiency-based damage reduction (Heavy Armor Master). */
   damageReductionChar: "cat_char_damage_reduction",
+  weaponSheetBadge: "cat_char_weapon_sheet_badge",
 } as const
 
 export type FeatModifierPreset = {
@@ -672,6 +673,27 @@ export function onHitTrigger(
       id: modId(key),
       type: "on_hit_trigger",
       oncePerTurn: true,
+      ...config,
+    },
+  ])
+}
+
+/** Named info chip on matching Combat weapon / Unarmed Strike cards. */
+export function weaponSheetBadge(
+  key: string,
+  config: Partial<Extract<CharacteristicModifier, { type: "weapon_sheet_badge" }>> & {
+    label: string
+  },
+): LinkedModifierInstance {
+  return charInstance(`modinst_${key}`, FEAT_MODIFIER_CATALOG.weaponSheetBadge, [
+    {
+      id: modId(key),
+      type: "weapon_sheet_badge",
+      includeUnarmed: false,
+      requireFirearm: false,
+      appliesTo: "all",
+      whenDamageDice: [],
+      weaponNames: [],
       ...config,
     },
   ])

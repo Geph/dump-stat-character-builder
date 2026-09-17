@@ -209,9 +209,7 @@ export default function HomePage() {
               : undefined
           }
         >
-          {heroBackgroundUrl ? (
-            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
-          ) : (
+          {heroBackgroundUrl ? null : (
             <div className="absolute inset-0 bg-card/30 pointer-events-none" />
           )}
 
@@ -222,8 +220,12 @@ export default function HomePage() {
               transition={{ duration: 0.5 }}
             >
               <h1
-                className="text-6xl md:text-8xl font-bold text-foreground mb-6 text-balance"
-                style={{ fontFamily: "var(--font-display)" }}
+                className="text-6xl md:text-8xl font-bold text-white mb-6 text-balance [paint-order:stroke_fill] [-webkit-text-stroke:2px_rgba(0,0,0,0.55)]"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  textShadow:
+                    "0 2px 0 rgba(0,0,0,0.55), 0 8px 22px rgba(0,0,0,0.7), 0 0 28px rgba(0,0,0,0.35)",
+                }}
               >
                 Dump Stat
               </h1>

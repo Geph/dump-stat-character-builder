@@ -344,11 +344,11 @@ export function MultiSelectChoices({
 
   const gridClass = compact
     ? showOptionSummaries
-      ? "grid grid-cols-1 sm:grid-cols-2 gap-1.5"
-      : "grid grid-cols-1 sm:grid-cols-3 gap-1.5"
+      ? "grid min-w-0 grid-cols-1 sm:grid-cols-2 gap-1.5"
+      : "grid min-w-0 grid-cols-1 sm:grid-cols-3 gap-1.5"
     : showOptionSummaries
-      ? "grid grid-cols-1 sm:grid-cols-2 gap-2"
-      : "grid grid-cols-1 sm:grid-cols-3 gap-2"
+      ? "grid min-w-0 grid-cols-1 sm:grid-cols-2 gap-2"
+      : "grid min-w-0 grid-cols-1 sm:grid-cols-3 gap-2"
 
   const renderOption = (option: ChoiceOption) => {
     const locked = isLockedName(option.name)
@@ -360,14 +360,16 @@ export function MultiSelectChoices({
       showOptionSummaries && !optionKind(option.name)
         ? stripFeatureHintHtml(option.description ?? "")
         : ""
-    const canShowInfo = showInfoButtons && Boolean(optionInfoText(option, showSkillInfoButtons))
+    const canShowInfo =
+      showInfoButtons &&
+      (Boolean(onOptionInfo) || Boolean(optionInfoText(option, showSkillInfoButtons)))
     const iconSlug = showSkillIcons ? skillIconSlug(option.name, skillIconByName) : null
     const prereq = option.prerequisite?.trim() || null
 
     return (
       <div
         key={option.name}
-        className={canShowInfo || !compact ? "flex items-stretch gap-1" : undefined}
+        className={canShowInfo || !compact ? "flex min-w-0 items-stretch gap-1" : undefined}
       >
         <button
           type="button"

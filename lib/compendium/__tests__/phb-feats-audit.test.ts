@@ -34,7 +34,7 @@ describe("PHB feats wiring (Origin / General / Fighting Style)", () => {
     expect(chars(mi).some((c) => c.type === "spells_known")).toBe(true)
 
     const savage = enrich("Savage Attacker")
-    expect(((savage.linked_modifiers as { catalogRefId?: string }[]) ?? []).length).toBeGreaterThan(0)
+    expect(chars(savage).some((c) => c.type === "weapon_sheet_badge")).toBe(true)
 
     const skilled = enrich("Skilled")
     expect(chars(skilled).some((c) => c.type === "skills")).toBe(true)
@@ -55,11 +55,43 @@ describe("PHB feats wiring (Origin / General / Fighting Style)", () => {
 
     const tavern = enrich("Tavern Brawler")
     expect(chars(tavern).some((c) => c.type === "unarmed_strike_damage")).toBe(true)
+    expect(chars(tavern).some((c) => c.type === "weapon_sheet_badge")).toBe(true)
+    expect(chars(tavern).some((c) => c.type === "on_hit_trigger")).toBe(true)
+
+    const tavernLegacy = enrichCustomFeatRow({
+      name: "Tavern Brawler",
+      source: PHB,
+      description: "Tavern Brawler",
+      linked_modifiers: [
+        {
+          instanceId: "modinst_tavern_brawler_reroll",
+          catalogRefId: "cat_fx_rider_damage",
+          characteristics: [],
+          activation: {
+            action: true,
+            effects: [{ id: "mod_tavern_brawler_reroll", kind: "rider_damage", bonusDice: "reroll" }],
+          },
+        },
+        {
+          instanceId: "modinst_tavern_brawler_unarmed",
+          catalogRefId: "cat_char_unarmed_strike_damage",
+          characteristics: [
+            {
+              id: "mod_tavern_brawler_unarmed",
+              type: "unarmed_strike_damage",
+              die: "1d4",
+              label: "Enhanced Unarmed Strike: 1d4 + STR",
+            },
+          ],
+        },
+      ],
+    })
+    expect(chars(tavernLegacy).some((c) => c.type === "weapon_sheet_badge")).toBe(true)
     expect(
-      ((tavern.linked_modifiers as { catalogRefId?: string }[]) ?? []).some(
-        (m) => m.catalogRefId === "cat_fx_rider_damage",
-      ),
-    ).toBe(true)
+      ((tavernLegacy.linked_modifiers as { instanceId?: string; catalogRefId?: string }[]) ?? []).find(
+        (m) => m.instanceId === "modinst_tavern_brawler_reroll",
+      )?.catalogRefId,
+    ).toBe("cat_char_weapon_sheet_badge")
 
     const healer = enrich("Healer")
     expect(chars(healer).some((c) => c.type === "spell_healing_modifier")).toBe(true)

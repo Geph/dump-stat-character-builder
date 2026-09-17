@@ -2056,6 +2056,9 @@ export default function BuilderPageClient() {
   const subclassGrantedSpellIds = collectSubclassAlwaysPreparedSpellIds(
     activeClassLevels.map((cl) => ({
       subclass: subclasses.find((sc) => sc.id === subclassByClassId[cl.classId]) ?? null,
+      classFeatures: classes.find((cls) => cls.id === cl.classId)?.features as
+        | import("@/lib/types").Feature[]
+        | undefined,
       classLevel: cl.level,
     })),
     spells,

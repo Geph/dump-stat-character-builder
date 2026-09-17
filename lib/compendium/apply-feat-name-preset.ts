@@ -119,6 +119,56 @@ function isLegacyInitiativeProficiencyCheck(instance: LinkedModifierInstance): b
   )
 }
 
+function isWeaponSheetBadgeInstance(instance: LinkedModifierInstance): boolean {
+  return Boolean(instance.characteristics?.some((mod) => mod.type === "weapon_sheet_badge"))
+}
+
+/**
+ * Upgrade legacy rider_damage attack notes (Tavern Brawler / Savage Attacker / Charger)
+ * to weapon_sheet_badge chips, and append any missing badge instances from the preset.
+ */
+function syncPresetWeaponSheetBadges(
+  row: Record<string, unknown>,
+  preset: FeatModifierPreset,
+): Record<string, unknown> {
+  const linkedRaw = row.linkedModifiers ?? row.linked_modifiers
+  if (!Array.isArray(linkedRaw)) return row
+  const presetBadges = (preset.linkedModifiers ?? []).filter(isWeaponSheetBadgeInstance)
+  if (!presetBadges.length) return row
+
+  let changed = false
+  const byId = new Map(presetBadges.map((inst) => [inst.instanceId, inst]))
+  const linked = (linkedRaw as LinkedModifierInstance[]).map((inst) => {
+    const replacement = byId.get(inst.instanceId)
+    if (!replacement) return inst
+    if (
+      inst.catalogRefId === replacement.catalogRefId &&
+      JSON.stringify(inst.characteristics ?? []) === JSON.stringify(replacement.characteristics ?? [])
+    ) {
+      return inst
+    }
+    changed = true
+    return replacement
+  })
+
+  const presentIds = new Set(linked.map((inst) => inst.instanceId))
+  for (const badge of presetBadges) {
+    if (presentIds.has(badge.instanceId)) continue
+    linked.push(badge)
+    changed = true
+  }
+
+  if (!changed) return row
+  const synced = syncModifierRefs({ linkedModifiers: linked })
+  return {
+    ...row,
+    linked_modifiers: synced.linkedModifiers,
+    linkedModifiers: synced.linkedModifiers,
+    modifier_refs: synced.modifierRefs,
+    modifierRefs: synced.modifierRefs,
+  }
+}
+
 /**
  * Replace leftover Alert-style check_bonus FeatureEffects with the initiative
  * characteristic the name preset now authors, so existing feat rows pick up PB
@@ -218,7 +268,10 @@ export function applyFeatNamePreset(
   const preset = resolveFeatNamePreset(name)
   if (!preset) return row
   if (featHasLinkedModifiers(row)) {
-    return syncPresetInitiativeProficiency(syncPresetAbilityScores(row, preset), preset)
+    return syncPresetWeaponSheetBadges(
+      syncPresetInitiativeProficiency(syncPresetAbilityScores(row, preset), preset),
+      preset,
+    )
   }
 
   const description = typeof row.description === "string" ? row.description : ""

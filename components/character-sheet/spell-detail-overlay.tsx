@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { AlertTriangle, X, Sparkles, Dices } from "lucide-react"
+import { AlertTriangle, X, Sparkles, Dices, Pin } from "lucide-react"
 import type { Spell } from "@/lib/types"
 import {
   concentrationConditionName,
@@ -37,6 +37,15 @@ import { useSheetRollContext } from "@/components/character-sheet/sheet-roll-con
 import { resolveRollMode } from "@/lib/character/resolve-roll-mode"
 import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-history-context"
 import type { PsionicAugmentSelection } from "@/lib/compendium/parse-psionic-augments"
+import { CompendiumCardHero } from "@/components/compendium/compendium-card-hero"
+import {
+  DETAIL_OVERLAY_HERO_GRADIENT_CLASS,
+  getCompendiumCardImageUrl,
+  WIDE_CARD_ASPECT_CLASS,
+} from "@/lib/compendium/card-image"
+import { spellDetailOverlayTags } from "@/lib/compendium/spell-detail-tags"
+import { compendiumAccentColorStyles, getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
+import { cn } from "@/lib/utils"
 
 type SpellDetailOverlayProps = {
   spell: Spell
@@ -80,6 +89,9 @@ type SpellDetailOverlayProps = {
   spellcastingMod?: number
   spellHealingModifiers?: SpellHealingModifierCharacteristic[]
   onApplySelfHeal?: (amount: number) => void
+  /** When set, show a control to pin this cast button onto Abilities & Skills. */
+  pinnedToAbilities?: boolean
+  onTogglePinToAbilities?: () => void
 }
 
 export function SpellDetailOverlay({
@@ -104,6 +116,8 @@ export function SpellDetailOverlay({
   spellcastingMod = 0,
   spellHealingModifiers = [],
   onApplySelfHeal,
+  pinnedToAbilities = false,
+  onTogglePinToAbilities,
 }: SpellDetailOverlayProps) {
   const [castFeedback, setCastFeedback] = useState<string | null>(null)
   const [concentrationWarningOpen, setConcentrationWarningOpen] = useState(false)
@@ -117,6 +131,11 @@ export function SpellDetailOverlay({
   const psionicAugments = resolveSpellPsionicAugments(spell)
   const needsAttack = spellRequiresAttack(spell.description)
   const isCantrip = spell.level === 0
+  const imageUrl = getCompendiumCardImageUrl(spell)
+  const accent = compendiumAccentColorStyles(
+    getCompendiumItemAccentColor(spell as unknown as Record<string, unknown>),
+  )
+  const overlayTags = spellDetailOverlayTags(spell)
 
   const isPointPool = castCost?.mode === "point_pool"
   const isResourceCast = castCost?.mode === "resource"
@@ -307,23 +326,130 @@ export function SpellDetailOverlay({
         className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-card border-2 border-border rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 flex items-start justify-between gap-3 p-4 border-b border-border bg-card/95 backdrop-blur-sm">
-          <div>
-            <h2 className="text-lg font-black text-foreground">{spell.name}</h2>
-            <p className="text-sm text-muted-foreground">
-              {spell.level === 0 ? "Cantrip" : `Level ${spell.level}`} · {spell.school}
-              {spell.concentration && " · Concentration"}
-              {spell.ritual && " · Ritual"}
-            </p>
+        {imageUrl ? (
+          <div className={cn("relative w-full overflow-hidden", WIDE_CARD_ASPECT_CLASS, "min-h-[11rem]")}>
+            <CompendiumCardHero
+              imageUrl={imageUrl}
+              crop="top"
+              variant="overlay"
+              fillHeight
+              overlayGradientClass={DETAIL_OVERLAY_HERO_GRADIENT_CLASS}
+            />
+            <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-end gap-2 p-3">
+              {onTogglePinToAbilities ? (
+                <button
+                  type="button"
+                  onClick={onTogglePinToAbilities}
+                  aria-pressed={pinnedToAbilities}
+                  title={
+                    pinnedToAbilities
+                      ? "Unpin from Abilities & Skills actions"
+                      : "Pin to Abilities & Skills actions"
+                  }
+                  aria-label={
+                    pinnedToAbilities
+                      ? "Unpin from Abilities & Skills actions"
+                      : "Pin to Abilities & Skills actions"
+                  }
+                  className={cn(
+                    "rounded-full border p-2 transition-colors",
+                    pinnedToAbilities
+                      ? "border-white/50 bg-white/20 text-white"
+                      : "border-white/20 bg-black/40 text-white/85 hover:bg-black/60 hover:text-white",
+                  )}
+                >
+                  <Pin className={cn("h-4 w-4", pinnedToAbilities && "fill-current")} />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-white/20 bg-black/40 p-2 text-white/85 hover:bg-black/60 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-3 pt-10">
+              {spell.school ? (
+                <p
+                  className={cn(
+                    "text-[10px] font-bold uppercase tracking-[0.22em]",
+                    accent.cardFooterText,
+                  )}
+                >
+                  {spell.school}
+                </p>
+              ) : null}
+              <h2 className="mt-0.5 font-serif text-2xl sm:text-3xl font-black text-white drop-shadow-lg leading-tight">
+                {spell.name}
+              </h2>
+              {overlayTags.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {overlayTags.map((tag) => (
+                    <span
+                      key={tag.label}
+                      className={cn(
+                        "rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                        tag.emphasis
+                          ? cn(accent.cardFooterBorder, "bg-black/35", accent.cardFooterText)
+                          : "border-white/35 bg-black/35 text-white",
+                      )}
+                    >
+                      {tag.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        ) : (
+          <div className="sticky top-0 flex items-start justify-between gap-3 p-4 border-b border-border bg-card/95 backdrop-blur-sm z-10">
+            <div className="min-w-0">
+              <h2 className="text-lg font-black text-foreground">{spell.name}</h2>
+              <p className="text-sm text-muted-foreground">
+                {spell.level === 0 ? "Cantrip" : `Level ${spell.level}`} · {spell.school}
+                {spell.concentration && " · Concentration"}
+                {spell.ritual && " · Ritual"}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {onTogglePinToAbilities ? (
+                <button
+                  type="button"
+                  onClick={onTogglePinToAbilities}
+                  aria-pressed={pinnedToAbilities}
+                  title={
+                    pinnedToAbilities
+                      ? "Unpin from Abilities & Skills actions"
+                      : "Pin to Abilities & Skills actions"
+                  }
+                  aria-label={
+                    pinnedToAbilities
+                      ? "Unpin from Abilities & Skills actions"
+                      : "Pin to Abilities & Skills actions"
+                  }
+                  className={cn(
+                    "p-1.5 rounded-lg transition-colors",
+                    pinnedToAbilities
+                      ? "text-primary bg-primary/10 hover:bg-primary/15"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                  )}
+                >
+                  <Pin className={cn("h-5 w-5", pinnedToAbilities && "fill-current")} />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="p-4 space-y-3 text-sm">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">

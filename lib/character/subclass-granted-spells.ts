@@ -1,5 +1,6 @@
 import type { Feature, Subclass } from "@/lib/types"
 import { featureChoiceKey } from "@/lib/builder/choices"
+import { resolveSpellIdAgainstCatalog } from "@/lib/import/resolve-linked-modifier-spells"
 import {
   isSubclassSpellTableFeature,
   parseSubclassSpellTable,
@@ -122,9 +123,12 @@ export function collectSubclassAlwaysPreparedSpells(
 
   const byId = new Map<string, GrantedSpell>()
   const add = (grant: GrantedSpell) => {
-    const existing = byId.get(grant.spellId)
+    const spellId = spellCatalog.length
+      ? resolveSpellIdAgainstCatalog(grant.spellId, spellCatalog)
+      : grant.spellId
+    const existing = byId.get(spellId)
     if (!existing || grant.unlocksAtClassLevel < existing.unlocksAtClassLevel) {
-      byId.set(grant.spellId, grant)
+      byId.set(spellId, { ...grant, spellId })
     }
   }
 
@@ -151,16 +155,32 @@ export function collectSubclassAlwaysPreparedSpells(
   return [...byId.values()]
 }
 
-/** Convenience: collect granted spell IDs across all of a character's subclasses. */
+/** Convenience: collect granted spell IDs from class and subclass features. */
 export function collectSubclassAlwaysPreparedSpellIds(
-  entries: { subclass: Subclass | null | undefined; classLevel: number }[],
+  entries: {
+    subclass?: Subclass | null | undefined
+    classFeatures?: Feature[] | null | undefined
+    classLevel: number
+    classId?: string
+    featureChoicePicks?: Record<string, string[]>
+  }[],
   spellCatalog: SpellCatalogEntry[],
 ): string[] {
   const ids = new Set<string>()
   for (const entry of entries) {
-    const features = (entry.subclass?.features as Feature[] | undefined) ?? []
-    for (const grant of collectSubclassAlwaysPreparedSpells(features, entry.classLevel, spellCatalog)) {
-      ids.add(grant.spellId)
+    const lists = [
+      entry.classFeatures ?? [],
+      (entry.subclass?.features as Feature[] | undefined) ?? [],
+    ]
+    for (const features of lists) {
+      for (const grant of collectSubclassAlwaysPreparedSpells(
+        features,
+        entry.classLevel,
+        spellCatalog,
+        { classId: entry.classId, featureChoicePicks: entry.featureChoicePicks },
+      )) {
+        ids.add(grant.spellId)
+      }
     }
   }
   return [...ids]

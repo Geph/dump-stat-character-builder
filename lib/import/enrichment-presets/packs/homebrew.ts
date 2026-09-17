@@ -8,7 +8,9 @@ import { characteristicCatalogRefId, effectCatalogRefId } from "@/lib/compendium
 import { requiresActiveToggleLimitation } from "@/lib/compendium/modifier-limitations"
 import { fxInstance, modId } from "@/lib/compendium/modifier-instance-builders"
 import type { Feature, FeatureChoice } from "@/lib/types"
+import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import {
+  NECROMANCER_ANIMATE_DEAD_FORMS,
   NECROMANCER_THRALL_CHOICE_OPTIONS,
   NECROMANCER_THRALL_COUNT_BY_LEVEL,
   NECROMANCER_THRALL_CR_BY_LEVEL,
@@ -1926,6 +1928,80 @@ export const NECROMANCER_PRESETS: EnrichmentPreset[] = [
               maxCreatureSize: "Medium",
               linkHostItem: true,
               label: "Extradimensional corpse storage linked to a chosen item",
+            },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "necromancer.class.animate_dead",
+    pack: "necromancer",
+    target: "class_feature",
+    match: { className: /necromancer/i, name: /^animate dead$/i },
+    operations: [
+      { op: "setActivation", activation: { action: true } },
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { combatActions: true, featuresTab: true },
+      },
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["spells_known"],
+        preset: {
+          kind: "char_instance",
+          idKey: "animate_dead_spells",
+          catalogRefId: characteristicCatalogRefId("spells_known"),
+          characteristics: [
+            {
+              id: modId("animate_dead_spells"),
+              type: "spells_known",
+              spells: [
+                {
+                  spellId: spellNamePlaceholder("Animate Dead"),
+                  alwaysPrepared: true,
+                },
+              ],
+              alwaysPrepared: true,
+              label: "Animate Dead",
+            },
+          ],
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        replaceEffectKinds: ["cast_spell"],
+        preset: {
+          kind: "fx_instance",
+          idKey: "animate_dead_cast",
+          catalogRefId: effectCatalogRefId("cast_spell"),
+          activation: { action: true },
+          effects: [
+            {
+              id: modId("animate_dead_cast"),
+              kind: "cast_spell",
+              castSpellName: "Animate Dead",
+              castSpellCastingTime: "action",
+            },
+          ],
+        },
+      },
+      {
+        op: "attachNamedPreset",
+        replaceCharacteristicTypes: ["grant_creature"],
+        preset: {
+          kind: "char_instance",
+          idKey: "animate_dead_creatures",
+          catalogRefId: characteristicCatalogRefId("grant_creature"),
+          characteristics: [
+            {
+              id: modId("animate_dead_creatures"),
+              type: "grant_creature",
+              creatureNames: [...NECROMANCER_ANIMATE_DEAD_FORMS],
+              choiceOptions: [...NECROMANCER_ANIMATE_DEAD_FORMS],
+              count: 1,
+              pickerTitle: "Animate Dead",
+              label: "Animated Undead (Skeleton, Spirit, or Zombie)",
             },
           ],
         },

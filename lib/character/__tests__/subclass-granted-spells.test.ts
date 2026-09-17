@@ -95,4 +95,35 @@ describe("collectSubclassAlwaysPreparedSpells", () => {
       ].sort(),
     )
   })
+
+  it("collects class-feature always-prepared grants and resolves name placeholders", () => {
+    const catalog = [...SPELL_CATALOG, { id: "spell-animate-dead", name: "Animate Dead" }]
+    const feature = {
+      level: 5,
+      name: "Animate Dead",
+      description: "You always have the Animate Dead spell prepared.",
+      linkedModifiers: [
+        {
+          instanceId: "modinst_animate",
+          catalogRefId: "cat_char_spells_known",
+          characteristics: [
+            {
+              id: "mod_animate",
+              type: "spells_known",
+              alwaysPrepared: true,
+              spells: [{ spellId: "import_spell_name:Animate Dead", alwaysPrepared: true }],
+            },
+          ],
+        },
+      ],
+    } as unknown as Feature
+    const ids = collectSubclassAlwaysPreparedSpellIds(
+      [{ classFeatures: [feature], classLevel: 5 }],
+      catalog,
+    )
+    expect(ids).toEqual(["spell-animate-dead"])
+    expect(collectSubclassAlwaysPreparedSpellIds([{ classFeatures: [feature], classLevel: 4 }], catalog)).toEqual(
+      [],
+    )
+  })
 })
