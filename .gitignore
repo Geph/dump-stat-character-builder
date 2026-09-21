@@ -164,13 +164,16 @@ public/images/compendium/spells/*
 !public/images/compendium/spells/creation.png
 !public/images/compendium/spells/cure-wounds.png
 !public/images/compendium/spells/dancing-lights.png
+!public/images/compendium/spells/darkness.png
 !public/images/compendium/spells/darkvision.png
 !public/images/compendium/spells/daylight.png
 !public/images/compendium/spells/death-ward.png
 !public/images/compendium/spells/delayed-blast-fireball.png
 !public/images/compendium/spells/demiplane.png
 !public/images/compendium/spells/detect-evil-and-good.png
+!public/images/compendium/spells/detect-magic.png
 !public/images/compendium/spells/detect-poison-and-disease.png
+!public/images/compendium/spells/detect-thoughts.png
 !public/images/compendium/spells/dimension-door.png
 !public/images/compendium/spells/disguise-self.png
 !public/images/compendium/spells/disintegrate.png
@@ -190,6 +193,7 @@ public/images/compendium/spells/*
 !public/images/compendium/spells/earthquake.png
 !public/images/compendium/spells/eldritch-blast.png
 !public/images/compendium/spells/elementalism.png
+!public/images/compendium/spells/enhance-ability.png
 !public/images/compendium/spells/enlarge-reduce.png
 !public/images/compendium/spells/ensnaring-strike.png
 !public/images/compendium/spells/entangle.png
@@ -243,6 +247,7 @@ public/images/compendium/spells/*
 !public/images/compendium/spells/guards-and-wards.png
 !public/images/compendium/spells/guidance.png
 !public/images/compendium/spells/guiding-bolt.png
+!public/images/compendium/spells/gust-of-wind.png
 !public/images/compendium/spells/gust.png
 !public/images/compendium/spells/hallow.png
 !public/images/compendium/spells/hallucinatory-terrain.png
@@ -277,11 +282,13 @@ public/images/compendium/spells/*
 !public/images/compendium/spells/knock.png
 !public/images/compendium/spells/legend-lore.png
 !public/images/compendium/spells/lesser-restoration.png
+!public/images/compendium/spells/levitate.png
 !public/images/compendium/spells/light.png
 !public/images/compendium/spells/lightning-bolt.png
 !public/images/compendium/spells/lightning-lure.png
 !public/images/compendium/spells/locate-animals-or-plants.png
 !public/images/compendium/spells/locate-creature.png
+!public/images/compendium/spells/locate-object.png
 !public/images/compendium/spells/longstrider.png
 !public/images/compendium/spells/mage-armor.png
 !public/images/compendium/spells/mage-hand.png
@@ -304,6 +311,7 @@ public/images/compendium/spells/*
 !public/images/compendium/spells/meteor-swarm.png
 !public/images/compendium/spells/mind-blank.png
 !public/images/compendium/spells/mind-sliver.png
+!public/images/compendium/spells/mind-spike.png
 !public/images/compendium/spells/minor-illusion.png
 !public/images/compendium/spells/mirage-arcane.png
 !public/images/compendium/spells/mirror-image.png
@@ -386,6 +394,7 @@ public/images/compendium/spells/*
 !public/images/compendium/spells/spider-climb.png
 !public/images/compendium/spells/spike-growth.png
 !public/images/compendium/spells/spirit-guardians.png
+!public/images/compendium/spells/spiritual-weapon.png
 !public/images/compendium/spells/starry-wisp.png
 !public/images/compendium/spells/stinking-cloud.png
 !public/images/compendium/spells/stone-shape.png
