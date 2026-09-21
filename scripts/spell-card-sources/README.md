@@ -18,4 +18,4 @@ Output: `public/images/compendium/spells/*.png` at **771×1024** (**3:4** portra
 
 Wire display names in `lib/compendium/spell-card-images-defaults.ts` (`BUNDLED_SPELL_CARD_IMAGE_NAMES`).
 
-Source files here are gitignored. Only `srd cantrips/` optimized outputs are eligible for GitHub. Keep Kibbles and Mage Hand Press masters local.
+Source files here are gitignored. Optimized outputs for **SRD seed spells** are eligible for GitHub (see `BUNDLED_SPELL_FILES` / `.gitignore` un-ignores). Keep Kibbles, Mage Hand Press, and other non-SRD masters local — import still attaches them when the PNG exists after optimize.

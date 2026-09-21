@@ -74,6 +74,15 @@ describe("spell card image defaults", () => {
     }
   })
 
+  it("applies bundled art to leveled SRD spells when optimized portraits exist", () => {
+    for (const name of ["Bane", "Alarm", "Fireball"] as const) {
+      const row = enrichSrdSpellRow({ name, source: "SRD", level: 1 })
+      expect(row.card_image_url).toMatch(
+        new RegExp(`/images/compendium/spells/${spellNameToCardImageSlug(name)}\\.png$`),
+      )
+    }
+  })
+
   it("keeps custom card art on SRD spells", () => {
     const custom = "https://example.com/custom.png"
     const row = enrichSrdSpellRow({

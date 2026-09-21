@@ -227,5 +227,33 @@ describe("card source layout", () => {
       outputSlug: "spare-the-dying",
       version: 0,
     })
+    expect(parseSpellCardSourceBase("armor of agathys alt")).toEqual({
+      outputSlug: "armor-of-agathys",
+      version: 0,
+    })
+    expect(parseSpellCardSourceBase("Melf's Acid Arrow")).toEqual({
+      outputSlug: "acid-arrow",
+      version: 0,
+    })
+    expect(parseSpellCardSourceBase("True-Strike-Spear")).toEqual({
+      outputSlug: "true-strike",
+      version: 0,
+    })
+    expect(parseSpellCardSourceBase("create water")).toEqual({
+      outputSlug: "create-or-destroy-water",
+      version: 0,
+    })
+    expect(parseSpellCardSourceBase("Ray-of-Frost-v2")).toEqual({
+      outputSlug: "ray-of-frost",
+      version: 0,
+    })
+    expect(parseSpellCardSourceBase("Leomund's Tiny Chest")).toEqual({
+      outputSlug: "secret-chest",
+      version: 0,
+    })
+    expect(parseSpellCardSourceBase("Entrancing-Mirrors-Fixed")).toEqual({
+      outputSlug: "mirror-image",
+      version: 0,
+    })
   })
 })

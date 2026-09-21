@@ -6,6 +6,7 @@ import {
   kebabSlug,
   parseSpellCardSourceBase,
   parseSubclassSourceBasename,
+  shouldSkipSpellCardSourceBase,
   stripCopySuffix,
 } from "./card-source-layout.mjs"
 import { isBundledCardSourceOrigin, isBundledPublicCardArtPath, cardSourceOriginFromRelative } from "./bundled-card-art.mjs"
@@ -270,6 +271,7 @@ function discoverSpellCardSlugs(sourcesDir) {
   const byOutputSlug = new Map()
 
   walkImageFiles(sourcesDir, ({ full, ext, base }) => {
+    if (shouldSkipSpellCardSourceBase(base)) return
     const { outputSlug, version } = parseSpellCardSourceBase(base)
     if (!outputSlug) return
     const prev = byOutputSlug.get(outputSlug)

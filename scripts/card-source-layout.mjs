@@ -36,25 +36,93 @@ export const SPELL_CARD_OUTPUT_SLUG_ALIASES = {
   "dancing-object": "dancing-object-animate-object",
   "terrific-transposition": "trarys-terrific-transposition",
   "sapre-the-dying": "spare-the-dying",
+  // WotC master filename quirks → SRD seed slugs
+  "create-water": "create-or-destroy-water",
+  "cure-light-wounds": "cure-wounds",
+  "detect-evil": "detect-evil-and-good",
+  "detect-poison": "detect-poison-and-disease",
+  "fairie-fire": "faerie-fire",
+  "good-berry": "goodberry",
+  "discordant-whispers": "dissonant-whispers",
+  "cat-nap": "catnap",
+  "aberrent-spirit": "aberrant-spirit",
+  "beastial-spirit": "bestial-spirit",
+  "thundrous-smite": "thunderous-smite",
+  antipathy: "antipathy-sympathy",
+  sympathy: "antipathy-sympathy",
+  "magic-aura": "arcanists-magic-aura",
+  "arcanists-magic-aura": "arcanists-magic-aura",
+  "melfs-acid-arrow": "acid-arrow",
+  "bigbys-hand": "arcane-hand",
+  "bigbys-forceful-hand": "arcane-hand",
+  "tashas-hideous-laughter": "hideous-laughter",
+  "hideous-laughter": "hideous-laughter",
+  "leomunds-tiny-hut": "tiny-hut",
+  "mordenkainens-faithful-hound": "faithful-hound",
+  "mordenkainens-private-sanctum": "private-sanctum",
+  "mordenkainens-magnificent-mansion": "magnificent-mansion",
+  "mordenkainens-sword": "arcane-sword",
+  "otilukes-freezing-sphere": "freezing-sphere",
+  "otilukes-resilient-sphere": "resilient-sphere",
+  "ottos-irresistible-dance": "irresistible-dance",
+  "drawmijs-instant-summons": "instant-summons",
+  "rarys-telepathic-bond": "telepathic-bond",
+  "evards-black-tentacles": "black-tentacles",
+  "locate-animals-and-plants": "locate-animals-or-plants",
+  "protection-from-evil": "protection-from-evil-and-good",
+  "purify-food-and-water": "purify-food-and-drink",
+  "nystuls-magic-aura": "arcanists-magic-aura",
+  "leomunds-tiny-chest": "secret-chest",
+  "entrancing-mirrors": "mirror-image",
 }
 
 export function spellCardSourceToSlug(basename) {
   return kebabSlug(basename)
 }
 
+/** Drop non-spell masters and Midjourney dump filenames. */
+export function shouldSkipSpellCardSourceBase(base) {
+  const stem = String(base ?? "").trim()
+  if (!stem) return true
+  if (/^gephginger[_-]/i.test(stem)) return true
+  if (/^coming\s+soon$/i.test(stem)) return true
+  if (/^_/.test(stem)) return true
+  return false
+}
+
 /**
  * Parse spell card masters like "Mutate 2.png" / "Repair Front.png".
  * Trailing version numbers collapse to one slug; higher version wins.
+ * Also strips WotC `alt` / `v2` / decorative suffixes before slugifying.
  */
 export function parseSpellCardSourceBase(base) {
-  let stem = String(base ?? "")
+  let stem = stripCopySuffix(String(base ?? ""))
     .replace(/\s+Front$/i, "")
+    .replace(/\s+alt$/i, "")
+    .replace(/[-_\s]alt$/i, "")
+    .replace(/[-_\s]v\d+$/i, "")
+    .replace(/[-_\s]spear$/i, "")
+    .replace(/[-_\s]void$/i, "")
+    .replace(/[-_\s]fixed$/i, "")
+    .replace(/[-_\s]revised$/i, "")
+    .replace(/[-_\s]variation$/i, "")
+    .replace(/[-_\s]ship[-_\s]?fixed$/i, "")
+    .replace(/[-_\s]similar[-_\s]?area$/i, "")
+    .replace(/[-_\s]on[-_\s]?target$/i, "")
+    .replace(/\s*\(creature\)\s*$/i, "")
+    .replace(/^_+/, "")
     .trim()
   let version = 0
   const versionMatch = stem.match(/^(.*?)(?:\s+|-)(\d+)$/)
   if (versionMatch) {
     stem = versionMatch[1].trim()
     version = Number(versionMatch[2])
+  }
+  // "Astral-Projection-02-Ship" style leftovers after suffix strip
+  const dashedVersion = stem.match(/^(.*?)-0*(\d+)$/)
+  if (dashedVersion && !version) {
+    stem = dashedVersion[1].trim()
+    version = Number(dashedVersion[2])
   }
   const slug = spellCardSourceToSlug(stem)
   const outputSlug = SPELL_CARD_OUTPUT_SLUG_ALIASES[slug] ?? slug
