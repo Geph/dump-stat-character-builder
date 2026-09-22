@@ -18,11 +18,21 @@ describe("Mage Hand Press cantrip card art", () => {
     expect(isDefaultCardArtAvailable(String(hex.card_image_url))).toBe(true)
   })
 
-  it("skips cantrips without optimized masters", () => {
-    const eye = enrichSpellRowWithBundledCardImage({
-      name: "Eye Of Anubis",
-      source: "Mage Hand Press",
-    })
-    expect(eye.card_image_url == null || eye.card_image_url === "").toBe(true)
+  it("assigns local art for the latest MHP cantrip masters", () => {
+    const cases = [
+      ["Eye Of Anubis", "eye-of-anubis"],
+      ["Eye Of Ra", "eye-of-ra"],
+      ["Moment To Think", "moment-to-think"],
+      ["Hex:blood curse", "hex-blood-curse"],
+      ["Hex:decay", "hex-decay"],
+      ["Hex:hallucination", "hex-hallucination"],
+      ["Hex:imperil", "hex-imperil"],
+      ["Hex:musical interlude", "hex-musical-interlude"],
+    ] as const
+    for (const [name, slug] of cases) {
+      const row = enrichSpellRowWithBundledCardImage({ name, source: "Mage Hand Press" })
+      expect(row.card_image_url, name).toMatch(new RegExp(`/images/compendium/spells/${slug}\\.png$`))
+      expect(isDefaultCardArtAvailable(String(row.card_image_url)), name).toBe(true)
+    }
   })
 })

@@ -119,6 +119,7 @@ import {
   resolveCompendiumCardImageUrl,
   type CompendiumCardVisual,
 } from "@/lib/compendium/card-image"
+import { enrichSpellRowWithBundledCardImage } from "@/lib/compendium/enrich-srd-spells"
 import { useAppPresentationMode } from "@/components/settings/use-app-presentation-mode"
 import { useBuilderLayout } from "@/components/settings/use-builder-layout"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
@@ -175,6 +176,9 @@ function enrichCompendiumTabRows(
 ) {
   if (tab === "classes") return enrichClassesList(rows as unknown as DndClass[])
   if (tab === "species") return enrichSpeciesList(rows as { name: string; source?: string | null }[])
+  if (tab === "spells") {
+    return (rows as Record<string, unknown>[]).map((row) => enrichSpellRowWithBundledCardImage(row))
+  }
   if (tab === "subclasses") {
     const subclassRows = asCompendiumRows(rows) as unknown as Subclass[]
     // Upgrade legacy flat `/subclasses/{slug}.png` URLs, then apply class-aware defaults.

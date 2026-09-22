@@ -7,7 +7,7 @@ import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
 import { buildSrdClassResourceRows } from "@/lib/compendium/seed-class-resources"
 import { ensureModifierCatalog } from "@/lib/compendium/ensure-modifier-catalog"
 import { createClient } from "@/lib/db/client"
-import { enrichSrdSpellList } from "@/lib/compendium/enrich-srd-spells"
+import { enrichSrdSpellList, enrichSpellRowWithBundledCardImage } from "@/lib/compendium/enrich-srd-spells"
 import { seedSrdEquipment } from "@/lib/compendium/seed-srd-equipment"
 import { buildSrdCreatureSeedRows } from "@/lib/compendium/seed-srd-creatures"
 import { getSrdSeedData, getSrdSeedTotals } from "@/lib/srd/load-seed"
@@ -43,7 +43,7 @@ export type LocalSeedResult = {
 
 const SRD_VERSION_STORAGE_KEY = "dump-stat-srd-version"
 const SPELL_CARD_ART_VERSION_STORAGE_KEY = "dump-stat-spell-card-art-version"
-const BUNDLED_SPELL_CARD_ART_VERSION = "6"
+const BUNDLED_SPELL_CARD_ART_VERSION = "8"
 
 export { isIndexedDbEmpty, getIndexedDbRowCounts } from "./indexed-db-store"
 
@@ -75,6 +75,17 @@ async function ensureBundledSpellCardArt(): Promise<void> {
     "spells",
     enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
   )
+  // Name-match art onto every stored spell (MHP / Kibbles / custom), not only the SRD seed list.
+  // Local-only portraits stay gated by available-card-art (PNG present on this install).
+  const existing = await getAllFromStore("spells")
+  const stamped = existing.map((row) =>
+    enrichSpellRowWithBundledCardImage(row as Record<string, unknown>),
+  )
+  const changed = stamped.filter((row, index) => {
+    const prev = existing[index] as Record<string, unknown>
+    return (row.card_image_url ?? null) !== (prev.card_image_url ?? null)
+  })
+  if (changed.length) await putRows("spells", changed)
   writeStoredSpellCardArtVersion(BUNDLED_SPELL_CARD_ART_VERSION)
 }
 

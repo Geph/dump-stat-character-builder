@@ -27,6 +27,7 @@ import { useModifierCatalog } from "@/hooks/use-modifier-catalog"
 import { useDuplicateCompendiumItem } from "@/hooks/use-duplicate-compendium-item"
 import { asCompendiumRow, asCompendiumRows, castCompendiumRow } from "@/lib/data/types"
 import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
+import { enrichSpellRowWithBundledCardImage } from "@/lib/compendium/enrich-srd-spells"
 import {
   getSpellSchools,
   SPELL_SCHOOLS_CHANGE_EVENT,
@@ -169,33 +170,34 @@ export default function SpellEditorPage({ id }: { id: string }) {
           if (!row) {
             setError("Spell not found")
           } else {
+            const enriched = enrichSpellRowWithBundledCardImage(row as Record<string, unknown>)
             setForm({
-              name: String(row.name ?? ""),
-              level: (row.level as number | null | undefined) ?? 0,
-              school: String(row.school ?? "Evocation"),
-              casting_time: String(row.casting_time ?? "1 action"),
-              range: String(row.range ?? "Self"),
-              components: (row.components as string[]) || ["V", "S"],
-              material: String(row.material ?? ""),
-              duration: String(row.duration ?? "Instantaneous"),
-              concentration: Boolean(row.concentration),
-              ritual: Boolean(row.ritual),
-              description: String(row.description ?? ""),
-              higher_levels: String(row.higher_levels ?? ""),
-              classes: (row.classes as string[]) || [],
-              companion_creature_names: Array.isArray(row.companion_creature_names)
-                ? (row.companion_creature_names as string[])
+              name: String(enriched.name ?? ""),
+              level: (enriched.level as number | null | undefined) ?? 0,
+              school: String(enriched.school ?? "Evocation"),
+              casting_time: String(enriched.casting_time ?? "1 action"),
+              range: String(enriched.range ?? "Self"),
+              components: (enriched.components as string[]) || ["V", "S"],
+              material: String(enriched.material ?? ""),
+              duration: String(enriched.duration ?? "Instantaneous"),
+              concentration: Boolean(enriched.concentration),
+              ritual: Boolean(enriched.ritual),
+              description: String(enriched.description ?? ""),
+              higher_levels: String(enriched.higher_levels ?? ""),
+              classes: (enriched.classes as string[]) || [],
+              companion_creature_names: Array.isArray(enriched.companion_creature_names)
+                ? (enriched.companion_creature_names as string[])
                 : [],
               linked_modifiers: normalizeLinkedModifiers(
-                (row.linked_modifiers ?? row.linkedModifiers) as LinkedModifierInstance[] | null | undefined,
+                (enriched.linked_modifiers ?? enriched.linkedModifiers) as LinkedModifierInstance[] | null | undefined,
                 modifierCatalog,
                 [],
               ),
-              source: String(row.source ?? "Custom"),
-              creator_url: String(row.creator_url ?? ""),
-              icon: (row.icon as string | null) ?? null,
-              accent_color: (row.accent_color as string | null) ?? null,
-              card_image_url: (row.card_image_url as string | null) ?? null,
+              source: String(enriched.source ?? "Custom"),
+              creator_url: String(enriched.creator_url ?? ""),
+              icon: (enriched.icon as string | null) ?? null,
+              accent_color: (enriched.accent_color as string | null) ?? null,
+              card_image_url: (enriched.card_image_url as string | null) ?? null,
             })
           }
         }
@@ -347,6 +349,9 @@ export default function SpellEditorPage({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
+            cardImageAspect="3/4"
           />
 
           <CompendiumEditorPanel title="On Class Spell List" defaultOpen>
