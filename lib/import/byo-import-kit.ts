@@ -12,7 +12,19 @@ import {
   CARD_ART_IMPORT_SYSTEM_PROMPT,
 } from "@/lib/import/card-art-import-hints"
 
+import { formatSubclassMatchImportHint } from "@/lib/import/subclass-match-import-hints"
+import {
+  LITE_BASE_PROMPT,
+  LITE_BATCHING_HINT,
+  LITE_JSON_OUTPUT_RULES,
+  LITE_SOURCE_FIT_HINT,
+  formatLiteCustomSystemsHint,
+  liteHintsForContentType,
+  type ByoPromptMode,
+} from "@/lib/import/byo-lite-prompt"
+
 export { CARD_ART_HOSTING_GUIDELINES, CARD_ART_IMPORT_SYSTEM_PROMPT } from "@/lib/import/card-art-import-hints"
+export { BYO_LITE_PROMPT_MAX_CHARS, type ByoPromptMode } from "@/lib/import/byo-lite-prompt"
 
 export const CLEAN_SOURCE_TEXT_GUIDELINES = `Preparing clean source text (from PDF or web)
 
@@ -123,6 +135,8 @@ export type ByoExtractionPromptOptions = {
   subclassMatch?: SubclassMatchImportHint | null
   /** Content-type hint used for page caps (e.g. spells → 15 pages). */
   contentTypeHint?: string | null
+  /** "lite" = compact prompt for free / base-tier LLMs (docs/byo-prompt-design.md). Default "full". */
+  promptMode?: ByoPromptMode
 }
 
 function formatPdfUploadBlock(
@@ -662,6 +676,10 @@ Emit only card_art[] (omit every other top-level array).`,
   const focus = CONTENT_TYPE_JSON_FOCUS[hint] ?? CONTENT_TYPE_JSON_FOCUS.all ?? ""
   const template = JSON.stringify(IMPORT_JSON_TEMPLATES[hint], null, 2)
 
+  if (options?.promptMode === "lite") {
+    return buildByoLiteExtractionPrompt(hint, focus, template, options)
+  }
+
   const sections = [
     buildImportSystemPrompt(contentTypeHint, {
       customSystems: options?.customSystems,
@@ -689,6 +707,30 @@ Emit only card_art[] (omit every other top-level array).`,
   )
 
   return sections.join("\n")
+}
+
+function buildByoLiteExtractionPrompt(
+  hint: ImportContentTypeHint,
+  focus: string,
+  template: string,
+  options: ByoExtractionPromptOptions,
+): string {
+  const sections: string[] = [LITE_BASE_PROMPT, LITE_SOURCE_FIT_HINT]
+  const customSystemsHint = formatLiteCustomSystemsHint(options.customSystems)
+  if (customSystemsHint) sections.push(customSystemsHint)
+  const subclassMatchHint = formatSubclassMatchImportHint(options.subclassMatch)
+  if (subclassMatchHint) sections.push(subclassMatchHint)
+  sections.push(...liteHintsForContentType(hint))
+  if (options.pdfUpload) {
+    sections.push(formatPdfUploadBlock(options.pageScope, options.contentTypeHint ?? hint))
+  }
+  sections.push(
+    focus,
+    LITE_BATCHING_HINT,
+    LITE_JSON_OUTPUT_RULES,
+    `Example JSON shape (fill with extracted content; omit arrays you do not need):\n${template}`,
+  )
+  return sections.filter(Boolean).join("\n\n")
 }
 
 export function buildByoFullPrompt(

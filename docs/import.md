@@ -78,7 +78,14 @@ The **Clipboard** tab is the primary import path for pasted text:
 3. Run the prompt in ChatGPT, Claude, Gemini, or any LLM — using your own API key or subscription.
 4. Paste the model's JSON output back into Dump Stat and click **Import JSON**.
 
-The prompt includes **clean PDF / paste guidelines** (keep level tables intact, one content type per run, preserve feature headings, collapse doubled ALL-CAPS PDF glyphs, strip trailing superscript markers like KibblesTasty `K`, etc.). No server API keys are required for this flow.
+**Prompt size.** Step 1 has a **Lite / Full** selector (your choice is remembered):
+
+- **Lite** is a short prompt (roughly 5–25K characters, depending on content type) that fits free or base-tier ChatGPT, Gemini, Copilot, and Claude. It asks the model to copy rules sentences verbatim and lets Dump Stat wire most mechanics at import. For long chapters the model returns the first part plus a `Continue with: …` line; reply "continue" and import each part in order.
+- **Full** is the complete wiring guide (about 190K characters before your source text) for paid or large-context models. It pre-wires more unusual mechanics, especially for homebrew classes Dump Stat has not seen before.
+
+If a free-tier model refuses the paste, switch to Lite, shorten the source (one class chapter or a short spell batch), or attach the prompt as a `.txt` file.
+
+The full prompt includes **clean PDF / paste guidelines** (keep level tables intact, one content type per run, preserve feature headings, collapse doubled ALL-CAPS PDF glyphs, strip trailing superscript markers like KibblesTasty `K`, etc.). No server API keys are required for this flow.
 
 **Optional server AI:** If the host has `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_GENERATIVE_AI_API_KEY` configured, an expandable **server AI extraction** section appears on Clipboard and PDF tabs. The BYO prompt/template workflow remains available either way.
 

@@ -16,6 +16,29 @@ A new Cursor agent has **no prior chat history**. It is not spun up with Drive J
 
 If a session hangs and you start a new one, restate the character/sheet URL and the invariant that still applies. Do not assume the new agent read the last chat.
 
+## Start here — what to read for the task
+
+Open only what the task needs. Each doc is written for an agent with no prior chat.
+
+| Task | Read first |
+|------|------------|
+| Wire a mechanic, fix sheet math, add a modifier type | [docs/custom-modifiers.md](docs/custom-modifiers.md), [docs/modifier-vs-feature-effect.md](docs/modifier-vs-feature-effect.md) |
+| Import or wire a **new class** / subclass pack | [docs/new-class-playbook.md](docs/new-class-playbook.md) (mechanic pattern lookup), then [docs/homebrew-import-review.md](docs/homebrew-import-review.md) |
+| Change BYO / server-AI prompt text, hints, or `mechanics[]` kinds | [docs/byo-prompt-design.md](docs/byo-prompt-design.md) — Full vs Lite prompt modes, the 30K Lite budget for entry-level LLMs; run `pnpm prompts:measure` |
+| Build or change UI | [docs/component-architecture.md](docs/component-architecture.md) — size hotspots, generic surfaces, render efficiency |
+| Where a folder or file lives / licensing | [docs/repository-overview.md](docs/repository-overview.md) |
+| Import formats users see | [docs/import.md](docs/import.md) |
+
+## Handing off between sessions
+
+Agents trade in and out of this repo mid-task. Leave the next one a clean start:
+
+- **End of turn:** state in your final message what is done, what is uncommitted, and the next concrete step (file + function). A summary without file paths is not a handoff.
+- **Uncommitted work:** say which files belong to your task. The tree often carries other in-progress work (local art, another feature); do not commit or revert files you did not touch.
+- **Docs travel with the change.** A new catalog type, engine, name-keyed branch, mechanic pattern, or prompt budget change updates the matching doc above in the same diff. Stale docs are how the next agent re-invents a solved problem.
+- **Do not leave handoff notes as repo files** (`NOTES.md`, `tmp-*`). Put durable knowledge in the docs above; put task state in your message or the PR description.
+- **Starting a session:** run `git status`, read the task row above, and check whether a doc's “Last reviewed” date predates recent commits in the files it describes.
+
 ## Session invariants
 
 These hold in every chat, including after a restart.
@@ -57,6 +80,9 @@ A one-off sheet patch for a single named feature, with no catalog / JSON / promp
 | Live sheet math | `lib/character/` | Duplicating derived formulas in UI |
 | Catalog / modifiers / enrichment | `lib/compendium/` | Per-class special cases when a modifier exists |
 | Import normalize / enrich / persist | `lib/import/` | Editing seed JSON by hand for one-off imports |
+| BYO / AI prompt guidance | Mechanic-pattern lines in `modifier-wiring-registry.ts`; type-specific focus in `byo-import-kit.ts` | Class-named prompt blocks for mistakes an enrichment pack or sanitizer can fix |
+| One class's import quirks | `lib/import/enrichment-presets/packs/` + `registry.ts` | Runtime `if (className === …)` |
+| New sheet / builder UI | New file beside the hotspot in `components/…`; logic in `lib/` or a hook | Growing `character-sheet-client.tsx` / `builder-page-client.tsx` |
 | SRD seed only | `lib/srd/seed-data/` via `pnpm srd:build` | Non-SRD book text in `lib/srd/` |
 | Optional publisher examples | `lib/seed-packs/` | Paid / disallowed pack content |
 | Hosted DB | `lib/db/`, `mysql/` | Client-side MySQL |
@@ -75,6 +101,7 @@ Deeper folder “why”: [docs/repository-overview.md](docs/repository-overview.
 - Prefer `pnpm` scripts already in `package.json` (`verify:ci`, `images:optimize`, `srd:build`, tests) over inventing new pipelines.
 - When changing SRD or 5E rules behavior, cite the source in the PR description (see CONTRIBUTING.md).
 - After local content import or art optimize, leave gitignored outputs untracked unless the user asks to ship allowed art.
+- When a change touches BYO / AI prompt text, include the `pnpm prompts:measure` before/after size in the PR description.
 
 ## Cursor-specific notes
 

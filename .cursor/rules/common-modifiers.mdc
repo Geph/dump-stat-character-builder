@@ -11,4 +11,5 @@ alwaysApply: false
 - Do not add `if (name === "…")` class or feature branches in `lib/character/` or React when a modifier can express it.
 - Pick CharacteristicModifier vs FeatureEffect using `docs/modifier-vs-feature-effect.md`.
 - Inventory, play-state engines, known gaps, and the add-type checklist: `docs/custom-modifiers.md`.
+- New class or unfamiliar mechanic: match the rules text in the pattern lookup in `docs/new-class-playbook.md` before adding anything.
 - Do not invent `class_resources`, `dieSidesByLevel`, or `new_toggles` for sheet-owned play-state engines (Rampage Die, Mutation Die, illusion tokens, Weapon Morph, Balance of Power, Influence).

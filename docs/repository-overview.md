@@ -30,7 +30,7 @@ Content is data. Mechanics are modifiers. The builder and sheet never hard-code 
 | `app/` | Next.js App Router: landing, builder, characters, sheet, compendium, import, dashboard, table, share, and `app/api/` |
 | `components/` | Shared UI. Pages stay thin; almost all interactive UI lives here |
 | `lib/` | Domain logic. If it calculates, persists, imports, or seeds, it belongs here |
-| `docs/` | Maintainer notes (this file, import formats, import review, modifier vs feature-effect) |
+| `docs/` | Maintainer notes (this file, import formats, import review, modifier maps, new-class playbook, BYO prompt design, component architecture) |
 | `public/` | Static assets: `icons/` (game-icons.net SVGs), `images/` (marketing + bundled card defaults) |
 | `scripts/` | Build, seed, image optimize, git hooks, homebrew import ops |
 | `mysql/` | Hosted MySQL DDL (`schema.sql`) |
@@ -293,5 +293,8 @@ Product names are used for identification only (README). The app does not collec
 - [Homebrew class import review](./homebrew-import-review.md) — Drive extract → audit → enrich loop
 - [CharacteristicModifier vs FeatureEffect](./modifier-vs-feature-effect.md) — which effect system to author
 - [Custom modifiers — agent map](./custom-modifiers.md) — catalog inventory, gaps, play-state engines, add-type checklist
+- [New class playbook](./new-class-playbook.md) — mechanic pattern → modifier lookup for classes not yet imported
+- [BYO prompt design](./byo-prompt-design.md) — prompt assembly, size budget for entry-level LLMs, where new guidance goes
+- [Component architecture](./component-architecture.md) — generic UI surfaces, size hotspots, render efficiency
 - [SRD seed](../lib/srd/README.md) — rebuild and attribution
 - [Example seed packs](../lib/seed-packs/README.md) — Kibbles / Mage Hand Press allowlist

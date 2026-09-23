@@ -1,0 +1,11 @@
+{
+  "terminal.integrated.env.windows": {
+    "PORT": "3001"
+  },
+  "terminal.integrated.env.linux": {
+    "PORT": "3001"
+  },
+  "terminal.integrated.env.osx": {
+    "PORT": "3001"
+  }
+}

@@ -1,0 +1,15 @@
+---
+description: Keep UI modular and generic as new classes arrive
+globs: components/**/*.tsx,app/**/*.tsx,hooks/**/*.ts
+alwaysApply: false
+---
+
+# Components
+
+See `docs/component-architecture.md`.
+
+- A new class should need no new React code. Render resources, actions, toggles, and choices through the generic trackers, action panel, and toggle overlays. A component named after a class means a modifier or engine is missing.
+- Never call `aggregateCharacteristics()` or re-derive sheet math in a component. Read `DerivedCharacter`; add missing values in `lib/character/` with a test.
+- Do not grow `character-sheet-client.tsx`, `builder-page-client.tsx`, `characteristic-modifiers-editor.tsx`, or `sheet-actions-panel.tsx`. Put new UI in a new file beside them and new state in a hook or `lib/` function.
+- Extracting the region you are already editing into its own file is fine; unrelated drive-by refactors are not.
+- Memoize derived values, keep high-frequency state (rolls, HP) local or in context, and mount heavy overlays only when open.

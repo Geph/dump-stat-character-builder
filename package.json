@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "node scripts/build-hosted.mjs",
     "build:hosted": "node scripts/build-hosted.mjs",
     "build:static": "node scripts/build-static.mjs",
@@ -30,7 +30,8 @@
     "import:merge": "node scripts/run-vite-node.mjs scripts/homebrew-import-ops.ts merge",
     "import:ops": "node scripts/run-vite-node.mjs scripts/homebrew-import-ops.ts",
     "import:smoke": "vitest run lib/import/__tests__/homebrew-drive-audit-smoke.test.ts lib/import/__tests__/homebrew-enrichment-smoke.test.ts",
-    "content:lint": "node scripts/content-lint.mjs"
+    "content:lint": "node scripts/content-lint.mjs",
+    "prompts:measure": "node scripts/run-vite-node.mjs scripts/measure-byo-prompts.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.85",

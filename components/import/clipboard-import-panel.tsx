@@ -32,6 +32,7 @@ import {
 } from "@/lib/import/import-source-limits"
 import { listImportedCompendiumSources } from "@/lib/compendium/list-imported-sources"
 import { ImportWorkflowGuidancePanel } from "@/components/import/import-workflow-guidance-panel"
+import { ByoPromptModeSelect, useByoPromptMode } from "@/components/import/byo-prompt-mode-select"
 import {
   Check,
   ChevronDown,
@@ -119,6 +120,7 @@ export function ClipboardImportPanel({
   const [existingSources, setExistingSources] = useState<string[]>([])
   const [loadingExistingSources, setLoadingExistingSources] = useState(false)
   const [existingSourcesError, setExistingSourcesError] = useState<string | null>(null)
+  const [promptMode, setPromptMode] = useByoPromptMode()
 
   const spellPdfMaxPages = maxPdfPagesForContentTypeHint(contentType)
 
@@ -188,8 +190,9 @@ export function ClipboardImportPanel({
         pageScope: pdfPageScopeForPrompt,
         customSystems,
         subclassMatch: subclassMatchHint,
+        promptMode,
       }),
-    [contentType, pdfPageScopeForPrompt, customSystems, subclassMatchHint],
+    [contentType, pdfPageScopeForPrompt, customSystems, subclassMatchHint, promptMode],
   )
 
   const handleCopy = async (kind: "prompt" | "full") => {
@@ -199,6 +202,7 @@ export function ClipboardImportPanel({
         : buildByoFullPrompt(sourceText, contentType, {
             customSystems,
             subclassMatch: subclassMatchHint,
+            promptMode,
           })
     const ok = await copyText(text)
     if (ok) {
@@ -441,6 +445,11 @@ export function ClipboardImportPanel({
               ? "Paste direct image URLs and/or a public directory listing URL. Server AI crawls listings with fetch_url. For BYO, copy the prompt into a tool-capable LLM, then paste the returned card_art JSON in Step 2. Or download the template and fill it in yourself."
               : "Choose one path below. Both produce the same JSON format for Step 2."}
           </p>
+          {!isImagesImport ? (
+            <div className="mt-3">
+              <ByoPromptModeSelect value={promptMode} onChange={setPromptMode} />
+            </div>
+          ) : null}
         </div>
 
         <div className={isImagesImport ? "space-y-4" : "grid gap-4 lg:grid-cols-2"}>

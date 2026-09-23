@@ -7,6 +7,10 @@ A new chat has **no prior transcript**. Read this before adding a modifier type,
 CharacteristicModifier vs FeatureEffect stays in
 [modifier-vs-feature-effect.md](./modifier-vs-feature-effect.md).
 
+Wiring a class that has not been imported before? Start with the rules-text → kind
+lookup in [new-class-playbook.md](./new-class-playbook.md). Changing prompt text? Read
+[byo-prompt-design.md](./byo-prompt-design.md) first.
+
 Do **not** copy the type lists into always-apply rules. The live lists are the
 source of truth; this file is the map, the gaps, and the add-type checklist.
 

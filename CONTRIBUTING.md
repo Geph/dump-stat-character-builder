@@ -17,7 +17,7 @@ pnpm db:setup   # or apply mysql/schema.sql manually
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). With npm instead of pnpm: `npm install` and `npm run dev`.
+Open [http://localhost:3001](http://localhost:3001). Prefer `pnpm dev` (or `npm run dev`) so the port is set in the script. Cursor/VS Code integrated terminals also export `PORT=3001` (see `.vscode/settings.json`), so bare `npx next dev` uses 3001 after you open a **new** terminal. With npm instead of pnpm: `npm install` and `npm run dev`.
 
 ## Checks before you push
 

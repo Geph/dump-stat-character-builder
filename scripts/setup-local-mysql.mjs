@@ -62,7 +62,7 @@ try {
   console.log(
     "\nNext: set DATABASE_URL or MYSQL_* in .env.local, then run:\n" +
       "  corepack pnpm dev\n" +
-      "  curl -X POST http://localhost:3000/api/seed",
+      "  curl -X POST http://localhost:3001/api/seed",
   )
 } catch (err) {
   console.error(err instanceof Error ? err.message : err)

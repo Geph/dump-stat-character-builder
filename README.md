@@ -110,7 +110,7 @@ or import `mysql/schema.sql` yourself. Set `DATABASE_URL` (or `MYSQL_*`) in `.en
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), go to **Import**, and click **Seed SRD 5.2.1 Content**, or `curl -X POST http://localhost:3000/api/seed`.
+Open [http://localhost:3001](http://localhost:3001), go to **Import**, and click **Seed SRD 5.2.1 Content**, or `curl -X POST http://localhost:3001/api/seed`.
 
 After pulling schema updates:
 
@@ -161,7 +161,7 @@ Map display names in the matching `lib/compendium/*-card-images-defaults.ts` fil
 
 | Symptom | What to check |
 |---------|----------------|
-| Dev server hangs / pages never load | Stale `next dev` on port 3000 — kill the Node process, delete `.next`, run `pnpm dev` again |
+| Dev server hangs / pages never load | Stale `next dev` on port 3001 — kill the Node process, delete `.next`, run `pnpm dev` again |
 | `Database is not configured` | `.env.local` missing or placeholder values; restart the dev server |
 | `fetch failed` / `ECONNREFUSED` | Wrong host/port, tunnel not running, or firewall blocking MySQL |
 | `Access denied` | Wrong user/password; user not granted access to the database |

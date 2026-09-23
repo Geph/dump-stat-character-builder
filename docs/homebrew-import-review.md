@@ -166,6 +166,8 @@ Package scripts:
 
 - If the same mistake appears twice across extracts → fix sanitizer + LLM hint, don’t only patch JSON
 - Prefer narrative notes over inventing unsupported sheet primitives
+- Write prompt fixes as mechanic patterns, not class-named blocks; check `pnpm prompts:measure` ([byo-prompt-design.md](./byo-prompt-design.md))
+- Classify each feature with the pattern lookup in [new-class-playbook.md](./new-class-playbook.md) before adding a preset
 
 **After spell / ability fill-ins**
 

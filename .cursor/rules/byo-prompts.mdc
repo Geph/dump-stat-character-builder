@@ -1,0 +1,17 @@
+---
+description: Keep BYO / AI import prompts small enough for entry-level LLMs
+globs: lib/import/byo-import-kit.ts,lib/import/byo-lite-prompt.ts,components/import/clipboard-import-panel.tsx,lib/import/import-system-prompt.ts,lib/import/content-schema.ts,lib/import/modifier-wiring-registry.ts,lib/import/*-import-hints.ts,lib/import/class-spell-lists.ts
+alwaysApply: false
+---
+
+# BYO prompt budget
+
+Prompts must work on free / base tiers of ChatGPT, Gemini, Copilot, and Claude. Read `docs/byo-prompt-design.md` before editing prompt text.
+
+- Two modes: **Full** (default, paid models) and **Lite** (`promptMode: "lite"`, blocks in `lib/import/byo-lite-prompt.ts`). Lite must stay under `BYO_LITE_PROMPT_MAX_CHARS` for every content type — `byo-lite-prompt.test.ts` enforces it.
+- Run `pnpm prompts:measure` before and after. Do not grow the shared base prompt or the Common Modifier index without scoping or removing something of similar size.
+- Write guidance as **mechanic patterns** ("pool that refills on Initiative → …"), not class names. One class's recurring mistake belongs in its enrichment pack or a sanitizer, not the prompt.
+- Content-type-specific rules go in `CONTENT_TYPE_JSON_FOCUS[type]`, not the shared hints.
+- Extend the existing cheat-sheet line for a kind instead of restating the rule elsewhere.
+- Verbatim rule sentences + the phrase matcher do most wiring; `mechanics[]` is optional and `unresolved` is the escape hatch.
+- Update `byo-prompt-guidance.test.ts` assertions to match intended behavior; do not delete them to make room.
