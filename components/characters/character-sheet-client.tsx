@@ -4168,6 +4168,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           activeConditions: row.activeConditions.length ? row.activeConditions : null,
           polymorphActive: row.polymorphActive ? true : null,
           knownForms: knownFormsByKey.get(row.key) ?? null,
+          notes: row.notes ?? null,
+          portraitUrl: row.portraitUrl ?? null,
         }
         if (row.key !== key) {
           if (patch.polymorphActive && row.polymorphActive) {
@@ -7196,6 +7198,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           }
                           onNameChange={(name) =>
                             patchCompanionState(companion.key, { customName: name })
+                          }
+                          onNotesChange={(notes) =>
+                            patchCompanionState(companion.key, { notes })
+                          }
+                          onPortraitChange={(portraitUrl) =>
+                            patchCompanionState(companion.key, { portraitUrl })
                           }
                         />
                         {hasFerocityMechanic && !companion.polymorph ? (

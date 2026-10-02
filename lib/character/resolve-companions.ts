@@ -269,6 +269,7 @@ export function buildCreatureTemplateLookup(
       ...template,
       name: creature.name,
       cr: template.cr ?? creature.cr ?? null,
+      cardImageUrl: creature.card_image_url ?? template.cardImageUrl ?? null,
     })
   }
   return lookup
@@ -960,6 +961,8 @@ export function mergeCompanionState(
     displayName: string
     activeConditions: string[]
     polymorphActive: boolean
+    notes: string | null
+    portraitUrl: string | null
   }
 > {
   const stateByKey = new Map((saved ?? []).map((row) => [row.key, row]))
@@ -975,6 +978,8 @@ export function mergeCompanionState(
       displayName: state?.customName?.trim() || companionDefaultDisplayName(companion),
       activeConditions: state?.activeConditions ?? [],
       polymorphActive: state?.polymorphActive ?? false,
+      notes: state?.notes?.trim() ? state.notes : null,
+      portraitUrl: state?.portraitUrl?.trim() ? state.portraitUrl : null,
     }
   })
 }
@@ -988,12 +993,16 @@ export function companionStateFromResolved(
       displayName: string
       activeConditions?: string[]
       polymorphActive?: boolean
+      notes?: string | null
+      portraitUrl?: string | null
     }
   >,
 ): CharacterCompanionState[] {
   return companions.map((c) => ({
     key: c.key,
     currentHp: c.currentHp,
+    notes: c.notes?.trim() ? c.notes : null,
+    portraitUrl: c.portraitUrl?.trim() ? c.portraitUrl : null,
     tempHp: (c.tempHp ?? 0) > 0 ? c.tempHp : null,
     ferocity: (c.ferocity ?? 0) > 0 ? c.ferocity : null,
     customName: c.displayName !== companionDefaultDisplayName(c) ? c.displayName : null,

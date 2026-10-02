@@ -11,10 +11,16 @@ import {
   COMPENDIUM_EDITOR_FORM_ID,
 } from "@/components/compendium/editor-toolbar"
 import { CreatureStatBlockView } from "@/components/compendium/creature-stat-block-view"
+import { CreatureBlockListEditor, fixedValueOf } from "@/components/compendium/creature-action-editor"
 import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
 import { parseCreatureStatBlock } from "@/lib/character/parse-creature-stat-block"
-import type { CompanionStatBlockTemplate } from "@/lib/character/companion-stat-block"
+import type {
+  CompanionAbilityRow,
+  CompanionNamedBlock,
+  CompanionStatBlockTemplate,
+} from "@/lib/character/companion-stat-block"
+import { ABILITY_SCORE_KEYS, type AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import { asCompendiumRow } from "@/lib/data/types"
 import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 
@@ -57,6 +63,26 @@ const defaultCreature: CreatureFormData = {
 }
 
 const fieldClass = compendiumFieldClass
+
+const ABILITY_LABEL: Record<AbilityScoreKey, string> = {
+  strength: "STR",
+  dexterity: "DEX",
+  constitution: "CON",
+  intelligence: "INT",
+  wisdom: "WIS",
+  charisma: "CHA",
+}
+
+function formatMod(value: number): string {
+  return value >= 0 ? `+${value}` : String(value)
+}
+
+/** Numeric proficiency bonus parsed from the printed label (e.g. "+2" → 2); defaults to +2. */
+function parsePbNumber(label: string | null | undefined): number {
+  if (!label) return 2
+  const match = label.match(/-?\d+/)
+  return match ? parseInt(match[0], 10) : 2
+}
 
 const SAMPLE = `Wolf
 Medium Beast, Unaligned
@@ -122,6 +148,26 @@ export default function CreatureEditor({ id }: { id: string }) {
     void fetchCreature()
   }, [id])
 
+  const statBlock = form.stat_block ?? EMPTY_STAT_BLOCK
+  const pbNumber = parsePbNumber(statBlock.proficiencyBonusLabel)
+
+  const updateStatBlock = (patch: Partial<CompanionStatBlockTemplate>) => {
+    setForm((prev) => ({ ...prev, stat_block: { ...(prev.stat_block ?? EMPTY_STAT_BLOCK), ...patch } }))
+  }
+
+  const updateAbilityScore = (key: AbilityScoreKey, score: number, proficient: boolean) => {
+    const modifier = Math.floor((score - 10) / 2)
+    const nextRow: CompanionAbilityRow = { score, modifier, save: modifier + (proficient ? pbNumber : 0) }
+    updateStatBlock({ abilityScores: { ...(statBlock.abilityScores ?? {}), [key]: nextRow } })
+  }
+
+  const updateBlockList = (
+    field: "traits" | "actions" | "bonusActions" | "reactions" | "legendaryActions",
+    next: CompanionNamedBlock[],
+  ) => {
+    updateStatBlock({ [field]: next })
+  }
+
   const handleParse = () => {
     const parsed = parseCreatureStatBlock(pasteText, form.name)
     if (!parsed) {
@@ -140,7 +186,7 @@ export default function CreatureEditor({ id }: { id: string }) {
     const traits = parsed.template.traits.length
     const actions = parsed.template.actions.length
     setParseNote(
-      `Parsed ${parsed.name || "creature"} — ${traits} trait${traits === 1 ? "" : "s"}, ${actions} action${actions === 1 ? "" : "s"}.`,
+      `Parsed ${parsed.name || "creature"} — ${traits} trait${traits === 1 ? "" : "s"}, ${actions} action${actions === 1 ? "" : "s"}. Edit fields below, or use them as a quick start for structured attacks.`,
     )
   }
 
@@ -149,7 +195,7 @@ export default function CreatureEditor({ id }: { id: string }) {
     setSaving(true)
     setError(null)
 
-    const statBlock: CompanionStatBlockTemplate = {
+    const statBlockToSave: CompanionStatBlockTemplate = {
       ...(form.stat_block ?? EMPTY_STAT_BLOCK),
       name: form.name.trim() || form.stat_block?.name || "Creature",
     }
@@ -162,7 +208,7 @@ export default function CreatureEditor({ id }: { id: string }) {
       alignment: form.alignment.trim() || null,
       cr: form.cr.trim() || null,
       description: form.description.trim() || null,
-      stat_block: statBlock,
+      stat_block: statBlockToSave,
       source: form.source,
       creator_url: normalizeCreatorUrl(form.creator_url),
       icon: form.icon,
@@ -234,12 +280,16 @@ export default function CreatureEditor({ id }: { id: string }) {
             onIconChange={(icon) => setForm({ ...form, icon })}
             accentColor={form.accent_color as CompendiumThemeColorId | null}
             onAccentColorChange={(accent_color) => setForm({ ...form, accent_color })}
+            cardImageUrl={form.card_image_url}
+            onCardImageUrlChange={(card_image_url) => setForm({ ...form, card_image_url })}
+            cardImageAspect="3/4"
           />
 
-          <CompendiumEditorPanel title="Paste stat block" className="space-y-3" defaultOpen>
+          <CompendiumEditorPanel title="Paste stat block" className="space-y-3" collapsible defaultOpen={!form.stat_block}>
             <p className="text-sm text-muted-foreground">
-              Paste a stat block (D&D 2024 Monster Manual layout) and parse it into structured
-              fields. You can edit the details afterward.
+              Paste a stat block (D&D 2024 Monster Manual layout) as a quick start — it fills in the
+              fields below, which you can then fine-tune (including turning actions into structured
+              attacks) without needing to re-paste.
             </p>
             <textarea
               value={pasteText}
@@ -320,8 +370,173 @@ export default function CreatureEditor({ id }: { id: string }) {
             </div>
           </CompendiumEditorPanel>
 
+          <CompendiumEditorPanel
+            title="Core stats"
+            hint="Individually editable AC, HP, Speed, proficiency bonus, and ability scores — these drive the sheet's Companions panel directly."
+            className="space-y-4"
+            defaultOpen
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1">Armor Class</label>
+                <input
+                  type="number"
+                  value={fixedValueOf(statBlock.ac)}
+                  onChange={(e) =>
+                    updateStatBlock({ ac: { parts: [{ type: "fixed", value: parseInt(e.target.value, 10) || 0 }] } })
+                  }
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">AC note</label>
+                <input
+                  value={statBlock.acNote ?? ""}
+                  onChange={(e) => updateStatBlock({ acNote: e.target.value || null })}
+                  placeholder="natural armor"
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">Hit Points</label>
+                <input
+                  type="number"
+                  value={fixedValueOf(statBlock.hp)}
+                  onChange={(e) =>
+                    updateStatBlock({ hp: { parts: [{ type: "fixed", value: parseInt(e.target.value, 10) || 0 }] } })
+                  }
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">Hit dice note</label>
+                <input
+                  value={statBlock.hitDiceNote ?? ""}
+                  onChange={(e) => updateStatBlock({ hitDiceNote: e.target.value || null })}
+                  placeholder="2d8 + 2"
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">Speed</label>
+                <input
+                  value={statBlock.speed ?? ""}
+                  onChange={(e) => updateStatBlock({ speed: e.target.value || null })}
+                  placeholder="30 ft., fly 60 ft."
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">Proficiency bonus</label>
+                <input
+                  value={statBlock.proficiencyBonusLabel ?? ""}
+                  onChange={(e) => updateStatBlock({ proficiencyBonusLabel: e.target.value || null })}
+                  placeholder="+2"
+                  className={fieldClass}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Used to compute proficient saving throws below.</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold mb-2">Ability scores</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {ABILITY_SCORE_KEYS.map((key) => {
+                  const row = statBlock.abilityScores?.[key]
+                  const score = row?.score ?? 10
+                  const modifier = Math.floor((score - 10) / 2)
+                  const proficient = row ? row.save !== row.modifier : false
+                  const save = modifier + (proficient ? pbNumber : 0)
+                  return (
+                    <div key={key} className="rounded-xl border-2 border-border p-2 space-y-1.5 text-center">
+                      <p className="text-xs font-bold text-muted-foreground uppercase">{ABILITY_LABEL[key]}</p>
+                      <input
+                        type="number"
+                        value={score}
+                        onChange={(e) => updateAbilityScore(key, parseInt(e.target.value, 10) || 0, proficient)}
+                        className="w-full px-2 py-1.5 bg-background border-2 border-border rounded-lg text-center text-sm font-bold focus:outline-none focus:border-primary"
+                      />
+                      <p className="text-[11px] text-muted-foreground tabular-nums">
+                        Mod {formatMod(modifier)} · Save {formatMod(save)}
+                      </p>
+                      <label className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={proficient}
+                          onChange={(e) => updateAbilityScore(key, score, e.target.checked)}
+                        />
+                        Proficient save
+                      </label>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </CompendiumEditorPanel>
+
+          <CompendiumEditorPanel title="Traits" collapsible defaultOpen={statBlock.traits.length > 0}>
+            <CreatureBlockListEditor
+              blocks={statBlock.traits}
+              onChange={(next) => updateBlockList("traits", next)}
+              namePlaceholder="Trait name"
+              addLabel="Add Trait"
+            />
+          </CompendiumEditorPanel>
+
+          <CompendiumEditorPanel title="Actions" collapsible defaultOpen>
+            <CreatureBlockListEditor
+              blocks={statBlock.actions}
+              onChange={(next) => updateBlockList("actions", next)}
+              namePlaceholder="Action name"
+              addLabel="Add Action"
+              allowAttack
+            />
+          </CompendiumEditorPanel>
+
+          <CompendiumEditorPanel
+            title="Bonus Actions, Reactions & Legendary Actions"
+            collapsible
+            defaultOpen={
+              (statBlock.bonusActions?.length ?? 0) > 0 ||
+              (statBlock.reactions?.length ?? 0) > 0 ||
+              (statBlock.legendaryActions?.length ?? 0) > 0
+            }
+            className="space-y-4"
+          >
+            <div>
+              <p className="text-sm font-semibold mb-2">Bonus Actions</p>
+              <CreatureBlockListEditor
+                blocks={statBlock.bonusActions ?? []}
+                onChange={(next) => updateBlockList("bonusActions", next)}
+                namePlaceholder="Bonus action name"
+                addLabel="Add Bonus Action"
+                allowAttack
+              />
+            </div>
+            <div>
+              <p className="text-sm font-semibold mb-2">Reactions</p>
+              <CreatureBlockListEditor
+                blocks={statBlock.reactions ?? []}
+                onChange={(next) => updateBlockList("reactions", next)}
+                namePlaceholder="Reaction name"
+                addLabel="Add Reaction"
+                allowAttack
+              />
+            </div>
+            <div>
+              <p className="text-sm font-semibold mb-2">Legendary Actions</p>
+              <CreatureBlockListEditor
+                blocks={statBlock.legendaryActions ?? []}
+                onChange={(next) => updateBlockList("legendaryActions", next)}
+                namePlaceholder="Legendary action name"
+                addLabel="Add Legendary Action"
+                allowAttack
+              />
+            </div>
+          </CompendiumEditorPanel>
+
           {form.stat_block ? (
-            <CompendiumEditorPanel title="Stat block preview" defaultOpen>
+            <CompendiumEditorPanel title="Stat block preview" collapsible defaultOpen={false}>
               <div className="rounded-xl border border-border bg-card p-4">
                 <CreatureStatBlockView template={form.stat_block} variant="light" />
               </div>

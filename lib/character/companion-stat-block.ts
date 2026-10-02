@@ -33,6 +33,43 @@ export type CompanionAbilityRow = {
   saveLabel?: string | null
 }
 
+/**
+ * Structured melee/ranged attack roll + damage for a companion/creature action —
+ * stored as data (reusing the same fixed/scale-ref parts as AC, HP, and saves above)
+ * so roll buttons read it directly instead of regex-parsing pasted stat block prose.
+ */
+export type CompanionAttackKind = "melee" | "ranged" | "melee_or_ranged"
+
+export type CompanionDamageRoll = {
+  /** Dice expression, e.g. "1d6" or "2d8". */
+  dice: string
+  bonus?: CompanionScaledValue | null
+  /** Damage type label, e.g. "Piercing". Free text so homebrew types still fit. */
+  type?: string | null
+}
+
+export type CompanionAttack = {
+  kind: CompanionAttackKind
+  toHit: CompanionScaledValue
+  reach?: string | null
+  range?: string | null
+  damage: CompanionDamageRoll[]
+}
+
+export type ResolvedCompanionDamageRoll = {
+  /** Ready-to-roll formula, e.g. "1d6+3". */
+  formula: string
+  type: string | null
+}
+
+export type ResolvedCompanionAttack = {
+  kind: CompanionAttackKind
+  toHitBonus: number
+  reach?: string | null
+  range?: string | null
+  damage: ResolvedCompanionDamageRoll[]
+}
+
 export type CompanionNamedBlock = {
   name: string
   description: string
@@ -41,6 +78,13 @@ export type CompanionNamedBlock = {
   unlockLevelLabel?: string | null
   /** Parenthetical tag: "2 Ferocity", "Recharge 6", "1/Day", "Signature Attack". */
   tag?: string | null
+  /** Structured attack data (Actions/Bonus Actions/Reactions/Legendary Actions only). */
+  attack?: CompanionAttack | null
+}
+
+/** A `CompanionNamedBlock` with its attack resolved to plain numbers/formulas for the sheet. */
+export type ResolvedCompanionNamedBlock = CompanionNamedBlock & {
+  resolvedAttack?: ResolvedCompanionAttack | null
 }
 
 /** Parsed companion stat block (template — resolved at sheet time). */
@@ -91,6 +135,8 @@ export type CompanionStatBlockTemplate = {
   proficiencyBonusLabel?: string | null
   /** Parenthetical AC qualifier (natural armor, shield). */
   acNote?: string | null
+  /** Generic portrait for this creature (from the compendium row); sheets may override per-instance. */
+  cardImageUrl?: string | null
 }
 
 export type CompanionSource = {
@@ -125,6 +171,12 @@ export type ResolvedCompanion = {
    * save modifier per ability; otherwise it mirrors the template.
    */
   abilityScores?: Partial<Record<AbilityScoreKey, CompanionAbilityRow>>
+  /** Generic creature portrait (compendium `card_image_url`); sheet may override per-instance. */
+  cardImageUrl?: string | null
+  actions: ResolvedCompanionNamedBlock[]
+  bonusActions: ResolvedCompanionNamedBlock[]
+  reactions: ResolvedCompanionNamedBlock[]
+  legendaryActions: ResolvedCompanionNamedBlock[]
 }
 
 export type CharacterCompanionState = {
@@ -144,6 +196,10 @@ export type CharacterCompanionState = {
    * Beasts, Find Familiar chosen form). Stored on the group's base key.
    */
   knownForms?: string[] | null
+  /** Freeform notes for this specific companion instance (inventory, quirks, etc.). */
+  notes?: string | null
+  /** Per-instance portrait override; falls back to the creature's compendium card art. */
+  portraitUrl?: string | null
 }
 
 export type CompanionResolveContext = {
@@ -305,6 +361,42 @@ function resolveAbilityScores(
   return result
 }
 
+function formatSignedDiceFormula(dice: string, bonus: number): string {
+  const trimmedDice = dice.trim()
+  if (!bonus) return trimmedDice
+  return bonus > 0 ? `${trimmedDice}+${bonus}` : `${trimmedDice}${bonus}`
+}
+
+/** Resolve a structured attack's to-hit and damage formulas against the owner/context. */
+export function resolveCompanionAttack(
+  attack: CompanionAttack,
+  ctx: CompanionResolveContext,
+): ResolvedCompanionAttack {
+  return {
+    kind: attack.kind,
+    toHitBonus: resolveCompanionScaledValue(attack.toHit, ctx),
+    reach: attack.reach ?? null,
+    range: attack.range ?? null,
+    damage: attack.damage.map((roll) => ({
+      formula: formatSignedDiceFormula(
+        roll.dice,
+        roll.bonus ? resolveCompanionScaledValue(roll.bonus, ctx) : 0,
+      ),
+      type: roll.type ?? null,
+    })),
+  }
+}
+
+function resolveNamedBlocks(
+  blocks: CompanionNamedBlock[] | undefined,
+  ctx: CompanionResolveContext,
+): ResolvedCompanionNamedBlock[] {
+  return (blocks ?? []).map((block) => ({
+    ...block,
+    resolvedAttack: block.attack ? resolveCompanionAttack(block.attack, ctx) : null,
+  }))
+}
+
 export function resolveCompanion(
   template: CompanionStatBlockTemplate,
   source: CompanionSource,
@@ -329,6 +421,11 @@ export function resolveCompanion(
     abilityScores: polymorph
       ? resolvePolymorphAbilityScores(template, ctx)
       : resolveAbilityScores(template.abilityScores, ctx),
+    cardImageUrl: template.cardImageUrl ?? null,
+    actions: resolveNamedBlocks(template.actions, ctx),
+    bonusActions: resolveNamedBlocks(template.bonusActions, ctx),
+    reactions: resolveNamedBlocks(template.reactions, ctx),
+    legendaryActions: resolveNamedBlocks(template.legendaryActions, ctx),
   }
 }
 

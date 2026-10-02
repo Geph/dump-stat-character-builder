@@ -100,7 +100,8 @@ export function compendiumTabSupportsCardImage(tab: CompendiumContentType): bool
     tab === "backgrounds" ||
     tab === "spells" ||
     tab === "magic_items" ||
-    tab === "abilities"
+    tab === "abilities" ||
+    tab === "creatures"
   )
 }
 
@@ -236,6 +237,7 @@ export const COMPENDIUM_PORTRAIT_CARD_TABS = new Set<CompendiumContentType>([
   "species",
   "subclasses",
   "spells",
+  "creatures",
 ])
 
 export function compendiumUsesPortraitCardArt(tab: CompendiumContentType): boolean {

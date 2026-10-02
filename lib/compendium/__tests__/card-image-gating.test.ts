@@ -43,11 +43,12 @@ describe("compendiumBrowseGridClass", () => {
 })
 
 describe("compendiumUsesPortraitCardArt", () => {
-  it("matches classes, species, subclasses, and spells only", () => {
+  it("matches classes, species, subclasses, spells, and creatures only", () => {
     expect(compendiumUsesPortraitCardArt("classes")).toBe(true)
     expect(compendiumUsesPortraitCardArt("species")).toBe(true)
     expect(compendiumUsesPortraitCardArt("subclasses")).toBe(true)
     expect(compendiumUsesPortraitCardArt("spells")).toBe(true)
+    expect(compendiumUsesPortraitCardArt("creatures")).toBe(true)
     expect(compendiumUsesPortraitCardArt("backgrounds")).toBe(false)
   })
 })
@@ -109,6 +110,7 @@ describe("compendiumTabSupportsCardImage", () => {
     expect(compendiumTabSupportsCardImage("backgrounds")).toBe(true)
     expect(compendiumTabSupportsCardImage("magic_items")).toBe(true)
     expect(compendiumTabSupportsCardImage("abilities")).toBe(true)
+    expect(compendiumTabSupportsCardImage("creatures")).toBe(true)
   })
 
   it("disallows card art on other tabs", () => {
