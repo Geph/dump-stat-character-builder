@@ -655,12 +655,30 @@ export const BUNDLED_SPELL_CARD_IMAGES_BY_NAME: Record<string, string> = Object.
   }),
 )
 
+/** Same art keyed by output slug so `Hex: Decay` matches `Hex:decay` → hex-decay.png. */
+export const BUNDLED_SPELL_CARD_IMAGES_BY_SLUG: Record<string, string> = Object.fromEntries(
+  BUNDLED_SPELL_CARD_IMAGE_NAMES.map((name) => {
+    const slug = SPELL_CARD_IMAGE_SLUG_OVERRIDES[name] ?? spellNameToCardImageSlug(name)
+    return [slug, spellCardImage(slug)]
+  }),
+)
+
+/** Resolve bundled spell card art by exact name, then by kebab slug (colon/spacing variants). */
+export function resolveBundledSpellCardImagePath(spellName: string): string | null {
+  const trimmed = spellName.trim()
+  if (!trimmed) return null
+  const fromName = BUNDLED_SPELL_CARD_IMAGES_BY_NAME[trimmed]
+  if (fromName) return fromName
+  const slug = SPELL_CARD_IMAGE_SLUG_OVERRIDES[trimmed] ?? spellNameToCardImageSlug(trimmed)
+  return BUNDLED_SPELL_CARD_IMAGES_BY_SLUG[slug] ?? null
+}
+
 export function defaultSpellCardImageUrl(
   spellName: string,
   options?: DefaultCardImageAvailability,
 ): string | null {
   return maybeFilterDefaultCardImageUrl(
-    BUNDLED_SPELL_CARD_IMAGES_BY_NAME[spellName] ?? null,
+    resolveBundledSpellCardImagePath(spellName),
     options?.requireAvailable !== false,
   )
 }

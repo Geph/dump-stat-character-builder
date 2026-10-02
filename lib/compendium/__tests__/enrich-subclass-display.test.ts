@@ -79,7 +79,9 @@ describe("enrichSubclassDisplayDefaults", () => {
       },
       "Necromancer",
     )
-    expect(row.card_image_url).toBeNull()
+    const url = row.card_image_url as string | null
+    if (url) expect(url).toMatch(/\/subclasses\/necromancer\/reanimator\.png$/)
+    expect(url ?? "").not.toMatch(/\/artificer\//)
   })
 
   it("leaves unmapped homebrew subclasses without bundled art as placeholders", () => {

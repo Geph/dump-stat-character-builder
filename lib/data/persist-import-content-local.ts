@@ -55,6 +55,7 @@ import {
   shouldMergeClassResources,
 } from "@/lib/import/merge-collision-update"
 import { spellRowsToUpsertForClassLists } from "@/lib/import/merge-spell-persist"
+import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
 
 function withResolvedFeatureSpells(
   rows: Record<string, unknown>[],
@@ -273,11 +274,14 @@ async function persistImportedContentLocalBody(
   }
 
   if (sanitized.classes?.length || sanitized.spells?.length) {
+    const normalizedSpells = sanitized.spells?.length
+      ? normalizeSpellImportRows(sanitized.spells as unknown as Record<string, unknown>[])
+      : undefined
     const { catalogPatches, incoming } = spellRowsToUpsertForClassLists({
       existingSpells: await listRowsLocal("spells"),
       existingClasses: await listRowsLocal("classes"),
       incomingClasses: sanitized.classes as unknown as Record<string, unknown>[] | undefined,
-      incomingSpells: sanitized.spells?.map((s) => stampSource({ ...s }, source)),
+      incomingSpells: normalizedSpells?.map((s) => stampSource({ ...s }, source)),
       replaceSourceNames: options.overwriteExistingNames?.spell,
     })
     const spellRows = [...catalogPatches, ...incoming]

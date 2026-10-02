@@ -92,6 +92,8 @@ for (const [label, command, args] of checks) {
   const result = spawnSync(command, args, {
     cwd: root,
     stdio: "inherit",
+    // Node refuses to spawn .cmd shims without a shell on Windows (EINVAL).
+    shell: command === pnpmBin && process.platform === "win32",
     env: {
       ...process.env,
       CI: "1",

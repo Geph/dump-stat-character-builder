@@ -1,6 +1,7 @@
 import fs from "fs"
 import path from "path"
 import { describe, expect, it } from "vitest"
+import { isBundledPublicCardArtPath } from "@/lib/compendium/bundled-card-art"
 import { enrichSrdSpellRow, resolveSpellCardImageUrl } from "@/lib/compendium/enrich-srd-spells"
 import {
   BUNDLED_SPELL_CARD_IMAGE_NAMES,
@@ -14,12 +15,23 @@ describe("spell card image defaults", () => {
     expect(spellNameToCardImageSlug("Acid Splash")).toBe("acid-splash")
     expect(spellNameToCardImageSlug("Green-Flame Blade")).toBe("green-flame-blade")
     expect(spellNameToCardImageSlug("Spare the Dying")).toBe("spare-the-dying")
+    expect(spellNameToCardImageSlug("Hex:decay")).toBe("hex-decay")
+    expect(spellNameToCardImageSlug("Hex: Decay")).toBe("hex-decay")
     expect(spellNameToCardImageSlug("Dancing Object (Animate Object)")).toBe(
       "dancing-object-animate-object",
     )
     expect(spellNameToCardImageSlug("Trary\u2019s Terrific Transposition")).toBe(
       "trarys-terrific-transposition",
     )
+  })
+
+  it("matches Hex cantrip art across colon spacing variants", () => {
+    const mapped = { requireAvailable: false } as const
+    for (const name of ["Hex:decay", "Hex: Decay", "Hex Decay", "hex:decay"] as const) {
+      expect(defaultSpellCardImageUrl(name, mapped), name).toMatch(/\/hex-decay\.png$/)
+    }
+    expect(defaultSpellCardImageUrl("Hex:evil Eye", mapped)).toMatch(/\/hex-evil-eye\.png$/)
+    expect(defaultSpellCardImageUrl("Hex: Evil Eye", mapped)).toMatch(/\/hex-evil-eye\.png$/)
   })
 
   it("maps Kibbles import spell names to local art when the PNG is present", () => {
@@ -39,19 +51,26 @@ describe("spell card image defaults", () => {
     )
   })
 
-  it("exposes bundled art for every listed spell name", () => {
+  it("maps every listed spell name to a compendium spell path", () => {
     for (const name of BUNDLED_SPELL_CARD_IMAGE_NAMES) {
-      expect(defaultSpellCardImageUrl(name)).toMatch(/\/images\/compendium\/spells\//)
+      expect(defaultSpellCardImageUrl(name, { requireAvailable: false }), name).toMatch(
+        /\/images\/compendium\/spells\//,
+      )
     }
   })
 
-  it("ships an image file for every mapped spell", () => {
+  it("ships an image file for every git-bundled spell mapping", () => {
     const imagesDir = path.join(process.cwd(), "public/images/compendium/spells")
-    for (const [name, url] of Object.entries(BUNDLED_SPELL_CARD_IMAGES_BY_NAME)) {
+    const bundled = Object.entries(BUNDLED_SPELL_CARD_IMAGES_BY_NAME).filter(([, url]) =>
+      isBundledPublicCardArtPath(`public/images/compendium/spells/${path.basename(url)}`),
+    )
+    expect(bundled.length).toBeGreaterThan(300)
+    for (const [name, url] of bundled) {
       const file = path.basename(url)
       expect(fs.existsSync(path.join(imagesDir, file)), `missing art for ${name}: ${file}`).toBe(
         true,
       )
+      expect(defaultSpellCardImageUrl(name), name).toMatch(/\/images\/compendium\/spells\//)
     }
   })
 

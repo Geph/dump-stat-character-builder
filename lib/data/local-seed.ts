@@ -43,7 +43,7 @@ export type LocalSeedResult = {
 
 const SRD_VERSION_STORAGE_KEY = "dump-stat-srd-version"
 const SPELL_CARD_ART_VERSION_STORAGE_KEY = "dump-stat-spell-card-art-version"
-const BUNDLED_SPELL_CARD_ART_VERSION = "8"
+const BUNDLED_SPELL_CARD_ART_VERSION = "10"
 
 export { isIndexedDbEmpty, getIndexedDbRowCounts } from "./indexed-db-store"
 
@@ -69,14 +69,18 @@ function writeStoredSpellCardArtVersion(version: string): void {
 
 async function ensureBundledSpellCardArt(): Promise<void> {
   if (!shouldAssignBundledCardArt()) return
-  if (readStoredSpellCardArtVersion() === BUNDLED_SPELL_CARD_ART_VERSION) return
-  const { spells } = getSrdSeedData()
-  await upsertByName(
-    "spells",
-    enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
-  )
+  const versionFresh = readStoredSpellCardArtVersion() === BUNDLED_SPELL_CARD_ART_VERSION
+  if (!versionFresh) {
+    const { spells } = getSrdSeedData()
+    await upsertByName(
+      "spells",
+      enrichSrdSpellList(withSrdCreatorUrlList(spells as unknown as Record<string, unknown>[])),
+    )
+  }
   // Name-match art onto every stored spell (MHP / Kibbles / custom), not only the SRD seed list.
   // Local-only portraits stay gated by available-card-art (PNG present on this install).
+  // Always fill missing URLs so clearing + re-seeding a pack still picks up local masters
+  // even when the art-version key was already current.
   const existing = await getAllFromStore("spells")
   const stamped = existing.map((row) =>
     enrichSpellRowWithBundledCardImage(row as Record<string, unknown>),

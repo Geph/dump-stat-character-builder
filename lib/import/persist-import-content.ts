@@ -31,6 +31,7 @@ import { buildGatedClassResourceRowsForSubclass } from "@/lib/compendium/subclas
 import { normalizeEquipmentRows } from "@/lib/import/normalize-equipment"
 import { buildCreaturePersistRows } from "@/lib/import/build-creature-persist-rows"
 import { spellRowsToUpsertForClassLists } from "@/lib/import/merge-spell-persist"
+import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
 import { normalizeAbilityImportRows } from "@/lib/import/normalize-ability-import"
 import { enrichAbilityImportRows } from "@/lib/import/enrich-ability-import"
 import { resolveAbilityAttachmentRow } from "@/lib/import/resolve-ability-attachment"
@@ -269,11 +270,14 @@ export async function persistImportedContent(
   }
 
   if (sanitized.classes?.length || sanitized.spells?.length) {
+    const normalizedSpells = sanitized.spells?.length
+      ? normalizeSpellImportRows(sanitized.spells as unknown as Record<string, unknown>[])
+      : undefined
     const { catalogPatches, incoming } = spellRowsToUpsertForClassLists({
       existingSpells: await listRows("spells"),
       existingClasses: await listRows("classes"),
       incomingClasses: sanitized.classes as unknown as Record<string, unknown>[] | undefined,
-      incomingSpells: sanitized.spells?.map((s) => stampSource({ ...s }, source)),
+      incomingSpells: normalizedSpells?.map((s) => stampSource({ ...s }, source)),
       replaceSourceNames: options.overwriteExistingNames?.spell,
     })
     const spellRows = [...catalogPatches, ...incoming]

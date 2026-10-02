@@ -124,15 +124,24 @@ describe("enrichCustomFeatRow PHB presets", () => {
     expect(resist).toBeTruthy()
   })
 
-  it("wires Charger with dash speed and charge rider", () => {
+  it("wires Charger with dash speed and a melee Charge weapon badge", () => {
     const row = enrichCustomFeatRow({
       name: "Charger",
       source: PHB_SOURCE,
       description: "Improved Dash and Charge Attack",
     })
-    const linked = (row.linked_modifiers ?? []) as { catalogRefId?: string; characteristics?: { type: string }[] }[]
-    expect(linked.some((i) => i.characteristics?.some((c) => c.type === "speed"))).toBe(true)
-    expect(linked.some((i) => i.catalogRefId === "cat_fx_rider_damage")).toBe(true)
+    const linked = (row.linked_modifiers ?? []) as {
+      catalogRefId?: string
+      characteristics?: { type: string; label?: string; appliesTo?: string; includeUnarmed?: boolean }[]
+    }[]
+    const chars = linked.flatMap((inst) => inst.characteristics ?? [])
+    expect(chars.some((c) => c.type === "speed")).toBe(true)
+    expect(chars.find((c) => c.type === "weapon_sheet_badge")).toMatchObject({
+      label: "Charge",
+      appliesTo: "melee",
+      includeUnarmed: true,
+    })
+    expect(linked.some((i) => i.catalogRefId === "cat_fx_rider_damage")).toBe(false)
   })
 
   it("does not apply custom presets to SRD-source rows", () => {

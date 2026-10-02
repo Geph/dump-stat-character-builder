@@ -32,7 +32,11 @@ export function enrichSrdSpellRow(row: Record<string, unknown>): Record<string, 
 export function enrichSpellRowWithBundledCardImage(
   row: Record<string, unknown>,
 ): Record<string, unknown> {
-  return applyBundledCardImage(row, BUNDLED_SPELL_CARD_IMAGES_BY_NAME)
+  const name = String(row.name ?? "").trim()
+  // Resolve via slug so Hex: Decay / Hex:decay / Hex Decay all hit hex-decay.png.
+  const resolved = defaultSpellCardImageUrl(name, { requireAvailable: false })
+  const defaults = resolved ? { [name]: resolved } : {}
+  return applyBundledCardImage(row, defaults)
 }
 
 export function enrichSrdSpellList(rows: Record<string, unknown>[]): Record<string, unknown>[] {

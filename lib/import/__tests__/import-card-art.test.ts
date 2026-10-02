@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import type { ImportContent } from "@/lib/import/content-schema"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { withBasePath } from "@/lib/config/deploy-mode"
 import {
   applyImportCardArtUrls,
   buildInitialImportCardArtUrlMap,
@@ -368,6 +369,8 @@ describe("import-card-art", () => {
     const inventorOnDisk = existsSync(
       join(process.cwd(), "public/images/compendium/classes/inventor.png"),
     )
-    expect(map[importCardArtTargetKey("classes", 0)]).toBe(inventorOnDisk ? inventorPath : "")
+    expect(map[importCardArtTargetKey("classes", 0)]).toBe(
+      inventorOnDisk ? withBasePath(inventorPath) : "",
+    )
   })
 })
