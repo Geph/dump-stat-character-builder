@@ -405,7 +405,7 @@ function collectAppliedModifiers(
       if (trigger.onlyIfTargetBelowHalfHp) bits.push("Bloodied target")
       const colon = rawLabel.indexOf(":")
       let name =
-        colon > 0 ? rawLabel.slice(0, colon).trim() : rawLabel || (trigger.triggerOn === "crit" ? "Critical hit" : "On hit")
+        colon > 0 ? rawLabel.slice(0, colon).trim() : rawLabel || (trigger.triggerOn === "crit" ? "Critical hit" : "Other on hit effects")
       if (/^concentration breaker$/i.test(name)) name = "Concentration Break"
       const detail = colon > 0 ? rawLabel.slice(colon + 1).trim() : ""
       applied.push({

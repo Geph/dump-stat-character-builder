@@ -1,5 +1,7 @@
 # Import formats
 
+Last reviewed: 2026-10-04.
+
 Dump Stat supports six compendium import paths:
 
 | Method | Input | AI? | Best for |

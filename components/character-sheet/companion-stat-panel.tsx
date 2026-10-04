@@ -12,6 +12,7 @@ import {
   extractCompanionDamageFormula,
   parseCompanionActionRoll,
 } from "@/lib/character/parse-companion-action-roll"
+import { CompanionHpPools, type CompanionHpPool } from "@/components/character-sheet/companion-hp-pools"
 import { ExpandableDescription } from "@/components/character-sheet/expandable-description"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 import { WeaponDamageRollButton } from "@/components/character-sheet/weapon-damage-roll-button"
@@ -224,6 +225,8 @@ type CompanionStatPanelProps = {
   onNameChange?: (name: string | null) => void
   onNotesChange?: (notes: string | null) => void
   onPortraitChange?: (url: string | null) => void
+  /** Two or more copies sharing this stat block; replaces the single HP box and conditions. */
+  hpPools?: CompanionHpPool[]
 }
 
 function MetaLine({ label, value }: { label: string; value: string }) {
@@ -247,13 +250,26 @@ function ActionBlock({
     ? null
     : parseCompanionActionRoll(block.name, block.description, spellAttackModifier)
   const attackBonus = structured?.toHitBonus ?? legacyRoll?.attackBonus ?? null
-  const damageFormulas = structured
-    ? structured.damage.map((roll) => roll.formula).filter(Boolean)
-    : [legacyRoll?.damageFormula ?? extractCompanionDamageFormula(block.description)].filter(
-        (value): value is string => Boolean(value),
-      )
-  const damageType = structured?.damage.find((roll) => roll.type)?.type ?? null
-  const rangeLabel = structured
+  const structuredDamage = structured?.damage.filter((roll) => roll.formula) ?? []
+  const damageRolls = structuredDamage.length
+    ? structuredDamage
+    : [legacyRoll?.damageFormula ?? extractCompanionDamageFormula(block.description)]
+        .filter((value): value is string => Boolean(value))
+        .map((formula) => ({ formula, type: null as string | null }))
+  const isSave = structured?.kind === "save"
+  const saveLabel = isSave
+    ? [
+        structured.saveDc != null
+          ? `DC ${structured.saveDc}`
+          : structured.saveDcLabel
+            ? `DC: ${structured.saveDcLabel.replace(/^your\s+/i, "")}`
+            : null,
+        structured.saveAbility ? ABILITY_LABEL_SHORT[structured.saveAbility] : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : null
+  const rangeLabel = structured && !isSave
     ? structured.kind === "ranged"
       ? structured.range
       : structured.reach
@@ -266,8 +282,16 @@ function ActionBlock({
           {block.name}
           {block.tag ? <span className="text-muted-foreground font-normal"> ({block.tag})</span> : null}
         </p>
-        {attackBonus != null || damageFormulas.length > 0 ? (
+        {attackBonus != null || damageRolls.length > 0 || saveLabel ? (
           <div className="flex items-center gap-1 shrink-0">
+            {saveLabel ? (
+              <span
+                className="rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-foreground"
+                title={structured?.halfOnSuccess ? "Half damage on a successful save" : undefined}
+              >
+                {saveLabel}
+              </span>
+            ) : null}
             {attackBonus != null ? (
               <D20RollButton
                 modifier={attackBonus}
@@ -276,11 +300,11 @@ function ActionBlock({
                 rollContext={{ kind: "attack", ability: "dexterity" }}
               />
             ) : null}
-            {damageFormulas.map((formula, index) => (
+            {damageRolls.map((roll, index) => (
               <WeaponDamageRollButton
-                key={`${formula}-${index}`}
-                expression={formula}
-                label={damageType ? `${block.name} ${damageType} damage` : `${block.name} damage`}
+                key={`${roll.formula}-${index}`}
+                expression={roll.formula}
+                label={roll.type ? `${block.name} ${roll.type} damage` : `${block.name} damage`}
               />
             ))}
           </div>
@@ -289,6 +313,13 @@ function ActionBlock({
       {rangeLabel ? (
         <p className="text-[9px] text-muted-foreground">
           {structured?.kind === "ranged" ? "Range" : "Reach"} {rangeLabel}
+        </p>
+      ) : null}
+      {isSave && (structured.area || structured.halfOnSuccess) ? (
+        <p className="text-[9px] text-muted-foreground">
+          {[structured.area, structured.halfOnSuccess ? "half damage on a success" : null]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       ) : null}
       <ExpandableDescription
@@ -332,7 +363,9 @@ export function CompanionStatPanel({
   onNameChange,
   onNotesChange,
   onPortraitChange,
+  hpPools,
 }: CompanionStatPanelProps) {
+  const pooled = (hpPools?.length ?? 0) > 1
   const { template, ac, maxHp, currentHp, tempHp = 0, source, polymorph, activeConditions, polymorphActive } =
     companion
   const abilityScores = companion.abilityScores ?? template.abilityScores
@@ -425,6 +458,11 @@ export function CompanionStatPanel({
                   aria-label="Companion name"
                   className="min-w-0 w-full bg-background border border-border rounded px-1.5 py-0.5 text-sm font-bold text-foreground"
                 />
+              ) : pooled ? (
+                <h3 className="text-sm font-bold text-foreground truncate">
+                  {template.name}{" "}
+                  <span className="font-black text-primary tabular-nums">×{hpPools!.length}</span>
+                </h3>
               ) : (
                 <h3 className="text-sm font-bold text-foreground truncate">
                   {renamed ? (
@@ -437,7 +475,7 @@ export function CompanionStatPanel({
                   )}
                 </h3>
               )}
-              {onNameChange && !renaming ? (
+              {onNameChange && !renaming && !pooled ? (
                 <button
                   type="button"
                   onClick={startRename}
@@ -482,19 +520,23 @@ export function CompanionStatPanel({
         </div>
         <div className="p-1.5 bg-muted/50 rounded-lg text-center">
           <Heart className="w-3 h-3 mx-auto text-red-500 mb-0.5" />
-          <p className="text-[7px] text-muted-foreground uppercase">HP</p>
-          <div className="flex items-center justify-center gap-1">
-            <input
-              type="number"
-              min={0}
-              max={maxHp}
-              value={currentHp}
-              onChange={(e) => onHpChange(parseInt(e.target.value, 10) || 0)}
-              className="w-11 text-center bg-background border border-border rounded px-1 py-0.5 text-sm font-bold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
-            <span className="text-[10px] text-muted-foreground">/ {maxHp}</span>
-          </div>
-          {tempHp > 0 ? (
+          <p className="text-[7px] text-muted-foreground uppercase">{pooled ? "Max HP each" : "HP"}</p>
+          {pooled ? (
+            <p className="text-base font-black tabular-nums text-foreground">{maxHp}</p>
+          ) : (
+            <div className="flex items-center justify-center gap-1">
+              <input
+                type="number"
+                min={0}
+                max={maxHp}
+                value={currentHp}
+                onChange={(e) => onHpChange(parseInt(e.target.value, 10) || 0)}
+                className="w-11 text-center bg-background border border-border rounded px-1 py-0.5 text-sm font-bold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <span className="text-[10px] text-muted-foreground">/ {maxHp}</span>
+            </div>
+          )}
+          {!pooled && tempHp > 0 ? (
             <p className="text-[9px] font-semibold text-primary tabular-nums">+{tempHp} temp</p>
           ) : null}
         </div>
@@ -505,7 +547,9 @@ export function CompanionStatPanel({
         </div>
       </div>
 
-      {onConditionsChange ? (
+      {pooled ? <CompanionHpPools pools={hpPools!} /> : null}
+
+      {onConditionsChange && !pooled ? (
         <div className="px-3 py-2 border-b border-border">
           <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Conditions</p>
           <div className="flex flex-wrap gap-1">

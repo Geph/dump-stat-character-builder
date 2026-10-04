@@ -1,6 +1,7 @@
 import { invalidateBuilderCompendiumCache } from "@/lib/data/builder-compendium-cache"
 import { upsertByName as upsertByNameLocal } from "@/lib/data/indexed-db-store"
 import { resolveAbilityAttachmentRow } from "@/lib/import/resolve-ability-attachment"
+import { mergeSharedAbilityRows } from "@/lib/import/merge-shared-ability-rows"
 import { formatFeatDescription } from "@/lib/compendium/feat-description"
 import { enrichImportedSubclassRows } from "@/lib/compendium/enrich-import-subclasses"
 import { normalizeBackgroundRows } from "@/lib/compendium/normalize-backgrounds"
@@ -631,11 +632,15 @@ async function persistImportedContentLocalBody(
       }
       return resolveAbilityAttachmentRow(withSpells, attachmentMaps)
     })
-    let abilitiesToWrite = abilityRows
+    const existingAbilities = await listRowsLocal("custom_abilities")
+    let abilitiesToWrite = mergeSharedAbilityRows(abilityRows, existingAbilities, {
+      classes: await listRowsLocal("classes"),
+      subclasses: await listRowsLocal("subclasses"),
+    })
     if (options.updateExistingNames?.ability?.length) {
       abilitiesToWrite = applyUpdateMergesToNamedRows(
-        abilityRows as unknown as Record<string, unknown>[],
-        await listRowsLocal("custom_abilities"),
+        abilitiesToWrite as unknown as Record<string, unknown>[],
+        existingAbilities,
         options.updateExistingNames.ability,
       ) as typeof abilityRows
     }

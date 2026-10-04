@@ -24,6 +24,7 @@ import {
   mergeActivationModeRidersIntoFeature,
 } from "@/lib/character/activation-mode-riders"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
+import { itemBoostsOwnChecks } from "@/lib/character/post-roll-die-boosts"
 import {
   HIT_DICE_RESOURCE_KEY,
   isHitDiceResourceKey,
@@ -2360,15 +2361,19 @@ function pushCustomAbilityActions(
     seenPowerNames.add(normalizePickName(ability.name))
     const healEffects = resolveHealEffects(item)
     const ownerClassId = resolveCustomAbilityOwnerClassId(ability, classDetails, classId)
+    const category = classifyActionCategory(item, {
+      preferCombat: preferCombatForAbility(ability, item),
+    })
     actions.push({
       id: `ability:${ability.id}`,
       name: ability.name,
       sourceLabel: customAbilitySourceLabel(ability),
       kinds,
       trigger,
-      category: classifyActionCategory(item, {
-        preferCombat: preferCombatForAbility(ability, item),
-      }),
+      category,
+      ...(category === "combat" && itemBoostsOwnChecks(item.linkedModifiers)
+        ? { showOnCombatTab: true, showOnAbilitiesTab: true }
+        : {}),
       limitedUses,
       classLevel: levelCap,
       description: ability.description ?? null,

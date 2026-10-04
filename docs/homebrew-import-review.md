@@ -1,5 +1,7 @@
 # Homebrew class import review (Cursor handoff)
 
+Last reviewed: 2026-10-04.
+
 How to give Cursor (and the repo tooling) content for the Mage Hand Press / homebrew **class extract → wiring review → merge → enrich** loop.
 
 This loop is not only for full class audits. If a sheet bug existed because Drive JSON, BYO instructions, detect rules, or enrichment missed a mechanic, update those sources in the same change — see [AGENTS.md](../AGENTS.md) session invariant 3. Which modifier layer to use (and when the sheet already owns the engine): [custom-modifiers.md](./custom-modifiers.md).
@@ -91,6 +93,13 @@ npm run import:merge -- \
 
 `npm run import:audit -- <catalog-or-class.json>` also reviews `import_proposals.custom_abilities` (duplicates, missing names/roles, empty catalogs).
 
+**Same-name knacks across classes.** Custom abilities persist by name. When a second class
+imports a knack whose rules text matches an existing row owned by another class (Vagabond and
+the Warden's Grey Watchman share Bear Hug, Bull Rush, Heel-Cutter, …), persist keeps one row and
+unions both owners into `eligible_classes` (`lib/import/merge-shared-ability-rows.ts`). Different
+rules text under the same name still overwrites — rename one in the JSON if two classes really
+have different abilities with one name.
+
 ### When you have a brand-new Claude `*_full.json`
 
 1. Save it somewhere stable (Claude outputs folder is fine).
@@ -180,10 +189,15 @@ Package scripts:
 | Gate | What |
 | --- | --- |
 | Vitest | `homebrew-import-ops`, `homebrew-prompt-footguns`, `homebrew-enrichment-smoke`, plus class-specific Drive tests |
-| Stop hook | After `eslint` + `tsc`, if the turn touched import enrichment / hint files, runs `test:import-homebrew` |
+| Stop hook (`.cursor/hooks/post-turn-verify.mjs`) | `eslint .` + `tsc --noEmit`; when the turn touched `lib/import`, `lib/compendium`, or `lib/character`, also the resource-graph, granted-equipment, and claim-coverage audits (`scripts/post-turn-audits.ts`). Force with `CURSOR_HOOK_FORCE=1`; add `next build` with `CURSOR_HOOK_RUN_BUILD=1` |
+| Manual | `pnpm test:import-homebrew` — the homebrew Drive / smoke bundle (not run by the hook) |
 | Pre-push | Existing affected-test vitest gate |
 
-Opt out of import smoke in the stop hook for a session: `CURSOR_HOOK_SKIP_IMPORT_SMOKE=1`.
+**Known failing locally (2026-10-04):** `mhp-masteries-drive-import.test.ts` › "routes every
+property without false passive modifiers". The **Finisher** mastery picks up a `power_rider`
+during `enrichImportContentModifiers`; masteries should carry no linked modifiers. It only runs
+where the Drive fixture exists (skipped in CI). Fix the detect rule that matches Finisher's
+text rather than loosening the test.
 
 ## File naming conventions
 

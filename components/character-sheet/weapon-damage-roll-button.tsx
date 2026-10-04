@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
   appendBonusDamageDice,
+  isOneShotWeaponDamageBonus,
   preferredWeaponDamageDiceId,
   swapDamageDice,
   type WeaponDamageBonusOption,
@@ -46,8 +47,8 @@ type WeaponDamageRollButtonProps = {
   tone?: "default" | "damage"
   caption?: string
   className?: string
-  /** Fired after a damage roll resolves (e.g. to mark Rampage Die damage dealt). */
-  onRoll?: () => void
+  /** Fired after a damage roll resolves with the damage modifiers it included. */
+  onRoll?: (bonuses: WeaponDamageBonusOption[]) => void
 }
 
 function abilityModInExpression(
@@ -161,7 +162,7 @@ export function WeaponDamageRollButton({
   }, [bonusIdsKey])
 
   const availableBonusIds = useMemo(
-    () => new Set(bonusOptions.map((option) => option.id)),
+    () => new Set(bonusOptions.filter((option) => !option.disabled).map((option) => option.id)),
     [bonusOptions],
   )
   const activeBonusIds = selectedBonusIds.filter((id) => availableBonusIds.has(id))
@@ -241,7 +242,11 @@ export function WeaponDamageRollButton({
       label: label ?? `Damage (${activeExpression})`,
       summary: `${formatDamageRollResult(result.rolls, result.modifier, result.total)}${modeSuffix}${noModSuffix}${bonusSuffix}`,
     })
-    onRoll?.()
+    onRoll?.(activeBonuses)
+    if (activeBonuses.some(isOneShotWeaponDamageBonus)) {
+      const spentIds = new Set(activeBonuses.filter(isOneShotWeaponDamageBonus).map((option) => option.id))
+      setSelectedBonusIds((prev) => prev.filter((id) => !spentIds.has(id)))
+    }
   }
 
   const filled = tone === "damage" || layout === "panel"
@@ -331,9 +336,10 @@ export function WeaponDamageRollButton({
               <DropdownMenuCheckboxItem
                 key={option.id}
                 checked={activeBonusIds.includes(option.id)}
+                disabled={option.disabled}
                 onCheckedChange={(checked) => toggleBonus(option.id, Boolean(checked))}
                 onSelect={(event) => event.preventDefault()}
-                title={option.title}
+                title={option.disabled ? (option.disabledReason ?? option.title) : option.title}
               >
                 {option.label}
               </DropdownMenuCheckboxItem>

@@ -5,6 +5,10 @@ import {
   type CompanionScaledValue,
   type CompanionStatBlockTemplate,
 } from "@/lib/character/companion-stat-block"
+import {
+  withInferredCompanionAttacks,
+  withInferredStatBlockAttacks,
+} from "@/lib/character/infer-companion-attack"
 import { parseCreatureScaledStat } from "@/lib/character/parse-creature-stat-block"
 import type {
   CreatureAbilityEntry,
@@ -177,13 +181,15 @@ export function mapCreatureImportV2ToTemplate(
     xp: creature.xp ?? null,
     proficiencyBonusLabel: creature.proficiency_bonus ?? null,
     traits: mapAbilityEntries(creature.traits),
-    actions: mapAbilityEntries(creature.actions),
+    actions: withInferredCompanionAttacks(mapAbilityEntries(creature.actions)),
     bonusActions: creature.bonus_actions?.length
-      ? mapAbilityEntries(creature.bonus_actions)
+      ? withInferredCompanionAttacks(mapAbilityEntries(creature.bonus_actions))
       : undefined,
-    reactions: creature.reactions?.length ? mapAbilityEntries(creature.reactions) : undefined,
+    reactions: creature.reactions?.length
+      ? withInferredCompanionAttacks(mapAbilityEntries(creature.reactions))
+      : undefined,
     legendaryActions: creature.legendary_actions?.length
-      ? mapAbilityEntries(creature.legendary_actions)
+      ? withInferredCompanionAttacks(mapAbilityEntries(creature.legendary_actions))
       : undefined,
   }
 }
@@ -242,7 +248,11 @@ function legacyToPersistRow(creature: CreatureImportLegacy, source: string): Cre
     xp: null,
     scaling: creature.scaling ?? template.scaling ?? null,
     import_payload: null,
-    stat_block: { ...template, name: creature.name, category: template.category ?? category },
+    stat_block: withInferredStatBlockAttacks({
+      ...template,
+      name: creature.name,
+      category: template.category ?? category,
+    }),
     prerequisite_rules: creature.prerequisite_rules ?? null,
     source: creature.source?.trim() || source,
   }

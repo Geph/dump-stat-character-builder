@@ -335,6 +335,68 @@ export function FailedRollTriggerEditor({
         />
         <span className="text-muted-foreground">Refund spent resource if roll still fails (Peerless Skill)</span>
       </label>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Spend class resource</label>
+          <input
+            type="text"
+            list="failed-roll-trigger-resources"
+            value={mod.spendResourceKey ?? ""}
+            onChange={(e) => onChange({ ...mod, spendResourceKey: e.target.value.trim() || null })}
+            placeholder="battle_dice"
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+          <datalist id="failed-roll-trigger-resources">
+            {classResources.map((resource) => (
+              <option key={resource.id} value={resource.id}>{resource.name}</option>
+            ))}
+          </datalist>
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Amount</label>
+          <input
+            type="number"
+            min={1}
+            value={mod.spendResourceAmount ?? 1}
+            onChange={(e) => onChange({ ...mod, spendResourceAmount: Math.max(1, Number(e.target.value) || 1) })}
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Only this ability (optional)</label>
+          <select
+            value={mod.ability ?? ""}
+            onChange={(e) => onChange({ ...mod, ability: e.target.value || null })}
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+          >
+            <option value="">Any</option>
+            {["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"].map((ability) => (
+              <option key={ability} value={ability}>{ability.charAt(0).toUpperCase() + ability.slice(1)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!mod.requiresProficiency}
+          onChange={(e) => onChange({ ...mod, requiresProficiency: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Only skills the character is proficient in (Knack)</span>
+      </label>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!mod.rerollRoll}
+          onChange={(e) => onChange({ ...mod, rerollRoll: e.target.checked })}
+          className="accent-primary"
+        />
+        <span className="text-muted-foreground">Reroll the d20, then add the die (Tenacity)</span>
+      </label>
+      <p className="text-xs text-muted-foreground">
+        With a resource and a die bonus below, the sheet offers the die on the roll button after a matching self roll.
+      </p>
       <NestedModifierEffectEditor
         value={mod.effect}
         onChange={(effect) => onChange({ ...mod, effect })}

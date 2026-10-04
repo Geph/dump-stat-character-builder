@@ -24,6 +24,7 @@ import {
   optionalWeaponDamageBonuses,
   optionalWeaponDamageReplacements,
   weaponDamageDiceOptions,
+  type WeaponDamageBonusOption,
 } from "@/lib/compendium/weapon-damage-roll"
 import type {
   PowerRiderCharacteristic,
@@ -82,6 +83,35 @@ type SheetEquippedWeaponsPanelProps = {
   powerRiders?: readonly PowerRiderCharacteristic[]
   weaponAbilityOverrides?: readonly WeaponAbilityOverrideCharacteristic[]
   abilityMods?: AbilityMods | null
+  /** Current single-die size per class resource (Battle Die d8 → 8). */
+  classResourceDieSides?: Record<string, number>
+  /** Remaining uses of a class resource pool by key; enables spend riders. */
+  classResourceAvailable?: (resourceKey: string) => number
+  /** Spend resources / action economy for damage riders included in a roll. */
+  onSpendDamageRiders?: (bonuses: WeaponDamageBonusOption[]) => void
+}
+
+type WeaponRiderSpendProps = Pick<
+  SheetEquippedWeaponsPanelProps,
+  "classResourceDieSides" | "classResourceAvailable" | "onSpendDamageRiders"
+>
+
+function withRiderAvailability(
+  options: WeaponDamageBonusOption[],
+  available: ((resourceKey: string) => number) | undefined,
+): WeaponDamageBonusOption[] {
+  if (!available) return options
+  return options.map((option) => {
+    const spend = option.resourceSpend
+    if (!spend) return option
+    const left = available(spend.classResourceKey)
+    if (left >= spend.amount) return option
+    return {
+      ...option,
+      disabled: true,
+      disabledReason: `Needs ${spend.amount} ${spend.classResourceKey.replace(/_/g, " ")}; ${left} left.`,
+    }
+  })
 }
 
 function WeaponAttackCard({
@@ -109,7 +139,10 @@ function WeaponAttackCard({
   powerRiders,
   weaponAbilityOverrides,
   abilityMods,
-}: EquippedWeaponCard & {
+  classResourceDieSides,
+  classResourceAvailable,
+  onSpendDamageRiders,
+}: EquippedWeaponCard & WeaponRiderSpendProps & {
   buildInputs: CharacterBuildInputs | null
   weaponProficiencies: string[]
   extraMastery?: ExtraWeaponMasteryControl
@@ -156,13 +189,17 @@ function WeaponAttackCard({
     }),
     ...optionalWeaponDamageReplacements(weapon, powerRiders),
   ]
-  const bonusOptions = optionalWeaponDamageBonuses(weapon, powerRiders, abilityMods, {
-    characterLevel: buildInputs
-      ? buildInputs.classLevels.reduce((sum, row) => sum + (row.level ?? 0), 0) || null
-      : null,
-    classResourceDiceByKey: buildInputs ? resolveClassResourceDamageDice(buildInputs) : null,
-    activeSheetToggleIds,
-  })
+  const bonusOptions = withRiderAvailability(
+    optionalWeaponDamageBonuses(weapon, powerRiders, abilityMods, {
+      characterLevel: buildInputs
+        ? buildInputs.classLevels.reduce((sum, row) => sum + (row.level ?? 0), 0) || null
+        : null,
+      classResourceDiceByKey: buildInputs ? resolveClassResourceDamageDice(buildInputs) : null,
+      classResourceDieSidesByKey: classResourceDieSides ?? null,
+      activeSheetToggleIds,
+    }),
+    classResourceAvailable,
+  )
   const spellBuffOptions = weaponCanReceiveSpellBuff(weapon)
     ? (availableWeaponSpellBuffs ?? []).map((buff) => ({
         id: buff.toggleId,
@@ -397,7 +434,10 @@ function WeaponAttackCard({
                 layout="panel"
                 tone="damage"
                 caption="Dmg"
-                onRoll={onDamageRoll}
+                onRoll={(bonuses) => {
+                  onDamageRoll?.()
+                  if (bonuses.length) onSpendDamageRiders?.(bonuses)
+                }}
               />
             </div>
           ) : null}
@@ -425,6 +465,9 @@ export function SheetEquippedWeaponsPanel({
   powerRiders,
   weaponAbilityOverrides,
   abilityMods,
+  classResourceDieSides,
+  classResourceAvailable,
+  onSpendDamageRiders,
 }: SheetEquippedWeaponsPanelProps) {
   if (!weapons.length) return null
 
@@ -455,6 +498,9 @@ export function SheetEquippedWeaponsPanel({
             powerRiders={powerRiders}
             abilityMods={abilityMods}
             weaponAbilityOverrides={weaponAbilityOverrides}
+            classResourceDieSides={classResourceDieSides}
+            classResourceAvailable={classResourceAvailable}
+            onSpendDamageRiders={onSpendDamageRiders}
           />
         ))}
       </div>

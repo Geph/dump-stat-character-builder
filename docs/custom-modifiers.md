@@ -1,6 +1,6 @@
 # Custom modifiers — agent map
 
-Last reviewed: 2026-09-10.
+Last reviewed: 2026-10-04.
 
 A new chat has **no prior transcript**. Read this before adding a modifier type, a
 `if (name === "…")` sheet branch, or a play-state field. Decision rule for
@@ -222,6 +222,8 @@ verbatim.
 | --- | --- | --- |
 | Inventory containers | `inventory-containers.ts` | CharacteristicModifier `inventory_container` (side-channel). Contents in `sheet_state.containerInventories`. Dead Space uses `linkHostItem` + create_mundane linked item (level-up slot and overlay share the pick); Bag of Holding / Portable Hole use `attachToEquipmentNames` or magic_effects on the item. Gear and the feature action overlay show Contents. |
 | Companion rest pick | `resolve-companions.ts` + rest overlay | CharacteristicModifier `grant_creature` with `choiceOptions` plus `pickOnRest` (`short_rest` / `long_rest` / `short_or_long_rest`) and optional `combinedCrByLevel` (`count` is the CR total, so `0.25` = 1/4). The rest overlay and Companions tab share `knownForms`. Do not name-branch Thralls in sheet runtime. |
+| Companion copies / HP pools | `companion-instance-groups.ts` + `components/character-sheet/companion-hp-pools.tsx` | Repeated picks of one form (4 × Skeleton) render as **one** stat block with a hit point pool per copy (`groupCompanionInstances`). Each copy keeps its own `companionKey` (with `formInstance`), so HP, temp HP, rename, and conditions persist per copy in `CharacterCompanionState`. No authoring — it follows from `grant_creature` picks. |
+| Companion / creature attacks | `companion-stat-block.ts` (`CompanionAttack`) + `infer-companion-attack.ts` | Creature actions carry a structured `attack` (kind `melee` / `ranged` / `melee_or_ranged` / `save`, to-hit or `saveDc`, `damage[]` rolls as `CompanionScaledValue` parts that can scale off the owner's ability mod / PB / spell attack). The Compendium creature editor (`creature-action-editor.tsx`) edits it; `withInferredCompanionAttacks` / `withInferredStatBlockAttacks` fill it from action prose when missing ("+5 to hit … 1d6 + 3 Slashing", "your spell attack modifier", saving-throw damage). Sheet roll buttons read the structured attack, never the prose. |
 | Rampage Die | `rampage-die.ts` | Wording only. Dependants gate with `requiresSheetToggle: "rampage_die_d8_plus"` (derived — not `new_toggles`). Tantrum / Unstoppable Rampage: names + text |
 | Flesh Warp Mutation Die | `mutation-die.ts` | Wording; ally-benefit counts in play state |
 | Mesmerism tokens | `illusion-tokens.ts` | Projected Self / Imaginary Ally names + text |
@@ -255,6 +257,43 @@ do not add a new name branch beside them.
 
 Several of those already have enrichment presets (Occultist, Necromancer, MHP
 Warden, Psion). The leftover is the **runtime flag**, not the import attach.
+
+### Spend-on-roll weapon riders (2026-10-03)
+
+`power_rider` with `weaponDamageMenu` can now cost something. `classResourceDieCount`
+rolls that many **single** dice at the pool's current size (`classResourceDieSides`) —
+not the pool-count column Finisher uses. `spendClassResourceAmount` and
+`riderActionKind` make the DMG ··· option one-shot: it starts unchecked, rolling spends
+the dice and marks the Bonus Action (`spendWeaponDamageRiders` in the sheet client),
+then it unticks. It is disabled when the pool is short. `weaponScope` limits to melee
+(incl. Unarmed Strike) or ranged; `complementaryAbilities` + `abilityBonusMinimum`
+cover "your STR or DEX modifier, whichever you don't already add". The menu dedupes by
+label so a subclass `[Maneuver]` feature and the ability it grants show one option.
+The maneuver's own card still exists — players use one path or the other.
+
+**Hazard:** a bare activation-level `check_roll_modifier` on a **class / subclass
+feature** is collected by `collectFeatureRollBonuses` for every matching d20 roll (only
+limitations gate it). A spend-a-die bonus must nest under `failed_roll_trigger` /
+`d20_test_reaction` so it rolls only when the card is used. Vagabond Tenacity was
+wired the bare way and rolled a Battle Die into every save until re-imported.
+
+### Post-roll resource dice on d20 buttons (2026-10-04)
+
+A self `failed_roll_trigger` with `spendResourceKey` and a nested die bonus
+(`bonusConfig.mode: "die"`) is offered on every matching `D20RollButton` **after** the
+roll: a `+d8 Knack` chip rolls the die, adds it to that result, spends the pool
+(`spendPostRollBoost` in the sheet client), and marks the Reaction when `useReaction`.
+`collectPostRollDieBoosts` (`lib/character/post-roll-die-boosts.ts`) does the matching:
+`rollKind: "ability"` also matches skill checks; `ability` / `skills` filter;
+`requiresProficiency` limits to proficient skills (Knack); `rerollRoll` rerolls the d20
+first (Tenacity). Ally-scope triggers are not offered. The sheet can't see the DC, so
+the chip shows on every matching roll and the player decides.
+
+Placement: an item with a self skill / ability-check trigger files on **both** Combat
+and Abilities & Skills (`itemBoostsOwnChecks` in `pushCustomAbilityActions` and
+`inferFeatureSheetDisplay`). An explicit feature `sheetDisplay` still wins.
+
+Not tracked yet: "once per turn" on Knack-style dice.
 
 ### Spell slots ride on `class_resource` (2026-09-01)
 

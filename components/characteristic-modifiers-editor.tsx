@@ -3387,6 +3387,123 @@ function ModifierFields({
               </div>
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
+                  Single dice of that resource
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={mod.classResourceDieCount ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...mod,
+                      classResourceDieCount: e.target.value === "" ? undefined : Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                  placeholder="Blank = pool column (Finisher)"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Spend from resource when rolled
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={mod.spendClassResourceAmount ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...mod,
+                      spendClassResourceAmount: e.target.value === "" ? undefined : Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Action cost</label>
+                <select
+                  value={mod.riderActionKind ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...mod,
+                      riderActionKind: (e.target.value || undefined) as typeof mod.riderActionKind,
+                    })
+                  }
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                >
+                  <option value="">None</option>
+                  <option value="bonus">Bonus Action</option>
+                  <option value="reaction">Reaction</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Weapons</label>
+                <select
+                  value={mod.weaponScope ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...mod,
+                      weaponScope: (e.target.value || undefined) as typeof mod.weaponScope,
+                    })
+                  }
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                >
+                  <option value="">Any weapon</option>
+                  <option value="melee">Melee + Unarmed Strike</option>
+                  <option value="ranged">Ranged</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Add unused ability of
+                </label>
+                <select
+                  value={mod.complementaryAbilities?.length ? "strength_dexterity" : ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...mod,
+                      complementaryAbilities: e.target.value ? ["strength", "dexterity"] : undefined,
+                    })
+                  }
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                >
+                  <option value="">None</option>
+                  <option value="strength_dexterity">Strength or Dexterity (whichever not used)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Ability bonus minimum
+                </label>
+                <input
+                  type="number"
+                  value={mod.abilityBonusMinimum ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...mod,
+                      abilityBonusMinimum: e.target.value === "" ? undefined : Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                  placeholder="1"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Extra dice damage type
+                </label>
+                <input
+                  type="text"
+                  value={mod.bonusDiceType ?? ""}
+                  onChange={(e) => onChange({ ...mod, bonusDiceType: e.target.value || undefined })}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm"
+                  placeholder="Same as weapon"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
                   Default on when toggle
                 </label>
                 <input

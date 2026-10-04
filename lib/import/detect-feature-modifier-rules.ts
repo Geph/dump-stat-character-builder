@@ -1,4 +1,9 @@
-import type { AbilityScoreKey, AbilityModifierKey, UnarmedStrikeDie } from "@/lib/compendium/characteristic-modifiers"
+import type {
+  AbilityScoreKey,
+  AbilityModifierKey,
+  RollTriggerKind,
+  UnarmedStrikeDie,
+} from "@/lib/compendium/characteristic-modifiers"
 import { SKILL_NAMES } from "@/lib/compendium/characteristic-modifiers"
 import {
   characteristicCatalogRefId,
@@ -168,6 +173,13 @@ function weaponDamageMenuRider(
     menuConditionLabel?: string
     label?: string
     alertSummary?: string
+    classResourceDieCount?: number
+    spendClassResourceAmount?: number
+    riderActionKind?: "bonus" | "reaction"
+    weaponScope?: "melee" | "ranged"
+    complementaryAbilities?: AbilityScoreKey[]
+    abilityBonusMinimum?: number
+    bonusDiceType?: string
   },
 ): LinkedModifierInstance {
   return charInstance(newInstanceId(), characteristicCatalogRefId("power_rider"), [
@@ -181,6 +193,13 @@ function weaponDamageMenuRider(
       dieByLevel: opts.dieByLevel,
       ability: opts.ability,
       classResourceKey: opts.classResourceKey,
+      ...(opts.classResourceDieCount != null ? { classResourceDieCount: opts.classResourceDieCount } : {}),
+      ...(opts.spendClassResourceAmount ? { spendClassResourceAmount: opts.spendClassResourceAmount } : {}),
+      ...(opts.riderActionKind ? { riderActionKind: opts.riderActionKind } : {}),
+      ...(opts.weaponScope ? { weaponScope: opts.weaponScope } : {}),
+      ...(opts.complementaryAbilities?.length ? { complementaryAbilities: opts.complementaryAbilities } : {}),
+      ...(opts.abilityBonusMinimum != null ? { abilityBonusMinimum: opts.abilityBonusMinimum } : {}),
+      ...(opts.bonusDiceType ? { bonusDiceType: opts.bonusDiceType } : {}),
       defaultSelectedWhenToggle: opts.defaultSelectedWhenToggle,
       menuConditionLabel: opts.menuConditionLabel,
       label: opts.label ?? ctx.featureName ?? "Damage rider",
@@ -304,6 +323,23 @@ export const FEATURE_NAME_MODIFIER_RULES: FeatureNameModifierRule[] = [
 
 function parseAbilityWord(word: string): AbilityScoreKey | null {
   return ABILITY_WORD_TO_KEY[word.trim().toLowerCase()] ?? null
+}
+
+/** One capturing group: "one" / "two" / "a" / "3". */
+const COUNT_WORD_PATTERN = "(one|two|three|four|five|a|an|\\d+)"
+
+const COUNT_WORDS: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5 }
+
+function parseCountWord(word: string): number | null {
+  const normalized = word.trim().toLowerCase()
+  if (/^\d+$/.test(normalized)) return Number(normalized)
+  return COUNT_WORDS[normalized] ?? null
+}
+
+/** Maneuver die names → class resource key. */
+const RESOURCE_DIE_KEYS: Record<string, string> = {
+  battle: "battle_dice",
+  superiority: "superiority_dice",
 }
 
 const ABILITY_SCORE_TO_MODIFIER: Record<AbilityScoreKey, AbilityModifierKey> = {
@@ -3566,6 +3602,136 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
         label: ctx.featureName ?? "Damage bonus",
         alertSummary: `${ctx.featureName ?? "Optional"}: add your ${match[1]} modifier under Damage modifiers on the weapon DMG menu.`,
       })
+    },
+  },
+  {
+    // Maneuvers: "expend two Battle Dice … Add the Battle Dice to the attack's damage roll."
+    id: "weapon.damage_menu.expend_resource_dice",
+    confidence: "high",
+    scope: "full",
+    test: new RegExp(
+      `\\bexpend(?:s|ing)?\\s+${COUNT_WORD_PATTERN}\\s+(battle|superiority)\\s+di(?:e|ce)\\b[\\s\\S]{0,500}?` +
+        `(?:\\badd(?:s|ing)?\\s+(the|a|one)\\s+\\2\\s+di(?:e|ce)\\b[^.]{0,120}?\\bto\\s+the\\s+(?:attack\\S{0,3}s\\s+)?damage\\s+roll` +
+        `|\\bextra\\s+(\\w+)\\s+damage\\s+equal\\s+to\\s+the\\s+roll\\s+of\\s+the\\s+\\2\\s+die)`,
+      "i",
+    ),
+    build: (match, ctx, text) => {
+      const spendCount = parseCountWord(match[1] ?? "")
+      const resourceKey = RESOURCE_DIE_KEYS[(match[2] ?? "").toLowerCase()]
+      if (!spendCount || !resourceKey) return null
+      // "On a hit with one of these extra attacks, add a Battle Die" — the spend paid for the attacks.
+      const perExtraAttack = (match[3] ?? "").toLowerCase() === "a" && spendCount > 1
+      const dieCount = perExtraAttack ? 1 : spendCount
+      const bonusAction = /\bas a bonus action\b/i.test(text)
+      const melee =
+        !/\bmelee or ranged\b/i.test(text) &&
+        /\b(?:using a melee weapon|with a melee attack roll|a melee attack)\b/i.test(text)
+      const complementary =
+        /\byour strength or dexterity modifier\s*\(whichever you don\S{0,3}t already add/i.test(text)
+      const minimum = text.match(/\bminimum of (\d+)\b/i)
+      const dieWord = (match[2] ?? "").replace(/^\w/, (c) => c.toUpperCase())
+      const label = (ctx.featureName ?? "Maneuver").replace(/\s*\[[^\]]+\]\s*$/, "").trim()
+      const diceLabel = `${dieCount} ${dieWord} ${dieCount === 1 ? "Die" : "Dice"}`
+      return weaponDamageMenuRider(ctx, {
+        label,
+        classResourceKey: resourceKey,
+        classResourceDieCount: dieCount,
+        spendClassResourceAmount: perExtraAttack ? undefined : spendCount,
+        riderActionKind: bonusAction ? "bonus" : undefined,
+        weaponScope: melee ? "melee" : undefined,
+        complementaryAbilities: complementary ? ["strength", "dexterity"] : undefined,
+        abilityBonusMinimum: complementary && minimum ? Number(minimum[1]) : undefined,
+        bonusDiceType: match[4]?.toLowerCase(),
+        menuConditionLabel: perExtraAttack ? "extra attack" : undefined,
+        alertSummary: perExtraAttack
+          ? `${label}: add ${diceLabel} to each extra attack's damage under Damage modifiers on the weapon DMG menu.`
+          : `${label}: tick under Damage modifiers on the weapon DMG menu — rolling adds ${diceLabel} and spends ${spendCount}${bonusAction ? " plus your Bonus Action" : ""}.`,
+      })
+    },
+  },
+  {
+    // "When you fail a Wisdom or Charisma check, you can expend one Battle Die to add it to the roll."
+    id: "failed_roll.expend_resource_die",
+    confidence: "high",
+    scope: "full",
+    test: /\bwhen (you|an ally[^,.]{0,60}?) (fail|miss)(?:s|es)?\b([^.]{0,120}?),\s*you can (?:take a reaction (?:and|to)\s+)?expend (?:one|a|an|1) (battle|superiority) die\b[^.]{0,40}?\badd it to the (?:attack )?roll\b/i,
+    build: (match, ctx) => {
+      const resourceKey = RESOURCE_DIE_KEYS[(match[4] ?? "").toLowerCase()]
+      if (!resourceKey) return null
+      const ally = !/^you$/i.test(match[1] ?? "")
+      const subject = `${match[2] ?? ""} ${match[3] ?? ""}`.toLowerCase()
+      const rollKind: RollTriggerKind = /\bmiss\b|\battack roll\b/.test(subject)
+        ? "attack"
+        : /\bsaving throw\b|\bsave\b/.test(subject)
+          ? "save"
+          : /\bskill\b/.test(subject)
+            ? "skill"
+            : "ability"
+      const reaction = /\btake a reaction\b/i.test(match[0])
+      const dieWord = (match[4] ?? "").replace(/^\w/, (c) => c.toUpperCase())
+      const trigger = (match[0].split(",")[0] ?? "").trim().replace(/^\w/, (c) => c.toUpperCase())
+      const namedAbilities = [
+        ...subject.matchAll(/\b(strength|dexterity|constitution|intelligence|wisdom|charisma)\b/g),
+      ].map((m) => m[1]!)
+      const requiresProficiency =
+        rollKind === "skill" && /\bskill (?:(?:in which|that|with which) )?you(?:'re| are| have) proficien/.test(subject)
+      return charInstance(newInstanceId(), characteristicCatalogRefId("failed_roll_trigger"), [
+        {
+          id: modId(instanceKey(ctx, "failed_roll_resource_die")),
+          type: "failed_roll_trigger",
+          triggerOn: "fail",
+          rollKind,
+          ...(namedAbilities.length === 1 && rollKind !== "attack" ? { ability: namedAbilities[0] } : {}),
+          ...(requiresProficiency ? { requiresProficiency: true } : {}),
+          ...(/\breroll\b/i.test(match[0]) ? { rerollRoll: true } : {}),
+          targetScope: ally ? "allied_creature" : "self",
+          useReaction: reaction,
+          spendResourceKey: resourceKey,
+          spendResourceAmount: 1,
+          label: `${trigger}: expend one ${dieWord} Die and add it to the roll`,
+          effect: {
+            catalogRefId: effectCatalogRefId("check_roll_modifier"),
+            activation: {
+              effects: [
+                {
+                  id: modId(instanceKey(ctx, "failed_roll_resource_die_bonus")),
+                  kind: "check_roll_modifier",
+                  checkRollMode: "bonus",
+                  checkCategory: rollKind,
+                  bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey: resourceKey },
+                  label: `+${dieWord} Die to the failed roll`,
+                },
+              ],
+            },
+          },
+        },
+      ])
+    },
+  },
+  {
+    // "take a Reaction and expend one Battle Die … Subtract the Battle Die from the attack roll."
+    id: "d20_reaction.subtract_resource_die_from_attack",
+    confidence: "high",
+    scope: "full",
+    test: /\btake a reaction (?:and|to) expend (?:one|a|an|1) (battle|superiority) die\b[\s\S]{0,300}?\bsubtract the \1 die from the attack roll\b/i,
+    build: (match, ctx) => {
+      const resourceKey = RESOURCE_DIE_KEYS[(match[1] ?? "").toLowerCase()]
+      if (!resourceKey) return null
+      const dieWord = (match[1] ?? "").replace(/^\w/, (c) => c.toUpperCase())
+      return charInstance(newInstanceId(), characteristicCatalogRefId("d20_test_reaction"), [
+        {
+          id: modId(instanceKey(ctx, "subtract_resource_die_attack")),
+          type: "d20_test_reaction",
+          modifierMode: "subtract",
+          rollKinds: ["attack"],
+          targetScope: "target_creature",
+          useReaction: true,
+          spendResourceKey: resourceKey,
+          spendResourceAmount: 1,
+          dieSource: "resource_die",
+          label: `Reaction: subtract a ${dieWord} Die from an enemy's attack roll`,
+        },
+      ])
     },
   },
   ...PSIONIC_TALENT_WIRING_RULES,

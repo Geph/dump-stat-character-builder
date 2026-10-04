@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest"
 import {
   DEFAULT_COMBAT_ACTION_GROUP_ORDER,
   defaultActionGroupColumn,
+  isNoOpActionGroupSlot,
   moveActionGroup,
   orderActionGroups,
+  placeActionGroup,
 } from "@/lib/character/action-group-layout"
 
 describe("action group layout", () => {
@@ -43,5 +45,57 @@ describe("action group layout", () => {
     expect(
       moveActionGroup(DEFAULT_COMBAT_ACTION_GROUP_ORDER, [], "triggered", "reaction"),
     ).toEqual(["weapons", "action", "bonus", "reaction", "triggered", "weapon-attack"])
+  })
+
+  it("places a dragged group before the target in either direction", () => {
+    const ids = ["weapons", "action", "triggered", "bonus", "reaction"]
+    expect(placeActionGroup(ids, "reaction", "action", ["weapons", "triggered", "reaction"])).toEqual([
+      "weapons",
+      "reaction",
+      "action",
+      "triggered",
+      "bonus",
+    ])
+    expect(placeActionGroup(ids, "weapons", "reaction", ["weapons", "triggered", "reaction"])).toEqual([
+      "action",
+      "triggered",
+      "bonus",
+      "weapons",
+      "reaction",
+    ])
+  })
+
+  it("drops at the end of a column after that column's last group", () => {
+    const ids = ["weapons", "action", "triggered", "bonus", "reaction"]
+    expect(placeActionGroup(ids, "reaction", null, ["action", "bonus"])).toEqual([
+      "weapons",
+      "action",
+      "triggered",
+      "bonus",
+      "reaction",
+    ])
+    expect(placeActionGroup(ids, "weapons", null, ["action", "bonus"])).toEqual([
+      "action",
+      "triggered",
+      "bonus",
+      "weapons",
+      "reaction",
+    ])
+    expect(placeActionGroup(ids, "action", null, [])).toEqual([
+      "weapons",
+      "triggered",
+      "bonus",
+      "reaction",
+      "action",
+    ])
+  })
+
+  it("flags slots that would not move the group", () => {
+    const column = ["weapons", "triggered", "reaction"]
+    expect(isNoOpActionGroupSlot({ column: 0, beforeId: "triggered" }, "triggered", 0, column)).toBe(true)
+    expect(isNoOpActionGroupSlot({ column: 0, beforeId: "reaction" }, "triggered", 0, column)).toBe(true)
+    expect(isNoOpActionGroupSlot({ column: 0, beforeId: null }, "reaction", 0, column)).toBe(true)
+    expect(isNoOpActionGroupSlot({ column: 0, beforeId: "weapons" }, "triggered", 0, column)).toBe(false)
+    expect(isNoOpActionGroupSlot({ column: 1, beforeId: null }, "triggered", 0, column)).toBe(false)
   })
 })

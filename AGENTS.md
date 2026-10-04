@@ -38,6 +38,8 @@ Agents trade in and out of this repo mid-task. Leave the next one a clean start:
 - **Docs travel with the change.** A new catalog type, engine, name-keyed branch, mechanic pattern, or prompt budget change updates the matching doc above in the same diff. Stale docs are how the next agent re-invents a solved problem.
 - **Do not leave handoff notes as repo files** (`NOTES.md`, `tmp-*`). Put durable knowledge in the docs above; put task state in your message or the PR description.
 - **Starting a session:** run `git status`, read the task row above, and check whether a doc's “Last reviewed” date predates recent commits in the files it describes.
+- **Known failing tests** are listed under “Tests & hooks” in [docs/homebrew-import-review.md](docs/homebrew-import-review.md#tests--hooks). Check there before chasing a red Drive-fixture test; remove the entry when you fix it.
+- **Which data store is live:** `NEXT_PUBLIC_DEPLOY_MODE` in `.env` decides hosted (MySQL via `/api/data`) vs static (IndexedDB). Inspect live rows with `fetch("/api/data/<table>")` on hosted; don't open IndexedDB on a hosted install (opening without a version creates an empty database).
 
 ## Session invariants
 

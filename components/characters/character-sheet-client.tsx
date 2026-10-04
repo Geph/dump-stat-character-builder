@@ -210,6 +210,8 @@ import { DEFAULT_ATTUNEMENT_SLOTS, mustAttuneBeforeEquip } from "@/lib/compendiu
 import { resolveCharacterEquipment } from "@/lib/compendium/equipment-base-selection"
 import { collectSheetActions } from "@/lib/character/sheet-actions"
 import type { ActionEconomyKind } from "@/lib/character/sheet-actions"
+import type { WeaponDamageBonusOption } from "@/lib/compendium/weapon-damage-roll"
+import type { PostRollDieBoost } from "@/lib/character/post-roll-die-boosts"
 import {
   actionEconomyKindFromCastingTime,
   attacksPerAttackAction,
@@ -388,8 +390,13 @@ import {
 } from "@/lib/character/weapon-mastery-picks"
 import type { CharacterCompanionState } from "@/lib/character/companion-stat-block"
 import {
+  companionPoolDefaultLabel,
+  groupCompanionInstances,
+} from "@/lib/character/companion-instance-groups"
+import {
   companionFormGroupAppearsOnRest,
   companionDefaultDisplayName,
+  companionHasCustomName,
   formSelectionsFromState,
   mergeCompanionState,
   resolveCharacterCompanionsDetailed,
@@ -2704,6 +2711,53 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     [resourceEntries, usedResourcesById, usesResolveContext, sorceryPointsState],
   )
 
+  const classResourceAvailableForRider = useCallback(
+    (resourceKey: string) => availablePointsForResourceKey(resourceKey).available,
+    [availablePointsForResourceKey],
+  )
+
+  const spendWeaponDamageRiders = useCallback(
+    (bonuses: WeaponDamageBonusOption[]) => {
+      const spends = new Map<string, number>()
+      for (const bonus of bonuses) {
+        const spend = bonus.resourceSpend
+        if (!spend) continue
+        const { resourceId, available } = availablePointsForResourceKey(spend.classResourceKey)
+        if (!resourceId) continue
+        const amount = Math.min(available - (spends.get(resourceId) ?? 0), spend.amount)
+        if (amount > 0) spends.set(resourceId, (spends.get(resourceId) ?? 0) + amount)
+      }
+      if (spends.size) {
+        setUsedResourcesById((prev) => {
+          const next = { ...prev }
+          for (const [resourceId, amount] of spends) next[resourceId] = (next[resourceId] ?? 0) + amount
+          return next
+        })
+      }
+      for (const kind of new Set(bonuses.map((bonus) => bonus.actionKind).filter(Boolean))) {
+        markActionEconomy(kind as ActionEconomyKind)
+      }
+    },
+    [availablePointsForResourceKey, markActionEconomy],
+  )
+
+  const postRollBoostFeatures = useMemo(
+    () => [...sheetSaveFeatures, ...sheetCustomAbilities.map(customAbilityAsFeature)],
+    [sheetSaveFeatures, sheetCustomAbilities],
+  )
+
+  const spendPostRollBoost = useCallback(
+    (boost: PostRollDieBoost) => {
+      const { resourceId, available } = availablePointsForResourceKey(boost.resourceKey)
+      const amount = Math.min(available, boost.amount)
+      if (resourceId && amount > 0) {
+        setUsedResourcesById((prev) => ({ ...prev, [resourceId]: (prev[resourceId] ?? 0) + amount }))
+      }
+      if (boost.useReaction) markActionEconomy("reaction")
+    },
+    [availablePointsForResourceKey, markActionEconomy],
+  )
+
   const metamagicOptions = useMemo(() => {
     const featIds = [
       ...(character?.feat_ids ?? []),
@@ -4119,6 +4173,10 @@ export default function CharacterSheetClient({ id }: { id: string }) {
   }, [character, classDetails, sheetCustomAbilities, companionState, derived, spells, equipment, creatures, modifierCatalog])
 
   const companionRows = companionResolution.rows
+  const companionInstanceGroups = useMemo(
+    () => groupCompanionInstances(companionRows),
+    [companionRows],
+  )
   const companionFormGroups = companionResolution.formGroups
   const visibleSheetTabs = useMemo(() => {
     const tabs: SheetTab[] = ["abilities", "combat", "equipment", "features"]
@@ -4885,6 +4943,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
           },
           criticalHitMinimum: 20,
           onAttackCriticalHit: handleAttackCriticalHit,
+          postRollBoostFeatures,
+          classResourceAvailable: classResourceAvailableForRider,
+          onSpendPostRollBoost: spendPostRollBoost,
         }}
       >
     <div className="min-h-screen bg-background flex flex-col">
@@ -6486,6 +6547,9 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                                     powerRiders={derived?.powerRiders ?? []}
                                     weaponAbilityOverrides={derived?.weaponAbilityOverrides ?? []}
                                     abilityMods={derived?.abilityMods ?? null}
+                                    classResourceDieSides={classResourceDieSides}
+                                    classResourceAvailable={classResourceAvailableForRider}
+                                    onSpendDamageRiders={spendWeaponDamageRiders}
                                     hideHeading
                                     activeSheetToggleIds={activeSheetToggleIds}
                                     sheetToggleWeaponIds={sheetToggleWeaponIds}
@@ -7184,10 +7248,39 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     </div>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-                    {companionRows.map((companion) => (
-                      <div key={companion.key} className="space-y-2">
+                    {companionInstanceGroups.map(({ key: groupKey, members }) => {
+                      const companion = members[0]!
+                      const hpPools =
+                        members.length > 1
+                          ? members.map((member) => {
+                              const defaultLabel = companionPoolDefaultLabel(member)
+                              const renamed = companionHasCustomName(member)
+                              return {
+                                key: member.key,
+                                label: renamed ? member.displayName : defaultLabel,
+                                renamed,
+                                currentHp: member.currentHp,
+                                maxHp: member.maxHp,
+                                tempHp: member.tempHp,
+                                activeConditions: member.activeConditions,
+                                onHpChange: (hp: number) => updateCompanionHp(member.key, hp),
+                                onConditionsChange: (conditions: string[]) =>
+                                  patchCompanionState(member.key, { activeConditions: conditions }),
+                                onNameChange: (name: string | null) =>
+                                  patchCompanionState(member.key, {
+                                    customName:
+                                      name && name !== defaultLabel && name !== companionDefaultDisplayName(member)
+                                        ? name
+                                        : null,
+                                  }),
+                              }
+                            })
+                          : undefined
+                      return (
+                      <div key={groupKey} className="space-y-2">
                         <CompanionStatPanel
                           companion={companion}
+                          hpPools={hpPools}
                           spellAttackModifier={spellAttackMod}
                           onHpChange={(hp) => updateCompanionHp(companion.key, hp)}
                           onConditionsChange={(conditions) =>
@@ -7281,7 +7374,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                           />
                         ) : null}
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </>
               ) : (

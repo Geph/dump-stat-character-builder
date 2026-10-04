@@ -9,6 +9,7 @@ import {
   itemSignalsEnemyCombatImpact,
   type ActivatableItem,
 } from "@/lib/character/sheet-actions"
+import { itemBoostsOwnChecks } from "@/lib/character/post-roll-die-boosts"
 import type { Feature } from "@/lib/types"
 
 export type ResolvedFeatureSheetDisplay = {
@@ -65,7 +66,8 @@ export function inferFeatureSheetDisplay(item: ActivatableItem): ResolvedFeature
   const category = inferActivatableActionCategory(item)
   return {
     featuresTab: true,
-    abilitiesActions: category === "utility",
+    // Spending a die on your own failed skill/ability check belongs beside the skills too.
+    abilitiesActions: category === "utility" || itemBoostsOwnChecks(item.linkedModifiers),
     combatActions: category === "combat",
     restDialogues,
   }

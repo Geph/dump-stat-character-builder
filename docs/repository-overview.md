@@ -1,5 +1,7 @@
 # Repository overview
 
+Last reviewed: 2026-10-04.
+
 Dump Stat is a 5E-compatible character builder and compendium. This note maps the directories, the files that actually run the product, and how licensed content is kept separate from copyrighted books.
 
 A shorter tree also lives in the [README project structure](../README.md#project-structure). Human contribution rules: [CONTRIBUTING.md](../CONTRIBUTING.md). Coding-agent placement notes: [AGENTS.md](../AGENTS.md) (not linked from the README).

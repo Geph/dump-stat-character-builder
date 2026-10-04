@@ -264,6 +264,7 @@ import {
   collectModifierPlayerChoiceBlockers,
   nonSpellModifierPlayerChoiceSlots,
   spellModifierPlayerChoiceSlots,
+  type ModifierPlayerChoiceSlot,
 } from "@/lib/builder/modifier-player-choices"
 import {
   normalizeSpeciesTraitPicksForSpecies,
@@ -2616,16 +2617,19 @@ export default function BuilderPageClient() {
     [classAbilityFeatures],
   )
 
-  const classStepFeatModifierSlots = useMemo(
+  /** Includes spell slots: the Feats section renders feat spell pickers inline. */
+  const classStepFeatSectionSlots = useMemo(
     () =>
-      nonSpellModifierPlayerChoiceSlots(
-        modifierPlayerChoiceSlots.filter((slot) =>
-          classStepFeatSlots.some(
-            (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
-          ),
+      modifierPlayerChoiceSlots.filter((slot) =>
+        classStepFeatSlots.some(
+          (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
         ),
       ),
     [modifierPlayerChoiceSlots, classStepFeatSlots],
+  )
+  const classStepFeatModifierSlots = useMemo(
+    () => nonSpellModifierPlayerChoiceSlots(classStepFeatSectionSlots),
+    [classStepFeatSectionSlots],
   )
 
   const classAbilityFeatModifierSlots = useMemo(
@@ -2778,36 +2782,53 @@ export default function BuilderPageClient() {
     [featSelectionEntries, backgroundFeatPickSlots, backgroundGrantedFeat?.id],
   )
 
-  const speciesStepModifierSlots = useMemo(
+  const spellNameById = useMemo(
+    () => new Map(spells.map((spell) => [spell.id, spell.name])),
+    [spells],
+  )
+  const modifierPickPreviewNames = useCallback(
+    (slot: ModifierPlayerChoiceSlot, picks: string[]) =>
+      slot.kind === "spell" ? picks.map((id) => spellNameById.get(id) ?? id) : picks,
+    [spellNameById],
+  )
+
+  /** Includes spell slots: Species Options renders trait / feat spell pickers inline. */
+  const speciesStepSectionSlots = useMemo(
     () =>
-      nonSpellModifierPlayerChoiceSlots(
-        modifierPlayerChoiceSlots.filter(
-          (slot) =>
-            speciesFeatPickSlots.some(
-              (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
-            ) ||
-            (character.species_id != null &&
-              slot.sourceKey.startsWith(`species:${character.species_id}:`)),
-        ),
+      modifierPlayerChoiceSlots.filter(
+        (slot) =>
+          speciesFeatPickSlots.some(
+            (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
+          ) ||
+          (character.species_id != null &&
+            slot.sourceKey.startsWith(`species:${character.species_id}:`)),
       ),
     [modifierPlayerChoiceSlots, speciesFeatPickSlots, character.species_id],
   )
+  const speciesStepModifierSlots = useMemo(
+    () => nonSpellModifierPlayerChoiceSlots(speciesStepSectionSlots),
+    [speciesStepSectionSlots],
+  )
 
-  const backgroundStepModifierSlots = useMemo(
+  /**
+   * Includes feat spell slots: Background Options renders origin-feat spell pickers inline
+   * (e.g. Guide's Magic Initiate cantrips), which must keep the section open. The
+   * background's own feature panel hides spell pickers, so those stay on the Spells step.
+   */
+  const backgroundStepSectionSlots = useMemo(
     () =>
-      nonSpellModifierPlayerChoiceSlots(
-        modifierPlayerChoiceSlots.filter(
-          (slot) =>
-            backgroundFeatPickSlots.some(
-              (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
-            ) ||
-            (character.background_id != null &&
-              slot.sourceKey.startsWith(`background:${character.background_id}:`)) ||
-            slot.sourceKey ===
-              (backgroundGrantedFeat?.id
-                ? grantedFeatChoicePickKey(backgroundGrantedFeat.id)
-                : ""),
-        ),
+      modifierPlayerChoiceSlots.filter(
+        (slot) =>
+          backgroundFeatPickSlots.some(
+            (featSlot) => featChoicePickKey(featSlot.key) === slot.sourceKey,
+          ) ||
+          (character.background_id != null &&
+            slot.kind !== "spell" &&
+            slot.sourceKey.startsWith(`background:${character.background_id}:`)) ||
+          slot.sourceKey ===
+            (backgroundGrantedFeat?.id
+              ? grantedFeatChoicePickKey(backgroundGrantedFeat.id)
+              : ""),
       ),
     [
       modifierPlayerChoiceSlots,
@@ -2815,6 +2836,10 @@ export default function BuilderPageClient() {
       character.background_id,
       backgroundGrantedFeat?.id,
     ],
+  )
+  const backgroundStepModifierSlots = useMemo(
+    () => nonSpellModifierPlayerChoiceSlots(backgroundStepSectionSlots),
+    [backgroundStepSectionSlots],
   )
 
   const classLevelSectionComplete = activeClassLevels.length > 0
@@ -2855,7 +2880,7 @@ export default function BuilderPageClient() {
     return (
       selectedFeatCount === requiredFeatSlots &&
       validateFeatModifierChoices(feats, classStepFeatSelectionEntries, featChoicePicks) &&
-      validateModifierPlayerChoices(classStepFeatModifierSlots, modifierPlayerPicks)
+      validateModifierPlayerChoices(classStepFeatSectionSlots, modifierPlayerPicks)
     )
   }, [
     requiredFeatSlots,
@@ -2863,7 +2888,7 @@ export default function BuilderPageClient() {
     feats,
     classStepFeatSelectionEntries,
     featChoicePicks,
-    classStepFeatModifierSlots,
+    classStepFeatSectionSlots,
     modifierPlayerPicks,
   ])
 
@@ -2891,7 +2916,7 @@ export default function BuilderPageClient() {
         featureChoicePicks,
       ).length === 0 &&
       validateFeatModifierChoices(feats, speciesStepFeatSelectionEntries, featChoicePicks) &&
-      validateModifierPlayerChoices(speciesStepModifierSlots, modifierPlayerPicks)
+      validateModifierPlayerChoices(speciesStepSectionSlots, modifierPlayerPicks)
     )
   }, [
     speciesPickerComplete,
@@ -2903,7 +2928,7 @@ export default function BuilderPageClient() {
     feats,
     speciesStepFeatSelectionEntries,
     featChoicePicks,
-    speciesStepModifierSlots,
+    speciesStepSectionSlots,
     modifierPlayerPicks,
     duplicateOriginFeatNames,
   ])
@@ -2929,7 +2954,7 @@ export default function BuilderPageClient() {
         selectedBackground,
       ).length === 0 &&
       validateFeatModifierChoices(feats, backgroundStepFeatSelectionEntries, featChoicePicks) &&
-      validateModifierPlayerChoices(backgroundStepModifierSlots, modifierPlayerPicks)
+      validateModifierPlayerChoices(backgroundStepSectionSlots, modifierPlayerPicks)
     )
   }, [
     backgroundPickerComplete,
@@ -2940,7 +2965,7 @@ export default function BuilderPageClient() {
     feats,
     backgroundStepFeatSelectionEntries,
     featChoicePicks,
-    backgroundStepModifierSlots,
+    backgroundStepSectionSlots,
     modifierPlayerPicks,
     duplicateOriginFeatNames,
   ])
@@ -3157,7 +3182,7 @@ export default function BuilderPageClient() {
       )
     }
 
-    for (const slot of speciesStepModifierSlots) {
+    for (const slot of speciesStepSectionSlots) {
       const picks = modifierPlayerPicks[slot.slotKey] ?? []
       if (!picks.length) continue
       const isSkillOrTool =
@@ -3169,7 +3194,7 @@ export default function BuilderPageClient() {
         <BuilderSelectedChoiceChips
           key={slot.slotKey}
           title={slot.label}
-          names={picks}
+          names={modifierPickPreviewNames(slot, picks)}
           layout={chipLayout}
           showSkillIcons={showIcons && isSkillOrTool}
           skillIconByName={customSkillIconByName}
@@ -3235,7 +3260,8 @@ export default function BuilderPageClient() {
     selectedSpecies,
     character.size,
     speciesTraitPicks,
-    speciesStepModifierSlots,
+    speciesStepSectionSlots,
+    modifierPickPreviewNames,
     modifierPlayerPicks,
     speciesFeatPickSlots,
     featureChoicePicks,
@@ -3318,7 +3344,7 @@ export default function BuilderPageClient() {
     const legacyFeat = legacyId ? feats.find((entry) => entry.id === legacyId) : null
     pushFeat(legacyFeat, `bg-legacy-${legacyKey}`)
 
-    for (const slot of backgroundStepModifierSlots) {
+    for (const slot of backgroundStepSectionSlots) {
       const picks = modifierPlayerPicks[slot.slotKey] ?? []
       if (!picks.length) continue
       const isSkillOrTool =
@@ -3330,7 +3356,7 @@ export default function BuilderPageClient() {
         <BuilderSelectedChoiceChips
           key={slot.slotKey}
           title={slot.label}
-          names={picks}
+          names={modifierPickPreviewNames(slot, picks)}
           layout={chipLayout}
           showSkillIcons={showIcons && isSkillOrTool}
           skillIconByName={customSkillIconByName}
@@ -3354,7 +3380,8 @@ export default function BuilderPageClient() {
     featChoicePicks,
     feats,
     backgroundGrantedFeat,
-    backgroundStepModifierSlots,
+    backgroundStepSectionSlots,
+    modifierPickPreviewNames,
     modifierPlayerPicks,
     skillPickerLayout,
     customSkillIconByName,

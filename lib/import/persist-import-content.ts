@@ -35,6 +35,7 @@ import { normalizeSpellImportRows } from "@/lib/import/normalize-spell-import"
 import { normalizeAbilityImportRows } from "@/lib/import/normalize-ability-import"
 import { enrichAbilityImportRows } from "@/lib/import/enrich-ability-import"
 import { resolveAbilityAttachmentRow } from "@/lib/import/resolve-ability-attachment"
+import { mergeSharedAbilityRows } from "@/lib/import/merge-shared-ability-rows"
 import type { ImportContent, ImportContentWithAbilities } from "@/lib/import/content-schema"
 import type { Feature } from "@/lib/types"
 
@@ -675,11 +676,15 @@ export async function persistImportedContent(
       return resolveAbilityAttachmentRow(withSpells, attachmentMaps)
     })
 
-    let abilitiesToWrite = abilityRows
+    const existingAbilities = await listRows("custom_abilities")
+    let abilitiesToWrite = mergeSharedAbilityRows(abilityRows, existingAbilities, {
+      classes: await listRows("classes"),
+      subclasses: await listRows("subclasses"),
+    })
     if (options.updateExistingNames?.ability?.length) {
       abilitiesToWrite = applyUpdateMergesToNamedRows(
-        abilityRows as unknown as Record<string, unknown>[],
-        await listRows("custom_abilities"),
+        abilitiesToWrite as unknown as Record<string, unknown>[],
+        existingAbilities,
         options.updateExistingNames.ability,
       ) as typeof abilityRows
     }

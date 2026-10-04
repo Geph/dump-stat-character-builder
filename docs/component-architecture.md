@@ -1,6 +1,6 @@
 # Component architecture — agent guide
 
-Last reviewed: 2026-09-22.
+Last reviewed: 2026-10-04.
 
 How to keep UI modular and cheap to re-render as more classes arrive. The rule
 underneath all of it: **content is data, mechanics are modifiers, UI renders what the
@@ -47,9 +47,9 @@ These files are far past a reviewable size. Do not grow them.
 
 | File | Lines | Hook calls |
 | --- | --- | --- |
-| `components/builder/builder-page-client.tsx` | ~8,000 | ~115 |
-| `components/characters/character-sheet-client.tsx` | ~7,600 | ~200 |
-| `components/characteristic-modifiers-editor.tsx` | ~4,900 | few (one big type switch) |
+| `components/builder/builder-page-client.tsx` | ~8,100 | ~130 |
+| `components/characters/character-sheet-client.tsx` | ~7,700 | ~210 |
+| `components/characteristic-modifiers-editor.tsx` | ~5,000 | few (one big type switch) |
 | `components/character-sheet/sheet-actions-panel.tsx` | ~3,900 | ~20 |
 | `components/compendium/compendium-page-client.tsx` | ~2,800 | — |
 | `components/compendium/feature-effect-list.tsx` | ~2,400 | — |
@@ -89,7 +89,16 @@ Check these before writing a new primitive:
 - `components/ui/` — shadcn primitives (dialogs, popovers, tabs, selects).
 - `components/character-sheet/` — trackers (uses, dice, slots, hit dice), roll buttons,
   `expandable-description.tsx`, `stat-explain-popover.tsx`, `feature-card-menu.tsx`.
-- `components/compendium/` — `CardImageField`, linked-modifier editors, detail overlays.
+- `components/character-sheet/action-group-columns.tsx` — desktop two-column action
+  groups with drag-to-rearrange drop slots. Order and column live per character in
+  `localStorage` via `lib/character/action-group-layout.ts` (`placeActionGroup`,
+  `isNoOpActionGroupSlot`); reuse it for any other reorderable card groups.
+- `components/character-sheet/companion-hp-pools.tsx` — per-copy HP / rename /
+  conditions rows under one grouped companion stat block.
+- `components/character-sheet/post-roll-boost-chips.tsx` — spend-after-the-roll die
+  chips on `D20RollButton` (fed by `sheet-roll-context.tsx`).
+- `components/compendium/` — `CardImageField`, linked-modifier editors, detail overlays,
+  `creature-action-editor.tsx` (structured creature attacks).
 - `hooks/` — `use-modifier-catalog`, `use-duplicate-compendium-item`,
   `use-picker-page-size`.
 

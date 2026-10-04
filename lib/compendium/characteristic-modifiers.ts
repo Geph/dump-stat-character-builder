@@ -1129,6 +1129,10 @@ export interface FailedRollTriggerCharacteristic extends CharacteristicModifierB
   spendResourceAmount?: number | null
   /** Peerless Skill: don't expend resource if the roll still fails after adding the die. */
   refundResourceOnStillFailed?: boolean
+  /** Only skill checks the character is proficient in qualify (Vagabond Knack). */
+  requiresProficiency?: boolean
+  /** Reroll the d20 and add the die to the new roll instead of the failed one (Tenacity). */
+  rerollRoll?: boolean
   effect?: NestedModifierEffect | null
 }
 
@@ -1464,6 +1468,26 @@ export interface PowerRiderCharacteristic extends CharacteristicModifierBase {
   ability?: AbilityScoreKey
   /** Special class-resource die (Finisher column) that supplies bonusDice. */
   classResourceKey?: string | null
+  /**
+   * Roll this many single dice of the classResourceKey pool's current die size
+   * ("add two Battle Dice") instead of the pool-count column (Finisher 2d8).
+   */
+  classResourceDieCount?: number | null
+  /** Expend this many from classResourceKey when the damage roll includes the rider. */
+  spendClassResourceAmount?: number | null
+  /** Action economy the rider costs when rolled (maneuvers used "as a Bonus Action"). */
+  riderActionKind?: "bonus" | "reaction" | null
+  /** Only offer on melee (incl. Unarmed Strike) or ranged weapons. */
+  weaponScope?: "melee" | "ranged" | null
+  /**
+   * Flat bonus from whichever listed ability the weapon is not already using
+   * (Battle Edge: "Strength or Dexterity modifier, whichever you don't already add").
+   */
+  complementaryAbilities?: AbilityScoreKey[]
+  /** Floor for the ability / complementary-ability flat bonus (e.g. 1). */
+  abilityBonusMinimum?: number | null
+  /** Damage type for the extra dice when it differs from the weapon (Bear Hug: bludgeoning). */
+  bonusDiceType?: string | null
   /** Check this rider when the named sheet toggle is on (e.g. below_half_hp). */
   defaultSelectedWhenToggle?: string | null
   /** Short condition suffix on the menu label (e.g. "Bloodied"). */
@@ -2076,6 +2100,8 @@ function migrateCharacteristicModifier(value: unknown): CharacteristicModifier |
       rangeFeet: raw.rangeFeet ?? null,
       useReaction: raw.useReaction ?? false,
       refundResourceOnStillFailed: raw.refundResourceOnStillFailed ?? false,
+      requiresProficiency: raw.requiresProficiency ?? false,
+      rerollRoll: raw.rerollRoll ?? false,
       effect: raw.effect ?? null,
     }
   }

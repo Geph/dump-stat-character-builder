@@ -14,6 +14,7 @@ import { CreatureStatBlockView } from "@/components/compendium/creature-stat-blo
 import { CreatureBlockListEditor, fixedValueOf } from "@/components/compendium/creature-action-editor"
 import { compendiumFieldClass } from "@/lib/compendium/editor-field-styles"
 import { normalizeCreatorUrl } from "@/components/compendium/source-link-field"
+import { withInferredStatBlockAttacks } from "@/lib/character/infer-companion-attack"
 import { parseCreatureStatBlock } from "@/lib/character/parse-creature-stat-block"
 import type {
   CompanionAbilityRow,
@@ -134,7 +135,9 @@ export default function CreatureEditor({ id }: { id: string }) {
             alignment: String(row.alignment ?? ""),
             cr: String(row.cr ?? ""),
             description: String(row.description ?? ""),
-            stat_block: (row.stat_block as CompanionStatBlockTemplate | null) ?? null,
+            stat_block: withInferredStatBlockAttacks(
+              (row.stat_block as CompanionStatBlockTemplate | null) ?? null,
+            ),
             source: String(row.source ?? "Custom"),
             creator_url: String(row.creator_url ?? ""),
             icon: (row.icon as string | null) ?? null,
@@ -181,7 +184,7 @@ export default function CreatureEditor({ id }: { id: string }) {
       size: parsed.size ?? prev.size,
       alignment: parsed.alignment ?? prev.alignment,
       cr: parsed.cr ?? prev.cr,
-      stat_block: parsed.template,
+      stat_block: withInferredStatBlockAttacks(parsed.template),
     }))
     const traits = parsed.template.traits.length
     const actions = parsed.template.actions.length

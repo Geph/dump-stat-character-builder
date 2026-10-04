@@ -480,6 +480,41 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
       "Optional ability-mod weapon damage (Fierce Start). weaponDamageMenu true + ability. Not a flat damage_roll_modifiers bonus.",
   },
   {
+    ruleId: "weapon.damage_menu.expend_resource_dice",
+    trigger: "description",
+    catalog: "cat_char_power_rider",
+    examples: [
+      "you can expend two Battle Dice as a Bonus Action … add the Battle Dice to the attack's damage roll",
+      "expend one Battle Die … the target takes extra Bludgeoning damage equal to the roll of the Battle Die",
+    ],
+    mechanicsKind: "power_rider",
+    notes:
+      "Maneuver damage riders (Vagabond / Captain Battle Dice, Superiority Dice). weaponDamageMenu + classResourceKey + classResourceDieCount (single dice at the pool's die size) + spendClassResourceAmount; riderActionKind bonus when used as a Bonus Action; weaponScope melee for Melee/Unarmed-only maneuvers. Rolling from the DMG menu spends the dice.",
+  },
+  {
+    ruleId: "failed_roll.expend_resource_die",
+    trigger: "description",
+    catalog: "cat_char_failed_roll_trigger",
+    examples: [
+      "When you fail a Wisdom or Charisma check, you can expend one Battle Die to add it to the roll",
+      "when you miss with a ranged attack roll, you can expend one Battle Die and add it to the attack roll",
+    ],
+    mechanicsKind: "failed_roll_trigger",
+    notes:
+      "Spend a maneuver die on your own (or an ally's) failed roll. failed_roll_trigger with spendResourceKey + nested check_roll_modifier bonusConfig die / class_resource.",
+  },
+  {
+    ruleId: "d20_reaction.subtract_resource_die_from_attack",
+    trigger: "description",
+    catalog: "cat_char_d20_test_reaction",
+    examples: [
+      "you can take a Reaction and expend one Battle Die … Subtract the Battle Die from the attack roll",
+    ],
+    mechanicsKind: "d20_test_reaction",
+    notes:
+      "Reaction that subtracts a maneuver die from an enemy attack roll. d20_test_reaction subtract + dieSource resource_die + spendResourceKey.",
+  },
+  {
     ruleId: "wield.extra_slots.secondary_arms",
     trigger: "description",
     catalog: "cat_char_extra_wield_slots",

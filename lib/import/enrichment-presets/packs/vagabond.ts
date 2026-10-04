@@ -361,19 +361,40 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
         op: "attachNamedPreset",
+        // A bare activation check_roll_modifier on a class feature applies to every save roll.
+        skipIfCharacteristicTypes: ["failed_roll_trigger"],
         preset: {
-          kind: "fx_instance",
+          kind: "char_instance",
           idKey: "vagabond_tenacity_reroll",
-          catalogRefId: effectCatalogRefId("check_roll_modifier"),
-          effects: [
+          catalogRefId: characteristicCatalogRefId("failed_roll_trigger"),
+          characteristics: [
             {
-              id: modId("tenacity_reroll"),
-              kind: "check_roll_modifier",
-              checkRollMode: "bonus",
-              checkCategory: "save",
-              bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey: "battle_dice" },
+              id: modId("tenacity_failed_save"),
+              type: "failed_roll_trigger",
+              triggerOn: "fail",
+              rollKind: "save",
+              rerollRoll: true,
+              targetScope: "self",
+              useReaction: false,
+              spendResourceKey: "battle_dice",
+              spendResourceAmount: 1,
               label:
                 "Expend one Battle Die to reroll a failed save (to avoid/end a condition on yourself) and add the die to the new roll — you must use the new roll",
+              effect: {
+                catalogRefId: effectCatalogRefId("check_roll_modifier"),
+                activation: {
+                  effects: [
+                    {
+                      id: modId("tenacity_reroll"),
+                      kind: "check_roll_modifier",
+                      checkRollMode: "bonus",
+                      checkCategory: "save",
+                      bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey: "battle_dice" },
+                      label: "+Battle Die to the rerolled save",
+                    },
+                  ],
+                },
+              },
             },
           ],
         },

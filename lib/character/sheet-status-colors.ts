@@ -31,16 +31,16 @@ export const SHEET_BANNER_BADGE = {
     "px-2 py-0.5 rounded-full text-xs font-medium bg-background/85 text-foreground border border-secondary/40",
 } as const
 
+/** Solid fill so chips read on banner art; inner info / clear buttons follow the chip text color. */
+const BANNER_CHIP_BASE =
+  "inline-flex items-center gap-0.5 rounded-md border px-1.5 py-1 text-[10px] font-semibold shadow-sm [&_button]:text-current [&_button]:opacity-85 [&_button:hover]:text-current [&_button:hover]:opacity-100"
+
 /** Status chips in the banner lower row (bloodied, conditions, etc.). */
 export const SHEET_BANNER_CHIP = {
-  bloodied:
-    "inline-flex items-center gap-0.5 rounded-md border border-amber-500/28 bg-amber-500/10 px-1.5 py-1 text-[10px] font-semibold text-amber-800 dark:text-amber-300",
-  exhaustion:
-    "inline-flex items-center gap-0.5 rounded-md border border-amber-500/28 bg-amber-500/10 px-1.5 py-1 text-[10px] font-semibold text-amber-900 dark:text-amber-200",
-  condition:
-    "inline-flex items-center gap-0.5 rounded-md border border-destructive/28 bg-destructive/10 px-1.5 py-1 text-[10px] font-semibold text-destructive",
-  concentration:
-    "inline-flex items-center gap-0.5 rounded-md border border-purple-500/28 bg-purple-500/12 px-1.5 py-1 text-[10px] font-semibold text-purple-800 dark:text-purple-300",
+  bloodied: `${BANNER_CHIP_BASE} border-amber-700/70 bg-amber-600/95 text-white`,
+  exhaustion: `${BANNER_CHIP_BASE} border-amber-800/70 bg-amber-700/95 text-white`,
+  condition: `${BANNER_CHIP_BASE} border-destructive/80 bg-destructive/95 text-destructive-foreground`,
+  concentration: `${BANNER_CHIP_BASE} border-purple-800/70 bg-purple-600/95 text-white`,
 } as const
 
 /** Banner toolbar buttons — solid enough to read on banner art without a box wash. */

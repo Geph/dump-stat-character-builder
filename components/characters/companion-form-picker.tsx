@@ -1,6 +1,7 @@
 "use client"
 
 import { crToNumber, formatChallengeRating } from "@/lib/character/companion-form-options"
+import { summarizeCompanionFormSelection } from "@/lib/character/companion-instance-groups"
 import type { CompanionFormGroup } from "@/lib/character/resolve-companions"
 
 function selectedCrTotal(group: CompanionFormGroup): number {
@@ -117,22 +118,44 @@ export function CompanionFormPicker({
       onChange(group.selected.filter((_, index) => index !== idx))
     }
 
+    const summary = summarizeCompanionFormSelection(group)
+
     return (
       <div className="bg-card rounded-xl border border-border p-3 space-y-1.5">
-        <p className="text-[10px] uppercase font-bold text-muted-foreground">
-          {heading}
-          {` (${group.selected.length}/${maxKnown})`}
-        </p>
+        <p className="text-[10px] uppercase font-bold text-muted-foreground">{heading}</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
+          <p className="text-sm font-black tabular-nums text-foreground">
+            {summary.total} / {maxKnown}
+            <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              chosen
+            </span>
+          </p>
+          {summary.crMax != null ? (
+            <p className="text-sm font-black tabular-nums text-foreground">
+              CR {formatChallengeRating(summary.crUsed)} / {formatChallengeRating(summary.crMax)}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-1">
+            {summary.types.length ? (
+              summary.types.map((type) => (
+                <span
+                  key={type.name}
+                  className="rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[11px] font-bold text-foreground"
+                >
+                  {type.count}× {type.name}
+                </span>
+              ))
+            ) : (
+              <span className="text-[11px] text-muted-foreground">None chosen yet</span>
+            )}
+          </div>
+        </div>
         <p className="text-[11px] leading-snug text-muted-foreground">
           {restContext
             ? "Choose creatures now. They appear on the Companions tab."
             : "Choose which creatures appear on this tab."}{" "}
-          You can pick the same creature more than once.
-          {group.maxCombinedCr != null
-            ? ` Combined CR up to ${formatChallengeRating(group.maxCombinedCr)}${
-                remainingCr != null ? ` · ${formatChallengeRating(remainingCr)} remaining` : ""
-              }.`
-            : ""}
+          You can pick the same creature more than once; copies share one stat block with a hit point
+          pool each.
         </p>
         <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
           {group.options.map((option) => {

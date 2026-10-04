@@ -7,7 +7,10 @@ import {
   weaponOmitsAbilityModifierFromDamage,
   type AbilityMods,
 } from "@/lib/compendium/combat-stats"
-import type { PowerRiderCharacteristic } from "@/lib/compendium/characteristic-modifiers"
+import type {
+  AbilityScoreKey,
+  PowerRiderCharacteristic,
+} from "@/lib/compendium/characteristic-modifiers"
 import { replaceDamageDiceSides } from "@/lib/compendium/weapon-damage-die-override"
 import type { Equipment } from "@/lib/types"
 
@@ -36,6 +39,18 @@ export type WeaponDamageBonusOption = {
   title?: string
   /** When false, leave unchecked until the player opts in. Defaults to true. */
   defaultSelected?: boolean
+  /** Class resource expended when a roll includes this option (maneuver Battle Dice). */
+  resourceSpend?: { classResourceKey: string; amount: number } | null
+  /** Action economy the option costs when rolled. */
+  actionKind?: "bonus" | "reaction" | null
+  /** Shown but not selectable (e.g. not enough Battle Dice left). */
+  disabled?: boolean
+  disabledReason?: string
+}
+
+/** Options consumed per roll — they spend a resource or action, so they reset after rolling. */
+export function isOneShotWeaponDamageBonus(option: WeaponDamageBonusOption): boolean {
+  return Boolean(option.resourceSpend || option.actionKind)
 }
 
 /** Persistent weapon spell buffs managed from the damage ··· menu (Magic Weapon, …). */
@@ -272,19 +287,30 @@ function riderHasWeaponDamageFields(rider: PowerRiderCharacteristic): boolean {
     Boolean(rider.bonusDice?.trim()) ||
     Boolean(rider.dieByLevel?.length) ||
     Boolean(rider.classResourceKey?.trim()) ||
-    Boolean(rider.ability)
+    Boolean(rider.ability) ||
+    Boolean(rider.complementaryAbilities?.length)
   )
+}
+
+type WeaponDamageRiderOpts = {
+  characterLevel?: number | null
+  investigatorLevel?: number | null
+  classResourceDiceByKey?: Record<string, string> | null
+  /** Current single-die sides per class resource key (Battle Die d8 → 8). */
+  classResourceDieSidesByKey?: Record<string, number> | null
+  activeSheetToggleIds?: readonly string[] | null
 }
 
 function resolveRiderBonusDice(
   rider: PowerRiderCharacteristic,
-  opts?: {
-    characterLevel?: number | null
-    investigatorLevel?: number | null
-    classResourceDiceByKey?: Record<string, string> | null
-  },
+  opts?: WeaponDamageRiderOpts,
 ): string | null {
   const key = rider.classResourceKey?.trim()
+  const dieCount = rider.classResourceDieCount
+  if (key && dieCount != null && dieCount > 0) {
+    const sides = opts?.classResourceDieSidesByKey?.[key]
+    return sides ? `${Math.floor(dieCount)}d${sides}` : null
+  }
   if (key && opts?.classResourceDiceByKey?.[key]) return opts.classResourceDiceByKey[key]
   const level = Math.max(1, opts?.characterLevel ?? opts?.investigatorLevel ?? 1)
   if (rider.dieByLevel?.length) {
@@ -304,42 +330,74 @@ function resolveRiderBonusDice(
   return null
 }
 
+function riderWeaponScopeMatches(weapon: Equipment, scope: PowerRiderCharacteristic["weaponScope"]): boolean {
+  if (!scope) return true
+  const sub = (weapon.subcategory ?? "").toLowerCase()
+  if (scope === "melee") return isUnarmedStrikeWeapon(weapon) || sub.includes("melee")
+  return sub.includes("ranged") || hasWeaponProperty(weapon, "thrown")
+}
+
+/** Ability the rider adds as a flat bonus, if any (fixed `ability` or the unused complementary one). */
+function resolveRiderFlatAbility(
+  weapon: Equipment,
+  rider: PowerRiderCharacteristic,
+  abilityMods: AbilityMods,
+): AbilityScoreKey | null {
+  if (rider.ability) return rider.ability
+  const candidates = rider.complementaryAbilities ?? []
+  if (!candidates.length) return null
+  const used = weaponOmitsAbilityModifierFromDamage(weapon)
+    ? null
+    : getWeaponAttackAbility(weapon, abilityMods, { forRoll: "damage" }).ability
+  const unused = candidates.filter((ability) => ability !== used)
+  if (!unused.length) return null
+  return unused.reduce((best, ability) => (abilityMods[ability] > abilityMods[best] ? ability : best))
+}
+
 function optionFromWeaponDamageRider(
+  weapon: Equipment,
   rider: PowerRiderCharacteristic,
   abilityMods: AbilityMods | null | undefined,
-  opts?: {
-    characterLevel?: number | null
-    investigatorLevel?: number | null
-    classResourceDiceByKey?: Record<string, string> | null
-    activeSheetToggleIds?: readonly string[] | null
-  },
+  opts?: WeaponDamageRiderOpts,
 ): WeaponDamageBonusOption | null {
   const name = riderDisplayName(rider)
   const title = rider.alertSummary?.trim() || undefined
   const toggle = rider.defaultSelectedWhenToggle?.trim()
   const toggleOn = Boolean(toggle && (opts?.activeSheetToggleIds ?? []).includes(toggle))
   const condition = rider.menuConditionLabel?.trim()
-  if (rider.ability && abilityMods) {
-    const bonus = abilityMods[rider.ability]
-    const signed = bonus >= 0 ? `+${bonus}` : `${bonus}`
-    const abbrev = ABILITY_ABBREV[rider.ability] ?? rider.ability.slice(0, 3).toUpperCase()
-    return {
-      id: riderMenuId(rider),
-      label: condition ? `${name} (${signed} ${abbrev}, ${condition})` : `${name} (${signed} ${abbrev})`,
-      bonus,
-      title,
-      defaultSelected: toggle ? toggleOn : undefined,
-    }
+  const flatAbility = abilityMods ? resolveRiderFlatAbility(weapon, rider, abilityMods) : null
+  const hasDiceSource =
+    Boolean(rider.bonusDice?.trim()) ||
+    Boolean(rider.dieByLevel?.length) ||
+    Boolean(rider.classResourceKey?.trim()) ||
+    riderMentions(rider, /\bfinisher\b/i)
+  const dice = !flatAbility || hasDiceSource ? resolveRiderBonusDice(rider, opts) : null
+  if (!flatAbility && !dice) return null
+
+  let bonus = 0
+  let amount = dice ?? ""
+  if (flatAbility && abilityMods) {
+    bonus = Math.max(rider.abilityBonusMinimum ?? Number.NEGATIVE_INFINITY, abilityMods[flatAbility])
+    const abbrev = ABILITY_ABBREV[flatAbility] ?? flatAbility.slice(0, 3).toUpperCase()
+    const flat = dice
+      ? `${bonus >= 0 ? "+" : "-"} ${Math.abs(bonus)} ${abbrev}`
+      : `${bonus >= 0 ? `+${bonus}` : bonus} ${abbrev}`
+    amount = dice ? `${dice} ${flat}` : flat
   }
-  const dice = resolveRiderBonusDice(rider, opts)
-  if (!dice) return null
+
+  const spendKey = rider.classResourceKey?.trim()
+  const spendAmount = Math.floor(rider.spendClassResourceAmount ?? 0)
+  const resourceSpend = spendKey && spendAmount > 0 ? { classResourceKey: spendKey, amount: spendAmount } : null
+  const actionKind = rider.riderActionKind ?? null
   return {
     id: riderMenuId(rider),
-    label: condition ? `${name} (${dice}, ${condition})` : `${name} (${dice})`,
-    bonus: 0,
-    bonusDice: dice,
+    label: condition ? `${name} (${amount}, ${condition})` : `${name} (${amount})`,
+    bonus,
+    ...(dice ? { bonusDice: dice, bonusDiceType: rider.bonusDiceType?.trim() || null } : {}),
     title,
-    defaultSelected: toggle ? toggleOn : undefined,
+    defaultSelected: toggle ? toggleOn : resourceSpend || actionKind ? false : undefined,
+    ...(resourceSpend ? { resourceSpend } : {}),
+    ...(actionKind ? { actionKind } : {}),
   }
 }
 
@@ -348,25 +406,24 @@ function optionFromWeaponDamageRider(
  * power_rider with weaponDamageMenu). Player opts in from the weapon DMG ··· menu.
  */
 export function optionalWeaponDamageBonuses(
-  _weapon: Equipment,
+  weapon: Equipment,
   riders: readonly PowerRiderCharacteristic[] | null | undefined,
   abilityMods: AbilityMods | null | undefined,
-  opts?: {
-    characterLevel?: number | null
-    investigatorLevel?: number | null
-    classResourceDiceByKey?: Record<string, string> | null
-    activeSheetToggleIds?: readonly string[] | null
-  },
+  opts?: WeaponDamageRiderOpts,
 ): WeaponDamageBonusOption[] {
   if (!riders?.length) return []
   const options: WeaponDamageBonusOption[] = []
   const seen = new Set<string>()
+  // A subclass "[Maneuver]" feature and the ability it grants carry the same rider.
+  const seenLabels = new Set<string>()
 
   for (const rider of riders) {
     if (!riderHasWeaponDamageFields(rider)) continue
-    const option = optionFromWeaponDamageRider(rider, abilityMods, opts)
-    if (!option || seen.has(option.id)) continue
+    if (!riderWeaponScopeMatches(weapon, rider.weaponScope)) continue
+    const option = optionFromWeaponDamageRider(weapon, rider, abilityMods, opts)
+    if (!option || seen.has(option.id) || seenLabels.has(option.label)) continue
     seen.add(option.id)
+    seenLabels.add(option.label)
     options.push(option)
   }
 

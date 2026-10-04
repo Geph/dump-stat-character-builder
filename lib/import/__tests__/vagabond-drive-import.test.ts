@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
+import { enrichAbilityImportRow } from "@/lib/import/enrich-ability-import"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { resolveHomebrewImportJsonPath } from "@/lib/import/homebrew-import-ops"
 import { collectImportModifierReview } from "@/lib/import/import-modifier-previews"
@@ -74,11 +75,56 @@ describe.skipIf(!hasDriveFixture)("Vagabond Drive import wiring", () => {
       type: "class_resource",
       classResourceKey: "battle_dice",
     })
-    const rollBonus = effects(tenacity).find(
-      (e) => (e as { kind?: string }).kind === "check_roll_modifier",
-    ) as { checkCategory?: string; bonusConfig?: { mode?: string; classResourceKey?: string } } | undefined
+    // Nested under failed_roll_trigger: a bare activation roll bonus would add a die to every save.
+    expect(effects(tenacity).some((e) => (e as { kind?: string }).kind === "check_roll_modifier")).toBe(false)
+    const trigger = characteristics(tenacity).find((c) => c.type === "failed_roll_trigger") as
+      | {
+          rollKind?: string
+          spendResourceKey?: string
+          effect?: { activation?: { effects?: { checkCategory?: string; bonusConfig?: unknown }[] } }
+        }
+      | undefined
+    expect(trigger).toMatchObject({ rollKind: "save", spendResourceKey: "battle_dice", rerollRoll: true })
+    const rollBonus = trigger?.effect?.activation?.effects?.[0]
     expect(rollBonus?.checkCategory).toBe("save")
     expect(rollBonus?.bonusConfig).toMatchObject({ mode: "die", classResourceKey: "battle_dice" })
+  })
+
+  it("wires Battle Die damage maneuvers as weapon DMG menu riders that spend the dice", () => {
+    const content = enrich()
+    const abilities = content.import_proposals?.custom_abilities ?? []
+    const damageManeuvers = abilities.filter((ability) =>
+      /\badd the battle di(?:e|ce)\b[^.]*\bto the attack\S{0,3}s damage roll/i.test(ability.description ?? ""),
+    )
+    expect(damageManeuvers.length).toBeGreaterThan(5)
+    for (const ability of damageManeuvers) {
+      const row = enrichAbilityImportRow(ability as unknown as Record<string, unknown>)
+      const linked = row.linked_modifiers as { characteristics?: { type: string }[] }[] | undefined
+      const rider = (linked ?? [])
+        .flatMap((instance) => instance.characteristics ?? [])
+        .find((c) => c.type === "power_rider") as
+        | { weaponDamageMenu?: boolean; classResourceKey?: string; spendClassResourceAmount?: number }
+        | undefined
+      expect(rider, ability.name).toMatchObject({ weaponDamageMenu: true, classResourceKey: "battle_dice" })
+      expect(rider?.spendClassResourceAmount ?? 0, ability.name).toBeGreaterThan(0)
+    }
+  })
+
+  it("Knack spends a Battle Die on failed proficient skill checks", () => {
+    const content = enrich()
+    const knack = (content.import_proposals?.custom_abilities ?? []).find((ability) => ability.name === "Knack")
+    expect(knack).toBeDefined()
+    const row = enrichAbilityImportRow(knack as unknown as Record<string, unknown>)
+    const linked = row.linked_modifiers as { characteristics?: { type: string }[] }[] | undefined
+    const trigger = (linked ?? [])
+      .flatMap((instance) => instance.characteristics ?? [])
+      .find((c) => c.type === "failed_roll_trigger")
+    expect(trigger).toMatchObject({
+      rollKind: "skill",
+      requiresProficiency: true,
+      targetScope: "self",
+      spendResourceKey: "battle_dice",
+    })
   })
 
   it("marks Desperate Survival, Deft Maneuver, and Wayworn as structural, not unwired", () => {

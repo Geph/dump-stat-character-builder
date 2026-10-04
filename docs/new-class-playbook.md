@@ -81,6 +81,8 @@ Match the rules text, not the class name. Field names are the `mechanics[]` shap
 | --- | --- |
 | Automatic extra damage once per turn on hit | `on_hit_trigger` (`oncePerTurn`, `bonusDice`, `requiresSheetToggle` when gated) |
 | Optional "you can deal extra damage" / Bloodied / first-round rider | `power_rider` with `parentPowerNames: ["Attack", "Unarmed Strike"]`, `weaponDamageMenu`, `selectable` |
+| Maneuver: "expend N Battle Dice … add the Battle Dice to the attack's damage roll" | Same `power_rider` + `classResourceKey`, `classResourceDieCount` (single dice at the pool's die size), `spendClassResourceAmount`, `riderActionKind: "bonus"`, `weaponScope: "melee"` when Melee/Unarmed only. Phrase-detected (`weapon.damage_menu.expend_resource_dice`); rolling from the DMG menu spends the dice |
+| "Expend a die and add it to a failed check / missed attack / ally's save" | `failed_roll_trigger` + `spendResourceKey` + nested `check_roll_modifier` die bonus (phrase-detected). Never a bare activation `check_roll_modifier` on a class feature — that rolls into **every** matching d20. The sheet offers it as a post-roll chip on the d20 button; "skill in which you have proficiency" → `requiresProficiency`, "reroll … and add" → `rerollRoll` |
 | Rider on another named power or menu option | `power_rider` with `parentPowerNames` / `parentMenuOptionNames` |
 | Breath weapon, bomb, blast, touch attack that is its own action | `special_attack` (`attackProfile`, save / area fields; `damageFromResourceSpend` for spend-scaled damage) |
 | "Improved X" changes X's cost or action economy | `replace_feature` on the improved feature |

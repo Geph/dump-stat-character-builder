@@ -103,3 +103,48 @@ export function orderActionGroups<T>(
 export function moveActionGroup(allIds: string[], order: string[] | undefined, fromId: string, toId: string): string[] {
   return moveOrderedId(allIds, order, fromId, toId)
 }
+
+/** Where a dragged group lands: before `beforeId`, or at the end of the column when null. */
+export type ActionGroupDropSlot = { column: 0 | 1; beforeId: string | null }
+
+/**
+ * Reorder `orderedIds` so `fromId` sits before `beforeId`, or after the last group of the
+ * target column (`columnIds`, in display order) when `beforeId` is null.
+ */
+export function placeActionGroup(
+  orderedIds: string[],
+  fromId: string,
+  beforeId: string | null,
+  columnIds: string[],
+): string[] {
+  if (!orderedIds.includes(fromId) || beforeId === fromId) return orderedIds
+  const ids = orderedIds.filter((id) => id !== fromId)
+  if (beforeId) {
+    const index = ids.indexOf(beforeId)
+    if (index >= 0) {
+      ids.splice(index, 0, fromId)
+      return ids
+    }
+  }
+  const lastInColumn = [...columnIds].reverse().find((id) => id !== fromId && ids.includes(id))
+  if (lastInColumn) {
+    ids.splice(ids.indexOf(lastInColumn) + 1, 0, fromId)
+  } else {
+    ids.push(fromId)
+  }
+  return ids
+}
+
+/** Slots that would leave `draggingId` where it already is. */
+export function isNoOpActionGroupSlot(
+  slot: ActionGroupDropSlot,
+  draggingId: string,
+  draggingColumn: 0 | 1,
+  columnIds: string[],
+): boolean {
+  if (slot.column !== draggingColumn) return false
+  const index = columnIds.indexOf(draggingId)
+  if (index < 0) return false
+  const nextId = columnIds[index + 1] ?? null
+  return slot.beforeId === draggingId || slot.beforeId === nextId
+}

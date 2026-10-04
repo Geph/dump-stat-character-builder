@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, type ReactNode } from "react"
+import type { PostRollDieBoost } from "@/lib/character/post-roll-die-boosts"
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
 import type { LimitationEvaluationContext } from "@/lib/compendium/modifier-limitations"
 import type { Feature } from "@/lib/types"
@@ -26,6 +27,11 @@ export type SheetRollContextValue = LimitationEvaluationContext & {
   criticalHitMinimum?: number
   /** Feature-gated restores such as Dire Gambit (1 Risk Die). */
   onAttackCriticalHit?: () => void
+  /** Features + picked custom abilities scanned for spend-after-the-roll dice (Knack). */
+  postRollBoostFeatures?: Feature[]
+  /** Remaining points in a class resource pool (by key). */
+  classResourceAvailable?: (resourceKey: string) => number
+  onSpendPostRollBoost?: (boost: PostRollDieBoost) => void
 }
 
 const defaultValue: SheetRollContextValue = {

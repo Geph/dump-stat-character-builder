@@ -1,5 +1,7 @@
 # CharacteristicModifier vs FeatureEffect — which system to use
 
+Last reviewed: 2026-10-04.
+
 Dump Stat has two parallel ways to author a mechanical effect on a feature/trait/feat. Both are
 legitimate; picking the wrong one is what shows up as "dead aggregate" or "duplicate calculation"
 in architecture audits. This doc is the answer to "which one do I use?"

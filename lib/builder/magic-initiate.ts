@@ -248,8 +248,10 @@ export function takenMagicInitiateSpellLists(
     currentSlotKey,
   )
 
+  // The background grant is the `:granted:` take itself — it only blocks *other* takes.
   const fromGrant = magicInitiateListFromFeatGranted(extras?.featGranted)
-  if (fromGrant) taken.add(fromGrant.toLowerCase())
+  const currentIsGrantedTake = Boolean(currentSlotKey?.includes(":granted:"))
+  if (fromGrant && !currentIsGrantedTake) taken.add(fromGrant.toLowerCase())
   return taken
 }
 

@@ -12,7 +12,16 @@ import {
   type ManualRollOverride,
 } from "@/lib/character/resolve-roll-mode"
 import { D20NaturalsDisplay } from "@/components/character-sheet/d20-naturals-display"
+import {
+  PostRollBoostChips,
+  type AppliedPostRollBoost,
+} from "@/components/character-sheet/post-roll-boost-chips"
+import {
+  collectPostRollDieBoosts,
+  type PostRollDieBoost,
+} from "@/lib/character/post-roll-die-boosts"
 import { formatD20RollSummary, rollD20WithMode, type D20RollMode } from "@/lib/dice/d20-roll"
+import { rollDie } from "@/lib/dice/roll-die"
 
 type D20RollButtonProps = {
   modifier: number
@@ -110,6 +119,7 @@ export function D20RollButton({
     total: number
     mode: D20RollMode
     naturals: number[]
+    boost?: AppliedPostRollBoost
   } | null>(null)
   const [manualOverride, setManualOverride] = useState<ManualRollOverride>("normal")
   const history = useSheetRollHistory()
@@ -157,6 +167,14 @@ export function D20RollButton({
       : 0
 
   const effectiveModifier = modifier + featureRollBonus
+
+  const postRollBoosts: PostRollDieBoost[] =
+    rollContext && rollCtx.postRollBoostFeatures?.length
+      ? collectPostRollDieBoosts(rollCtx.postRollBoostFeatures, rollContext, {
+          skillProficient,
+          classResourceDieSides: rollCtx.featureEffectContext?.classResourceDieSides,
+        })
+      : []
 
   const effectiveMode = resolved.mode
   const filled = tone !== "default" || layout === "panel"
@@ -232,6 +250,39 @@ export function D20RollButton({
     }
     onRoll?.()
   }
+
+  const applyPostRollBoost = (boost: PostRollDieBoost) => {
+    if (!result || result.boost || result.mode === "auto_fail") return
+    const value = rollDie(boost.dieSides)
+    const base = boost.reroll ? rollD20WithMode(effectiveMode, effectiveModifier) : result
+    const next = {
+      natural: base.natural,
+      naturals: base.naturals,
+      mode: base.mode,
+      total: base.total + value,
+      boost: { sourceName: boost.sourceName, value, dieSides: boost.dieSides },
+    }
+    setResult(next)
+    const rerollText = boost.reroll ? `reroll ${formatD20RollSummary(base, effectiveModifier)}, ` : ""
+    history?.logRoll({
+      kind: "d20",
+      label: `${title ?? `d20 ${modLabel}`} · ${boost.sourceName}`,
+      summary: `${rerollText}+ d${boost.dieSides} (${value}) = ${next.total}`,
+      natural: next.natural,
+      naturals: next.naturals,
+    })
+    rollCtx.onSpendPostRollBoost?.(boost)
+  }
+
+  const boostChips =
+    result && result.mode !== "auto_fail" && (result.boost || postRollBoosts.length) ? (
+      <PostRollBoostChips
+        boosts={postRollBoosts}
+        applied={result.boost ?? null}
+        availableFor={rollCtx.classResourceAvailable}
+        onApply={applyPostRollBoost}
+      />
+    ) : null
 
   const modeToggle = (
     <button
@@ -316,6 +367,7 @@ export function D20RollButton({
       <span className="relative block w-full">
         <span className="pointer-events-auto absolute right-2 top-1.5 z-10">{modeToggle}</span>
         {rollButton}
+        {boostChips ? <span className="mt-1 flex flex-wrap justify-center gap-1">{boostChips}</span> : null}
       </span>
     )
   }
@@ -325,12 +377,14 @@ export function D20RollButton({
       <span className="inline-flex flex-col items-center gap-0.5 shrink-0">
         {modeToggle}
         {rollButton}
+        {boostChips}
       </span>
     )
   }
 
   return (
     <span className="inline-flex items-center gap-1 shrink-0">
+      {boostChips}
       {modeToggle}
       {rollButton}
     </span>

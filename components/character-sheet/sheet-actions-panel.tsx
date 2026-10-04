@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { AlertTriangle, Dices, GripVertical, X } from "lucide-react"
+import { AlertTriangle, Dices, X } from "lucide-react"
 import { GameIcon } from "@/components/game-icon-picker"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
@@ -112,13 +112,15 @@ import {
   defaultActionGroupColumn,
   loadActionGroupColumns,
   loadActionGroupOrder,
-  moveActionGroup,
   orderActionGroups,
+  placeActionGroup,
   saveActionGroupColumns,
   saveActionGroupOrder,
   type ActionGroupColumnMap,
+  type ActionGroupDropSlot,
   type ActionGroupId,
 } from "@/lib/character/action-group-layout"
+import { ActionGroupColumns } from "@/components/character-sheet/action-group-columns"
 
 type SheetActionsPanelProps = {
   actions: SheetActionEntry[]
@@ -3201,7 +3203,6 @@ export function SheetActionsPanel({
   const [groupOrder, setGroupOrder] = useState<string[]>([])
   const [groupColumns, setGroupColumns] = useState<ActionGroupColumnMap>({})
   const [desktopGroupDragEnabled, setDesktopGroupDragEnabled] = useState(false)
-  const dragGroupIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!characterId) {
@@ -3741,14 +3742,16 @@ export function SheetActionsPanel({
   ] as const
   const canDragGroups = groupLayout === "responsive-grid" && desktopGroupDragEnabled
 
-  const dropGroup = (column: 0 | 1, targetId?: string) => {
-    const fromId = dragGroupIdRef.current
-    dragGroupIdRef.current = null
-    if (!fromId) return
-    setGroupColumns((previous) => ({ ...previous, [fromId]: column }))
-    if (targetId && fromId !== targetId) {
-      setGroupOrder(moveActionGroup(visibleGroupIds, groupOrder, fromId, targetId))
-    }
+  const placeGroup = (fromId: string, slot: ActionGroupDropSlot) => {
+    setGroupColumns((previous) => ({ ...previous, [fromId]: slot.column }))
+    setGroupOrder(
+      placeActionGroup(
+        visibleGroupIds,
+        fromId,
+        slot.beforeId,
+        groupsByColumn[slot.column].map((group) => group.id),
+      ),
+    )
   }
 
   return (
@@ -3771,64 +3774,7 @@ export function SheetActionsPanel({
         ))}
       </div>
       {groupLayout === "responsive-grid" ? (
-        <div className="hidden min-w-0 grid-cols-2 items-start gap-3 xl:grid">
-          {groupsByColumn.map((groups, columnIndex) => {
-            const column = columnIndex as 0 | 1
-            return (
-              <div
-                key={column}
-                className="min-h-16 min-w-0 space-y-3 rounded-lg transition-colors"
-                onDragOver={(event) => {
-                  if (canDragGroups) event.preventDefault()
-                }}
-                onDrop={(event) => {
-                  if (!canDragGroups) return
-                  event.preventDefault()
-                  dropGroup(column)
-                }}
-              >
-                {groups.map((group) => (
-                  <div
-                    key={group.id}
-                    className="min-w-0"
-                    onDragOver={(event) => {
-                      if (canDragGroups) event.preventDefault()
-                    }}
-                    onDrop={(event) => {
-                      if (!canDragGroups) return
-                      event.preventDefault()
-                      event.stopPropagation()
-                      dropGroup(column, group.id)
-                    }}
-                  >
-                    <div
-                      className={cn(
-                        "mb-1.5 flex items-center gap-1",
-                        canDragGroups && "cursor-grab active:cursor-grabbing",
-                      )}
-                      draggable={canDragGroups}
-                      onDragStart={(event) => {
-                        if (!canDragGroups) {
-                          event.preventDefault()
-                          return
-                        }
-                        dragGroupIdRef.current = group.id
-                        event.dataTransfer.effectAllowed = "move"
-                        event.dataTransfer.setData("text/plain", group.id)
-                      }}
-                    >
-                      <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                        {group.label}
-                      </p>
-                    </div>
-                    {group.body}
-                  </div>
-                ))}
-              </div>
-            )
-          })}
-        </div>
+        <ActionGroupColumns columns={groupsByColumn} canDrag={canDragGroups} onPlace={placeGroup} />
       ) : null}
 
       <AnimatePresence>

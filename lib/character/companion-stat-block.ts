@@ -1,4 +1,5 @@
 import type { AbilityScoreKey } from "@/lib/compendium/characteristic-modifiers"
+import { inferCompanionAttackFromText } from "@/lib/character/infer-companion-attack"
 
 /** How a companion stat scales with the owner character. */
 export type CompanionScaleRef =
@@ -38,7 +39,8 @@ export type CompanionAbilityRow = {
  * stored as data (reusing the same fixed/scale-ref parts as AC, HP, and saves above)
  * so roll buttons read it directly instead of regex-parsing pasted stat block prose.
  */
-export type CompanionAttackKind = "melee" | "ranged" | "melee_or_ranged"
+/** `save` = saving-throw action (Breath Weapon, Blood Splash): DC + damage, no attack roll. */
+export type CompanionAttackKind = "melee" | "ranged" | "melee_or_ranged" | "save"
 
 export type CompanionDamageRoll = {
   /** Dice expression, e.g. "1d6" or "2d8". */
@@ -50,9 +52,18 @@ export type CompanionDamageRoll = {
 
 export type CompanionAttack = {
   kind: CompanionAttackKind
-  toHit: CompanionScaledValue
+  /** Attack roll bonus; omitted for `save` actions. */
+  toHit?: CompanionScaledValue | null
   reach?: string | null
   range?: string | null
+  /** `save` actions: which save the targets make. */
+  saveAbility?: AbilityScoreKey | null
+  /** `save` actions: DC as fixed/scaled parts; empty parts + label for prose-only DCs. */
+  saveDc?: CompanionScaledValue | null
+  /** Targets / area, e.g. "each creature in a 30-foot Cone". */
+  area?: string | null
+  /** `save` actions: a successful save halves the damage. */
+  halfOnSuccess?: boolean | null
   damage: CompanionDamageRoll[]
 }
 
@@ -64,9 +75,15 @@ export type ResolvedCompanionDamageRoll = {
 
 export type ResolvedCompanionAttack = {
   kind: CompanionAttackKind
-  toHitBonus: number
+  toHitBonus: number | null
   reach?: string | null
   range?: string | null
+  saveAbility?: AbilityScoreKey | null
+  saveDc?: number | null
+  /** Prose DC when it cannot be resolved to a number ("your Cohort save DC"). */
+  saveDcLabel?: string | null
+  area?: string | null
+  halfOnSuccess?: boolean
   damage: ResolvedCompanionDamageRoll[]
 }
 
@@ -372,11 +389,22 @@ export function resolveCompanionAttack(
   attack: CompanionAttack,
   ctx: CompanionResolveContext,
 ): ResolvedCompanionAttack {
+  const isSave = attack.kind === "save"
+  const dcResolvable = Boolean(attack.saveDc?.parts.length)
   return {
     kind: attack.kind,
-    toHitBonus: resolveCompanionScaledValue(attack.toHit, ctx),
+    toHitBonus: !isSave && attack.toHit ? resolveCompanionScaledValue(attack.toHit, ctx) : null,
     reach: attack.reach ?? null,
     range: attack.range ?? null,
+    ...(isSave
+      ? {
+          saveAbility: attack.saveAbility ?? null,
+          saveDc: dcResolvable ? resolveCompanionScaledValue(attack.saveDc!, ctx) : null,
+          saveDcLabel: dcResolvable ? null : (attack.saveDc?.label ?? null),
+          area: attack.area ?? null,
+          halfOnSuccess: Boolean(attack.halfOnSuccess),
+        }
+      : {}),
     damage: attack.damage.map((roll) => ({
       formula: formatSignedDiceFormula(
         roll.dice,
@@ -391,10 +419,13 @@ function resolveNamedBlocks(
   blocks: CompanionNamedBlock[] | undefined,
   ctx: CompanionResolveContext,
 ): ResolvedCompanionNamedBlock[] {
-  return (blocks ?? []).map((block) => ({
-    ...block,
-    resolvedAttack: block.attack ? resolveCompanionAttack(block.attack, ctx) : null,
-  }))
+  return (blocks ?? []).map((block) => {
+    const attack = block.attack ?? inferCompanionAttackFromText(block.description)
+    return {
+      ...block,
+      resolvedAttack: attack ? resolveCompanionAttack(attack, ctx) : null,
+    }
+  })
 }
 
 export function resolveCompanion(

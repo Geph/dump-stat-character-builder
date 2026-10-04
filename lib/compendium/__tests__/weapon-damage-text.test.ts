@@ -303,3 +303,93 @@ describe("optional Finisher damage dice", () => {
     })
   })
 })
+
+describe("maneuver resource-die damage riders", () => {
+  const shortbow = {
+    id: "shortbow",
+    name: "Shortbow",
+    category: "Weapon",
+    subcategory: "Simple Ranged Weapons",
+    properties: { damage: "1d6 Piercing", properties: ["Ammunition", "Two-Handed"] },
+  } as unknown as Equipment
+
+  const abilityMods = {
+    strength: 0,
+    dexterity: 3,
+    constitution: 2,
+    intelligence: 0,
+    wisdom: 1,
+    charisma: 1,
+  }
+
+  function maneuverRider(overrides: Partial<PowerRiderCharacteristic>): PowerRiderCharacteristic {
+    return {
+      id: "mod_maneuver_weapon_damage_menu",
+      type: "power_rider",
+      parentPowerNames: ["Attack", "Unarmed Strike"],
+      selectable: true,
+      weaponDamageMenu: true,
+      classResourceKey: "battle_dice",
+      ...overrides,
+    } as PowerRiderCharacteristic
+  }
+
+  it("rolls single dice at the pool's die size and spends them as a one-shot option", () => {
+    const rider = maneuverRider({
+      label: "Ruinous Blow",
+      classResourceDieCount: 2,
+      spendClassResourceAmount: 2,
+      riderActionKind: "bonus",
+    })
+    const [option] = optionalWeaponDamageBonuses(whip, [rider], abilityMods, {
+      classResourceDieSidesByKey: { battle_dice: 8 },
+      // Pool-count column must not be used for "add two Battle Dice".
+      classResourceDiceByKey: { battle_dice: "6d8" },
+    })
+    expect(option).toMatchObject({
+      label: "Ruinous Blow (2d8)",
+      bonusDice: "2d8",
+      bonus: 0,
+      defaultSelected: false,
+      resourceSpend: { classResourceKey: "battle_dice", amount: 2 },
+      actionKind: "bonus",
+    })
+  })
+
+  it("adds the STR/DEX modifier the weapon is not already using, with a minimum", () => {
+    const rider = maneuverRider({
+      label: "Battle Edge",
+      classResourceDieCount: 1,
+      spendClassResourceAmount: 1,
+      complementaryAbilities: ["strength", "dexterity"],
+      abilityBonusMinimum: 1,
+    })
+    const [option] = optionalWeaponDamageBonuses(whip, [rider], abilityMods, {
+      classResourceDieSidesByKey: { battle_dice: 8 },
+    })
+    // Finesse whip uses DEX (+3), so Battle Edge adds STR (+0 → minimum 1).
+    expect(option).toMatchObject({ label: "Battle Edge (1d8 + 1 STR)", bonusDice: "1d8", bonus: 1 })
+  })
+
+  it("keeps melee-only maneuvers off ranged weapons", () => {
+    const rider = maneuverRider({ label: "Challenge", classResourceDieCount: 1, weaponScope: "melee" })
+    const opts = { classResourceDieSidesByKey: { battle_dice: 8 } }
+    expect(optionalWeaponDamageBonuses(shortbow, [rider], abilityMods, opts)).toEqual([])
+    expect(optionalWeaponDamageBonuses(whip, [rider], abilityMods, opts)).toHaveLength(1)
+  })
+
+  it("shows one option when a subclass feature and its granted ability carry the same rider", () => {
+    const fromFeature = maneuverRider({ id: "mod_a", label: "Challenge", classResourceDieCount: 1 })
+    const fromAbility = maneuverRider({ id: "mod_b", label: "Challenge", classResourceDieCount: 1 })
+    expect(
+      optionalWeaponDamageBonuses(whip, [fromFeature, fromAbility], abilityMods, {
+        classResourceDieSidesByKey: { battle_dice: 10 },
+      }),
+    ).toHaveLength(1)
+  })
+
+  it("omits the rider when the character has no die size for the pool", () => {
+    const rider = maneuverRider({ label: "Stunning Blow", classResourceDieCount: 3 })
+    expect(optionalWeaponDamageBonuses(whip, [rider], abilityMods, {})).toEqual([])
+  })
+})

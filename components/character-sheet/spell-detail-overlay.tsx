@@ -39,9 +39,9 @@ import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-his
 import type { PsionicAugmentSelection } from "@/lib/compendium/parse-psionic-augments"
 import { CompendiumCardHero } from "@/components/compendium/compendium-card-hero"
 import {
-  DETAIL_OVERLAY_HERO_GRADIENT_CLASS,
+  CLASS_CARD_ASPECT_CLASS,
+  COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS,
   getCompendiumCardImageUrl,
-  WIDE_CARD_ASPECT_CLASS,
 } from "@/lib/compendium/card-image"
 import { spellDetailOverlayTags } from "@/lib/compendium/spell-detail-tags"
 import { compendiumAccentColorStyles, getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
@@ -327,13 +327,13 @@ export function SpellDetailOverlay({
         onClick={(e) => e.stopPropagation()}
       >
         {imageUrl ? (
-          <div className={cn("relative w-full overflow-hidden", WIDE_CARD_ASPECT_CLASS, "min-h-[11rem]")}>
+          <div className={cn("relative w-full overflow-hidden", CLASS_CARD_ASPECT_CLASS, "max-h-[70vh]")}>
             <CompendiumCardHero
               imageUrl={imageUrl}
               crop="top"
               variant="overlay"
               fillHeight
-              overlayGradientClass={DETAIL_OVERLAY_HERO_GRADIENT_CLASS}
+              overlayGradientClass={COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS}
             />
             <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-end gap-2 p-3">
               {onTogglePinToAbilities ? (

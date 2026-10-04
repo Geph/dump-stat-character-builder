@@ -1644,6 +1644,147 @@ describe("detectFeatureModifiers by feature name", () => {
     })
   })
 
+  describe("maneuver resource-die riders", () => {
+    function riderFor(text: string, featureName: string) {
+      return detectFeatureModifiers(text, { ...baseCtx, featureName })
+        .find((entry) => entry.ruleId === "weapon.damage_menu.expend_resource_dice")
+        ?.instance.characteristics?.[0]
+    }
+
+    it("spends N Battle Dice as a Bonus Action and adds N single dice to weapon damage", () => {
+      expect(
+        riderFor(
+          "When you hit a creature with a weapon, you can expend two Battle Dice as a Bonus Action to rattle it. Add the Battle Dice to the attack's damage roll.",
+          "Test Blow",
+        ),
+      ).toMatchObject({
+        type: "power_rider",
+        weaponDamageMenu: true,
+        classResourceKey: "battle_dice",
+        classResourceDieCount: 2,
+        spendClassResourceAmount: 2,
+        riderActionKind: "bonus",
+        label: "Test Blow",
+      })
+    })
+
+    it("scopes Melee-only maneuvers, keeps extra damage types, and strips the [Maneuver] tag", () => {
+      expect(
+        riderFor(
+          "When you hit a creature with an attack using a Melee weapon or an Unarmed Strike, you can expend one Battle Die. The target takes extra Bludgeoning damage equal to the roll of the Battle Die.",
+          "Test Shove [Maneuver]",
+        ),
+      ).toMatchObject({
+        classResourceDieCount: 1,
+        spendClassResourceAmount: 1,
+        weaponScope: "melee",
+        bonusDiceType: "bludgeoning",
+        label: "Test Shove",
+      })
+    })
+
+    it("adds the unused STR/DEX modifier when the text says whichever you don't already add", () => {
+      expect(
+        riderFor(
+          "You can expend one Battle Die as a Bonus Action. Add the Battle Die and your Strength or Dexterity modifier (whichever you don't already add, minimum of 1) to the attack's damage roll.",
+          "Test Edge",
+        ),
+      ).toMatchObject({
+        classResourceDieCount: 1,
+        complementaryAbilities: ["strength", "dexterity"],
+        abilityBonusMinimum: 1,
+      })
+    })
+
+    it("adds one die per extra attack without re-spending the up-front cost", () => {
+      const rider = riderFor(
+        "You can expend three Battle Dice to make up to three extra melee or ranged attacks. On a hit with one of these extra attacks, add a Battle Die to the damage roll.",
+        "Test Spin",
+      )
+      expect(rider).toMatchObject({ classResourceDieCount: 1, menuConditionLabel: "extra attack" })
+      expect((rider as { spendClassResourceAmount?: number }).spendClassResourceAmount).toBeUndefined()
+      expect((rider as { weaponScope?: string }).weaponScope).toBeUndefined()
+    })
+
+    it("ignores dice an ally or companion adds to its own roll", () => {
+      expect(
+        riderFor(
+          "As a Bonus Action, you can expend one Battle Die. The next time your ally makes an attack, it adds the Battle Die to the attack and damage roll.",
+          "Test Rally",
+        ),
+      ).toBeUndefined()
+    })
+
+    it("wires a die added to your own failed check as a failed_roll_trigger", () => {
+      const trigger = detectFeatureModifiers(
+        "When you fail an Intelligence check, you can expend one Battle Die to add it to the roll, potentially turning it into a success.",
+        { ...baseCtx, featureName: "Test Insight" },
+      ).find((entry) => entry.ruleId === "failed_roll.expend_resource_die")?.instance.characteristics?.[0]
+      expect(trigger).toMatchObject({
+        type: "failed_roll_trigger",
+        rollKind: "ability",
+        targetScope: "self",
+        spendResourceKey: "battle_dice",
+        effect: {
+          activation: {
+            effects: [
+              expect.objectContaining({
+                kind: "check_roll_modifier",
+                bonusConfig: { mode: "die", dieScaling: "class_resource", classResourceKey: "battle_dice" },
+              }),
+            ],
+          },
+        },
+      })
+    })
+
+    it("keeps the named ability and the proficient-skill gate on failed-check dice", () => {
+      const ability = detectFeatureModifiers(
+        "When you fail an Intelligence check, you can expend one Battle Die to add it to the roll, potentially turning it into a success.",
+        { ...baseCtx, featureName: "Test Insight" },
+      ).find((entry) => entry.ruleId === "failed_roll.expend_resource_die")?.instance.characteristics?.[0]
+      expect(ability).toMatchObject({ rollKind: "ability", ability: "intelligence" })
+      expect(ability).not.toHaveProperty("requiresProficiency")
+
+      const skill = detectFeatureModifiers(
+        "When you fail a check with a skill you are proficient in, you can expend one Battle Die to add it to the roll.",
+        { ...baseCtx, featureName: "Test Knack" },
+      ).find((entry) => entry.ruleId === "failed_roll.expend_resource_die")?.instance.characteristics?.[0]
+      expect(skill).toMatchObject({ rollKind: "skill", requiresProficiency: true, targetScope: "self" })
+      expect(skill).not.toHaveProperty("ability")
+    })
+
+    it("wires a missed attack and an ally's failed save as failed_roll_triggers", () => {
+      const miss = detectFeatureModifiers(
+        "Once per turn when you miss with a ranged attack roll, you can expend one Battle Die and add it to the attack roll.",
+        { ...baseCtx, featureName: "Test Aim" },
+      ).find((entry) => entry.ruleId === "failed_roll.expend_resource_die")?.instance.characteristics?.[0]
+      expect(miss).toMatchObject({ rollKind: "attack", targetScope: "self", useReaction: false })
+
+      const ally = detectFeatureModifiers(
+        "When an ally you can see fails a saving throw, you can take a Reaction to expend one Battle Die and add it to the roll.",
+        { ...baseCtx, featureName: "Test Shout" },
+      ).find((entry) => entry.ruleId === "failed_roll.expend_resource_die")?.instance.characteristics?.[0]
+      expect(ally).toMatchObject({ rollKind: "save", targetScope: "allied_creature", useReaction: true })
+    })
+
+    it("wires a reaction that subtracts a Battle Die from an enemy attack roll", () => {
+      const reaction = detectFeatureModifiers(
+        "When an enemy hits a creature with a ranged attack roll, you can take a Reaction and expend one Battle Die to intercept it. Subtract the Battle Die from the attack roll.",
+        { ...baseCtx, featureName: "Test Intercept" },
+      ).find((entry) => entry.ruleId === "d20_reaction.subtract_resource_die_from_attack")?.instance
+        .characteristics?.[0]
+      expect(reaction).toMatchObject({
+        type: "d20_test_reaction",
+        modifierMode: "subtract",
+        rollKinds: ["attack"],
+        useReaction: true,
+        spendResourceKey: "battle_dice",
+        dieSource: "resource_die",
+      })
+    })
+  })
+
   it("wires first-round ability-mod damage as a weapon DMG menu rider", () => {
     const detections = detectFeatureModifiers(
       "Whenever you deal damage to a creature with a weapon or Unarmed Strike on the first round of combat, you can add your Charisma modifier to the damage roll.",

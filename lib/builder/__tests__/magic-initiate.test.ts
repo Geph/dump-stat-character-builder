@@ -92,6 +92,23 @@ describe("magic-initiate spell list exclusivity", () => {
     ).toBe(true)
   })
 
+  it("does not treat the background grant as taken for its own spell-list slot", () => {
+    const granted = listSlot("feat:granted:mi")
+    const picks = { [granted.slotKey]: ["Druid"] }
+    const extras = { featGranted: "Magic Initiate (Druid)" }
+    expect(takenMagicInitiateSpellLists([granted], picks, granted.slotKey, extras).has("druid")).toBe(
+      false,
+    )
+    expect(unavailableMagicInitiateSpellListNames([granted], picks, granted.slotKey, extras)).toEqual(
+      [],
+    )
+
+    const second = listSlot("feat:mi2")
+    expect(
+      unavailableMagicInitiateSpellListNames([granted, second], picks, second.slotKey, extras),
+    ).toEqual(["Druid"])
+  })
+
   it("counts granted modifier picks even when that take's slot is not in the list", () => {
     const picks = {
       "feat:granted:mi-id::mod_magic_initiate_spells::spell_list_class": ["Wizard"],
