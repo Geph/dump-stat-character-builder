@@ -38,6 +38,10 @@ import {
   resolveSpellSlotUseEffects,
   type SpellSlotUseEffects,
 } from "@/lib/character/spell-slot-use-effects"
+import {
+  resolveClassResourceRestoreOnUse,
+  type ClassResourceRestoreOnUse,
+} from "@/lib/character/class-resource-restore-on-use"
 import { DEFAULT_SHEET_ACTIONS } from "@/lib/character/default-actions"
 import {
   hasManeuverSpendText,
@@ -198,6 +202,8 @@ export type SheetActionEntry = {
     amount: number
     restoreOn?: "short_rest" | "long_rest"
   }
+  /** Martial Recovery and similar: regain uses of a named class resource pool. */
+  restoreClassResourceOnUse?: ClassResourceRestoreOnUse
   /** Dark Arcana: spend a spell slot to refill a class resource. */
   restoreResourceFromSpellSlotOnUse?: {
     resourceKey: string
@@ -791,6 +797,9 @@ function authoredTriggerLabel(item: ActivatableItem): string | null {
   if (item.activation?.onInitiative) return "When you roll Initiative"
   if (item.activation?.onDropToZeroHp) return "When reduced to 0 HP"
   if (item.activation?.onFailedSave) return "When you fail a save"
+  for (const requirement of item.activation?.requirements ?? []) {
+    if (requirement.kind === "custom" && requirement.text.trim()) return requirement.text.trim()
+  }
   for (const instance of item.linkedModifiers ?? []) {
     if (instance.activation?.onInitiative) return "When you roll Initiative"
     if (instance.activation?.onDropToZeroHp) return "When reduced to 0 HP"
@@ -1986,6 +1995,7 @@ function pushActivatableItemActions(
             ? false
             : (fallback.spendsEconomy ?? resolveSpendsEconomy(feature)),
           restoreHitDiceOnUse: resolveHitDiceRestoreOnUse(feature, levelCap),
+          restoreClassResourceOnUse: resolveClassResourceRestoreOnUse(feature),
           ...resolveSpellSlotUseEffects(feature),
           dropToOneHpOnUse: resolveDropToOneHpOnUse(feature),
           alsoActivateFeatureNames: resolveAlsoActivateFeatureNames(feature),
@@ -2393,6 +2403,7 @@ function pushCustomAbilityActions(
       concentration: ability.concentration,
       healEffects: healEffects.length ? healEffects : undefined,
       useBonuses: resolveUseBonuses(item),
+      restoreClassResourceOnUse: resolveClassResourceRestoreOnUse(item),
       spendsEconomy: trigger ? false : fallback.spendsEconomy,
     })
   }

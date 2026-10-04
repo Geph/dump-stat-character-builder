@@ -111,7 +111,9 @@ export function inferAllyHealEffect(
   name: string,
   description?: string | null,
 ): FeatureEffect | null {
-  const text = `${name}\n${description ?? ""}`.replace(/<[^>]+>/g, " ")
+  const text = `${name}\n${description ?? ""}`
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\b(?:can[’']?t|cannot|can not|doesn[’']?t|does not|won[’']?t)\s+regain\s+hit\s+points\b/gi, " ")
   if (!/regains? hit points/i.test(text)) return null
   if (!ALLY_TARGET_RE.test(text) && !/\bthat creature\b/i.test(text)) return null
   if (/\byou regain\b/i.test(text) && !ALLY_TARGET_RE.test(text)) return null

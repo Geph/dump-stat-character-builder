@@ -167,8 +167,9 @@ export const THIRD_PARTY_RESOURCE_PATTERNS: ThirdPartyResourcePattern[] = [
     },
     spendPatterns: [
       /\bexpend\s+(?:one|an?|1)\s+battle\s+die\b/i,
-      /\bexpend\s+(?:up\s+to\s+)?(\d+)\s+battle\s+dice\b/i,
+      /\bexpend\s+(?:up\s+to\s+)?(\d+|two|three|four|five)\s+battle\s+dice\b/i,
       /\bexpend\s+a\s+battle\s+die\b/i,
+      /\bgive\b[^.]{0,80}\bone\s+of\s+your\s+unexpended\s+battle\s+dice\b/i,
     ],
   },
   {
@@ -729,6 +730,8 @@ export function matchThirdPartyResourceHeader(header: string): ThirdPartyResourc
   return null
 }
 
+const SPEND_WORD_NUMBERS: Record<string, number> = { two: 2, three: 3, four: 4, five: 5 }
+
 export function detectThirdPartyResourceSpend(
   text: string,
   resourceKey: string,
@@ -738,7 +741,8 @@ export function detectThirdPartyResourceSpend(
   for (const spendPattern of pattern.spendPatterns) {
     const match = text.match(spendPattern)
     if (match) {
-      const amount = match[1] ? parseInt(match[1], 10) : 1
+      const raw = match[1]?.toLowerCase()
+      const amount = raw ? (SPEND_WORD_NUMBERS[raw] ?? parseInt(raw, 10)) : 1
       return Number.isFinite(amount) && amount > 0 ? amount : 1
     }
   }

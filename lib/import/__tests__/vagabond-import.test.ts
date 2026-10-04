@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest"
+import { attachClassDetails } from "@/lib/character/character-classes"
+import { collectSheetActions } from "@/lib/character/sheet-actions"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import { sanitizeVagabondImportContent } from "@/lib/import/enrichment-presets/packs/vagabond"
 import { auditImportWiring, summarizeFindings } from "@/lib/import/homebrew-import-ops"
 import type { ImportContent } from "@/lib/import/content-schema"
-import type { Feature } from "@/lib/types"
+import type { DndClass, Feature, Subclass } from "@/lib/types"
 
 function sampleVagabond(): ImportContent {
   return {
@@ -150,5 +152,94 @@ describe("Vagabond enrichment sanitize", () => {
     expect(summarizeFindings(findings).errors, JSON.stringify(findings, null, 2)).toBe(0)
     expect(findings.some((f) => f.id === "vagabond.subclass_maneuver_knack")).toBe(false)
     expect(findings.some((f) => f.id === "vagabond.battle_tactics_resource_key")).toBe(false)
+  })
+})
+
+describe("Vagabond level-up features on the live sheet", () => {
+  const feature = (level: number, name: string, description: string): Feature => ({
+    level,
+    name,
+    description,
+  })
+
+  const vagabond = {
+    id: "vag",
+    name: "Vagabond",
+    hit_die: 10,
+    class_resources: [
+      {
+        id: "battle_dice",
+        name: "Battle Dice",
+        uses: { type: "at_level", atLevelMode: "tier", atLevelTable: [{ level: 1, count: 2 }] },
+      },
+    ],
+    features: [
+      feature(2, "Breather", "Spend a Hit Point Die to catch your breath and recover."),
+      feature(3, "Overexertion", "With an empty pool you can push past your limit at a cost."),
+      feature(9, "Last Stand", "When you would fall, you keep standing instead."),
+      feature(17, "Deft Maneuver", "You gain an extra Bonus Action each turn, only for maneuvers."),
+      feature(20, "Martial Recovery", "Catch a second wind for your Battle Dice."),
+    ],
+  } as unknown as DndClass
+
+  function sheetFor(subclass: { name: string; features: Feature[] }) {
+    const sub = { id: "sub", class_id: "vag", ...subclass } as unknown as Subclass
+    const details = attachClassDetails(
+      [{ class_id: "vag", subclass_id: "sub", level: 20, order: 0 } as never],
+      [vagabond],
+      [sub],
+    )
+    return collectSheetActions({ classDetails: details, species: null })
+  }
+
+  it("makes class features actionable on the Combat tab", () => {
+    const actions = sheetFor({ name: "Brigand", features: [] })
+    const byName = (name: string) => actions.find((action) => action.name === name)
+
+    expect(byName("Breather")?.healEffects).toEqual(
+      expect.arrayContaining([expect.objectContaining({ healMode: "hit_dice", healAbility: "CON" })]),
+    )
+    expect(byName("Last Stand")?.dropToOneHpOnUse).toBe(true)
+    expect(byName("Last Stand")?.healEffects).toEqual(
+      expect.arrayContaining([expect.objectContaining({ healMode: "character_level", healLevelMultiplier: 2 })]),
+    )
+    expect(byName("Martial Recovery")?.restoreClassResourceOnUse).toEqual({
+      resourceKey: "battle_dice",
+      amount: "all",
+    })
+    expect(byName("Overexertion")).toMatchObject({
+      trigger: "When you have no Battle Dice",
+      restoreClassResourceOnUse: { resourceKey: "battle_dice", amount: 1 },
+    })
+    // Passive action-economy grant: Features tab only, no inert Use button.
+    expect(byName("Deft Maneuver")).toBeUndefined()
+  })
+
+  it("leaves subclass [Maneuver] cards to the granted ability and files consumables on Combat", () => {
+    expect(
+      sheetFor({
+        name: "Brigand",
+        features: [feature(3, "Ambush [Maneuver]", "You learn the Ambush maneuver.")],
+      }).some((action) => action.name === "Ambush [Maneuver]"),
+    ).toBe(false)
+
+    const stim = sheetFor({
+      name: "Adrenaline Junkie",
+      features: [
+        feature(
+          3,
+          "Stim Potion",
+          "When you finish a Long Rest, you brew potions equal to your Constitution modifier. You drink one as a Bonus Action.",
+        ),
+      ],
+    }).find((action) => action.name === "Stim Potion")
+    expect(stim).toMatchObject({ kinds: ["bonus"], showOnCombatTab: true })
+
+    const snack = sheetFor({
+      name: "Gourmand",
+      features: [feature(10, "Quick Snack", "At the start of your turn, eat a snack to catch your breath.")],
+    }).find((action) => action.name === "Quick Snack")
+    expect(snack?.showOnCombatTab).toBe(true)
+    expect(snack?.alsoActivate?.map((entry) => entry.name)).toEqual(["Breather"])
   })
 })

@@ -348,6 +348,22 @@ Healing 1/2/3/4). Rest restore stays `hit_dice_restore` (Divine Respite).
 
 Reader: `lib/character/hit-dice-use-effects.ts`.
 
+### Named-pool refill on Use (2026-10-04)
+
+A `class_resource` `reset` / `increase` on a **non-reserved** key with no refresh
+flag (`resourceRefreshOn*`, `regainAllOnLinkedFeatureUse`) is an activated refill
+(Vagabond Martial Recovery, Overexertion). `resolveClassResourceRestoreOnUse`
+sets `SheetActionEntry.restoreClassResourceOnUse`; the panel's Use handler
+gives back expended uses via `resolveResourcePool`. Refresh-flagged effects stay
+with `collect-resource-refresh-effects.ts`.
+
+Reader: `lib/character/class-resource-restore-on-use.ts`.
+
+A conditional spend with no action economy ("When you have no Battle Dice")
+gets its card from `activation.requirements` `{ kind: "custom", text }`:
+`authoredTriggerLabel` uses the text as the trigger, so the card files under
+Triggered instead of vanishing.
+
 ## Efficiency and dependency hazards
 
 - **Two walkers.** A value that lives on both a characteristic and an effect

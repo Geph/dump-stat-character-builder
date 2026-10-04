@@ -1,6 +1,6 @@
 # New class playbook — agent guide
 
-Last reviewed: 2026-09-22.
+Last reviewed: 2026-10-04.
 
 Use this when a class (or subclass pack) that has never been imported arrives, usually
 through the BYO LLM flow. Twenty-plus homebrew classes have already been workshopped;
@@ -60,6 +60,9 @@ Match the rules text, not the class name. Field names are the `mechanics[]` shap
 | Restore spell / Pact slots on use | Reserved `spell_slots` / `pact_magic_slots` keys on `class_resource` |
 | Points that appear at turn start and vanish at turn end | `turn_start_bonus_grant` (`expiresEndOfTurn`) |
 | Refill a spent pool at turn start | `turn_start_resource_restore` |
+| "As a Bonus Action, regain all your expended [pool]" | `class_resource` `reset` (or `increase` + amount) on the pool key with the action kind — no refresh flag. Use on the sheet refills it (`restoreClassResourceOnUse`). Phrase-detected (`resource.regain_all_on_use`) |
+| "When you have no [pool]…" / other conditional spends with no action | `activation.requirements` `{ kind: "custom", text }` — the text becomes the card's trigger label so it files under Triggered |
+| "Expend a Hit Die … regain HP equal to the roll plus CON" | `heal_self` `healMode: hit_dice` + `healAbility: CON`; the heal count is the HD spend. Phrase-detected (`heal.hit_dice_roll_plus_con`) |
 
 ### Picks and options
 

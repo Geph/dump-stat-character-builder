@@ -87,6 +87,8 @@ export const AI_MECHANICS_NARRATIVE_CATALOG_SUFFIXES = new Set([
   "cast_spell",
   // Feature-gated pool refresh (Initiative / crit) — not a top-level mechanics[].kind.
   "class_resource",
+  // Hit-Die / level heals are auto-wired by phrase detection and enrichment presets.
+  "heal_self",
   "*",
 ])
 
@@ -896,6 +898,21 @@ export const DESCRIPTION_PHRASE_WIRING: ModifierWiringEntry[] = [
     ],
     notes:
       'Reserved classResourceKey "hit_dice" (aliases hit_point_dice / hit_point_die) reduces the sheet Hit Dice tracker. classResourceChange reduce; classResourceAmount defaults to 1. Do not emit a class_resources.hit_dice row. For heal-from-HD (Miraculous Healing) also emit heal_self healMode hit_dice — the heal dice count is the spend.',
+  },
+  {
+    ruleId: "heal.hit_dice_roll_plus_con",
+    trigger: "description",
+    catalog: "cat_fx_heal_self",
+    examples: ["expend one Hit Die and roll it; you regain Hit Points equal to the roll plus your Constitution modifier"],
+    notes: "heal_self healMode hit_dice + healDiceCount + healAbility CON. The heal dice count is the Hit Die spend (see resource.expend_hit_dice).",
+  },
+  {
+    ruleId: "resource.regain_all_on_use",
+    trigger: "description",
+    catalog: "cat_fx_class_resource",
+    examples: ["As a Bonus Action, you can regain all of your expended Battle Dice"],
+    notes:
+      "Activated refill of a named pool: classResourceKey + classResourceChange reset (increase + classResourceAmount for a partial refill). Pair with the action kind and uses. Not a refresh flag — Use on the sheet regains the expended uses.",
   },
   {
     ruleId: "uses.fixed_rest",

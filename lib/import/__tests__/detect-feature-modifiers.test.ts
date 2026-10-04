@@ -188,6 +188,29 @@ describe("detectFeatureModifiers", () => {
       },
     },
     {
+      label: "roll a spent Hit Point Die plus CON to heal",
+      text: "As a Bonus Action, you can expend one of your Hit Point Dice, roll it, and regain Hit Points equal to the roll plus your Constitution modifier.",
+      ruleId: "heal.hit_dice_roll_plus_con",
+      assert: (detections) => {
+        const effect = detections
+          .find((entry) => entry.ruleId === "heal.hit_dice_roll_plus_con")
+          ?.instance.activation?.effects?.find((row) => row.kind === "heal_self")
+        expect(effect).toMatchObject({ healMode: "hit_dice", healDiceCount: 1, healAbility: "CON" })
+      },
+    },
+    {
+      label: "Bonus Action that refills a named dice pool",
+      text: "You can take a Bonus Action to regain all of your expended Battle Dice. You can't do so again until you finish a Short Rest.",
+      ruleId: "resource.regain_all_on_use",
+      assert: (detections) => {
+        const effect = detections
+          .find((entry) => entry.ruleId === "resource.regain_all_on_use")
+          ?.instance.activation?.effects?.find((row) => row.kind === "class_resource")
+        expect(effect).toMatchObject({ classResourceKey: "battle_dice", classResourceChange: "reset" })
+        expect(effect?.resourceRefreshOnInitiative).toBeFalsy()
+      },
+    },
+    {
       label: "fixed uses per long rest",
       text: "You can use this feature 3 times, regaining all expended uses when you finish a long rest.",
       ruleId: "uses.fixed_rest",

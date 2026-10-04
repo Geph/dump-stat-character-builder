@@ -1588,6 +1588,16 @@ function ActionDetailOverlay({
           : "No expended Hit Point Dice to regain",
       )
     }
+    if (action.restoreClassResourceOnUse && resolveResourcePool) {
+      const { resourceKey, amount } = action.restoreClassResourceOnUse
+      const pool = resolveResourcePool(resourceKey, action.classId)
+      if (pool) {
+        const poolName = pool.resourceName ?? resourceKey.replace(/_/g, " ")
+        const regained = amount === "all" ? pool.used : Math.min(pool.used, amount)
+        if (regained > 0) pool.setUsed(pool.used - regained)
+        parts.push(regained > 0 ? `Regained ${regained} ${poolName}` : `No expended ${poolName} to regain`)
+      }
+    }
     if (action.restoreResourceFromSpellSlotOnUse && onRestoreResourceFromSpellSlot) {
       if (!chosenSlotLevel || !canAffordChosenSlot) {
         setUseFeedback("No spell slot available")

@@ -56,6 +56,21 @@ describe("inferClassResourceSpendFromText", () => {
     ).toBeNull()
   })
 
+  it("reads spelled-out Battle Dice counts and dice handed to an ally", () => {
+    expect(
+      inferClassResourceSpendFromText(
+        "When you hit, you can expend three Battle Dice as a Bonus Action to stagger the target.",
+        ["battle_dice"],
+      ),
+    ).toEqual({ resourceKey: "battle_dice", amount: 3 })
+    expect(
+      inferClassResourceSpendFromText(
+        "As a Bonus Action, give an ally within 60 feet one of your unexpended Battle Dice.",
+        ["battle_dice"],
+      ),
+    ).toEqual({ resourceKey: "battle_dice", amount: 1 })
+  })
+
   it("detects reserved Hit Dice spend when that key is available", () => {
     expect(
       inferClassResourceSpendFromText("As a Bonus Action, you expend a Hit Die.", ["hit_dice"]),
@@ -825,6 +840,58 @@ describe("spell-slot hooks come from class_resource effects, not feature names",
       subclass: null,
     }
   }
+
+  it("refills a named pool on Use from a bare reset, but not from an Initiative refresh", () => {
+    const refill = collectSheetActions({
+      classDetails: [
+        slotEffectClass(
+          "Second Breath",
+          { kind: "class_resource", classResourceKey: "battle_dice", classResourceChange: "reset" },
+          { activation: { bonusAction: true } },
+        ),
+      ],
+      species: null,
+    }).find((action) => action.name === "Second Breath")
+    expect(refill?.restoreClassResourceOnUse).toEqual({ resourceKey: "battle_dice", amount: "all" })
+
+    const refresh = collectSheetActions({
+      classDetails: [
+        slotEffectClass(
+          "Ready Stance",
+          {
+            kind: "class_resource",
+            classResourceKey: "battle_dice",
+            classResourceChange: "reset",
+            resourceRefreshOnInitiative: true,
+          },
+          { activation: { bonusAction: true } },
+        ),
+      ],
+      species: null,
+    }).find((action) => action.name === "Ready Stance")
+    expect(refresh?.restoreClassResourceOnUse).toBeUndefined()
+  })
+
+  it("files a custom activation requirement as the card trigger", () => {
+    const action = collectSheetActions({
+      classDetails: [
+        slotEffectClass(
+          "Last Reserves",
+          {
+            kind: "class_resource",
+            classResourceKey: "battle_dice",
+            classResourceChange: "increase",
+            classResourceAmount: 1,
+          },
+          { activation: { requirements: [{ kind: "custom", text: "When your pool is empty" }] } },
+        ),
+      ],
+      species: null,
+    }).find((entry) => entry.name === "Last Reserves")
+    expect(action?.trigger).toBe("When your pool is empty")
+    expect(action?.spendsEconomy).toBe(false)
+    expect(action?.restoreClassResourceOnUse).toEqual({ resourceKey: "battle_dice", amount: 1 })
+  })
 
   it("restores pact slots from a pact_magic_slots reset effect", () => {
     const actions = collectSheetActions({

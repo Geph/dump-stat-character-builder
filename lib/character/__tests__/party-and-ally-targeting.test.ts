@@ -133,6 +133,13 @@ describe("ally heal targeting", () => {
       healAbility: "CHA",
     })
 
+    expect(
+      inferAllyHealEffect(
+        "Rending Cut",
+        "On a hit, the creature gains a wound. A wounded creature can't regain Hit Points until the wound closes.",
+      ),
+    ).toBeNull()
+
     const blitz = inferDirectCompanionEffect(
       "Blitz",
       "Once on each of your turns, you can direct your Cohort or an ally within 60 feet of yourself.",

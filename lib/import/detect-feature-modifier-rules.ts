@@ -28,7 +28,10 @@ import type { DetectFeatureContext } from "@/lib/import/detect-feature-modifiers
 import { spellNamePlaceholder } from "@/lib/import/resolve-linked-modifier-spells"
 import { parseSubclassSpellTable } from "@/lib/import/subclass-spell-table"
 import { PSIONIC_TALENT_WIRING_RULES } from "@/lib/import/psionic-talent-wiring"
-import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
+import {
+  matchThirdPartyResourceHeader,
+  THIRD_PARTY_RESOURCE_PATTERNS,
+} from "@/lib/import/third-party-resources"
 import { parseChooseOneNamedOptions } from "@/lib/compendium/choose-one-named-options"
 import type { UsesConfig, FeatureEffect } from "@/lib/types"
 import {
@@ -2277,6 +2280,51 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
             classResourceChange: "reduce",
             classResourceAmount: amount,
             label: amount === 1 ? "Spend 1 Hit Die" : `Spend ${amount} Hit Dice`,
+          },
+        ],
+      })
+    },
+  },
+  {
+    id: "heal.hit_dice_roll_plus_con",
+    confidence: "high",
+    scope: "full",
+    test: /\b(?:expend|spend)(?:s|ing)?\s+(one|a|an|\d+)\s+(?:of\s+your\s+)?hit\s+(?:point\s+)?dic?e\b[^.]{0,60}\broll\b[^.]{0,80}\bregain\b[^.]{0,60}\bhit points?\s+equal\s+to\s+the\s+(?:roll|number rolled|total rolled)\s+plus\s+your\s+constitution\s+modifier\b/i,
+    build: (match, ctx) => {
+      const raw = (match[1] ?? "1").toLowerCase()
+      const count = raw === "one" || raw === "a" || raw === "an" ? 1 : parseInt(raw, 10)
+      if (!Number.isFinite(count) || count < 1) return null
+      return fxInstance(newInstanceId(), effectCatalogRefId("heal_self"), {
+        effects: [
+          {
+            id: modId(instanceKey(ctx, "hit_dice_heal")),
+            kind: "heal_self" as const,
+            healTarget: "self" as const,
+            healMode: "hit_dice" as const,
+            healDiceCount: count,
+            healAbility: "CON" as const,
+            label: "Roll the spent Hit Point Die + CON modifier and regain that many HP",
+          },
+        ],
+      })
+    },
+  },
+  {
+    id: "resource.regain_all_on_use",
+    confidence: "high",
+    scope: "full",
+    test: /\b(?:take an? (?:bonus )?action|as an? (?:bonus )?action)\b[^.]{0,30}?\bregain all (?:of )?your expended ([a-z][a-z' ]{2,40}?)(?=[.,;]|\s+(?:and|but|once)\b|$)/i,
+    build: (match, ctx) => {
+      const resource = matchThirdPartyResourceHeader(match[1] ?? "")
+      if (!resource) return null
+      return fxInstance(newInstanceId(), effectCatalogRefId("class_resource"), {
+        effects: [
+          {
+            id: modId(instanceKey(ctx, "resource_regain_all")),
+            kind: "class_resource" as const,
+            classResourceKey: resource.resourceKey,
+            classResourceChange: "reset" as const,
+            label: `Regain all expended ${resource.displayName}`,
           },
         ],
       })

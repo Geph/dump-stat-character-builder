@@ -281,6 +281,26 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
       { op: "setActivation", activation: { action: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
+        op: "attachNamedPreset",
+        skipIfEffectKinds: ["heal_self"],
+        preset: {
+          kind: "fx_instance",
+          idKey: "vagabond_breather_heal",
+          catalogRefId: effectCatalogRefId("heal_self"),
+          effects: [
+            {
+              id: modId("vagabond_breather_heal"),
+              kind: "heal_self",
+              healTarget: "self",
+              healMode: "hit_dice",
+              healDiceCount: 1,
+              healAbility: "CON",
+              label: "Roll the spent Hit Point Die + CON modifier and regain that many HP",
+            },
+          ],
+        },
+      },
+      {
         op: "appendDescription",
         text: "Spend one Hit Point Die from the sheet Hit Dice tracker when you use this (play-time).",
       },
@@ -302,6 +322,25 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
           recharges: [{ rest: "long_rest" }],
         },
       },
+      {
+        op: "attachNamedPreset",
+        skipIfEffectKinds: ["heal_self"],
+        preset: {
+          kind: "fx_instance",
+          idKey: "vagabond_last_stand_heal",
+          catalogRefId: effectCatalogRefId("heal_self"),
+          effects: [
+            {
+              id: modId("vagabond_last_stand_heal"),
+              kind: "heal_self",
+              healTarget: "self",
+              healMode: "character_level",
+              healLevelMultiplier: 2,
+              label: "After dropping to 1 HP, regain HP equal to twice your level",
+            },
+          ],
+        },
+      },
     ],
   },
   {
@@ -321,6 +360,24 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
         },
       },
       {
+        op: "attachNamedPreset",
+        skipIfEffectKinds: ["class_resource"],
+        preset: {
+          kind: "fx_instance",
+          idKey: "vagabond_martial_recovery",
+          catalogRefId: effectCatalogRefId("class_resource"),
+          effects: [
+            {
+              id: modId("vagabond_martial_recovery"),
+              kind: "class_resource",
+              classResourceKey: "battle_dice",
+              classResourceChange: "reset",
+              label: "Regain all expended Battle Dice",
+            },
+          ],
+        },
+      },
+      {
         op: "appendDescription",
         text: "Regains all expended Battle Dice when used — resolve against the battle_dice pool on the sheet.",
       },
@@ -332,7 +389,8 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
     target: "class_feature",
     match: { className: /vagabond/i, name: /^deft maneuver$/i },
     operations: [
-      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      // Passive action-economy grant (like Extra Attack): no Use button on Combat.
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: false, featuresTab: true } },
       {
         op: "appendDescription",
         text: "Extra Bonus Action each turn that can only be used to perform a maneuver — track narratively when selecting maneuvers.",
@@ -345,7 +403,30 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
     target: "class_feature",
     match: { className: /vagabond/i, name: /^overexertion$/i },
     operations: [
+      {
+        op: "setActivation",
+        activation: { requirements: [{ kind: "custom", text: "When you have no Battle Dice" }] },
+      },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      {
+        op: "attachNamedPreset",
+        skipIfEffectKinds: ["class_resource"],
+        preset: {
+          kind: "fx_instance",
+          idKey: "vagabond_overexertion",
+          catalogRefId: effectCatalogRefId("class_resource"),
+          effects: [
+            {
+              id: modId("vagabond_overexertion"),
+              kind: "class_resource",
+              classResourceKey: "battle_dice",
+              classResourceChange: "increase",
+              classResourceAmount: 1,
+              label: "Regain 1 Battle Die to spend immediately (take Necrotic damage equal to one roll of it)",
+            },
+          ],
+        },
+      },
       {
         op: "appendDescription",
         text: "When you have 0 Battle Dice, regain one die to spend immediately and take Necrotic damage equal to one roll of your Battle Die — play-time; keep \"Battle Die\" phrasing.",
@@ -414,7 +495,8 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
       name: /\[maneuver\]/i,
     },
     operations: [
-      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      // The granted maneuver ability is the Combat card; a second card here would double it.
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: false, featuresTab: true } },
       {
         op: "appendDescription",
         text: "Subclass maneuver is auto-known and does not count against Maneuvers Known. Keep \"expend one Battle Die\" phrasing. Not a knack-pool pick.",
@@ -467,6 +549,37 @@ export const VAGABOND_PRESETS: EnrichmentPreset[] = [
     operations: [
       { op: "setActivation", activation: { bonusAction: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "vagabond.subclass.stim_potion",
+    pack: "vagabond",
+    target: "subclass_feature",
+    match: { subclassClassName: /vagabond/i, name: /^stim potion$/i },
+    operations: [
+      // Brewed on a Long Rest (rest dialog) but drunk as a Bonus Action in combat.
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
+    id: "vagabond.subclass.quick_snack",
+    pack: "vagabond",
+    target: "subclass_feature",
+    match: { subclassClassName: /vagabond/i, name: /^quick snack$/i },
+    operations: [
+      {
+        op: "setActivation",
+        activation: {
+          noEconomyCost: true,
+          alsoActivateFeatureNames: ["Breather"],
+          requirements: [{ kind: "custom", text: "At the start of your turn" }],
+        },
+      },
+      {
+        op: "setSheetDisplay",
+        sheetDisplay: { combatActions: true, abilitiesActions: false, featuresTab: true },
+      },
     ],
   },
   {
