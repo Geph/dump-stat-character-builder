@@ -331,6 +331,28 @@ export function sanitizeInvestigatorImportContent(content: ImportContent): Impor
 
   let next: ImportContent = { ...content }
 
+  // This subclass grants its own pact progression; the base Ritualist has no slots.
+  // Keep it in the shared spellcasting model so the sheet and level-up wizard agree.
+  if (next.subclasses?.length) {
+    const preparedByLevel = [3, 4, 4, 4, 5, 6, 6, 7, 8, 8, 9, 10, 10, 11, 11, 11, 12, 13]
+    next = { ...next, subclasses: next.subclasses.map((subclass) => {
+      if (!/^investigator$/i.test(subclass.class_name ?? "") || !/^occultist$/i.test(subclass.name ?? "") ||
+        !subclass.features?.some((f) => /^pact magic$/i.test(f.name))) return subclass
+      const progression = preparedByLevel.map((prepared, index) => {
+        const level = index + 3
+        return { level, prepared, cantrips: level < 10 ? 2 : 3,
+          max_spell_level: level < 7 ? 1 : level < 13 ? 2 : level < 19 ? 3 : 4 }
+      })
+      return { ...subclass, spellcasting: {
+        ...subclass.spellcasting, ability: "Intelligence", type: "pact" as const,
+        caster_progression: "pact" as const, pact_magic: true, starts_at: 3, progression,
+        explicit_slot_progression: progression.map(({ level, max_spell_level }) => ({
+          level, slots: Array.from({ length: max_spell_level }, (_, i) => i === max_spell_level - 1 ? (level < 5 ? 1 : 2) : 0),
+        })),
+      } }
+    }) }
+  }
+
   if (next.class_resources?.length) {
     next = {
       ...next,

@@ -26,6 +26,21 @@ function classDetail(
 }
 
 describe("collectSheetActions", () => {
+  it.each(["Magic", "Utilize"])("recognizes a current-level 'you can take a %s action'", (kind) => {
+    const feature: Feature = { name: "Deploy Ward", level: 6,
+      description: `You can take a ${kind} action to deploy a trap that deals damage.` }
+    expect(collectSheetActions({ classDetails: [classDetail([feature], 5)], species: null })).toEqual([])
+    const actions = collectSheetActions({ classDetails: [classDetail([feature], 6)], species: null })
+    expect(actions.find((a) => a.name === feature.name)).toMatchObject({ kinds: ["action"], showOnCombatTab: true })
+  })
+
+  it("keeps an in-turn use visible alongside its rest preparation", () => {
+    const feature: Feature = { name: "Prepared Ward", level: 1,
+      description: "When you finish a Long Rest, choose a ward. You can take a Bonus Action to activate the ward and reduce damage." }
+    const actions = collectSheetActions({ classDetails: [classDetail([feature])], species: null })
+    expect(actions.find((a) => a.name === feature.name)).toMatchObject({ kinds: ["bonus"], showOnCombatTab: true })
+  })
+
   it("keeps feature.limitedUses when other characteristics are present", () => {
     const actions = collectSheetActions({
       classDetails: [

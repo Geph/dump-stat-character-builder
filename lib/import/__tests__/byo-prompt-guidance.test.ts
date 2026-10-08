@@ -15,6 +15,23 @@ import { COMMON_MODIFIERS_IMPORT_HINT } from "@/lib/import/common-modifiers-impo
 import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
 
 describe("BYO prompt guidance (Psion audit follow-up)", () => {
+  it("preserves nested gates and separates independent point costs in both prompt modes", () => {
+    for (const promptMode of ["full", "lite"] as const) {
+      const prompt = buildByoExtractionPrompt("classes", { promptMode })
+      expect(prompt).toContain("incompatible-with exclusions")
+      expect(prompt).toContain("specialization_choices")
+      expect(prompt).toContain("separate costs")
+      expect(prompt).toContain("Overwrite")
+    }
+  })
+  it("preserves in-turn actions and source ownership in Full and Lite prompts", () => {
+    for (const mode of ["full", "lite"] as const) {
+      const prompt = buildByoExtractionPrompt("classes", { promptMode: mode })
+      expect(prompt).toContain("Magic/Utilize action")
+      expect(prompt).toContain("one-time creation")
+      expect(prompt).toContain("adjacent PDF columns")
+    }
+  })
   it("places name/source matching before the Common Modifier wiring index", () => {
     const prompt = buildImportSystemPrompt("classes")
     const nameIdx = prompt.indexOf("Name and source matching")

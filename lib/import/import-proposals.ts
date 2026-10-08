@@ -49,6 +49,8 @@ export type ImportProposalClassResource = {
 }
 
 export type ImportProposalCustomAbility = {
+  /** Preserve authored modifiers, nested choices, and casting metadata through review. */
+  originalRow?: Record<string, unknown>
   id: string
   name: string
   definition: string
@@ -458,6 +460,7 @@ function collectFromAiProposals(content: ImportContent): ImportProposalSet {
 
     const talentCount = ability.choices?.options?.length
     pushAbility(customAbilities, seenAbilities, {
+      originalRow: { ...ability },
       id: ability.proposal_id ? `ability:${slugId(ability.proposal_id)}` : undefined,
       name: ability.name,
       definition:
@@ -756,14 +759,28 @@ function collectExplicitAbilities(
   for (const ability of content.abilities ?? []) {
     const companionStatBlock = parseCompanionStatBlock(ability.name, ability.description)
     pushAbility(into.customAbilities, seenAbilities, {
+      originalRow: { ...ability },
       name: ability.name,
       definition: `Custom builder ability from ${ability.source_name ?? "imported content"}.`,
       description: ability.description,
       sourceType: normalizeProposalSourceType(ability.source_type),
       sourceName: ability.source_name,
       levelRequirement: ability.level_requirement,
+      abilityRole: ability.ability_role,
+      prerequisite: ability.prerequisite,
+      repeatable: ability.repeatable,
+      choices: ability.choices as import("@/lib/types").FeatureChoice | undefined,
+      specializationChoices: ability.specialization_choices as import("@/lib/types").FeatureChoice | undefined,
+      casting_time: ability.casting_time,
+      execution: ability.execution,
+      eligible_classes: ability.eligible_classes,
+      range: ability.range,
+      components: ability.components,
+      duration: ability.duration,
+      concentration: ability.concentration,
       companionStatBlock,
       source: "explicit",
+      resourceKey: isBattleMasterManeuverLikeFeature(ability) ? maneuverResourceKey(ability) : undefined,
     })
   }
 }
@@ -786,11 +803,11 @@ export function collectImportProposals(content: ImportContent): ImportProposalSe
     pushAbility(result.customAbilities, seenAbilities, ability)
   }
 
+  collectExplicitAbilities(content, result, seenAbilities)
   collectDisciplineFeatures(content, result, seenAbilities)
   collectMartialExploitFeatures(content, result, seenAbilities)
   collectBattleMasterManeuverFeatures(content, result, seenAbilities)
   collectCompanionStatBlockFeatures(content, result, seenAbilities)
-  collectExplicitAbilities(content, result, seenAbilities)
 
   return result
 }
@@ -835,6 +852,7 @@ export function applyProposalSelections(
   }))
 
   const abilities = selectedAbilities.map((row) => ({
+    ...row.originalRow,
     name: row.name,
     description: row.description,
     prerequisite: row.prerequisite ?? null,
@@ -843,7 +861,7 @@ export function applyProposalSelections(
     source_name: row.sourceName,
     level_requirement: row.levelRequirement,
     companion_stat_block: row.companionStatBlock ?? null,
-    ...(row.choices ? { isChoice: true, choices: row.choices } : {}),
+    ...(row.choices ? { isChoice: row.originalRow?.isChoice ?? true, choices: row.choices } : {}),
     ...(row.specializationChoices
       ? { specialization_choices: row.specializationChoices }
       : {}),

@@ -229,8 +229,8 @@ function WeaponAttackCard({
 
   return (
     <div className="min-w-0 rounded border border-primary/40 bg-primary/5 px-2.5 py-2">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-        <div className="min-w-0 space-y-1">
+      <div className="flex flex-wrap items-start gap-2">
+        <div className="min-w-0 flex-1 space-y-1" style={{ flexBasis: 140 }}>
           <div className="flex flex-wrap items-center gap-x-1.5">
             {weapon.icon?.trim() ? (
               <GameIcon name={weapon.icon.trim()} className="h-5 w-5 shrink-0 text-primary" />
@@ -283,125 +283,11 @@ function WeaponAttackCard({
               ) : null}
             </p>
           ) : null}
-
-          {mastery ||
-          properties.length > 0 ||
-          appliedModifiers.length > 0 ||
-          sheetContext?.extraMasteries.length ? (
-            <div className="flex min-w-0 flex-wrap items-center gap-1">
-              {mastery ? (
-                <span
-                  className={cn(
-                    "inline-flex max-w-full items-center gap-0.5 rounded-full px-2 py-0.5 text-left text-[10px] font-semibold border",
-                    masteryActive
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-border bg-muted/60 text-muted-foreground",
-                  )}
-                >
-                  {mastery}
-                  <ConditionInfoTip
-                    description={masteryDescription ?? mastery}
-                    ariaLabel={`${mastery} mastery`}
-                  />
-                </span>
-              ) : null}
-              {(sheetContext?.extraMasteries ?? []).map((entry) => (
-                <span
-                  key={`extra-${entry.name}`}
-                  className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-primary bg-primary/15 px-2 py-0.5 text-left text-[10px] font-semibold text-primary"
-                >
-                  {entry.name}
-                  <ConditionInfoTip
-                    description={entry.description ?? entry.name}
-                    ariaLabel={`${entry.name} mastery`}
-                  />
-                </span>
-              ))}
-              {properties.map((property) => (
-                <span
-                  key={property}
-                  className={cn(
-                    "inline-flex max-w-full items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-left text-[10px] font-medium",
-                    weaponModifierBadgeClass(undefined),
-                  )}
-                >
-                  {property}
-                  <ConditionInfoTip
-                    description={describeWeaponProperty(property) ?? property}
-                    ariaLabel={`${property} property`}
-                  />
-                </span>
-              ))}
-              {appliedModifiers.map((modifier, index) => (
-                <span
-                  key={`${modifier.name}-${modifier.sourceLabel ?? index}`}
-                  className={cn(
-                    "inline-flex max-w-full items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-left text-[10px] font-medium",
-                    weaponModifierBadgeClass("feature"),
-                  )}
-                >
-                  {modifier.name}
-                  <ConditionInfoTip
-                    description={modifier.description}
-                    details={
-                      modifier.sourceLabel
-                        ? [{ label: modifier.name, description: modifier.description, source: modifier.sourceLabel }]
-                        : undefined
-                    }
-                    ariaLabel={`${modifier.name} on ${weapon.name}`}
-                  />
-                </span>
-              ))}
-            </div>
-          ) : null}
-
-          {extraMastery && extraMastery.slotCount > 0 && onExtraMasteryChange ? (
-            <div className="space-y-1 pt-0.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Extra mastery {extraMastery.slotCount === 1 ? "property" : "properties"}
-              </p>
-              {Array.from({ length: extraMastery.slotCount }).map((_, index) => (
-                <select
-                  key={`${weapon.id}-extra-${index}`}
-                  value={extraMastery.picks[index] ?? ""}
-                  onChange={(event) => {
-                    const next = [...extraMastery.picks]
-                    if (event.target.value) next[index] = event.target.value
-                    else next.splice(index, 1)
-                    onExtraMasteryChange(weapon.id, next.filter(Boolean))
-                  }}
-                  className="w-full rounded-md border border-border bg-card px-2 py-1 text-[11px]"
-                >
-                  <option value="">Choose…</option>
-                  {extraMastery.options.map((option) => (
-                    <option key={option.name} value={option.name}>
-                      {option.name}
-                    </option>
-                  ))}
-                </select>
-              ))}
-            </div>
-          ) : null}
-          {canMount && onToggleMounted ? (
-            <label className="flex items-center gap-2 pt-0.5 text-[11px]">
-              <Switch
-                checked={mounted}
-                onCheckedChange={() => onToggleMounted(weapon.id)}
-                aria-label={`Mount ${weapon.name}`}
-              />
-              <span className="min-w-0 leading-snug text-muted-foreground">
-                Mount (Bonus Action)
-              </span>
-            </label>
-          ) : null}
-          {note ? (
-            <p className="text-[10px] leading-snug text-amber-800 dark:text-amber-200">{note}</p>
-          ) : null}
         </div>
 
-        {/* Stay top-right; wrap To Hit / Dmg into a stack only if this column is too narrow. */}
-        <div className="flex w-max max-w-full min-w-0 flex-row flex-wrap justify-end justify-self-end gap-1">
-          <div className="w-[6.328125rem] max-w-full">
+        {/* Keep roll controls together; move below the title when the card is narrow. */}
+        <div className="flex min-w-0 flex-1 gap-1" style={{ flexBasis: 206 }}>
+          <div className="min-w-0 flex-1">
             <D20RollButton
               modifier={attack.attackBonus}
               title={`${weapon.name} attack`}
@@ -415,7 +301,7 @@ function WeaponAttackCard({
             />
           </div>
           {damageExpression ? (
-            <div className="w-[6.328125rem] max-w-full">
+            <div className="min-w-0 flex-1">
               <WeaponDamageRollButton
                 expression={damageExpression}
                 label={`${weapon.name} damage`}
@@ -442,6 +328,121 @@ function WeaponAttackCard({
             </div>
           ) : null}
         </div>
+      </div>
+      <div className="mt-1.5 min-w-0 space-y-1">
+        {mastery ||
+        properties.length > 0 ||
+        appliedModifiers.length > 0 ||
+        sheetContext?.extraMasteries.length ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-1">
+            {mastery ? (
+              <span
+                className={cn(
+                  "inline-flex max-w-full items-center gap-0.5 rounded-full px-2 py-0.5 text-left text-[10px] font-semibold border",
+                  masteryActive
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-border bg-muted/60 text-muted-foreground",
+                )}
+              >
+                {mastery}
+                <ConditionInfoTip
+                  description={masteryDescription ?? mastery}
+                  ariaLabel={`${mastery} mastery`}
+                />
+              </span>
+            ) : null}
+            {(sheetContext?.extraMasteries ?? []).map((entry) => (
+              <span
+                key={`extra-${entry.name}`}
+                className="inline-flex max-w-full items-center gap-0.5 rounded-full border border-primary bg-primary/15 px-2 py-0.5 text-left text-[10px] font-semibold text-primary"
+              >
+                {entry.name}
+                <ConditionInfoTip
+                  description={entry.description ?? entry.name}
+                  ariaLabel={`${entry.name} mastery`}
+                />
+              </span>
+            ))}
+            {properties.map((property) => (
+              <span
+                key={property}
+                className={cn(
+                  "inline-flex max-w-full items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-left text-[10px] font-medium",
+                  weaponModifierBadgeClass(undefined),
+                )}
+              >
+                {property}
+                <ConditionInfoTip
+                  description={describeWeaponProperty(property) ?? property}
+                  ariaLabel={`${property} property`}
+                />
+              </span>
+            ))}
+            {appliedModifiers.map((modifier, index) => (
+              <span
+                key={`${modifier.name}-${modifier.sourceLabel ?? index}`}
+                className={cn(
+                  "inline-flex max-w-full items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-left text-[10px] font-medium",
+                  weaponModifierBadgeClass("feature"),
+                )}
+              >
+                {modifier.name}
+                <ConditionInfoTip
+                  description={modifier.description}
+                  details={
+                    modifier.sourceLabel
+                      ? [{ label: modifier.name, description: modifier.description, source: modifier.sourceLabel }]
+                      : undefined
+                  }
+                  ariaLabel={`${modifier.name} on ${weapon.name}`}
+                />
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {extraMastery && extraMastery.slotCount > 0 && onExtraMasteryChange ? (
+          <div className="space-y-1 pt-0.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Extra mastery {extraMastery.slotCount === 1 ? "property" : "properties"}
+            </p>
+            {Array.from({ length: extraMastery.slotCount }).map((_, index) => (
+              <select
+                key={`${weapon.id}-extra-${index}`}
+                value={extraMastery.picks[index] ?? ""}
+                onChange={(event) => {
+                  const next = [...extraMastery.picks]
+                  if (event.target.value) next[index] = event.target.value
+                  else next.splice(index, 1)
+                  onExtraMasteryChange(weapon.id, next.filter(Boolean))
+                }}
+                className="w-full rounded-md border border-border bg-card px-2 py-1 text-[11px]"
+              >
+                <option value="">Choose…</option>
+                {extraMastery.options.map((option) => (
+                  <option key={option.name} value={option.name}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            ))}
+          </div>
+        ) : null}
+        {canMount && onToggleMounted ? (
+          <label className="flex items-center gap-2 pt-0.5 text-[11px]">
+            <Switch
+              checked={mounted}
+              onCheckedChange={() => onToggleMounted(weapon.id)}
+              aria-label={`Mount ${weapon.name}`}
+            />
+            <span className="min-w-0 leading-snug text-muted-foreground">
+              Mount (Bonus Action)
+            </span>
+          </label>
+        ) : null}
+        {note ? (
+          <p className="text-[10px] leading-snug text-amber-800 dark:text-amber-200">{note}</p>
+        ) : null}
       </div>
     </div>
   )

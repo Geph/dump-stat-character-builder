@@ -1,6 +1,6 @@
 # Homebrew class import review (Cursor handoff)
 
-Last reviewed: 2026-10-04.
+Last reviewed: 2026-10-08.
 
 How to give Cursor (and the repo tooling) content for the Mage Hand Press / homebrew **class extract → wiring review → merge → enrich** loop.
 
@@ -22,6 +22,15 @@ Please: audit wiring → merge fill-in if given → fix Drive JSON / enrichment 
 
 Shared catalogs (Psionic Disciplines, Exploits, multi-class Knacks) are first-class: point `Ability fill-in` at a Drive file shaped like `{ "import_proposals": { "custom_abilities": […] } }` (example: `kibbles-psion-custom`). Do **not** put `magehandpress-spells` in Ability fill-in.
 ## What this pipeline is
+
+Spell-list membership does not determine authorship. `merge-spell-persist.ts`
+keeps the description, publisher, and matching creator link together; a complete
+write-up can repair an empty stub's incorrect publisher. Spell normalization and
+`SpellImportSchema` preserve `creator_url`. The merge regression suite checks
+every bundled SRD spell for a nonempty description and retained SRD attribution.
+Non-SRD spells referenced by class lists need a separate write-up in local imports;
+do not add them to SRD seed data. Correct misspelled names in the originating JSON
+list and stub together rather than creating additional empty catalog entries.
 
 1. LLM extracts a class (+ subclasses, resources, spells, creatures) into JSON.
 2. You (or Cursor) audit wiring against Dump Stat conventions.
@@ -186,6 +195,74 @@ Package scripts:
 
 ## Tests & hooks
 
+### Kibbles bundled progression audit
+
+`lib/import/__tests__/kibbles-level-progression.test.ts` runs the actual prepare,
+proposal-confirmation, enrichment and normalization path for Inventor, Occultist,
+Psion and Warden, then checks base/subclass and selected custom-ability actions at
+levels 1–20. It pins resource tables, Psion discipline/power counts, specialization
+and talent gates, free base powers versus paid augments, and Inventor upgrade tiers.
+Source authority: local `KibblesCompendiumOfCraftAndCraftion-v1.2-compressed.pdf`
+and `KibblesCompendiumOfLegendsAndLegaciesV1.0.2-compressed.pdf`. Upgrade sections
+were checked against the rendered columns, not just extraction order. Fifteen
+Inventor tier corrections are metadata in the Inventor enrichment pack and are
+also applied to bundled/Drive JSON. These tests run without private fixtures.
+
+This verifies data-to-sheet progression, not every possible combination or a
+manual browser playthrough. Narrative effects, temporary/conditional companion
+stat changes and complex upgrade prerequisites involving companion statistics
+still need source-rule adjudication. Do not replace those with unconditional
+player bonuses. Companion upgrades retain full rules on the companion.
+
+### Referenced spells and attribution
+
+Blank spell-list references use `SPELL_REFERENCE_IMPORT_NOTICE`: import the owning
+source and choose Overwrite. Non-SRD WotC prose is not bundled. Seed pack generation
+uses `normalizeBundledSpellReference` to preserve the spell's publisher rather than
+stamp its referencing class's publisher. The SRD read fallback fills missing SRD
+descriptions and corrects their source/creator URL; non-SRD entries retain the
+import notice. Merge treats that notice as empty, so a later real writeup replaces
+it while a later reference-only import cannot erase an existing description.
+`spell-references.test.ts` checks all 339 SRD writeups through this path. Spell-name
+matching only strips actual apostrophe-s author prefixes; "Mass" must never match
+the single-target spell or share its persisted ID.
+
+### Mage Hand Press source revisions and level coverage
+
+The local Valda class extracts use **Valda's Class Update 1.2, June 13, 2026**
+(`Valdas-Class-Update-1.2-6-13-2026-k5j4ws.pdf`) as their authority. It covers
+Alchemist, Captain, Craftsman, Gunslinger, Investigator, Martyr, Necromancer,
+Warden, Warmage, and Witch. Dancer and Vagabond retain their separate source PDFs.
+Keep publisher prose, PDFs, and revision backups in the external working-files
+directory, never in this repository.
+
+When reconciling a new edition, compare feature **owner, level, name, description,
+choices, and linked mechanics**. A corrected sentence does not remove an obsolete
+modifier. Inspect multi-column pages visually, including boxed spell/progression
+tables. Source headers can be repeated in introductory lists, and a feature can
+continue in the next column; neither is a subclass boundary. Preserve useful HTML
+tables in import JSON. Recheck the structured values as well as the displayed table.
+
+Run `pnpm exec vitest run lib/import/__tests__/mhp-level-progression.test.ts`.
+With the local fixtures present it traverses the base and all subclass paths for
+all 12 MHP classes at levels 1–20, checks action visibility and premature unlocks,
+exercises selected action options and granted custom abilities, and pins important
+version corrections and Combat-tab placements. Private fixtures are optional and
+these checks skip in CI when absent; the synthetic sheet-action and prompt tests
+remain runnable everywhere. This is an automated data-to-sheet check, not a browser
+playthrough or a proof that every narrative effect is automated.
+
+The Occultist subclass's 1.2 slot counts are normalized in the Investigator import
+pack; the shared spell-slot resolver handles the resulting explicit pact table.
+Bonus Actions and Reactions on both features and granted custom abilities appear
+on Combat, including utility uses that also remain on Abilities.
+
+Current explicit manual boundaries: Soulsteel uses a common modifier reminder for
+the chosen weapon, once-per-turn damage, proficiency restriction and duration;
+Arcane Dominance exposes a combat Bonus Action but combined spell-slot payment is
+manual. Do not reintroduce unconditional damage bonuses or fake single-slot costs
+to make a coverage report appear fully wired.
+
 | Gate | What |
 | --- | --- |
 | Vitest | `homebrew-import-ops`, `homebrew-prompt-footguns`, `homebrew-enrichment-smoke`, plus class-specific Drive tests |
@@ -193,11 +270,11 @@ Package scripts:
 | Manual | `pnpm test:import-homebrew` — the homebrew Drive / smoke bundle (not run by the hook) |
 | Pre-push | Existing affected-test vitest gate |
 
-**Known failing locally (2026-10-04):** `mhp-masteries-drive-import.test.ts` › "routes every
-property without false passive modifiers". The **Finisher** mastery picks up a `power_rider`
-during `enrichImportContentModifiers`; masteries should carry no linked modifiers. It only runs
-where the Drive fixture exists (skipped in CI). Fix the detect rule that matches Finisher's
-text rather than loosening the test.
+Weapon-mastery catalog rows suppress both name and phrase detection: a mastery
+named Finisher must not inherit the Investigator class feature's damage rider.
+The Drive mastery test covers that collision; synthetic detector coverage also
+runs in CI. Explicit maneuver proposals retain inferred resource labels when
+their authored rows take priority over inferred feature proposals.
 
 ## File naming conventions
 

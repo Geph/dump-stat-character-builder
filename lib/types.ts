@@ -881,6 +881,8 @@ export interface CustomAbility {
    * Alternate Effects spells_known modifiers.
    */
   specialization_choices?: FeatureChoice | null
+  /** Soft parent link for nested discipline powers and talent-library leaves. */
+  parent_ability_name?: string | null
   level_requirement?: number | null
   /** Semantic role used by builder/catalog aggregation. */
   ability_role?:

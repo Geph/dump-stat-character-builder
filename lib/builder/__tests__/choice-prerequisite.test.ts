@@ -30,6 +30,13 @@ function knack(partial: Partial<CustomAbility> & Pick<CustomAbility, "name">): C
 }
 
 describe("choice prerequisites (Warmage-style)", () => {
+  it("enforces incompatible talents without hiding both alternatives", () => {
+    const prerequisite = "9th-level Psion; incompatible with Unchecked Power"
+    expect(isChoicePrerequisiteMet(prerequisite, { classLevel: 8 })).toBe(false)
+    expect(isChoicePrerequisiteMet(prerequisite, { classLevel: 9 })).toBe(true)
+    expect(isChoicePrerequisiteMet(prerequisite, { classLevel: 9, selectedAbilityNames: ["Unchecked Power"] })).toBe(false)
+    expect(isChoicePrerequisiteMet("Shaper’s Mind", { classLevel: 9, subclassName: "Shaper's Mind" })).toBe(true)
+  })
   it("extracts Prerequisite: lines from descriptions", () => {
     expect(
       extractPrerequisiteFromDescription(

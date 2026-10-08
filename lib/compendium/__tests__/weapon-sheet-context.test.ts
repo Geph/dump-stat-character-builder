@@ -4,6 +4,7 @@ import { featureChoiceKey } from "@/lib/builder/choices"
 import { SUBCLASS_GATED_CLASS_RESOURCES } from "@/lib/compendium/subclass-gated-class-resources"
 import { describeWeaponProperty, describeWeaponRange } from "@/lib/compendium/weapon-property-reference"
 import { buildWeaponSheetContext } from "@/lib/compendium/weapon-sheet-context"
+import { CUSTOM_FEAT_MODIFIER_PRESETS } from "@/lib/compendium/custom-feat-modifier-presets"
 import type { CharacterBuildInputs } from "@/lib/character/types"
 import type { Equipment } from "@/lib/types"
 
@@ -100,6 +101,50 @@ describe("buildWeaponSheetContext", () => {
 
     expect(context.masteryName).toBe("Sap")
     expect(context.masteryActive).toBe(true)
+  })
+
+  it.each([
+    ["Poisoner", "Dagger", "Piercing", []],
+    ["Crusher", "Mace", "Bludgeoning", []],
+    ["Slasher", "Longsword", "Slashing", []],
+    ["Piercer", "Dagger", "Piercing", []],
+    ["Grappler", "Unarmed Strike", "Bludgeoning", []],
+    ["Great Weapon Master", "Greatsword", "Slashing", ["Heavy", "Two-Handed"]],
+    ["Mage Slayer", "Mace", "Bludgeoning", []],
+    ["Savage Attacker", "Mace", "Bludgeoning", []],
+    ["Charger", "Mace", "Bludgeoning", []],
+    ["Tavern Brawler", "Unarmed Strike", "Bludgeoning", []],
+    ["Sharpshooter", "Longbow", "Piercing", ["Ranged"]],
+    ["Crossbow Expert", "Hand Crossbow", "Piercing", ["Ranged", "Light"]],
+    ["Archery", "Longbow", "Piercing", ["Ranged"]],
+    ["Dueling", "Mace", "Bludgeoning", []],
+    ["Great Weapon Fighting", "Greatsword", "Slashing", ["Two-Handed"]],
+    ["Thrown Weapon Fighting", "Dagger", "Piercing", ["Thrown"]],
+    ["Two-Weapon Fighting", "Dagger", "Piercing", ["Light"]],
+    ["Skulker", "Dagger", "Piercing", []],
+  ] as const)("%s has one named badge with its complete imported description", (name, weaponName, damageType, properties) => {
+    const description = `<p>Full imported description for ${name}.</p><p>Additional conditions and effects.</p>`
+    const weapon = { ...mace, id: weaponName, name: weaponName, damage_type: damageType,
+      properties: [...properties], subcategory: properties.some((p) => p === "Ranged") ? "Martial Ranged Weapons" : "Simple Melee Weapons" }
+    const feat = { id: name, name, description, ...CUSTOM_FEAT_MODIFIER_PRESETS[name] }
+    const context = buildWeaponSheetContext(weapon, { ...baseInputs, feats: [feat as never], selectedFeatIds: [name] }, ["Simple weapons", "Martial weapons"])
+    expect(context.appliedModifiers).toEqual([expect.objectContaining({ name, description })])
+    expect(buildWeaponSheetContext(weapon, { ...baseInputs, feats: [feat as never] }, []).appliedModifiers).toEqual([])
+  })
+
+  it.each([
+    ["Crossbow Expert", "Longbow", ["Ranged"]],
+    ["Dueling", "Greatsword", ["Two-Handed"]],
+    ["Great Weapon Fighting", "Mace", []],
+    ["Thrown Weapon Fighting", "Mace", []],
+    ["Two-Weapon Fighting", "Mace", []],
+  ] as const)("does not show %s on an ineligible %s", (name, weaponName, properties) => {
+    const weapon = { ...mace, name: weaponName, properties: [...properties],
+      subcategory: properties.some((p) => p === "Ranged") ? "Martial Ranged Weapons" : "Simple Melee Weapons" }
+    const feat = { id: name, name, ...CUSTOM_FEAT_MODIFIER_PRESETS[name] }
+    expect(buildWeaponSheetContext(weapon, {
+      ...baseInputs, feats: [feat as never], selectedFeatIds: [name],
+    }, []).appliedModifiers).toEqual([])
   })
 
   it("collects attack modifiers that apply to the weapon", () => {
@@ -227,7 +272,7 @@ describe("buildWeaponSheetContext", () => {
     )
 
     const rider = context.appliedModifiers.find((entry) => entry.name === "Precision Attack")
-    expect(rider?.description).toBe("1d10 (superiority_dice die)")
+    expect(rider?.description).toContain("1d10 (superiority_dice die)")
   })
 
   it("applies unarmed-only reach to Unarmed Strike and not to a mace", () => {
@@ -332,14 +377,14 @@ describe("buildWeaponSheetContext", () => {
     const unarmedContext = buildWeaponSheetContext(unarmed, inputs, ["Simple weapons"])
     expect(
       unarmedContext.appliedModifiers.some((entry) =>
-        /Push 5 ft\. on bludgeoning hit/i.test(entry.name),
+        entry.name === "Crusher" && /Push 5 ft\. on bludgeoning hit/i.test(entry.description),
       ),
     ).toBe(true)
 
     const maceContext = buildWeaponSheetContext(mace, inputs, ["Simple weapons"])
     expect(
       maceContext.appliedModifiers.some((entry) =>
-        /Push 5 ft\. on bludgeoning hit/i.test(entry.name),
+        entry.name === "Crusher" && /Push 5 ft\. on bludgeoning hit/i.test(entry.description),
       ),
     ).toBe(true)
 
@@ -527,8 +572,8 @@ describe("buildWeaponSheetContext", () => {
       ["Simple weapons"],
     )
 
-    expect(context.appliedModifiers.some((row) => /\bfinisher\b/i.test(row.name))).toBe(false)
-    const concentration = context.appliedModifiers.find((row) => row.name === "Concentration Break")
+    expect(context.appliedModifiers.some((row) => /\bfinisher\b/i.test(row.description))).toBe(false)
+    const concentration = context.appliedModifiers.find((row) => row.description.includes("Concentration Break"))
     expect(concentration?.description).toMatch(/Disadvantage on Concentration save/i)
     expect(concentration?.description).toMatch(/On a hit/)
   })
@@ -610,10 +655,11 @@ describe("buildWeaponSheetContext", () => {
 
     const unarmedContext = buildWeaponSheetContext(unarmed, inputs, ["Simple weapons"])
     const names = unarmedContext.appliedModifiers.map((row) => row.name)
-    expect(names).toEqual(expect.arrayContaining(["Enhanced Unarmed Strike", "Damage Rerolls", "Push"]))
+    expect(names).toEqual(["Tavern Brawler"])
     expect(
-      unarmedContext.appliedModifiers.find((row) => row.name === "Push")?.sourceLabel,
+      unarmedContext.appliedModifiers.find((row) => row.name === "Tavern Brawler")?.sourceLabel,
     ).toBe("Tavern Brawler")
+    expect(unarmedContext.appliedModifiers[0].description).toMatch(/Enhanced Unarmed Strike[\s\S]*Damage Rerolls[\s\S]*Push/)
 
     const daggerContext = buildWeaponSheetContext(dagger, inputs, ["Simple weapons"])
     expect(daggerContext.appliedModifiers.some((row) => row.name === "Push")).toBe(false)

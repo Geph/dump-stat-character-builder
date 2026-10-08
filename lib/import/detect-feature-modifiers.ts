@@ -30,6 +30,8 @@ export type DetectFeatureContext = {
    * "deals an extra 1d6 damage" there is not a passive sheet modifier.
    */
   suppressPhraseDetection?: boolean
+  /** Structural catalog entries must not acquire a class feature with the same name. */
+  suppressNameDetection?: boolean
 }
 
 export type DetectedModifier = {
@@ -310,7 +312,7 @@ export function detectFeatureModifiers(text: string, ctx: DetectFeatureContext):
   const all: DetectedModifier[] = []
   const globalFingerprints = new Set<string>()
 
-  for (const detection of detectFeatureModifiersByName(ctx, normalized)) {
+  for (const detection of ctx.suppressNameDetection ? [] : detectFeatureModifiersByName(ctx, normalized)) {
     const fp = modifierInstanceFingerprint(detection.instance)
     if (globalFingerprints.has(fp)) continue
     globalFingerprints.add(fp)

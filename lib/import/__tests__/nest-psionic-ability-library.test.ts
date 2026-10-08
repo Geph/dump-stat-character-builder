@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest"
+import { normalizeFeatureChoices } from "@/lib/compendium/normalize-feature-activation"
+import { normalizeAbilityImportRow } from "@/lib/import/normalize-ability-import"
 import {
   extractDisciplinePassive,
   GENERAL_PSIONIC_TALENTS_NAME,
@@ -7,6 +9,23 @@ import {
 } from "@/lib/import/nest-psionic-ability-library"
 
 describe("nestPsionicAbilityLibrary", () => {
+  it("retains option levels and prerequisites through feature and ability normalization", () => {
+    const choices = { category: "Talents", count: 1, options: [{ name: "Advanced", description: "A talent.", prerequisite: "Foundation", level_requirement: 11 }] }
+    expect(normalizeFeatureChoices(choices)?.options).toEqual(choices.options)
+    expect(normalizeAbilityImportRow({ name: "Discipline", choices }).choices).toEqual(choices)
+  })
+  it("preserves pool identity and talent wiring without duplicating packages on reimport", () => {
+    const rows = [
+      { name: "Test Discipline", ability_role: "discipline" },
+      { name: GENERAL_PSIONIC_TALENTS_NAME, ability_role: "talent_pool", id: "pool" },
+      { name: "Advanced Talent", ability_role: "class_talent", level_requirement: 11, linkedModifiers: [{ id: "test", characteristics: [] }] },
+    ]
+    const once = nestPsionicAbilityLibrary(rows)
+    expect(nestPsionicAbilityLibrary(once)).toEqual(once)
+    const pools = once.filter((r) => r.ability_role === "talent_pool")
+    expect(pools).toHaveLength(1)
+    expect(pools[0]).toMatchObject({ id: "pool", choices: { options: [{ name: "Advanced Talent", level_requirement: 11, linkedModifiers: rows[2].linkedModifiers }] } })
+  })
   it("builds discipline modifier_catalog entries and a General Psionic Talents pool", () => {
     const nested = nestPsionicAbilityLibrary([
       {

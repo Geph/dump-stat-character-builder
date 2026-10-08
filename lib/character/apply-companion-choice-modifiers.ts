@@ -14,7 +14,8 @@ import {
 } from "@/lib/compendium/feature-choice-target"
 import { effectiveLinkedModifiers } from "@/lib/compendium/linked-modifiers"
 import type { ModifierCatalogEntry } from "@/lib/compendium/modifier-catalog"
-import type { Feature } from "@/lib/types"
+import type { CustomAbility, Feature } from "@/lib/types"
+import { inferCompanionAttackFromText } from "@/lib/character/infer-companion-attack"
 
 function uniqLabels(values: string[]): string[] {
   const seen = new Set<string>()
@@ -40,6 +41,14 @@ function appendCsv(line: string | null | undefined, names: string[]): string | n
 }
 
 function pushTrait(template: CompanionStatBlockTemplate, trait: CompanionNamedBlock): CompanionStatBlockTemplate {
+  const text = trait.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+  const activation = text.match(/(?:^|\.\s+)As (?:an?|your) (bonus action|reaction|action)\b/i)?.[1]?.toLowerCase()
+  if (activation) {
+    const key = activation === "bonus action" ? "bonusActions" : activation === "reaction" ? "reactions" : "actions"
+    const entries = template[key] ?? []
+    if (entries.some((entry) => entry.name.toLowerCase() === trait.name.toLowerCase())) return template
+    return { ...template, [key]: [...entries, { ...trait, attack: inferCompanionAttackFromText(trait.description) }] }
+  }
   if (
     template.traits.some(
       (entry) => entry.name.trim().toLowerCase() === trait.name.trim().toLowerCase(),
@@ -107,6 +116,8 @@ export function applyCompanionScopedChoiceModifiers(params: {
   featureChoicePicks?: Record<string, string[]>
   modifierPlayerPicks?: Record<string, string[]>
   modifierCatalog?: ModifierCatalogEntry[]
+  /** Already filtered to the character's selected/granted abilities. */
+  customAbilities?: CustomAbility[]
 }): CompanionStatBlockTemplate {
   const catalog = params.modifierCatalog ?? []
   const picks = params.featureChoicePicks ?? {}
@@ -118,11 +129,20 @@ export function applyCompanionScopedChoiceModifiers(params: {
     const features = [
       ...((entry.class?.features as Feature[] | undefined) ?? []),
       ...((entry.subclass?.features as Feature[] | undefined) ?? []),
+      ...(params.customAbilities ?? [])
+        .filter((ability) => featureChoiceAppliesToCompanion(ability) &&
+          ((ability.attached_to_type === "subclass" && [entry.subclass?.id, entry.subclass?.name].includes(ability.attached_to_id ?? "")) ||
+           (ability.attached_to_type === "class" && [entry.class?.id, entry.class?.name].includes(ability.attached_to_id ?? ""))))
+        .map((ability) => ({ name: ability.name, description: ability.description ?? "", level: ability.level_requirement ?? 1,
+          isChoice: ability.isChoice ?? false, choices: ability.choices ?? undefined,
+          linkedModifiers: ability.linked_modifiers ?? [], modifierRefs: ability.modifierRefs ?? [],
+        })),
     ]
     for (const feature of features) {
       if ((feature.level ?? 1) > entry.row.level) continue
       if (!featureChoiceAppliesToCompanion(feature)) continue
       if (!companionSourceMatchesChoice(feature, params.source)) continue
+      if (!feature.choices?.options?.length) template = pushTrait(template, { name: feature.name, description: feature.description })
       const key = featureChoiceKey(entry.row.class_id, feature.name, feature.level)
       const featureInstances = effectiveLinkedModifiers(
         feature.linkedModifiers,

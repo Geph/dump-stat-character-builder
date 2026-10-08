@@ -76,6 +76,7 @@ export function normalizeFeatureChoices(
     resourceKey: choices.resourceKey ?? undefined,
     options: Array.isArray(choices.options)
       ? choices.options.map((option) => ({
+          ...option,
           name: option?.name ?? "",
           description: option?.description ?? "",
           modifierRefs: Array.isArray(option?.modifierRefs) ? option.modifierRefs : undefined,

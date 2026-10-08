@@ -37,7 +37,9 @@ function inferRestDialogues(item: ActivatableItem): boolean {
 /** Infer sheet placement from activation wiring (legacy default when sheetDisplay is unset). */
 export function inferFeatureSheetDisplay(item: ActivatableItem): ResolvedFeatureSheetDisplay {
   const restDialogues = inferRestDialogues(item)
-  if (isRestDialogueChoiceText(item.name, item.description) || featureHasHitDiceRestore(item)) {
+  const kinds = inferActivatableActionKinds(item)
+  const hasTurnAction = kinds.includes("bonus") || kinds.includes("reaction")
+  if ((!hasTurnAction && isRestDialogueChoiceText(item.name, item.description)) || featureHasHitDiceRestore(item)) {
     return {
       featuresTab: true,
       abilitiesActions: false,
@@ -45,7 +47,6 @@ export function inferFeatureSheetDisplay(item: ActivatableItem): ResolvedFeature
       restDialogues: true,
     }
   }
-  const kinds = inferActivatableActionKinds(item)
   if (!kinds.length) {
     // Non-action enemy combat impact (debuff attacks/damage/saves) → Combat Passive.
     if (itemSignalsEnemyCombatImpact(item)) {
@@ -68,7 +69,9 @@ export function inferFeatureSheetDisplay(item: ActivatableItem): ResolvedFeature
     featuresTab: true,
     // Spending a die on your own failed skill/ability check belongs beside the skills too.
     abilitiesActions: category === "utility" || itemBoostsOwnChecks(item.linkedModifiers),
-    combatActions: category === "combat",
+    // Utility uses can still spend Bonus Action/Reaction during an encounter.
+    // Keep the utility surface too; do not force users to leave Combat to use them.
+    combatActions: category === "combat" || hasTurnAction,
     restDialogues,
   }
 }
@@ -108,7 +111,7 @@ export function resolveFeatureSheetDisplay(
       opensCombatRound ||
       (inferred.combatActions && /^reckless attack$/i.test((feature.name ?? "").trim()))
     return {
-      featuresTab: explicit.featuresTab ?? false,
+      featuresTab: explicit.featuresTab ?? true,
       // First-round combat openers are Combat-tab actions even when older stamps filed
       // social/utility wording (Influence, etc.) on Abilities only.
       abilitiesActions: opensCombatRound ? false : (explicit.abilitiesActions ?? false),

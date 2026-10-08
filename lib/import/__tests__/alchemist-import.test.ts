@@ -950,7 +950,7 @@ describe("Alchemist Tier 1 / Tier 2 subclass stubs", () => {
   it("wires Surgical Strike, Toxic Recompense, Beguiling Perfume, Alchemical Resurrection", () => {
     const surgical = enrichSubclassFeature("Surgical Strike", "Xenoalchemist")
     expect(surgical.activation?.bonusAction).toBe(true)
-    expect(surgical.limitedUses?.type).toBe("fixed")
+    expect(surgical.limitedUses).toBeUndefined()
 
     const toxic = enrichSubclassFeature("Toxic Recompense", "Venomsmith")
     expect(toxic.activation?.reaction).toBe(true)
@@ -1078,11 +1078,9 @@ describe("Alchemist Tier 1 / Tier 2 subclass stubs", () => {
 
     const timed = enrichSubclassFeature("Timed Demolition", "Mad Bomber")
     const timedChars = (timed.linkedModifiers ?? []).flatMap((mod) => mod.characteristics ?? [])
-    expect(timedChars.find((char) => char.type === "power_rider")).toMatchObject({
-      parentPowerNames: ["Bomb", "Bombs"],
-      appliesToAttackVariants: ["primed"],
-      selectable: true,
-    })
+    expect(timed.activation?.action).toBe(true)
+    expect(timedChars.some((char) => char.type === "power_rider")).toBe(false)
+    expect(timedChars.find((char) => char.type === "player_note")).toMatchObject({ target: "feature" })
 
     const oozes = enrichSubclassFeature("Elemental Oozes", "Ooze Rancher")
     expect(oozes.choices?.options?.map((opt) => opt.name)).toEqual([

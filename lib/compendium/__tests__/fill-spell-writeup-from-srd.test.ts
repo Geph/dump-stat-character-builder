@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest"
+import { SRD_SOURCE, SRD_CREATOR_URL } from "@/lib/srd/source"
+import { SPELL_REFERENCE_IMPORT_NOTICE } from "@/lib/import/spell-reference-placeholder"
 import {
   fillEmptySpellWriteup,
   lookupSrdSpellWriteup,
@@ -26,7 +28,8 @@ describe("fillEmptySpellWriteup", () => {
     })
 
     expect(filled.id).toBe("mhp-acid")
-    expect(filled.source).toBe("Mage Hand Press")
+    expect(filled.source).toBe(SRD_SOURCE)
+    expect((filled as Record<string, unknown>).creator_url).toBe(SRD_CREATOR_URL)
     expect(filled.classes).toEqual(["Necromancer"])
     expect(filled.description).toBe(srd?.description)
     expect(filled.casting_time).toBe(srd?.casting_time)
@@ -64,7 +67,7 @@ describe("fillEmptySpellWriteup", () => {
       school: "Necromancy",
       source: "Mage Hand Press",
     }
-    expect(fillEmptySpellWriteup(stub)).toEqual(stub)
+    expect(fillEmptySpellWriteup(stub)).toEqual({ ...stub, description: SPELL_REFERENCE_IMPORT_NOTICE })
     expect(lookupSrdSpellWriteup("Spark of Life")).toBeNull()
   })
 })

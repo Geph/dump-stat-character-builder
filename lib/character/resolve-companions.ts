@@ -939,6 +939,7 @@ export function resolveCharacterCompanionsDetailed(params: ResolveCompanionsPara
       featureChoicePicks: params.featureChoicePicks,
       modifierPlayerPicks: params.modifierPlayerPicks,
       modifierCatalog: catalog,
+      customAbilities: params.customAbilities,
     })
     const resolved = resolveCompanion(template, row.source, params.ctx)
     byKey.set(resolved.key, resolved)

@@ -524,6 +524,7 @@ export function collectBuilderModifierRefIds(params: {
   const unlockedAbilities = filterUnlockedCustomAbilities(customAbilities, selectedAbilityNames)
 
   const customAbilityMods = unlockedAbilities.flatMap((ability) => {
+    if (featureChoiceAppliesToCompanion(ability)) return []
     const row = ability as unknown as Record<string, unknown>
     let linked = readLinkedModifiers(row, catalog)
     const refs = ability.modifierRefs ?? readModifierRefs(row)
@@ -560,6 +561,7 @@ export function collectBuilderModifierRefIds(params: {
 
   // Discipline-nested talent options store modifiers on the option, not a separate ability row.
   const nestedTalentMods = unlockedAbilities.flatMap((ability) => {
+    if (featureChoiceAppliesToCompanion(ability)) return []
     const options = ability.choices?.options ?? []
     if (!options.length) return []
     return options.flatMap((option) => {

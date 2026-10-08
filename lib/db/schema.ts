@@ -257,6 +257,8 @@ export const customAbilities = mysqlTable("custom_abilities", {
   concentration: boolean("concentration"),
   is_choice: boolean("is_choice"),
   choices: json("choices").$type<import("@/lib/types").FeatureChoice>(),
+  specialization_choices: json("specialization_choices").$type<import("@/lib/types").FeatureChoice>(),
+  parent_ability_name: varchar("parent_ability_name", { length: 255 }),
   level_requirement: int("level_requirement"),
   ability_role: varchar("ability_role", { length: 32 }),
   is_system: boolean("is_system").notNull().default(false),

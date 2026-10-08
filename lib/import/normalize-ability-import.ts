@@ -39,6 +39,7 @@ function coerceChoices(raw: unknown): FeatureChoice | null {
             name: string
             description: string
             prerequisite?: string | null
+            level_requirement?: number | null
             linkedModifiers?: FeatureChoice["options"][number]["linkedModifiers"]
           } =>
             !!entry &&
@@ -47,17 +48,22 @@ function coerceChoices(raw: unknown): FeatureChoice | null {
             typeof (entry as { description?: unknown }).description === "string",
         )
         .map((entry) => ({
+          ...entry,
           name: entry.name,
           description: entry.description,
           ...(typeof entry.prerequisite === "string" ? { prerequisite: entry.prerequisite } : {}),
+          ...(typeof entry.level_requirement === "number" ? { level_requirement: entry.level_requirement } : {}),
           ...(entry.linkedModifiers?.length ? { linkedModifiers: entry.linkedModifiers } : {}),
         }))
     : []
-  if (!category || count == null || !options.length) return null
+  if (!category || count == null || (!options.length && row.applyTo !== "companion")) return null
   return {
+    ...(row as unknown as FeatureChoice),
     category,
     count,
     options,
+    ...(row.applyTo === "companion" ? { applyTo: "companion" as const } : {}),
+    ...(typeof row.applyToCompanionFeature === "string" ? { applyToCompanionFeature: row.applyToCompanionFeature } : {}),
     ...(typeof row.resourceKey === "string" ? { resourceKey: row.resourceKey } : {}),
     ...(typeof row.optionsSource === "string"
       ? { optionsSource: row.optionsSource as FeatureChoice["optionsSource"] }

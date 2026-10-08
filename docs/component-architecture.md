@@ -1,6 +1,6 @@
 # Component architecture — agent guide
 
-Last reviewed: 2026-10-04.
+Last reviewed: 2026-10-08.
 
 How to keep UI modular and cheap to re-render as more classes arrive. The rule
 underneath all of it: **content is data, mechanics are modifiers, UI renders what the
@@ -86,13 +86,31 @@ Rules when you touch one:
 
 Check these before writing a new primitive:
 
+- `components/character-sheet/sheet-equipped-weapons-panel.tsx` keeps title/range
+  and roll controls in a wrapping header, with full-width properties, mastery,
+  feat badges, and optional controls beneath it. Preserve all badge overlays.
+- `components/character-sheet/sheet-spells-panel.tsx` owns the combat spell list.
+  Level groups flow into columns based on panel width; spell tiles have a 44px
+  minimum height, wrap full names, and retain concentration and granted markers.
+  Selection delegates to the existing spell overlay in the page client.
+- `sheet-standard-action-buttons.tsx` maps standard combat action IDs to decorative
+  Lucide icons. Keep visible action names and the existing action-use behavior.
+
 - `components/ui/` — shadcn primitives (dialogs, popovers, tabs, selects).
 - `components/character-sheet/` — trackers (uses, dice, slots, hit dice), roll buttons,
   `expandable-description.tsx`, `stat-explain-popover.tsx`, `feature-card-menu.tsx`.
-- `components/character-sheet/action-group-columns.tsx` — desktop two-column action
-  groups with drag-to-rearrange drop slots. Order and column live per character in
-  `localStorage` via `lib/character/action-group-layout.ts` (`placeActionGroup`,
-  `isNoOpActionGroupSlot`); reuse it for any other reorderable card groups.
+- `components/character-sheet/action-group-columns.tsx` — combat group board with
+  measured, automatically balanced columns. `use-action-group-measurements.ts`
+  observes card content and container width; `packActionGroups` in
+  `lib/character/action-group-layout.ts` puts unpinned groups in the shorter column
+  and starts weapons on the left. Below 600px of board width it uses one column.
+  Full-width headers drag to stable drop markers; the move menu supports keyboard
+  and touch operation. Order and explicit column placements persist per character
+  and scope in `localStorage`; **Auto arrange** clears both. Do not persist measured
+  heights or rebalance during drag by inserting space-taking placeholders.
+  `action-entry-heading.tsx` and `action-group-theme.tsx` provide the icon tiles and
+  shared economy colors. Keep rules, counters, and action activation in the existing
+  sheet collectors and action cards; this board changes presentation only.
 - `components/character-sheet/companion-hp-pools.tsx` — per-copy HP / rename /
   conditions rows under one grouped companion stat block.
 - `components/character-sheet/post-roll-boost-chips.tsx` — spend-after-the-roll die
@@ -105,6 +123,17 @@ Check these before writing a new primitive:
 Match the surrounding component's naming, file layout, and comment density.
 
 ## Tests for UI changes
+
+Weapon badges are collected by `buildWeaponSheetContext` in
+`lib/compendium/weapon-sheet-context.ts` after weapon eligibility checks.
+`groupFeatWeaponBadges` in `feat-weapon-badges.ts` groups eligible modifiers by their
+feat source ID: one badge named for the feat, with the full imported description
+in its information overlay. If the description is absent, retain the individual
+effect labels and details in the overlay. Do not truncate rules into badge text,
+or add feat-name branches to React. `ConditionInfoTip` scrolls long descriptions.
+Legacy custom-target weapon phrases are interpreted for badge placement only;
+this does not change attack or damage math. Use `weapon_sheet_badge` for pure
+reminders (such as Skulker); preset badge synchronization updates older imports.
 
 - Put logic you can unit test in `lib/` and test it with Vitest there. Components in
   this repo are mostly verified by the lib tests behind them plus a manual pass.

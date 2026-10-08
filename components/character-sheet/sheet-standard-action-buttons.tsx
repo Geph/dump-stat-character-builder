@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { ChevronDown, X } from "lucide-react"
+import { ArrowRightFromLine, ChevronDown, EyeOff, Footprints, Hand, HandGrab, Shield, Swords, Timer, X, type LucideIcon } from "lucide-react"
 import { RichTextContent } from "@/components/compendium/rich-text-editor"
 import {
   DEFAULT_SHEET_ACTIONS,
@@ -10,6 +10,17 @@ import {
 } from "@/lib/character/default-actions"
 import type { ActionEconomyKind } from "@/lib/character/sheet-actions"
 import { cn } from "@/lib/utils"
+
+const STANDARD_ACTION_ICONS: Record<string, LucideIcon> = {
+  attack: Swords,
+  dash: Footprints,
+  disengage: ArrowRightFromLine,
+  dodge: Shield,
+  grapple: HandGrab,
+  hide: EyeOff,
+  ready: Timer,
+  shove: Hand,
+}
 
 const COMBAT_STANDARD_ACTIONS = DEFAULT_SHEET_ACTIONS.filter(
   (action) => action.category === "combat",
@@ -58,24 +69,28 @@ export function SheetStandardActionButtons({
               className="overflow-hidden"
             >
               <div className="grid w-full grid-cols-4 gap-1.5 pt-0.5 sm:grid-cols-8">
-                {COMBAT_STANDARD_ACTIONS.map((action) => (
-                  <button
-                    key={action.id}
-                    type="button"
-                    disabled={disabled}
-                    title={action.description}
-                    onClick={() => {
-                      onUse("action", action)
-                      setDetail(action)
-                    }}
-                    className={cn(
-                      "flex min-h-11 w-full items-center justify-center rounded-md border border-border/80 bg-muted/30 px-1.5 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10",
-                      disabled && "pointer-events-none opacity-50",
-                    )}
-                  >
-                    {action.name}
-                  </button>
-                ))}
+                {COMBAT_STANDARD_ACTIONS.map((action) => {
+                  const Icon = STANDARD_ACTION_ICONS[action.id] ?? Swords
+                  return (
+                    <button
+                      key={action.id}
+                      type="button"
+                      disabled={disabled}
+                      title={action.description}
+                      onClick={() => {
+                        onUse("action", action)
+                        setDetail(action)
+                      }}
+                      className={cn(
+                        "flex min-h-11 w-full flex-col gap-1 items-center justify-center rounded-md border border-border/80 bg-muted/30 px-1.5 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10",
+                        disabled && "pointer-events-none opacity-50",
+                      )}
+                    >
+                      <Icon className="h-4 w-4 text-primary" aria-hidden />
+                      {action.name}
+                    </button>
+                  )
+                })}
               </div>
             </motion.div>
           ) : null}

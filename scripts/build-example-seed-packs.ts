@@ -5,6 +5,10 @@
  */
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { normalizeBundledSpellReference } from "@/lib/seed-packs/spell-references"
+import srdSpells from "@/lib/srd/seed-data/spells.json"
+import kibblesSpells from "@/lib/seed-packs/kibbles-tasty/kibbles-spells.json"
+import mhpSpells from "@/lib/seed-packs/mage-hand-press/magehandpress-spells.json"
 import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/apply"
 import { enrichImportContentModifiers } from "@/lib/import/enrich-import-modifiers"
 import { stampAbilityDefaultIcons } from "@/lib/compendium/ability-icons-defaults"
@@ -93,7 +97,11 @@ function stampSourceDeep(content: ImportContent, source: string): ImportContent 
     ...content,
     classes: stampList(content.classes as Record<string, unknown>[] | undefined) as typeof content.classes,
     subclasses: stampList(content.subclasses as Record<string, unknown>[] | undefined) as typeof content.subclasses,
-    spells: stampList(content.spells as Record<string, unknown>[] | undefined) as typeof content.spells,
+    // A class spell list references another author's spells; pack ownership is not authorship.
+    spells: content.spells?.map((spell) => normalizeBundledSpellReference(
+      { ...spell, source: spell.source || source },
+      [...srdSpells, ...kibblesSpells.spells, ...mhpSpells.spells],
+    )),
     feats: stampList(content.feats as Record<string, unknown>[] | undefined) as typeof content.feats,
     species: stampList(content.species as Record<string, unknown>[] | undefined) as typeof content.species,
     backgrounds: stampList(

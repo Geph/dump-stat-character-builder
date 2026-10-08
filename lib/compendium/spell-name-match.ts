@@ -19,7 +19,11 @@ export function spellNameMatchKeys(name: string): string[] {
   keys.add(diskSwap)
   keys.add(discSwap)
 
-  const withoutPossessive = base.replace(/^[a-z]+s\s+/, "")
+  // Only a real possessive author prefix may be removed. A word ending in s
+  // (notably Mass) is part of the spell name, not an author attribution.
+  const withoutPossessive = /^[^\s]+['’]s\s+/i.test(cleanSpellListName(name))
+    ? base.replace(/^[a-z]+s\s+/, "")
+    : base
   if (withoutPossessive && withoutPossessive !== base) {
     keys.add(withoutPossessive)
     keys.add(withoutPossessive.replace(/\bdisc\b/g, "disk"))

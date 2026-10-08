@@ -28,7 +28,7 @@ export function ConditionInfoTip({
           <Info className="w-3 h-3" />
         </button>
       </TooltipTrigger>
-      <TooltipContent side="right" sideOffset={6} className="max-w-[260px] text-left">
+      <TooltipContent side="right" sideOffset={6} className="max-h-[60vh] max-w-[320px] overflow-y-auto text-left">
         {details?.length ? (
           <div className="space-y-2">
             {details.map((detail, index) => (

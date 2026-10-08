@@ -3,6 +3,7 @@ import { applyImportEnrichmentPresets } from "@/lib/import/enrichment-presets/ap
 import { sanitizeInventorImportContent } from "@/lib/import/enrichment-presets/packs/inventor"
 import { auditImportWiring, summarizeFindings } from "@/lib/import/homebrew-import-ops"
 import type { ImportContent } from "@/lib/import/content-schema"
+import { SPELL_REFERENCE_IMPORT_NOTICE } from "@/lib/import/spell-reference-placeholder"
 
 function sampleInventor(): ImportContent {
   return {
@@ -295,7 +296,7 @@ describe("KibblesTasty Inventor enrichment sanitize", () => {
     ])
 
     const spell = sanitized.spells?.find((s) => s.name === "Disorient")
-    expect(spell?.description).toContain("Import note:")
+    expect(spell?.description).toBe(SPELL_REFERENCE_IMPORT_NOTICE)
     expect((spell as { note?: string } | undefined)?.note).toBeUndefined()
 
     const summary = summarizeFindings(auditImportWiring(sanitized))

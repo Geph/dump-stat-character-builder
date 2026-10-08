@@ -7,6 +7,10 @@ import {
 import type { Feature } from "@/lib/types"
 
 describe("feature sheet display", () => {
+  it("keeps a feature visible when only its action tab was authored", () => {
+    expect(resolveFeatureSheetDisplay({ name: "Ward", description: "", level: 1, sheetDisplay: { combatActions: true } }).featuresTab).toBe(true)
+    expect(resolveFeatureSheetDisplay({ name: "Ward", description: "", level: 1, sheetDisplay: { combatActions: true, featuresTab: false } }).featuresTab).toBe(false)
+  })
   it("defaults passive features to Features tab only", () => {
     const feature = {
       level: 2,
@@ -120,7 +124,7 @@ describe("feature sheet display", () => {
     expect(enriched.sheetDisplay).toEqual({
       featuresTab: true,
       abilitiesActions: true,
-      combatActions: false,
+      combatActions: true,
       restDialogues: false,
     })
   })

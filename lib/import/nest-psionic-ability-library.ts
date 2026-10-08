@@ -242,8 +242,10 @@ export function nestPsionicAbilityLibrary(
 
   const powers = rows.filter((row) => abilityRole(row) === "psionic_power")
   const classTalents = rows.filter((row) => abilityRole(row) === "class_talent")
+  const existingGeneral = rows.find((row) => abilityRole(row) === "talent_pool" && row.name === GENERAL_PSIONIC_TALENTS_NAME)
   const other = rows.filter((row) => {
     const role = abilityRole(row)
+    if (classTalents.length && row === existingGeneral) return false
     return role !== "discipline" && role !== "psionic_power" && role !== "class_talent"
   })
 
@@ -299,6 +301,7 @@ export function nestPsionicAbilityLibrary(
       ),
     )
     generalPackage = {
+      ...existingGeneral,
       name: GENERAL_PSIONIC_TALENTS_NAME,
       description:
         "<p>General psionic talents available to any Psion, independent of known disciplines. Class-level talents such as Astral Arms, Aura Sight, and Schism live here.</p>",
@@ -306,7 +309,10 @@ export function nestPsionicAbilityLibrary(
       source_type: classTalents[0]?.source_type ?? "class",
       source_name: classTalents[0]?.source_name ?? "Psion",
       show_in_builder: true,
-      modifier_catalog: catalog,
+      modifier_catalog: catalog.map((item) => {
+        const prior = (existingGeneral?.modifier_catalog as ModifierCatalogEntry[] | undefined)?.find((entry) => entry.name === item.name)
+        return prior ? { ...item, id: prior.id, characteristics: prior.characteristics, activation: prior.activation } : item
+      }),
       choices: {
         category: "General Psionic Talents",
         count: 1,
@@ -315,6 +321,8 @@ export function nestPsionicAbilityLibrary(
           description: String(talent.description ?? ""),
           prerequisite:
             typeof talent.prerequisite === "string" ? talent.prerequisite : null,
+          level_requirement: talent.level_requirement,
+          linkedModifiers: talent.linkedModifiers ?? talent.linked_modifiers,
         })),
       },
       isChoice: true,

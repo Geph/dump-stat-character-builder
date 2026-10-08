@@ -27,6 +27,19 @@ const baseCtx = {
 }
 
 describe("detectFeatureModifiers", () => {
+  it("does not apply a same-name class feature to a structural mastery entry", () => {
+    const ctx = { ...baseCtx, featureName: "Finisher" }
+    expect(detectFeatureModifiers("A weapon mastery property.", ctx).some((d) => d.ruleId === "weapon.damage_menu.finisher_by_name")).toBe(true)
+    expect(detectFeatureModifiers("A weapon mastery property.", { ...ctx, suppressPhraseDetection: true, suppressNameDetection: true })).toEqual([])
+  })
+  it("keeps targeting clauses and generic spell-slot permissions out of granted spell names", () => {
+    const grants = (description: string) => detectFeatureModifiers(description, baseCtx)
+      .flatMap((d) => d.instance.characteristics ?? [])
+      .filter((c) => c.type === "spells_known")
+      .flatMap((c) => c.spells ?? []).map((s) => s.spellId)
+    expect(grants("You can cast enlarge/reduce targeting that creature.")).toContain("import_spell_name:enlarge/reduce")
+    expect(grants("You can cast a spell using any spell slots you have.")).toEqual([])
+  })
   const positiveCases: Array<{
     label: string
     text: string
@@ -208,6 +221,77 @@ describe("detectFeatureModifiers", () => {
           ?.instance.activation?.effects?.find((row) => row.kind === "class_resource")
         expect(effect).toMatchObject({ classResourceKey: "battle_dice", classResourceChange: "reset" })
         expect(effect?.resourceRefreshOnInitiative).toBeFalsy()
+      },
+    },
+    {
+      label: "two named skills ending in 'skills'",
+      text: "Raised at court, you gain proficiency in the Insight and Persuasion skills.",
+      ruleId: "proficiency.skills.list",
+      assert: (detections) => {
+        const char = detections.find((entry) => entry.ruleId === "proficiency.skills.list")?.instance
+          .characteristics?.[0]
+        expect(char).toMatchObject({
+          entries: [
+            { skill: "Insight", expertise: false },
+            { skill: "Persuasion", expertise: false },
+          ],
+        })
+      },
+    },
+    {
+      label: "any skill with Expertise plus a tool pick",
+      text: "Your guild trained you. You gain proficiency and Expertise with any skill of your choice, and proficiency in one tool of your choice.",
+      ruleId: "proficiency.skills.choice",
+      assert: (detections) => {
+        const skill = detections.find((entry) => entry.ruleId === "proficiency.skills.choice")?.instance
+          .characteristics?.[0]
+        expect(skill).toMatchObject({ allowAnySkill: true, choiceCount: 1, grantExpertise: true })
+        const tool = detections.find((entry) => entry.ruleId === "proficiency.tools.choice")?.instance
+          .characteristics?.[0]
+        expect(tool).toMatchObject({ type: "tool_proficiencies", values: [], choiceCount: 1 })
+      },
+    },
+    {
+      label: "cantrips from a named class list",
+      text: "You learn two cantrips of your choice from the Druid spell list.",
+      ruleId: "spell.cantrip.choice",
+      assert: (detections) => {
+        const char = detections.find((entry) => entry.ruleId === "spell.cantrip.choice")?.instance
+          .characteristics?.[0]
+        expect(char).toMatchObject({ choiceGrants: [{ level: 0, count: 2, classNames: ["Druid"] }] })
+      },
+    },
+    {
+      label: "Advantage on Death Saving Throws",
+      text: "An old wound keeps you stubborn: you have Advantage on Death Saving Throws.",
+      ruleId: "save.advantage.death",
+      assert: (detections) => {
+        const effect = detections
+          .find((entry) => entry.ruleId === "save.advantage.death")
+          ?.instance.activation?.effects?.[0]
+        expect(effect).toMatchObject({ checkRollMode: "advantage", checkCategory: "death_save" })
+      },
+    },
+    {
+      label: "ability checks and saving throws together",
+      text: "While you are Bloodied, you have Advantage on Dexterity checks and saving throws.",
+      ruleId: "save.advantage",
+      assert: (detections) => {
+        const save = detections.find((entry) => entry.ruleId === "save.advantage")?.instance.activation
+          ?.effects?.[0]
+        expect(save).toMatchObject({ checkCategory: "save", checkAbility: "Dexterity" })
+        expect(save?.limitations?.[0]?.value).toBe("below_half_hp")
+        expect(detections.some((entry) => entry.ruleId === "check.advantage.ability")).toBe(true)
+      },
+    },
+    {
+      label: "extra dice only against chosen creatures",
+      text: "Name three creatures you hunt. Your weapon attacks against the chosen creatures deal an extra 1d6 damage on a hit.",
+      ruleId: "damage.rider.dice",
+      assert: (detections) => {
+        const char = detections.find((entry) => entry.ruleId === "damage.rider.dice")?.instance
+          .characteristics?.[0]
+        expect(char?.limitations?.[0]).toMatchObject({ rule: "requires_active", value: "attacking_chosen_foe" })
       },
     },
     {

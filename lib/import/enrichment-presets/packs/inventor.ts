@@ -1,5 +1,6 @@
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { EnrichmentPreset } from "@/lib/import/enrichment-presets/types"
+import { isSpellReferencePlaceholder, SPELL_REFERENCE_IMPORT_NOTICE } from "@/lib/import/spell-reference-placeholder"
 
 /** Upgrades column: 1 at 3rd → 9 at 19th. */
 export const INVENTOR_UPGRADES_BY_LEVEL = [
@@ -36,6 +37,43 @@ export const INVENTOR_SPELL_GRANTS = [
 ] as const
 
 type Row = Record<string, unknown>
+
+/** Craft and Creation 1.2, printed pp. 21–26, 31: column-order extraction repairs. */
+export const INVENTOR_UPGRADE_LEVEL_CORRECTIONS: Record<string, Record<string, number>> = {
+  Golemsmith: {
+    "Grappling Appendages": 1, "Heavy Armor Plating": 1, "Magical Essence": 1,
+    "Structural Constitution": 1, "Systematic Strength": 1, "Warfare Routines": 1,
+    "Thundering Stomp": 11, "Transforming Golem": 11, "Shared Power": 15,
+  },
+  Infusionsmith: {
+    "Translocation Binding": 5, "Deflecting Weapon": 5, "Mixed Technique": 11,
+    "Spell-Trapping Ring": 9,
+  },
+  Potionsmith: { "Mutation Mixture": 13, "Philosopher's Stone": 15 },
+}
+
+function repairUpgradeTiers<T extends Row>(ability: T): T {
+  const level = INVENTOR_UPGRADE_LEVEL_CORRECTIONS[String(ability.source_name)]?.[String(ability.name)]
+  const companionOnly = ability.source_name === "Golemsmith" && ability.ability_role === "upgrade" && ![
+    "Arcane Resonance", "Reciprocity Programming", "Overdrive", "Shared Power",
+  ].includes(String(ability.name))
+  return {
+    ...ability,
+    ...(level != null ? { level_requirement: level } : {}),
+    ...(companionOnly ? {
+      // Upgrade text remains a companion trait; conditional stat increases are not player proficiencies.
+      choices: { category: "Companion upgrade", count: 1, options: [], applyTo: "companion", applyToCompanionFeature: "Mechanical Golem" },
+      isChoice: false,
+      // Keep explicitly companion-scoped author wiring; discard legacy player detections.
+      ...(asRecord(ability.choices)?.applyTo === "companion" ? {} : {
+        linkedModifiers: [], modifierRefs: [], linked_modifiers: [], modifier_refs: [],
+      }),
+    } : {}),
+    ...(typeof ability.description === "string" ? {
+      description: ability.description.replace(/\s*\[Tier uncertain:[^\]]*\]/g, ""),
+    } : {}),
+  }
+}
 
 function asRecord(value: unknown): Row | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Row) : null
@@ -197,6 +235,9 @@ function foldSpellNotesIntoDescription(content: ImportContent): ImportContent {
       const { note: _drop, ...rest } = row
       const noteHtml = `<p><em>Import note: ${note}</em></p>`
       const desc = rest.description
+      if (!desc?.trim() || isSpellReferencePlaceholder(desc)) {
+        return { ...rest, description: SPELL_REFERENCE_IMPORT_NOTICE }
+      }
       if (desc && /Import note:/i.test(desc)) return rest
       return {
         ...rest,
@@ -284,6 +325,14 @@ export function sanitizeInventorImportContent(content: ImportContent): ImportCon
   next = foldSpellNotesIntoDescription(next)
   next = normalizeTruncationMarkers(next)
   next = ensureJusticarSavantChoice(next)
+  next = {
+    ...next,
+    abilities: next.abilities?.map((ability) => repairUpgradeTiers(ability)),
+    ...(next.import_proposals ? { import_proposals: {
+      ...next.import_proposals,
+      custom_abilities: next.import_proposals.custom_abilities?.map((ability) => repairUpgradeTiers(ability)),
+    } } : {}),
+  }
 
   if (next.classes?.length) {
     next = {

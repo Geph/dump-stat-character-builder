@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { SubclassImportSchema } from "@/lib/import/content-schema"
 import {
   getMulticlassSpellSlotTables,
+  getSpellSlotTable,
   resolveEffectiveClassSpellcasting,
 } from "@/lib/compendium/spell-slots"
 import type { CharacterClassDetail } from "@/lib/character/character-classes"
@@ -77,6 +78,23 @@ function fighterWithEldritchKnight(level: number): CharacterClassDetail {
 }
 
 describe("resolveEffectiveClassSpellcasting", () => {
+  it("does not let an ability-only base mask subclass slots", () => {
+    const entry = fighterWithEldritchKnight(3)
+    entry.class = { ...entry.class!, spellcasting: { ability: "Intelligence" } }
+    expect(resolveEffectiveClassSpellcasting(entry)?.caster_progression).toBe("third")
+  })
+
+  it("respects explicit pact tiers and exposes their slot level", () => {
+    const config: NonNullable<DndClass["spellcasting"]> = {
+      ability: "Intelligence", caster_progression: "pact", starts_at: 3,
+      explicit_slot_progression: [{ level: 3, slots: [1] }, { level: 5, slots: [2] }, { level: 7, slots: [0, 2] }],
+    }
+    expect(getSpellSlotTable("Scholar", 2, config)?.slotsByLevel).toEqual([])
+    expect(getSpellSlotTable("Scholar", 3, config)).toMatchObject({ type: "pact", pactSlotLevel: 1 })
+    expect(getSpellSlotTable("Scholar", 7, config)).toMatchObject({ type: "pact", pactSlotLevel: 2 })
+    expect(getSpellSlotTable("Scholar", 7, config)?.slotsByLevel.slice(0, 2)).toEqual([0, 2])
+    expect(getSpellSlotTable("Scholar", 2, { ...config, starts_at: undefined })?.slotsByLevel.every((n) => n === 0)).toBe(true)
+  })
   it("falls back to the subclass's spellcasting when the class itself has none", () => {
     const entry = fighterWithEldritchKnight(3)
     expect(resolveEffectiveClassSpellcasting(entry)).toEqual({

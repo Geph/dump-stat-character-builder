@@ -6,6 +6,7 @@ import { sanitizeVagabondImportContent } from "@/lib/import/enrichment-presets/p
 import { auditImportWiring, summarizeFindings } from "@/lib/import/homebrew-import-ops"
 import type { ImportContent } from "@/lib/import/content-schema"
 import type { DndClass, Feature, Subclass } from "@/lib/types"
+import vagabondSeed from "@/lib/seed-packs/mage-hand-press/magehandpress-vagabond-class.json"
 
 function sampleVagabond(): ImportContent {
   return {
@@ -241,5 +242,55 @@ describe("Vagabond level-up features on the live sheet", () => {
     }).find((action) => action.name === "Quick Snack")
     expect(snack?.showOnCombatTab).toBe(true)
     expect(snack?.alsoActivate?.map((entry) => entry.name)).toEqual(["Breather"])
+  })
+})
+
+describe("Vagabond seed pack Secret options", () => {
+  const secret = (vagabondSeed as unknown as { classes: DndClass[] }).classes[0].features.find(
+    (entry) => entry.name === "Secret",
+  )
+  const characteristicsOf = (optionName: string) =>
+    (secret?.choices?.options.find((option) => option.name === optionName)?.linkedModifiers ?? []).flatMap(
+      (instance) => instance.characteristics ?? [],
+    )
+  const effectsOf = (optionName: string) =>
+    (secret?.choices?.options.find((option) => option.name === optionName)?.linkedModifiers ?? []).flatMap(
+      (instance) => instance.activation?.effects ?? [],
+    )
+  const skillsOf = (optionName: string) =>
+    characteristicsOf(optionName).flatMap((char) =>
+      char.type === "skills" ? char.entries.map((entry) => entry.skill) : [],
+    )
+
+  it("grants both named skills", () => {
+    expect(skillsOf("Nobility")).toEqual(["History", "Persuasion"])
+    expect(skillsOf("Heretic")).toEqual(["Arcana", "Religion"])
+  })
+
+  it("wires the player picks", () => {
+    expect(characteristicsOf("Faction Agent")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "skills", allowAnySkill: true, choiceCount: 1, grantExpertise: true }),
+        expect.objectContaining({ type: "tool_proficiencies", choiceCount: 1 }),
+        expect.objectContaining({ type: "languages", choiceCount: 1 }),
+      ]),
+    )
+    expect(characteristicsOf("Heretic")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "spells_known",
+          choiceGrants: [expect.objectContaining({ level: 0, count: 2, classNames: ["Warlock"] })],
+        }),
+      ]),
+    )
+  })
+
+  it("wires roll modifiers and gates the sworn-foe die", () => {
+    expect(effectsOf("Dying")).toEqual([
+      expect.objectContaining({ checkRollMode: "advantage", checkCategory: "death_save" }),
+    ])
+    expect(effectsOf("Monstrous").map((effect) => effect.checkCategory).sort()).toEqual(["ability", "save"])
+    const avengerDie = characteristicsOf("Avenger").find((char) => char.type === "damage_roll_modifiers")
+    expect(avengerDie?.limitations?.[0]?.value).toBe("attacking_chosen_foe")
   })
 })

@@ -290,6 +290,8 @@ CREATE TABLE IF NOT EXISTS custom_abilities (
   is_choice TINYINT(1),
   choices JSON,
   level_requirement INT,
+  specialization_choices JSON,
+  parent_ability_name VARCHAR(255),
   ability_role VARCHAR(32),
   is_system TINYINT(1) NOT NULL DEFAULT 0,
   prerequisite_rules JSON,

@@ -278,7 +278,7 @@ export function WelcomeSplashOverlay() {
                   id="welcome-splash-description"
                   className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base lg:max-w-none lg:whitespace-nowrap"
                 >
-                  This app was developed with use of{" "}
+                  This app was developed with{" "}
                   <a
                     href="https://cursor.com/"
                     target="_blank"
@@ -287,8 +287,16 @@ export function WelcomeSplashOverlay() {
                   >
                     Cursor
                   </a>
-                  , a <span className="font-bold text-foreground">natural language programming</span>{" "}
-                  (AI-assisted coding) tool.
+                  {" "}and{" "}
+                  <a
+                    href="https://openai.com/codex/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-primary underline underline-offset-2 hover:decoration-primary"
+                  >
+                    OpenAI Codex
+                  </a>
+                  .
                 </p>
               </header>
 

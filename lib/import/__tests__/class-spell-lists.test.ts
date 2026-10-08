@@ -6,6 +6,12 @@ import {
 } from "@/lib/import/class-spell-lists"
 
 describe("spellNameMatchKeys", () => {
+  it("keeps Mass spells distinct from their single-target names", () => {
+    for (const name of ["Cure Wounds", "Heal", "Healing Word", "Suggestion"]) {
+      const single = spellNameMatchKeys(name)
+      expect(spellNameMatchKeys(`Mass ${name}`).some((key) => single.includes(key))).toBe(false)
+    }
+  })
   it("treats Disk/Disc and a leading possessive as the same spell", () => {
     const disc = spellNameMatchKeys("Floating Disc")
     const tensers = spellNameMatchKeys("Tenser's Floating Disk")

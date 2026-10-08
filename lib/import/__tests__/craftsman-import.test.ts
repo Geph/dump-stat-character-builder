@@ -130,10 +130,10 @@ describe("Craftsman enrichment", () => {
     expect(magazine.sheetDisplay).toMatchObject({ combatActions: true, featuresTab: true })
     expect(resolveFeatureSheetDisplay(magazine).combatActions).toBe(true)
 
-    // Without the preset the "Crafting Tools" wording files it under Non-Combat.
+    // The reusable in-turn action takes precedence over the preparation wording.
     expect(
       inferActivatableActionCategory({ name: "Magazine", description }),
-    ).toBe("utility")
+    ).toBe("combat")
   })
 
   it("wires Eye for Quality free casts with Intelligence, whichever order presets run in", () => {

@@ -206,6 +206,29 @@ export function sanitizeWitchImportContent(content: ImportContent): ImportConten
 
 export const WITCH_PRESETS: EnrichmentPreset[] = [
   {
+    id: "witch.subclass.soulsteel", pack: "witch", target: "subclass_feature",
+    match: { subclassClassName: /^witch$/i, name: /^soulsteel$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      { op: "attachNamedPreset", replaceCharacteristicTypes: ["damage_roll_modifiers", "power_rider"], preset: {
+        kind: "char_instance", idKey: "soulsteel", catalogRefId: "cat_char_power_rider",
+        characteristics: [{ id: modId("soulsteel"), type: "power_rider", parentPowerNames: ["Soulsteel"],
+          alertSummary: "Choose the familiar-bound melee weapon. Once per turn, its hit adds 1d6 Force, Necrotic, or Radiant. While active, Charisma can replace Strength/Dexterity for proficient weapon attacks and damage. Track weapon, duration, and optional ability manually; this is not an unconditional damage bonus.",
+        }],
+      } },
+    ],
+  },
+  {
+    id: "witch.subclass.undeath_command",
+    pack: "witch", target: "subclass_feature",
+    match: { subclassClassName: /^witch$/i, name: /^undeath command$/i },
+    operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+    ],
+  },
+  {
     id: "witch.class.spellcasting",
     pack: "witch",
     target: "class_feature",

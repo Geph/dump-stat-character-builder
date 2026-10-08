@@ -5,6 +5,7 @@ import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import { getCompendiumItemIcon } from "@/lib/compendium/content-types"
 import { isBombFormulaAbility } from "@/lib/builder/aggregate-bomb-formulas"
 import { isDisciplinePackageAbility } from "@/lib/builder/aggregate-psionic-talents"
+import { selectedCustomAbilityOptions } from "@/lib/character/selected-custom-ability-options"
 import {
   expandAlchemistBombProfiles,
   isAlchemistBombName,
@@ -74,7 +75,7 @@ import {
 } from "@/lib/compendium/characteristic-modifiers"
 import type { LinkedModifierInstance } from "@/lib/compendium/linked-modifiers"
 import { expandLegacyLimitations } from "@/lib/compendium/modifier-limitations"
-import type { PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
+import { parsePsionicAugmentsFromDescription, type PsionicAugmentsConfig } from "@/lib/compendium/parse-psionic-augments"
 import { resolvePsionicAugments } from "@/lib/compendium/resolve-psionic-augments"
 import { resolveSpecialAttackAtLevel } from "@/lib/character/special-attack-empower"
 import { resolveAttachedClassIcon } from "@/lib/compendium/class-icons-defaults"
@@ -323,7 +324,7 @@ const COMBAT_CHARACTERISTIC_TYPES = new Set<CharacteristicModifier["type"]>([
 ])
 
 const COMBAT_TEXT_RE =
-  /\b(?:attacks?|attacking|damage|weapons?|enem(?:y|ies)|foe|hostile|armou?r class|bloodied|initiative|smite|sneak attack|opportunity attack|hit points?|psi points?|psionic|first (?:round|turn) of combat)\b/i
+  /\b(?:attacks?|attacking|damage|weapons?|traps?|detonat\w*|enem(?:y|ies)|foe|hostile|armou?r class|bloodied|initiative|smite|sneak attack|opportunity attack|hit points?|psi points?|psionic|first (?:round|turn) of combat)\b/i
 
 /** Resource keys that always place a spend action on the Combat tab. */
 const COMBAT_CLASS_RESOURCE_KEYS = new Set<string>([
@@ -346,13 +347,16 @@ const COMBAT_CLASS_RESOURCE_KEYS = new Set<string>([
 
 /** Description phrasings that imply an action-economy cost when no structured activation exists. */
 const ACTION_TEXT_PATTERNS: { re: RegExp; kind: ActionEconomyKind }[] = [
+  { re: /\byou (?:can |may )?use your bonus action\b/i, kind: "bonus" },
+  { re: /\byou (?:can |may )?use your reaction\b/i, kind: "reaction" },
+  { re: /\byou (?:can|may) use (?:an?|your) action\b/i, kind: "action" },
   { re: /\bas a bonus action\b/i, kind: "bonus" },
   { re: /\ba bonus action\b/i, kind: "bonus" },
   { re: /\bas a reaction\b/i, kind: "reaction" },
   { re: /\btake a reaction\b/i, kind: "reaction" },
   { re: /\ba reaction\b/i, kind: "reaction" },
-  { re: /\bas an? (?:magic )?action\b/i, kind: "action" },
-  { re: /\bas a magic action\b/i, kind: "action" },
+  { re: /\bas an? (?:(?:magic|utilize) )?action\b/i, kind: "action" },
+  { re: /\byou (?:can |may )?take (?:an?|the) (?:(?:magic|utilize) )?action\b/i, kind: "action" },
 ]
 
 const ACTION_OR_BONUS_RE =
@@ -592,9 +596,12 @@ function resolveLimitedUsesWithInference(
   item: ActivatableItem,
   availableKeys: readonly string[],
   extraText?: string | null,
+  skipTextInference = false,
 ): UsesConfig | null | undefined {
   const existing = resolveItemLimitedUses(item)
   if (existing) return existing
+  // Augment costs belong to the selected augment, not the power's base activation.
+  if (skipTextInference) return existing
   if (resolveSpellSlotUseEffects(item).restoreResourceFromSpellSlotOnUse) return existing
   const fromTrigger = limitedUsesFromTriggerSpend(item)
   if (fromTrigger) return fromTrigger
@@ -688,14 +695,14 @@ function featureUnlocked(
  * Reaction to cast"). Stripped before pattern matching so they don't invent an action cost.
  */
 const NEGATED_ACTION_RE =
-  /\b(?:(?:does|do|did)(?:n'?t| not)\s+(?:require|need|cost|use|take)|without\s+(?:using|expending|spending|taking))\s+(?:an?\s+)?(?:bonus\s+action|reaction|magic\s+action|action)\b/gi
+  /\b(?:(?:does|do|did)(?:n'?t| not)\s+(?:require|need|cost|use|take)|without\s+(?:using|expending|spending|taking))\s+(?:an?\s+)?(?:bonus\s+action|reaction|(?:magic|utilize)\s+action|action)\b/gi
 
 /**
  * "The chosen creature can take a Reaction to move" is that creature's cost, not the
  * character's. Strip those clauses before inferring Action / Bonus Action / Reaction.
  */
 const OTHER_CREATURE_ECONOMY_RE =
-  /\b(?:(?:the|that|your|an?)\s+)?(?:chosen\s+)?(?:creature|ally|allies|cohort|companion|target)s?(?:\s+\w+){0,8}\s+(?:can|may)\s+take\s+(?:a\s+)?(?:bonus\s+action|reaction|magic\s+action|action)\b/gi
+  /\b(?:(?:the|that|your|an?)\s+)?(?:chosen\s+)?(?:creature|ally|allies|cohort|companion|target)s?(?:\s+\w+){0,8}\s+(?:can|may)\s+take\s+(?:an?\s+)?(?:bonus\s+action|reaction|(?:magic|utilize)\s+action|action)\b/gi
 
 function stripOtherCreatureActionEconomy(text: string): string {
   return text.replace(OTHER_CREATURE_ECONOMY_RE, " ")
@@ -908,6 +915,12 @@ function classifyActionCategory(
   if (/^potion mixologist$/i.test(item.name.trim())) return "combat"
 
   const haystack = `${item.name} ${stripHtml(item.description ?? "")}`
+  // Preparation and recharge prose must not hide the ability's in-turn use.
+  // A crafted item or rest-selected benefit can still grant a Bonus Action or Reaction.
+  const kinds = explicitActionKinds(item)
+  if (kinds.includes("reaction") || (kinds.includes("bonus") && COMBAT_TEXT_RE.test(haystack))) return "combat"
+  if (/\b(?:at the start|at the end) of (?:each of )?your turns?\b/i.test(haystack)) return "combat"
+  if (/\b(?:if|when) you fail a saving throw\b/i.test(haystack)) return "combat"
   if (isUtilityOnlyHaystack(haystack) || isShortRestActivityText(item.name, item.description)) {
     return "utility"
   }
@@ -929,7 +942,6 @@ function classifyActionCategory(
   // A Reaction only exists inside the turn order, and a Bonus Action that burns a limited pool
   // is nearly always a fight resource (Bardic Inspiration, Nature's Veil, Dragon Wings) even when
   // its rules text never says "attack" or "damage".
-  const kinds = explicitActionKinds(item)
   if (kinds.includes("reaction")) return "combat"
   if (kinds.includes("bonus") && spendsLimitedPool(item) && !isUtilityOnlyHaystack(haystack)) {
     return "combat"
@@ -2292,6 +2304,7 @@ function pushCustomAbilityActions(
   const seenPowerNames = new Set<string>()
 
   for (const ability of abilities ?? []) {
+    if (ability.choices?.applyTo === "companion") continue
     if (!isCustomAbilityAction(ability)) continue
     if (ability.level_requirement != null && ability.level_requirement > levelCap) continue
 
@@ -2306,6 +2319,7 @@ function pushCustomAbilityActions(
       },
       availableKeys,
       `${ability.execution ?? ""} ${ability.casting_time ?? ""}`,
+      Boolean(resolvePsionicAugments(ability)?.augments.length),
     )
     const item: ActivatableItem = {
       name: ability.name,
@@ -2384,6 +2398,9 @@ function pushCustomAbilityActions(
       ...(category === "combat" && itemBoostsOwnChecks(item.linkedModifiers)
         ? { showOnCombatTab: true, showOnAbilitiesTab: true }
         : {}),
+      ...(kinds.some((kind) => kind === "bonus" || kind === "reaction")
+        ? { showOnCombatTab: true, showOnAbilitiesTab: category === "utility" || itemBoostsOwnChecks(item.linkedModifiers) }
+        : {}),
       limitedUses,
       classLevel: levelCap,
       description: ability.description ?? null,
@@ -2441,7 +2458,8 @@ function pushCustomAbilityActions(
       }
       const powerText = `${entry.description ?? ""} ${entry.summary ?? ""}`
       const powerKeys = resourceKeysForAbility(ability, classDetails, fallbackResourceKeys)
-      const limitedUses = resolveLimitedUsesWithInference(item, powerKeys, entry.summary)
+      const limitedUses = resolveLimitedUsesWithInference(item, powerKeys, entry.summary,
+        !!parsePsionicAugmentsFromDescription(item.description, { powerName: entryName }))
       const itemWithUses: ActivatableItem = { ...item, limitedUses }
       const castingKinds = kindsFromCastingTime(entry.summary)
       const linkedKinds = castingKinds.length ? [] : kindsFromLinkedModifiers(linkedModifiers)
@@ -3139,7 +3157,7 @@ export function collectSheetActions(params: {
     )
     pushCustomAbilityActions(
       actions,
-      params.customAbilities,
+      [...params.customAbilities, ...selectedCustomAbilityOptions(params.customAbilities, featureChoicePicks)],
       Math.max(totalLevel, 1),
       soleClassId,
       params.classDetails,

@@ -242,6 +242,7 @@ function armorEnchantmentOptions(): FeatureChoice["options"] {
       description: "Hide as a Bonus Action; Advantage on Stealth for Hide in combat.",
       linkedModifiers: [
         fxInstance(createModifierInstanceId(), effectCatalogRefId("check_roll_modifier"), {
+          bonusAction: true,
           effects: [
             {
               id: modId("enchant_cloaking"),
@@ -251,6 +252,7 @@ function armorEnchantmentOptions(): FeatureChoice["options"] {
               checkSkills: ["Stealth"],
               label: "Cloaking: Advantage on Stealth (Hide in combat)",
             },
+            { id: modId("enchant_cloaking_hide"), kind: "movement_option", movementHide: true },
           ],
         }),
       ],
@@ -274,6 +276,12 @@ function armorEnchantmentOptions(): FeatureChoice["options"] {
     {
       name: "Winged",
       description: "Bonus Action: Fly Speed equal to Speed until end of turn.",
+      linkedModifiers: [
+        fxInstance(createModifierInstanceId(), effectCatalogRefId("movement_option"), {
+          bonusAction: true,
+          effects: [{ id: modId("enchant_winged"), kind: "movement_option", movementTypes: ["fly"], moveDistanceMode: "speed", label: "Fly Speed equals Speed until end of turn" }],
+        }),
+      ],
     },
   ]
 }
@@ -331,6 +339,17 @@ const MASTERWORK_SCALED_USES = {
 }
 
 export const CRAFTSMAN_PRESETS: EnrichmentPreset[] = [
+  {
+    id: "craftsman.subclass.tower_shield",
+    pack: "craftsman", target: "subclass_feature",
+    match: { subclassClassName: /^craftsman$/i, name: /^tower shield$/i },
+    operations: [{ op: "attachNamedPreset", replaceCharacteristicTypes: ["ac"], preset: {
+      kind: "char_instance", idKey: "tower_shield", catalogRefId: characteristicCatalogRefId("ac"),
+      characteristics: [{ id: modId("tower_shield"), type: "ac", mode: "flat_bonus", flatBonus: 1,
+        limitations: [{ id: modId("tower_shield_equipped"), kind: "armor_type", rule: "requires_wearing", value: "Shield" }],
+        label: "Tower Shield: +1 beyond the equipped shield bonus" }],
+    } }],
+  },
   {
     id: "craftsman.class.expert_crafting",
     pack: "craftsman",
@@ -546,7 +565,7 @@ export const CRAFTSMAN_PRESETS: EnrichmentPreset[] = [
           swapRestType: "long",
         },
       },
-      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setActivation", activation: { bonusAction: false } },
       {
         op: "appendDescription",
         text: "Winged: BA Fly Speed = Speed until end of turn. Adamantine: crits vs you become normal hits (narrative).",
@@ -594,16 +613,8 @@ export const CRAFTSMAN_PRESETS: EnrichmentPreset[] = [
     match: { className: /craftsman/i, name: /^magnum opus$/i },
     operations: [
       { op: "setActivation", activation: { bonusAction: true } },
-      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true, featuresTab: true } },
-      {
-        op: "setLimitedUses",
-        uses: {
-          type: "fixed",
-          fixedAmount: 1,
-          useShareKey: "magnum_opus",
-          recharges: [],
-        },
-      },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, abilitiesActions: true, featuresTab: true } },
+      { op: "clearLimitedUses" },
       {
         op: "appendDescription",
         text: "Once: create a Very Rare or Legendary magic item. BA call item to hand/body while on the same plane. Free attunement that doesn't count against your limit.",

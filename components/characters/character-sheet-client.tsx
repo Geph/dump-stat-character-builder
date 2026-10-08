@@ -179,6 +179,7 @@ import {
 } from "@/lib/character/equipped-weapon-attack"
 import { buildUnarmedStrikeEquipment } from "@/lib/character/unarmed-strike"
 import { SheetActionEconomyTracker } from "@/components/character-sheet/sheet-action-economy-tracker"
+import { SheetSpellsPanel } from "@/components/character-sheet/sheet-spells-panel"
 import { SheetStandardActionButtons } from "@/components/character-sheet/sheet-standard-action-buttons"
 import { SheetSectionHeading } from "@/components/character-sheet/sheet-section-heading"
 import { SheetEquipmentPanel } from "@/components/character-sheet/sheet-equipment-panel"
@@ -6581,58 +6582,12 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   </div>
 
                 {showSpellsPanel && (
-                  <div id="sheet-spells" className={`${SHEET_COMBAT_PANEL.spells} rounded-xl p-3 border border-border min-w-0`}>
-                    <SheetSectionHeading icon={Wand2}>Spells</SheetSectionHeading>
-                    {spellsGroupedByLevel.length ? (
-                      <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-                        {spellsGroupedByLevel.map((group) => (
-                          <div key={group.level}>
-                            <h3 className={`text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1.5 sticky top-0 ${SHEET_COMBAT_PANEL.spells} py-0.5 z-10`}>
-                              {group.label}
-                              <span className="ml-1.5 font-medium text-muted-foreground/60 normal-case">
-                                ({group.spells.length})
-                              </span>
-                            </h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-1.5">
-                              {group.spells.map((spell) => (
-                                <button
-                                  key={spell.id}
-                                  type="button"
-                                  onClick={() => setSelectedSpell(spell)}
-                                  title={spell.name}
-                                  className="flex items-center justify-between gap-1 text-xs pl-2 pr-1.5 py-1.5 bg-muted rounded hover:bg-primary/10 hover:border-primary/30 border border-transparent transition-colors text-left min-w-0"
-                                >
-                                  <span className="font-medium truncate min-w-0">{spell.name}</span>
-                                  <span className="flex items-center gap-1 shrink-0">
-                                    {alwaysPreparedSpellIds.has(spell.id) && (
-                                      <span
-                                        className="h-1.5 w-1.5 rounded-full bg-amber-500 dark:bg-amber-400"
-                                        title={
-                                          spellResourceCastCosts.has(spell.id)
-                                            ? "Granted by a discipline / feature (cast with class resource)"
-                                            : "Always prepared by your subclass"
-                                        }
-                                      />
-                                    )}
-                                    {spell.concentration && (
-                                      <span
-                                        className="text-[9px] font-bold text-purple-600 dark:text-purple-400"
-                                        title="Concentration"
-                                      >
-                                        C
-                                      </span>
-                                    )}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No spells prepared</p>
-                    )}
-                  </div>
+                  <SheetSpellsPanel
+                    groups={spellsGroupedByLevel}
+                    alwaysPreparedSpellIds={alwaysPreparedSpellIds}
+                    spellResourceCastCosts={spellResourceCastCosts}
+                    onSelect={setSelectedSpell}
+                  />
                 )}
                 </div>
 

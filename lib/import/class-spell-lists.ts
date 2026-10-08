@@ -29,6 +29,8 @@ export const CLASS_SPELL_LIST_IMPORT_HINT = `When a class has its own dedicated 
   - Skip footnote-only lines (e.g. "*Appears in this chapter.") and intro paragraphs about the Special column.
 - Also emit spells[] rows for each list entry with at least: name, level, school, concentration, components (or null), classes: ["<ClassName>"]. Full casting_time/range/duration/description when the document has them; otherwise null is fine for list-only stubs. This is one row per list entry — a spell_list of 80 names must produce 80 spells[] rows, not just the handful with full write-ups.
 - For each spell on that list, include the class's exact name in the spell's classes array (e.g. "Artificer").
+- Class-list membership is not authorship: preserve a spell's original publisher in source and its official creator_url when known; never attribute a borrowed spell to the class publisher. Do not invent missing write-ups.
+- For a reference without its write-up, leave description null; the importer displays an instruction to import its source and choose Overwrite. A class-list reference does not authorize bundling non-SRD Wizards of the Coast rules.
 - Custom/non-SRD classes are not among the standard eight (Bard, Cleric, Druid, Paladin, Ranger, Sorcerer, Warlock, Wizard); use the class name directly — never store the literal word "Other".
 - Spells may also appear on standard class lists; include all applicable class names in classes.
 - A class chapter may include its spell list in the same extract: keep the full class features[] and still populate spell_list + spells[] stubs from the list tables.

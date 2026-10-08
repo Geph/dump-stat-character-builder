@@ -1,6 +1,6 @@
 # BYO prompt design — agent guide
 
-Last reviewed: 2026-09-22.
+Last reviewed: 2026-10-08.
 
 The BYO (bring-your-own LLM) import flow hands the user a prompt they paste into
 their own chat model. The goal is that the prompt works on **entry-level models**:
@@ -15,13 +15,28 @@ Read this before you add a hint, a homebrew pattern, a worked example, or a new
 
 ## Two prompt modes
 
+Keep shared extraction pitfalls in both modes: feature ownership and unlock levels
+across PDF columns, explicit Magic/Utilize/Bonus/Reaction costs, and rest preparation
+versus later combat use. Full guidance lives in `modifier-wiring-registry.ts`;
+compact equivalents live in `LITE_BASE_PROMPT` / `LITE_MECHANICS_HINT` in
+`byo-lite-prompt.ts`. `byo-prompt-guidance.test.ts` checks both outputs. Do not assume
+that editing the Full wiring index changes Lite.
+
+Measured 2026-10-08 after the Kibbles audit: classes Full 199,666 characters,
+Lite 27,376; subclasses Full 197,099, Lite 24,926. Before this audit they were
+198,732 / 25,432 and 196,165 / 23,213 respectively. All Lite types remain below
+30,000. Class and subclass Lite prompts now include custom-ability guidance:
+nested talent prerequisites, separate specialization choices, power versus augment
+costs, upgrade tiers across PDF columns, and companion ownership. Spell references
+retain their original publisher and request an Overwrite import for missing rules.
+
 The Clipboard tab has a **Prompt size** selector (`components/import/byo-prompt-mode-select.tsx`,
 saved in `localStorage`). Both modes produce the same JSON shape for Step 2.
 
 | Mode | Built by | Size | For |
 | --- | --- | --- | --- |
 | **Full** (default) | `buildByoExtractionPrompt()` in `lib/import/byo-import-kit.ts` | ~190–214K chars | Paid / large-context models. Carries the whole Common Modifier index and every homebrew pattern |
-| **Lite** | Same function with `promptMode: "lite"`; blocks in `lib/import/byo-lite-prompt.ts` | ~5–25K chars | Free / base-tier models. Verbatim wording + compact mechanics shapes + content-type-scoped hints |
+| **Lite** | Same function with `promptMode: "lite"`; blocks in `lib/import/byo-lite-prompt.ts` | ~5–28K chars | Free / base-tier models. Verbatim wording + compact mechanics shapes + content-type-scoped hints |
 
 Lite is enforced by `lib/import/__tests__/byo-lite-prompt.test.ts`: every content type
 (with PDF, custom-systems, and subclass-match options) must stay under

@@ -33,7 +33,7 @@ export type ChoicePrerequisiteContext = {
 }
 
 function normalizeName(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ")
+  return value.trim().toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, " ")
 }
 
 function nameMatches(haystack: string, needle: string): boolean {
@@ -211,6 +211,11 @@ export function isChoicePrerequisiteMet(
     .map((chunk) => chunk.trim())
     .filter(Boolean)
   for (const chunk of chunks) {
+    const excluded = chunk.match(/^(?:incompatible with|cannot (?:have|take)|not compatible with)\s+(.+)$/i)
+    if (excluded) {
+      if (excluded[1].split(/\s+or\s+|,\s*/i).some((name) => listHasName(context.selectedAbilityNames, name))) return false
+      continue
+    }
     const groups = parseNamedRequirementGroups(chunk)
     for (const group of groups) {
       const satisfied = group.some((req) => {

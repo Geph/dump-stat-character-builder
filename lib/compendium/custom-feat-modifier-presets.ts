@@ -695,11 +695,12 @@ export const CUSTOM_FEAT_MODIFIER_PRESETS: Record<string, FeatModifierPreset> = 
         { kind: "check_advantage", checkCategory: "skill", checkSkills: ["Stealth"] },
         {},
       ),
-      attackMod(
-        "skulker_sniper",
-        [{ bonus: 0, target: "custom", customTarget: "Hidden attack miss does not reveal location" }],
-        "Sniper",
-      ),
+      weaponSheetBadge("skulker_sniper", {
+        label: "Skulker",
+        description: "A missed attack while hidden does not reveal your location.",
+        appliesTo: "all",
+        includeUnarmed: true,
+      }),
     ],
   },
 

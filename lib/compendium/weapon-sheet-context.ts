@@ -36,6 +36,7 @@ import { migrateFeatureOptionPickers } from "@/lib/compendium/feature-option-cho
 import { resolveSubclassUnlockLevel } from "@/lib/builder/choices"
 import type { CharacterBuildInputs } from "@/lib/character/types"
 import { readModifierSource } from "@/lib/character/tag-modifier-source"
+import { groupFeatWeaponBadges } from "@/lib/compendium/feat-weapon-badges"
 import type { StatContributionSourceType } from "@/lib/character/stat-contributions"
 import type { Equipment, Feature } from "@/lib/types"
 
@@ -44,6 +45,7 @@ export type WeaponSheetAppliedModifier = {
   description: string
   sourceType?: StatContributionSourceType
   sourceLabel?: string
+  sourceId?: string
 }
 
 export type WeaponSheetExtraMastery = {
@@ -126,6 +128,23 @@ function entryMatchesWeapon(
   properties: string[],
   entry: RollModifierEntry,
 ): boolean {
+  // Legacy imports put both weapon eligibility and reminder text in customTarget.
+  // Interpret the known weapon restrictions for display only; do not grant bonuses.
+  const custom = entry.customTarget?.toLowerCase() ?? ""
+  const unarmed = isUnarmedStrikeWeapon(weapon)
+  if (/\bcrossbows?\b/.test(custom) && !/crossbow/i.test(weapon.name)) return false
+  if (entry.target === "custom") {
+    if (/\bcrossbows?\b/.test(custom)) return !unarmed && /crossbow/i.test(weapon.name)
+    if (/^one-handed melee weapon\b/.test(custom)) {
+      return !unarmed && weaponMatchesModifierTarget(weapon.subcategory ?? "", properties, "one_handed_melee")
+    }
+    if (/^two-handed\/versatile melee\b/.test(custom)) {
+      return !unarmed && /melee/i.test(weapon.subcategory ?? "") &&
+        properties.some((p) => /^(two[- ]handed|versatile)\b/i.test(p))
+    }
+    if (/^thrown weapon ranged attacks\b/.test(custom)) return !unarmed && hasWeaponProperty(weapon, "thrown")
+    if (/^light weapon bonus-action attack\b/.test(custom)) return !unarmed && hasWeaponProperty(weapon, "light")
+  }
   return weaponMatchesModifierTarget(
     weapon.subcategory ?? "",
     properties,
@@ -134,9 +153,10 @@ function entryMatchesWeapon(
   )
 }
 
-function describeAttackEntry(entry: RollModifierEntry): string {
+function describeAttackEntry(entry: RollModifierEntry, rollKind: "attack" | "damage" = "attack"): string {
   const parts: string[] = []
-  if (entry.bonus) parts.push(`${formatSigned(entry.bonus)} to attack rolls`)
+  if (entry.bonus) parts.push(`${formatSigned(entry.bonus)} to ${rollKind} rolls`)
+  if (entry.customTarget?.trim()) parts.push(entry.customTarget.trim())
   if (entry.criticalHitMinimum && entry.criticalHitMinimum < 20) {
     parts.push(`Critical hit on ${entry.criticalHitMinimum}–20`)
   }
@@ -167,12 +187,13 @@ function describeRiderOption(rider: BonusDamageRiderEntry): string {
 
 function appliedModifierSource(mod: CharacteristicModifier): Pick<
   WeaponSheetAppliedModifier,
-  "sourceType" | "sourceLabel"
+  "sourceType" | "sourceLabel" | "sourceId"
 > {
   const source = readModifierSource(mod)
   return {
     sourceType: source?.sourceType,
     sourceLabel: source?.label || source?.source,
+    sourceId: source?.sourceId,
   }
 }
 
@@ -361,7 +382,7 @@ function collectAppliedModifiers(
       const damageMod = mod as DamageRollModifiersCharacteristic
       for (const entry of damageMod.entries ?? []) {
         if (!entryMatchesWeapon(weapon, properties, entry)) continue
-        const description = describeAttackEntry(entry)
+        const description = describeAttackEntry(entry, "damage")
         if (!description) continue
         applied.push({
           name: mod.label ?? "Damage modifier",
@@ -666,11 +687,11 @@ export function buildWeaponSheetContext(
     masteryActive,
     extraMasteries,
     extraMasterySlotCount,
-    appliedModifiers: collectAppliedModifiers(
+    appliedModifiers: groupFeatWeaponBadges(collectAppliedModifiers(
       weapon,
       allMods,
       classResourceDieSides,
       inputs.activeSheetToggles,
-    ),
+    ), inputs.feats),
   }
 }

@@ -595,6 +595,8 @@ export const WARMAGE_PRESETS: EnrichmentPreset[] = [
     target: "subclass_feature",
     match: { subclassClassName: /warmage/i, name: /^arcane dominance$/i },
     operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
         op: "attachNamedPreset",
         preset: {

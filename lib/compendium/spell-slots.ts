@@ -11,7 +11,11 @@ import { ABILITY_SCORE_KEYS, type AbilityScoreKey } from "@/lib/compendium/chara
 export function resolveEffectiveClassSpellcasting(
   entry: Pick<CharacterClassDetail, "class" | "subclass">,
 ): DndClass["spellcasting"] | null {
-  return entry.class?.spellcasting ?? entry.subclass?.spellcasting ?? null
+  const base = entry.class?.spellcasting
+  const subclass = entry.subclass?.spellcasting
+  // Ritualists and cantrip-only classes can still gain real slots from a subclass.
+  if (subclass && (!base || !getCasterSlotType(entry.class?.name ?? "", base))) return subclass
+  return base ?? subclass ?? null
 }
 
 /** Map SRD spellcasting ability labels (including "Dexterity and Wisdom") to a score key. */
@@ -152,19 +156,25 @@ export function getSpellSlotTable(
   if (!type) return null
 
   const level = Math.max(1, Math.min(20, classLevel))
+  if (level < (spellcasting?.starts_at ?? 1)) {
+    return { type, slotsByLevel: [], className, classLevel: level }
+  }
 
   const explicitProgression = spellcasting?.explicit_slot_progression
   if (explicitProgression?.length) {
     const sorted = [...explicitProgression].sort((a, b) => a.level - b.level)
-    let row = sorted[0]
+    let row: (typeof sorted)[number] | undefined
     for (const entry of sorted) {
       if (level >= entry.level) row = entry
     }
-    const slotsByLevel = [...row.slots]
+    const slotsByLevel = [...(row?.slots ?? [])]
     while (slotsByLevel.length < 9) slotsByLevel.push(0)
     return {
       type: type ?? "half",
       slotsByLevel: slotsByLevel.slice(0, 9),
+      ...(type === "pact" && slotsByLevel.some((count) => count > 0)
+        ? { pactSlotLevel: slotsByLevel.findLastIndex((count) => count > 0) + 1 }
+        : {}),
       className,
       classLevel: level,
     }

@@ -481,6 +481,7 @@ export const ChoiceOptionsSchema = z.object({
       description: z.string(),
       prerequisite: z.string().nullable().optional(),
       repeatable: z.boolean().nullable().optional(),
+      level_requirement: z.number().nullable().optional(),
       linkedModifiers: z
         .array(z.record(z.unknown()))
         .transform((value) => value as LinkedModifierInstance[])
@@ -677,6 +678,7 @@ export const CREATURE_COMPANION_IMPORT_HINT = `For creatures[] (companions, summ
 - Pair every summoned/attached companion with mechanics [{ "kind": "grant_creature", "creatureNames": ["<name>"] }] on the class/subclass feature that grants it, and emit the creatures[] row in the same JSON. Never leave a companion stat block only inside a feature description.`
 
 export const SpellImportSchema = z.object({
+  creator_url: z.string().max(512).nullable().optional(),
   name: z.string(),
   source: z.string().nullable().optional(),
   card_image_url: z.string().nullable().optional(),
@@ -956,6 +958,7 @@ export const AbilityImportSchema = z.object({
    * (e.g. Psychokinesis Cryokinetic / Electrokinetic / Pyrokinetic with replacement AE tables).
    */
   specialization_choices: ChoiceOptionsSchema.nullable().optional(),
+  parent_ability_name: z.string().nullable().optional(),
   ability_role: z
     .enum([
       "discipline",
@@ -1229,7 +1232,7 @@ export const SUBCLASS_IMPORT_HINT = `For subclasses:
 - A state with several mutually exclusive modes needs one gated key per mode, not one cosmetic parent toggle. For Elemental Mind's Primordial Aspect, use the recognized keys primordial_aspect_cold, primordial_aspect_fire, and primordial_aspect_lightning in the corresponding mechanics; do not emit a lone primordial_aspect toggle.
 - Do not model a mutable combat die (such as Unleashed Mind's Rampage Die) as a level-scaled dieSidesByLevel resource: its current size changes during play, not by class level. Preserve the exact feature and trigger wording so the dedicated play-state wiring can recognize it. The sheet already steps the die up after a turn you dealt damage, resets it to d4 after a turn without damage or while Incapacitated, allows one die per damage roll each turn, applies Exhaustion for holding d12 too long, and resets it on a rest — do not add a class_resources row for it.
 - Benefits that only hold while a play-state engine is in a given state must be gated, not granted outright: Uncontrollable Mind is condition_immunity ["Charmed", "Frightened"] with requiresSheetToggle "rampage_die_d8_plus" (a sheet-derived key — do not declare it under new_toggles). Tantrum, Unstoppable Rampage, and Empowered Psionics need no mechanics[]; the sheet drives them from the feature names and descriptions.
-- When the SUBCLASS itself grants spell slots that the base class doesn't have (e.g. Eldritch Knight, Arcane Trickster — the "Spellcasting"/"Spell Slots" feature has its own slot table separate from any full-caster class), set the subclass's own spellcasting field: { ability, caster_progression }. Use caster_progression "third" for a table that starts at level 3 and grants its first 2nd-level slot around level 7 (Eldritch Knight/Arcane Trickster pattern); use "half" only if the table instead starts at level 2 and matches a half-caster's pace. If the table doesn't match either canonical shape, also set explicit_slot_progression: [{ level, slots: [1st,2nd,...] }, ...] read directly from the table. Do NOT set this for subclasses that just add spells known/prepared to an already-full-caster base class (e.g. Divine Soul Sorcerer) — that's already covered by the base class's own spellcasting.`
+- When the SUBCLASS itself grants spell slots that the base class doesn't have (e.g. Eldritch Knight, Arcane Trickster — the "Spellcasting"/"Spell Slots" feature has its own slot table separate from any full-caster class), set the subclass's own spellcasting field: { ability, caster_progression }. Use caster_progression "third" for a table that starts at level 3 and grants its first 2nd-level slot around level 7 (Eldritch Knight/Arcane Trickster pattern); use "half" only if the table instead starts at level 2 and matches a half-caster's pace. If the table doesn't match either canonical shape, also set explicit_slot_progression: [{ level, slots: [1st,2nd,...] }, ...] read directly from the table. For a custom Pact Magic table use caster_progression "pact", starts_at, and explicit_slot_progression (put the count in the unified slot-level column); do not substitute the Warlock table. An ability-only ritual/cantrip base does not replace this subclass config. Do NOT set this for subclasses that just add spells known/prepared to an already-full-caster base class (e.g. Divine Soul Sorcerer) — that's already covered by the base class's own spellcasting.`
 
 export const CLASS_RESOURCE_IMPORT_HINT = `For class_resources (custom class pools like Psi Points, Rage, Ki, Risk Dice):
 - Extract rows when a class level table lists named resource columns (Psi Points, Psi Limit, Rage, Risk Dice, etc.)

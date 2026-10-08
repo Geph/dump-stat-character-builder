@@ -89,6 +89,37 @@ function elementalOozeOptions(): FeatureChoice["options"] {
 
 export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
   {
+    id: "alchemist.subclass.miracle_serum", pack: "alchemist", target: "subclass_feature",
+    match: { subclassClassName: /^alchemist$/i, name: /^miracle serum$/i },
+    operations: [{ op: "attachNamedPreset", replaceCharacteristicTypes: ["power_rider"], preset: {
+      kind: "char_instance", idKey: "miracle_serum", catalogRefId: "cat_char_power_rider",
+      characteristics: [{ id: modId("miracle_serum"), type: "power_rider",
+        parentPowerNames: ["Potion Mixologist", "Unconventional Potions", "Potion Toss", "Reactionary Gulp"],
+        alertSummary: "A potion recipient who regains HP gains Advantage on all D20 Tests until the start of their next turn. Apply to the recipient, not automatically to the Alchemist.",
+      }],
+    } }],
+  },
+  ...([
+    { key: "charmer", name: /^charmer$/i, skills: ["Deception", "Persuasion"] },
+    { key: "physician_studies", name: /^physician['’]s studies$/i, skills: ["Medicine"] },
+  ].map(({ key, name, skills }): EnrichmentPreset => ({
+    id: `alchemist.subclass.${key}`,
+    pack: "alchemist",
+    target: "subclass_feature",
+    match: { subclassClassName: /^alchemist$/i, name },
+    operations: [{
+      op: "attachNamedPreset",
+      replaceEffectKinds: ["check_roll_modifier"],
+      replaceCharacteristicTypes: ["skill_check_alternate_ability"],
+      preset: {
+        kind: "fx_instance", idKey: key, catalogRefId: effectCatalogRefId("check_roll_modifier"),
+        effects: [{ id: modId(key), kind: "check_roll_modifier", checkCategory: "skill", checkSkills: skills,
+          checkRollMode: "bonus", bonusConfig: { mode: "ability_modifier", ability: "INT", resultFloor: { mode: "fixed", fixed: 1 } },
+          label: "Additional Intelligence bonus (minimum +1)" }],
+      },
+    }],
+  }))),
+  {
     id: "alchemist.class.bombs",
     pack: "alchemist",
     target: "class_feature",
@@ -411,7 +442,7 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     match: { subclassClassName: /alchemist/i, name: /^magnetic personality$/i },
     operations: [
       { op: "setActivation", activation: { bonusAction: true } },
-      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, abilitiesActions: true } },
       {
         op: "appendDescription",
         text: "Bonus Action: take the Influence action.",
@@ -717,7 +748,7 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     match: { subclassClassName: /alchemist/i, name: /^alchemical resurrection$/i },
     operations: [
       { op: "setActivation", activation: { action: true, bonusAction: true } },
-      { op: "setSheetDisplay", sheetDisplay: { abilitiesActions: true, featuresTab: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, abilitiesActions: true, featuresTab: true } },
       {
         op: "attachNamedPreset",
         preset: {
@@ -832,12 +863,12 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
               targetMode: "single",
               rangeFeet: 5,
               damageTypes: ["Poison"],
-              damageDiceCount: 1,
+              damageDiceCount: 2,
               damageDieType: "d10",
               saveAbility: "CON",
               saveDCBase: 8,
               label:
-                "Reaction (melee hit): CON save vs Alchemist DC or Poisoned 1 min; 1d10 Poison at start of turns (repeat save ends)",
+                "Reaction (hit by an attack within 5 feet): CON save vs Alchemist DC or Poisoned 1 min; 2d10 Poison at start of turns (repeat save ends)",
             },
           ],
         },
@@ -863,22 +894,14 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     id: "alchemist.subclass.surgical_strike",
     pack: "alchemist",
     target: "subclass_feature",
-    match: { subclassClassName: /alchemist/i, name: /^surgical strike$/i },
+    match: { subclassClassName: /alchemist/i, name: /^(surgical strike|examine specimen)$/i },
     operations: [
       { op: "setActivation", activation: { bonusAction: true } },
       { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
-      {
-        op: "setLimitedUses",
-        uses: {
-          type: "fixed",
-          fixedAmount: 1,
-          useShareKey: "surgical_strike",
-          recharges: [{ rest: "short_rest" }, { rest: "long_rest" }],
-        },
-      },
+      { op: "clearLimitedUses" },
       {
         op: "appendDescription",
-        text: "Bonus Action Study: learn creature type; DC 15 INT check (Examine Specimen table). On success learn AC, Immunities, Resistances, or Bloodied. Per creature kind until rest — tracker is 1/rest as a reminder.",
+        text: "Study each creature kind separately; track examined kinds in notes. The restriction is per kind, not a shared rest-use pool.",
       },
     ],
   },
@@ -901,7 +924,7 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
               parentPowerNames: ["Bomb", "Bombs"],
               appliesToAttackVariants: ["primed"],
               alertSummary:
-                "Overloaded Charge: spend PB Reagents to empower → gain +2 Reagents you may spend immediately (can exceed max).",
+                "Overloaded Charge: spending your Prime Bomb maximum adds two free Reagents to that bomb; it does not restore the Reagent pool.",
             },
           ],
         },
@@ -1178,25 +1201,25 @@ export const ALCHEMIST_PRESETS: EnrichmentPreset[] = [
     target: "subclass_feature",
     match: { subclassClassName: /alchemist/i, name: /^timed demolition$/i },
     operations: [
+      { op: "setActivation", activation: { action: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
         op: "attachNamedPreset",
         preset: {
           kind: "char_instance",
           idKey: "timed_demolition",
-          catalogRefId: "cat_char_power_rider",
+          catalogRefId: "cat_char_player_note",
           characteristics: [
             {
               id: "char_timed_demolition",
-              type: "power_rider",
-              parentPowerNames: ["Bomb", "Bombs"],
-              appliesToAttackVariants: ["primed"],
-              selectable: true,
-              alertSummary:
-                "When you prime a Bomb: set a delay (rounds up to 10 min); it Explodes at the end of your turn after that duration. Overlapping blasts: one Bomb of your choice.",
+              type: "player_note",
+              target: "feature",
+              prompt: "Armed bombs and detonation rounds",
+              placeholder: "Location, bomb formula, and the turn when it detonates",
             },
           ],
         },
-        replaceCharacteristicTypes: ["power_rider"],
+        replaceCharacteristicTypes: ["power_rider", "player_note"],
       },
     ],
   },

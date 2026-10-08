@@ -109,7 +109,6 @@ import { formatDamageRollResult, rollDamageWithMode } from "@/lib/dice/damage-ro
 import { resolveRollMode } from "@/lib/character/resolve-roll-mode"
 import {
   DEFAULT_COMBAT_ACTION_GROUP_ORDER,
-  defaultActionGroupColumn,
   loadActionGroupColumns,
   loadActionGroupOrder,
   orderActionGroups,
@@ -121,6 +120,7 @@ import {
   type ActionGroupId,
 } from "@/lib/character/action-group-layout"
 import { ActionGroupColumns } from "@/components/character-sheet/action-group-columns"
+import { ActionEntryHeading } from "@/components/character-sheet/action-entry-heading"
 
 type SheetActionsPanelProps = {
   actions: SheetActionEntry[]
@@ -3212,7 +3212,6 @@ export function SheetActionsPanel({
   const [openEconomyKind, setOpenEconomyKind] = useState<ActionEconomyKind | null>(null)
   const [groupOrder, setGroupOrder] = useState<string[]>([])
   const [groupColumns, setGroupColumns] = useState<ActionGroupColumnMap>({})
-  const [desktopGroupDragEnabled, setDesktopGroupDragEnabled] = useState(false)
 
   useEffect(() => {
     if (!characterId) {
@@ -3223,24 +3222,6 @@ export function SheetActionsPanel({
     setGroupOrder(loadActionGroupOrder(characterId, layoutScope))
     setGroupColumns(loadActionGroupColumns(characterId, layoutScope))
   }, [characterId, layoutScope])
-
-  useEffect(() => {
-    if (!characterId || !groupOrder.length) return
-    saveActionGroupOrder(characterId, layoutScope, groupOrder)
-  }, [characterId, layoutScope, groupOrder])
-
-  useEffect(() => {
-    if (!characterId || !Object.keys(groupColumns).length) return
-    saveActionGroupColumns(characterId, layoutScope, groupColumns)
-  }, [characterId, layoutScope, groupColumns])
-
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1280px)")
-    const update = () => setDesktopGroupDragEnabled(media.matches)
-    update()
-    media.addEventListener("change", update)
-    return () => media.removeEventListener("change", update)
-  }, [])
 
   const resourceById = useMemo(
     () => new Map(resourceEntries.map((entry) => [entry.id, entry])),
@@ -3547,6 +3528,8 @@ export function SheetActionsPanel({
         }
         className={cn(
           "relative flex min-w-0 flex-col gap-1 rounded border px-2.5 py-1.5",
+          groupLayout === "responsive-grid" && "min-h-12 rounded-lg shadow-[inset_0_1px_0_0_#ffffff40] hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-primary",
+          groupLayout === "responsive-grid" && isSpecialAttack && "col-span-full",
           usesClassResource ? SHEET_ACTION_CARD.classResource : SHEET_ACTION_CARD.default,
           reminderToggleOn && "border-destructive/40 bg-destructive/10",
           interactive &&
@@ -3557,36 +3540,14 @@ export function SheetActionsPanel({
         )}
       >
         <div className="flex items-stretch justify-between gap-2">
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <div className="flex flex-wrap items-center gap-x-1.5">
-              {entry.icon ? (
-                <span
-                  className="rounded text-primary"
-                  title={
-                    entry.relatedTalentAlerts?.length
-                      ? entry.relatedTalentAlerts
-                          .map((alert) => `${alert.name}: ${alert.summary}`)
-                          .join(" · ")
-                      : undefined
-                  }
-                >
-                  <GameIcon name={entry.icon} className="h-5 w-5 shrink-0" />
-                </span>
-              ) : entry.relatedTalentAlerts?.length ? (
-                <span
-                  className="rounded text-amber-600 dark:text-amber-400"
-                  title={entry.relatedTalentAlerts
-                    .map((alert) => `${alert.name}: ${alert.summary}`)
-                    .join(" · ")}
-                >
-                  <AlertTriangle className="h-5 w-5 shrink-0" />
-                </span>
-              ) : null}
-              <p className="text-xs font-semibold text-foreground">{entry.name}</p>
-            </div>
+          <div className={cn("min-w-0 flex-1 space-y-0.5",
+            groupLayout === "responsive-grid" && !isSpecialAttack && "relative min-h-8 pl-10")}>
+            <ActionEntryHeading name={entry.name} icon={entry.icon} group={keyPrefix}
+              compact={groupLayout === "responsive-grid" && !isSpecialAttack}
+              hint={entry.relatedTalentAlerts?.map((alert) => `${alert.name}: ${alert.summary}`).join(" · ")} />
 
             {subtitleMeta || showOwnUses ? (
-              <div className="space-y-1">
+              <div className={groupLayout === "responsive-grid" && !subtitleMeta ? "flex flex-wrap items-center gap-x-2 gap-y-1" : "space-y-1"}>
                 {subtitleMeta || (usage && showOwnUses) ? (
                   <p className="text-[10px] leading-snug text-muted-foreground tabular-nums">
                     {[
@@ -3600,7 +3561,9 @@ export function SheetActionsPanel({
                   </p>
                 ) : null}
                 {usage && showOwnUses ? (
-                  <UseDots usage={usage} label={entry.name} tone="default" />
+                  <div className="min-w-0 max-w-full">
+                    <UseDots usage={usage} label={entry.name} tone="default" />
+                  </div>
                 ) : null}
               </div>
             ) : null}
@@ -3665,8 +3628,13 @@ export function SheetActionsPanel({
 
   const gridClass = cn(
     "grid gap-2",
-    singleColumn ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+    groupLayout === "responsive-grid" ? "gap-1.5"
+      : singleColumn ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
   )
+
+  const tileGridStyle = groupLayout === "responsive-grid"
+    ? { gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))" }
+    : undefined
 
   const showEconomy = sections === "all" || sections === "economy"
   const showTriggered =
@@ -3692,6 +3660,7 @@ export function SheetActionsPanel({
     id: ActionGroupId
     label: string
     body: ReactNode
+    count?: number
   }
 
   const actionGroups: RenderableActionGroup[] = []
@@ -3708,17 +3677,19 @@ export function SheetActionsPanel({
       if (!entries.length) continue
       actionGroups.push({
         id: kind,
+        count: entries.length,
         label: ACTION_KIND_LABELS[kind],
-        body: <div className={gridClass}>{entries.map((entry) => renderEntryCard(entry, kind))}</div>,
+        body: <div className={gridClass} style={tileGridStyle}>{entries.map((entry) => renderEntryCard(entry, kind))}</div>,
       })
     }
   }
   if (hasWeaponAttackEntries) {
     actionGroups.push({
       id: "weapon-attack",
+      count: weaponAttackEntries.length,
       label: "Extra Attacks",
       body: (
-        <div className={gridClass}>
+        <div className={gridClass} style={tileGridStyle}>
           {weaponAttackEntries.map((entry) => renderEntryCard(entry, "weapon-attack"))}
         </div>
       ),
@@ -3727,9 +3698,10 @@ export function SheetActionsPanel({
   if (hasTriggeredEntries) {
     actionGroups.push({
       id: "triggered",
+      count: triggeredEntries.length,
       label: "Passive",
       body: (
-        <div className={gridClass}>
+        <div className={gridClass} style={tileGridStyle}>
           {triggeredEntries.map((entry) => renderEntryCard(entry, "triggered"))}
         </div>
       ),
@@ -3744,24 +3716,16 @@ export function SheetActionsPanel({
   )
   const visibleGroupIds = visibleGroups.map((group) => group.id)
 
-  const columnForGroup = (id: string): 0 | 1 =>
-    groupColumns[id] ?? defaultActionGroupColumn(id)
-  const groupsByColumn = [
-    visibleGroups.filter((group) => columnForGroup(group.id) === 0),
-    visibleGroups.filter((group) => columnForGroup(group.id) === 1),
-  ] as const
-  const canDragGroups = groupLayout === "responsive-grid" && desktopGroupDragEnabled
-
-  const placeGroup = (fromId: string, slot: ActionGroupDropSlot) => {
-    setGroupColumns((previous) => ({ ...previous, [fromId]: slot.column }))
-    setGroupOrder(
-      placeActionGroup(
-        visibleGroupIds,
-        fromId,
-        slot.beforeId,
-        groupsByColumn[slot.column].map((group) => group.id),
-      ),
-    )
+  const saveGroupLayout = (order: string[], columns: ActionGroupColumnMap) => {
+    setGroupOrder(order)
+    setGroupColumns(columns)
+    if (!characterId) return
+    saveActionGroupOrder(characterId, layoutScope, order)
+    saveActionGroupColumns(characterId, layoutScope, columns)
+  }
+  const placeGroup = (fromId: string, slot: ActionGroupDropSlot, columnIds: string[]) => {
+    saveGroupLayout(placeActionGroup(visibleGroupIds, fromId, slot.beforeId, columnIds),
+      { ...groupColumns, [fromId]: slot.column })
   }
 
   return (
@@ -3771,7 +3735,7 @@ export function SheetActionsPanel({
           Incapacitated — you cannot take actions, bonus actions, or reactions.
         </p>
       ) : null}
-      <div className={groupLayout === "responsive-grid" ? "space-y-3 xl:hidden" : "space-y-3"}>
+      {groupLayout !== "responsive-grid" ? <div className="space-y-3">
         {visibleGroups.map((group) => (
           <div key={group.id} className="min-w-0">
             <div className="mb-1.5 flex items-center gap-1">
@@ -3782,9 +3746,10 @@ export function SheetActionsPanel({
             {group.body}
           </div>
         ))}
-      </div>
+      </div> : null}
       {groupLayout === "responsive-grid" ? (
-        <ActionGroupColumns columns={groupsByColumn} canDrag={canDragGroups} onPlace={placeGroup} />
+        <ActionGroupColumns groups={visibleGroups} preferredColumns={groupColumns} canDrag onPlace={placeGroup}
+          onReset={() => saveGroupLayout([], {})} />
       ) : null}
 
       <AnimatePresence>

@@ -26,7 +26,7 @@ export function upgradeAbilitiesForClass(
 export function isUpgradeEligible(
   upgrade: CustomAbility,
   classLevel: number,
-  context?: Pick<ChoicePrerequisiteContext, "classNames" | "weapon">,
+  context?: Pick<ChoicePrerequisiteContext, "classNames" | "weapon" | "selectedAbilityNames">,
 ): boolean {
   return isChoiceOptionEligible(
     {
@@ -37,7 +37,7 @@ export function isUpgradeEligible(
     },
     {
       classLevel,
-      selectedAbilityNames: [],
+      selectedAbilityNames: context?.selectedAbilityNames ?? [],
       classNames: context?.classNames,
       weapon: context?.weapon,
     },
@@ -65,7 +65,7 @@ export function aggregateUpgradeOptions(params: {
   }[] = []
 
   for (const upgrade of upgrades) {
-    if (!isUpgradeEligible(upgrade, params.classLevel, { classNames: params.classNames })) continue
+    if (!isUpgradeEligible(upgrade, params.classLevel, { classNames: params.classNames, selectedAbilityNames: selected })) continue
     const countInSelection = selected.filter((name) => normalizeName(name) === normalizeName(upgrade.name)).length
     if (!upgrade.repeatable && countInSelection > 0) continue
     options.push({
@@ -125,7 +125,7 @@ export function validateUpgradeSelectionChange(params: {
   for (const name of params.next) {
     const upgrade = upgradeByName.get(normalizeName(name))
     if (!upgrade) continue
-    if (!isUpgradeEligible(upgrade, params.classLevel)) {
+    if (!isUpgradeEligible(upgrade, params.classLevel, { selectedAbilityNames: params.next })) {
       return { ok: false, message: `${name} is not available with your current prerequisites.` }
     }
     if (upgrade.repeatable) {

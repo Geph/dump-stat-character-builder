@@ -391,6 +391,8 @@ export const DANCER_PRESETS: EnrichmentPreset[] = [
     target: "class_feature",
     match: { className: /dancer/i, name: /^freestyle$/i },
     operations: [
+      { op: "setActivation", activation: { bonusAction: true } },
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
       {
         op: "appendDescription",
         text: "When you begin Dance, choose two Dance Styles (Dance Styles picker count becomes 2 at level 13). Change one style at a time as a Bonus Action.",

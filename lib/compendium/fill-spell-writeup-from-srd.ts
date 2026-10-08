@@ -1,5 +1,7 @@
 import { spellNameMatchKeys } from "@/lib/compendium/spell-name-match"
 import { getSrdSeedData } from "@/lib/srd/load-seed"
+import { SPELL_REFERENCE_IMPORT_NOTICE, isSpellReferencePlaceholder } from "@/lib/import/spell-reference-placeholder"
+import { SRD_SOURCE, SRD_CREATOR_URL } from "@/lib/srd/source"
 
 const WRITEUP_KEYS = [
   "description",
@@ -15,7 +17,7 @@ let writeupIndex: Map<string, Record<string, unknown>> | null = null
 
 function isEmptyWriteupField(value: unknown): boolean {
   if (value == null) return true
-  if (typeof value === "string") return !value.trim()
+  if (typeof value === "string") return !value.trim() || isSpellReferencePlaceholder(value)
   if (Array.isArray(value)) return value.length === 0
   return false
 }
@@ -44,14 +46,19 @@ export function lookupSrdSpellWriteup(name: string | null | undefined): Record<s
 
 /**
  * Copy SRD casting details / prose onto a catalog stub without changing id,
- * classes, source, or card art. Used when a class-list import wiped write-ups.
+ * classes or card art. Authorship follows the restored SRD write-up.
  */
 export function fillEmptySpellWriteup<T extends Record<string, unknown>>(row: T): T {
   const srd = lookupSrdSpellWriteup(String(row.name ?? ""))
-  if (!srd) return row
+  if (!srd) return isEmptyWriteupField(row.description) ? { ...row, description: SPELL_REFERENCE_IMPORT_NOTICE } : row
 
   let changed = false
   const next: Record<string, unknown> = { ...row }
+  if (isEmptyWriteupField(row.description)) {
+    next.source = SRD_SOURCE
+    next.creator_url = SRD_CREATOR_URL
+    changed = true
+  }
   for (const key of WRITEUP_KEYS) {
     if (!isEmptyWriteupField(next[key]) || isEmptyWriteupField(srd[key])) continue
     next[key] = srd[key]

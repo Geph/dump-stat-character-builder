@@ -512,7 +512,8 @@ export function enrichImportContentModifiers(content: ImportContent): ImportCont
         sourceName: ability.source_name ?? ability.name,
         // Power bodies describe the power's own active effect; phrase rules would
         // wire spurious passive modifiers (damage riders, "you know it" languages).
-        suppressPhraseDetection: isPsionicPower || isWeaponMastery,
+        suppressPhraseDetection: isPsionicPower || isWeaponMastery || (ability.choices as Feature["choices"])?.applyTo === "companion",
+        suppressNameDetection: isWeaponMastery,
       }
       const enriched = enrichFeatureLike(ability as ImportMechanicsCarrier, {
         ...ctx,

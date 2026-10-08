@@ -90,6 +90,12 @@ export const OPTIONAL_SHEET_TOGGLES: SheetToggleDefinition[] = [
     defaultDuration: "1_round",
     hideFromBanner: true,
   },
+  {
+    id: "attacking_chosen_foe",
+    label: "Attacking a chosen foe",
+    sourceType: "class_feature",
+    hint: "Turn on while attacking a creature your feature singled out (sworn enemy, designated target).",
+  },
   { id: "while_concentrating", label: "Concentrating", sourceType: "class_feature" },
   { id: "while_flying", label: "Flying", sourceType: "class_feature" },
   { id: "physical_surge_active", label: "Physical Surge", sourceType: "class_feature" },

@@ -1,6 +1,24 @@
 # Custom modifiers — agent map
 
-Last reviewed: 2026-10-04.
+Last reviewed: 2026-10-08.
+
+Custom ability choices retain their nested metadata throughout import confirmation
+and normalization (`import-proposals.ts`, `normalize-ability-import.ts`).
+`specialization_choices` and `parent_ability_name` are persisted custom-ability
+columns in both hosted schema and additive migrations. Specializations remain
+separate from repeatable discipline talents. Selected nested options become sheet
+actions through `selected-custom-ability-options.ts`; their linked modifiers remain
+the editable source of mechanical effects. Upgrade prerequisites see the current
+selection, including prerequisite chains and explicit incompatible choices.
+
+For companion-only upgrades, `choices.applyTo: "companion"` plus
+`applyToCompanionFeature` directs the ability to its companion. The player modifier
+collector and import phrase detector must not attach its flight, proficiencies or
+ability scores to the character. Selected abilities with no sub-options become
+companion traits; conditional changes remain visible rules for manual application.
+Explicit action costs route those entries to companion action/bonus/reaction lists.
+Already authored companion-scoped modifiers survive enrichment; only legacy
+player-targeted detections are discarded when repairing the Golemsmith scope.
 
 A new chat has **no prior transcript**. Read this before adding a modifier type, a
 `if (name === "…")` sheet branch, or a play-state field. Decision rule for
@@ -15,6 +33,20 @@ Do **not** copy the type lists into always-apply rules. The live lists are the
 source of truth; this file is the map, the gaps, and the add-type checklist.
 
 ## Source of truth
+
+For mixed rest/combat features, activation and placement are separate inputs:
+`sheet-actions.ts` resolves action economy, while `feature-sheet-display.ts`
+resolves surfaces. An in-turn Bonus Action or Reaction must survive rest-choice
+inference. Partial `sheetDisplay` values retain the Features card unless explicitly
+disabled. The level-by-level audit procedure is in
+[new-class-playbook.md](./new-class-playbook.md#actions-unlocked-during-progression).
+
+Use existing kinds for source revisions: `check_roll_modifier` with an
+ability-modifier bonus and `resultFloor` for an additional minimum +1 skill bonus;
+`ac` with a Shield limitation for a shield-only increment; `player_note` for delayed
+detonation bookkeeping; `replace_failure` for elective successful saves. Replace
+stale linked `uses` modifiers when recharge amounts change—the linked value can
+take precedence over the feature's legacy `limitedUses` field.
 
 | What | Where |
 | --- | --- |
@@ -235,6 +267,10 @@ verbatim.
 Derived keys the sheet owns: `rampage_die_d8_plus`, `weapon_morph_*`,
 `below_half_hp`. **Reference** them from modifiers; never declare them under
 `new_toggles`.
+
+`attacking_chosen_foe` (optional) gates riders that only apply against creatures
+a feature singled out ("against the chosen creatures", sworn foes). The
+`damage.rider.dice` detector attaches it; `quarry_marked` stays Hunter's Mark.
 
 Name → toggle activation (not a catalog type):
 `ACTION_NAME_ACTIVATES_TOGGLE` / `RESOURCE_KEY_ACTIVATES_TOGGLE` in

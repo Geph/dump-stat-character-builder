@@ -384,13 +384,6 @@ describe("audit-resource-graph", () => {
         },
         {
           "class": "Vagabond",
-          "feature": "Overexertion",
-          "level": 3,
-          "phrase": "If you have no Battle Dice remaining, you can regain one Battle Die to immediately expend it and use a maneuver or Vagabond feature",
-          "resource": "Battle Dice",
-        },
-        {
-          "class": "Vagabond",
           "feature": "Sick 'Em! [Maneuver] (Houndmaster)",
           "level": 3,
           "phrase": "As a Bonus Action, you can expend one Battle Die to command your hound to attack a creature you can see within 40 feet of it",
@@ -422,13 +415,6 @@ describe("audit-resource-graph", () => {
           "feature": "Old Dog, New Tricks (Houndmaster)",
           "level": 14,
           "phrase": "Battle Dice",
-          "resource": "Battle Dice",
-        },
-        {
-          "class": "Vagabond",
-          "feature": "Martial Recovery",
-          "level": 20,
-          "phrase": "You can take a Bonus Action to regain all of your expended Battle Dice",
           "resource": "Battle Dice",
         },
         {

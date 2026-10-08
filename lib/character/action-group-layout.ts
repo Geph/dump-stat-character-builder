@@ -107,6 +107,27 @@ export function moveActionGroup(allIds: string[], order: string[] | undefined, f
 /** Where a dragged group lands: before `beforeId`, or at the end of the column when null. */
 export type ActionGroupDropSlot = { column: 0 | 1; beforeId: string | null }
 
+export type ActionGroupPlacement = { id: string; column: 0 | 1; top: number; height: number }
+
+/** Pack measured groups into the shortest column, respecting explicit player placements. */
+export function packActionGroups(
+  ids: readonly string[],
+  heights: Readonly<Record<string, number>>,
+  columnCount: 1 | 2,
+  preferredColumns: ActionGroupColumnMap = {},
+  gap = 10,
+): ActionGroupPlacement[] {
+  const bottoms = [0, 0]
+  return ids.map((id) => {
+    const column: 0 | 1 = columnCount === 1 ? 0
+      : preferredColumns[id] ?? (id === "weapons" ? 0 : bottoms[0] <= bottoms[1] ? 0 : 1)
+    const height = Math.max(1, Math.ceil(heights[id] ?? (id === "weapons" ? 220 : 120)))
+    const top = bottoms[column]
+    bottoms[column] = top + height + gap
+    return { id, column, top, height }
+  })
+}
+
 /**
  * Reorder `orderedIds` so `fromId` sits before `beforeId`, or after the last group of the
  * target column (`columnIds`, in display order) when `beforeId` is null.

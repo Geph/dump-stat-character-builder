@@ -373,7 +373,7 @@ function titleCaseWords(value: string): string {
 function matchSkillName(fragment: string): string | null {
   const stripped = fragment
     .replace(/^the\s+/i, "")
-    .replace(/\s+skill$/i, "")
+    .replace(/\s+skills?$/i, "")
     .trim()
   const normalized = titleCaseWords(stripped.replace(/\s+and\s+/gi, " "))
   for (const skill of SKILL_NAMES) {
@@ -446,7 +446,7 @@ function buildCheckRollModifier(
   ruleSuffix: string,
   options: {
     checkRollMode: "advantage" | "disadvantage"
-    checkCategory: "save" | "skill" | "initiative" | "attack" | "ability"
+    checkCategory: "save" | "death_save" | "skill" | "initiative" | "attack" | "ability"
     checkAbility?: string | null
     checkSkills?: string[]
     /** Conditions the roll is made against (e.g. ["spell"] for saves vs spells). */
@@ -536,6 +536,7 @@ function unlockLevelNear(text: string, index: number): number | undefined {
 
 function parseSpellNameList(fragment: string): string[] {
   const cleaned = fragment
+    .replace(/\s+targeting\b[\s\S]*$/i, "")
     .replace(/^the\s+/i, "")
     .replace(/\s+spells?$/i, "")
     .trim()
@@ -549,6 +550,7 @@ function parseSpellNameList(fragment: string): string[] {
 
 /** Reject chooser / pool phrasing that is not a concrete spell title. */
 function looksLikeNamedSpell(name: string): boolean {
+  if (/^spells?(?:$|\s+(?:using|that|you|from|with)\b)/i.test(name)) return false
   if (/\d/.test(name)) return false
   if (/^(one|two|three|four|five|six|a|an|any|it|this|that|them|the|each|whether|how|what)\b/i.test(name)) {
     return false
@@ -1304,13 +1306,14 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "proficiency.skills.choice",
     confidence: "medium",
-    test: /\bproficien(?:cy|t)\s+(?:with|in)\s+(?:one|two|three|four|\d+)\s+skills?\b/i,
+    test: /\bproficien(?:cy|t)\s+(?:and\s+expertise\s+)?(?:with|in)\s+(?:(?:one|two|three|four|\d+)\s+skills?|any\s+skill\s+of\s+your\s+choice)\b/i,
     build: (match, ctx) => {
       const countMatch = match[0].match(/\b(one|two|three|four|\d+)\s+skills?\b/i)
       const wordToCount: Record<string, number> = { one: 1, two: 2, three: 3, four: 4 }
       const raw = countMatch?.[1]?.toLowerCase() ?? "1"
       const count = wordToCount[raw] ?? parseInt(raw, 10)
       if (!Number.isFinite(count) || count < 1) return null
+      const grantExpertise = /\band\s+expertise\b/i.test(match[0])
       return charInstance(newInstanceId(), characteristicCatalogRefId("skills"), [
         {
           id: modId(instanceKey(ctx, "skills_choice")),
@@ -1318,6 +1321,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           entries: [],
           allowAnySkill: true,
           choiceCount: count,
+          ...(grantExpertise ? { grantExpertise: true } : {}),
         },
       ])
     },
@@ -1381,6 +1385,26 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
           type: "attunement_slots",
           totalSlots: total,
           label: `Attune to ${total} magic items`,
+        },
+      ])
+    },
+  },
+  {
+    id: "proficiency.tools.choice",
+    confidence: "high",
+    test: /\b(?:proficien(?:cy|t)\s+(?:with|in)\s+(one|two|three|\d+)\s+tools?|(one|two|three|\d+)\s+tool\s+proficienc(?:y|ies))\b/i,
+    build: (match, ctx) => {
+      const wordToCount: Record<string, number> = { one: 1, two: 2, three: 3 }
+      const raw = (match[1] ?? match[2] ?? "1").toLowerCase()
+      const count = wordToCount[raw] ?? parseInt(raw, 10)
+      if (!Number.isFinite(count) || count < 1) return null
+      return charInstance(newInstanceId(), characteristicCatalogRefId("tool_proficiencies"), [
+        {
+          id: modId(instanceKey(ctx, "tools_choice")),
+          type: "tool_proficiencies",
+          values: [],
+          choiceCount: count,
+          label: `Choose ${count} tool${count === 1 ? "" : "s"}`,
         },
       ])
     },
@@ -1645,12 +1669,17 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
         return null
       }
       const damageType = match[2] ? titleCaseWords(match[2]) : undefined
+      const chosenFoeOnly =
+        /\bagainst\s+(?:the|your|a|any\s+of\s+the|one\s+of\s+the)\s+(?:chosen|sworn|designated|marked)\s+(?:creatures?|targets?|foes?|enem(?:y|ies))\b/i.test(
+          text,
+        )
       return charInstance(newInstanceId(), characteristicCatalogRefId("damage_roll_modifiers"), [
         {
           id: modId(instanceKey(ctx, "damage_rider")),
           type: "damage_roll_modifiers",
           entries: [{ bonus: 0, target: "all", customTarget: `${match[1]}${damageType ? ` ${damageType}` : ""}` }],
-          label: `Extra ${match[1]}${damageType ? ` ${damageType}` : ""} damage`,
+          label: `Extra ${match[1]}${damageType ? ` ${damageType}` : ""} damage${chosenFoeOnly ? " vs. chosen foe" : ""}`,
+          ...(chosenFoeOnly ? { limitations: [requiresActiveToggleLimitation("attacking_chosen_foe")] } : {}),
         },
       ])
     },
@@ -1754,7 +1783,7 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
   {
     id: "save.advantage",
     confidence: "high",
-    test: /\badvantage\s+on\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+(?:saving\s+throws?|saves?)\b/i,
+    test: /\badvantage\s+on\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+(?:checks?\s+and\s+)?(?:saving\s+throws?|saves?)\b/i,
     build: (match, ctx, text) => {
       const ability = parseSaveAbility(match[1])
       if (!ability) return null
@@ -1769,6 +1798,18 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
         text,
       )
     },
+  },
+  {
+    id: "save.advantage.death",
+    confidence: "high",
+    test: /\badvantage\s+on\s+death\s+saving\s+throws?\b/i,
+    build: (_match, ctx, text) =>
+      buildCheckRollModifier(
+        ctx,
+        "death_save_adv",
+        { checkRollMode: "advantage", checkCategory: "death_save" },
+        text,
+      ),
   },
   {
     // "Advantage on Intelligence, Wisdom, and Charisma saving throws against spells" (Deep Gnome).
@@ -2965,13 +3006,25 @@ export const FEATURE_MODIFIER_RULES: FeatureModifierRule[] = [
     id: "spell.cantrip.choice",
     confidence: "high",
     test:
-      /\blearn (?:one|two|three|four|\d+) other cantrips? of your choice(?: from the ([^.]+?))?(?:\.|$)/i,
+      /\blearn (?:one|two|three|four|\d+) (?:other )?cantrips? of your choice(?: from the ([^.]+?))?(?:\.|$)/i,
     build: (match, ctx) => {
-      const countMatch = match[0].match(/\b(one|two|three|four|\d+)\s+other cantrips?\b/i)
+      const countMatch = match[0].match(/\b(one|two|three|four|\d+)\s+(?:other\s+)?cantrips?\b/i)
       const wordToCount: Record<string, number> = { one: 1, two: 2, three: 3, four: 4 }
       const raw = countMatch?.[1]?.toLowerCase() ?? "1"
       const count = wordToCount[raw] ?? parseInt(raw, 10)
       if (!Number.isFinite(count) || count < 1) return null
+      const className = match[1]?.match(/^([A-Z][A-Za-z' ]*?)\s+spell\s+list$/)?.[1]?.trim()
+      if (className) {
+        return charInstance(newInstanceId(), characteristicCatalogRefId("spells_known"), [
+          {
+            id: modId(instanceKey(ctx, "cantrip_choice")),
+            type: "spells_known",
+            spells: [],
+            choiceGrants: [{ level: 0, count, classNames: [className] }],
+            label: `${className} cantrip choice`,
+          },
+        ])
+      }
       const schoolNote = match[1]?.replace(/\s+school(?:\s+of\s+magic)?$/i, "").trim()
       return charInstance(newInstanceId(), characteristicCatalogRefId("spells_known"), [
         {

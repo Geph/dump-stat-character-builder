@@ -4,7 +4,8 @@ import {
   stampClassSpellListsOntoSpellRows,
   unionSpellClassNames,
 } from "@/lib/import/class-spell-lists"
-import { isSrdSource } from "@/lib/srd/source"
+import { isSrdSource, SRD_CREATOR_URL } from "@/lib/srd/source"
+import { isSpellReferencePlaceholder } from "./spell-reference-placeholder"
 
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
@@ -33,13 +34,13 @@ function asSourceString(value: unknown): string {
 }
 
 function isEmptyWriteup(value: unknown): boolean {
-  return typeof value !== "string" || !value.trim()
+  return typeof value !== "string" || !value.trim() || isSpellReferencePlaceholder(value)
 }
 
 /**
  * Keep the catalog row's publisher label unless the importer explicitly overwrote
  * this spell. Class-list stubs must not relabel an SRD (or other existing) row.
- * An SRD re-seed may restore the SRD label onto a stub that previously stole it.
+ * A complete write-up restores its publisher onto an empty misattributed stub.
  */
 export function mergeSpellSource(
   existing: Record<string, unknown>,
@@ -56,7 +57,6 @@ export function mergeSpellSource(
   }
   if (
     incomingSource &&
-    isSrdSource(incomingSource) &&
     isEmptyWriteup(existing.description) &&
     !isEmptyWriteup(incoming.description)
   ) {
@@ -86,13 +86,20 @@ export function mergeSpellRowForPersist(
     preferIncoming
       ? firstFilled(incomingValue, existingValue) ?? incomingValue
       : firstFilled(existingValue, incomingValue) ?? incomingValue
+  const source = mergeSpellSource(existing, incoming, preferIncoming)
+  const sameSource = asSourceString(existing.source) === asSourceString(incoming.source)
+  const creatorUrl = source === incoming.source && (preferIncoming || !sameSource)
+    ? firstFilled(incoming.creator_url, sameSource ? existing.creator_url : undefined)
+    : firstFilled(existing.creator_url, sameSource ? incoming.creator_url : undefined)
   return {
     ...existing,
     ...incoming,
     id: existing.id,
     name: existing.name ?? incoming.name,
     created_at: existing.created_at ?? incoming.created_at,
-    description: pick(existing.description, incoming.description),
+    description: isEmptyWriteup(existing.description) && !isEmptyWriteup(incoming.description)
+      ? incoming.description
+      : pick(existing.description, incoming.description),
     casting_time: pick(existing.casting_time, incoming.casting_time),
     range: pick(existing.range, incoming.range),
     components: pick(existing.components, incoming.components),
@@ -100,7 +107,8 @@ export function mergeSpellRowForPersist(
     material: pick(existing.material, incoming.material),
     higher_levels: pick(existing.higher_levels, incoming.higher_levels),
     school: pick(existing.school, incoming.school),
-    source: mergeSpellSource(existing, incoming, preferIncoming),
+    source,
+    creator_url: creatorUrl ?? (isSrdSource(asSourceString(source)) ? SRD_CREATOR_URL : null),
     classes: unionClasses(existing.classes, incoming.classes),
     enabled: "enabled" in existing ? existing.enabled : incoming.enabled,
   }

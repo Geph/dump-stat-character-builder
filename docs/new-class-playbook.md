@@ -1,6 +1,6 @@
 # New class playbook — agent guide
 
-Last reviewed: 2026-10-04.
+Last reviewed: 2026-10-08.
 
 Use this when a class (or subclass pack) that has never been imported arrives, usually
 through the BYO LLM flow. Twenty-plus homebrew classes have already been workshopped;
@@ -41,6 +41,53 @@ Never skip to a `if (className === "…")` branch in `lib/character/` or React.
 ## Mechanic pattern lookup
 
 Match the rules text, not the class name. Field names are the `mechanics[]` shape.
+
+### Actions unlocked during progression
+
+Nested selected custom-ability options use `selectedCustomAbilityOptions` in
+`lib/character/selected-custom-ability-options.ts` to expose their own Combat
+actions. Keep option prerequisites, unlock levels and linked modifiers through
+proposal confirmation and normalization; do not turn every unselected option
+into an action. Psionic powers with augment tables use explicit base costs only:
+an optional augment's cost is not the power's default cost.
+
+Companion upgrades use `choices.applyTo: "companion"` and
+`applyToCompanionFeature` even when they have no additional sub-options.
+`applyCompanionScopedChoiceModifiers` places these selected abilities on the
+companion as traits. Player aggregation and phrase detection exclude them.
+Explicit "As an action/bonus action/reaction" entries appear in the companion's
+matching action section instead; attack text uses the existing companion parser.
+Conditional, repeatable and replacement stat changes still need manual tracking
+unless an existing companion modifier expresses the actual condition.
+
+An ability being present in `features[]` does not prove that it has a usable sheet
+card. Run the import through `prepareImportedContent`, attach the character's class
+and subclass with `attachClassDetails`, then inspect `collectSheetActions` at every
+level. Pass the actual `featureChoicePicks` and unlocked custom abilities too.
+Weapon masteries belong on equipped weapon cards; spell and ability grants need
+their granted entries checked instead of a duplicate parent button.
+
+`sheet-actions.ts` recognizes both "as a Magic/Utilize action" and "you can take a
+Magic/Utilize action". Prefer explicit `activation` when authoring JSON. Put an
+option's activation and effects on its linked modifiers, not on an unconditional
+parent choice. A feature can prepare something during a rest and activate it in
+combat: retain both surfaces using `sheetDisplay`. Explicit `featuresTab: false`
+hides the feature; omitting it keeps the feature visible.
+
+Separate creation limits from subsequent uses. A once-created item with a reusable
+Bonus Action summon must not consume its creation charge on every summon. Likewise,
+"once per creature kind" is not a single shared rest pool. Use the common
+`player_note` characteristic for per-target bookkeeping when a dedicated tracker
+does not exist. A `power_rider` reminder is informational, not proof of automated
+damage, targeting, or resource payment.
+
+Subclass-granted spell slots use `Subclass.spellcasting`, including for a base class
+that only knows rituals or cantrips. `resolveEffectiveClassSpellcasting` chooses the
+subclass slot model in that case. Nonstandard Pact Magic uses `caster_progression:
+"pact"`, `starts_at`, and `explicit_slot_progression`; put the count at the single
+slot level in each row. `getSpellSlotTable` preserves the pact slot level for rest
+recovery and grants nothing before the first row. Use existing spellcasting fields
+rather than inventing a class-resource slot pool or a class-name runtime branch.
 
 ### Resources and uses
 

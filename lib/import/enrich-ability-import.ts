@@ -86,7 +86,8 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
       contentKind: "feat",
       sourceName: String(row.source_name ?? name),
       featureName: name,
-      suppressPhraseDetection: isPsionicPower || isWeaponMastery,
+      suppressPhraseDetection: isPsionicPower || isWeaponMastery || (row.choices as Feature["choices"])?.applyTo === "companion",
+      suppressNameDetection: isWeaponMastery,
     },
   )
 

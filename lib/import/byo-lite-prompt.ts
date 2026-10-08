@@ -33,7 +33,7 @@ export const LITE_BASE_PROMPT = `You are a D&D 2024 (5.5e) content parser. Conve
 Core rules:
 1. Extract only what the source contains. Never invent rules, names, or numbers.
 2. Copy every rules sentence verbatim into description. Dump Stat reads that exact wording to wire mechanics automatically, so keeping the sentence matters more than anything else in this prompt.
-3. Class and subclass features include the level they are gained at.
+3. Class and subclass features include their unlock level and correct subclass owner. Check headings against the progression table; never merge adjacent PDF columns.
 4. Say "Species", not "Race".
 5. If an entry is cut off, keep what is there and end its description with "[Source ends mid-entry]".
 6. Use the same exact name string every time you refer to the same thing.`
@@ -74,6 +74,7 @@ export const LITE_MECHANICS_HINT = `Mechanics (Dump Stat wires these for you)
 - Every mechanics[] entry needs sourcePhrase (the verbatim rule sentence) and confidence (high | medium | low).
 - If nothing fits, use { "kind": "unresolved", "sourcePhrase": "<the rule sentence>" }.
 - A player pick between named options is isChoice + choices { category, count, options[] }, not mechanics[].
+- Keep each action cost: 'you can take a Magic/Utilize action' means activation.action; Bonus Actions and Reactions stay explicit. A rest-prepared item may still grant a combat action (sheetDisplay combatActions). Put selected actions on choice options. Do not charge a one-time creation use again for every later summon or activation.
 - A form or state ("while in this form") → declare once on the class or subclass: new_toggles [{ key, name, grantingFeature }]; then put requiresSheetToggle: key on the benefits. Rage, Wild Shape, and Bloodied (below_half_hp) need no declaration.
 Common shapes (kind: fields):
 ${LITE_MECHANIC_SHAPES.map((line) => `- ${line}`).join("\n")}`
@@ -92,6 +93,8 @@ export const LITE_CUSTOM_ABILITY_HINT = `Custom ability libraries (maneuvers, ex
 - Fields: proposal_id (snake_case), name, ability_role (knack | discipline | psionic_power | class_talent | upgrade — omit if unsure), definition (one line), description (full rules), prerequisite (real prerequisites only), level_requirement, source_type (class | subclass | compendium), source_name, eligible_classes when the source lists classes, execution when there is an Execution / Activation / Trigger line.
 - A rule stated once in a section intro (recharge, cost, level gate) applies to every row in that section. Copy it onto each row.
 - Talents that belong to one package: nest them in that package's choices { category, count, options[] }.
+- Preserve prerequisite and level_requirement on nested options, including incompatible-with exclusions. Keep specialization_choices separate from talent picks. Read upgrade tiers within each PDF column; an explicit higher-level prerequisite wins. Companion-only benefits belong to the companion.
+- Base powers, optional augments, alternate-effect spells, and independent talent reactions have separate costs; never charge a spell's psi cost to an unrelated reaction.
 - Powers with casting headers that the source calls psionic powers are custom abilities (ability_role psionic_power), never spells[]. Keep each augment as its own "<strong>Name (N points):</strong> …" list item.
 - Keep spend and cost sentences verbatim ("expend one Exploit Die", "costs 1 sorcery point").
 - Do not put the same row in both abilities[] and import_proposals.custom_abilities[].`
@@ -134,11 +137,13 @@ const LITE_HINTS_BY_TYPE: Partial<Record<ImportContentTypeHint, string[]>> = {
     CLASS_SPELL_LIST_IMPORT_HINT,
     SPELL_SCHOOL_IMPORT_HINT,
     LITE_CLASS_RESOURCE_HINT,
+    LITE_CUSTOM_ABILITY_HINT,
     LITE_MECHANICS_HINT,
   ],
   subclasses: [
     CARD_BLURB_IMPORT_HINT,
     SUBCLASS_IMPORT_HINT,
+    LITE_CUSTOM_ABILITY_HINT,
     CHOICE_EXTRACTION_HINT,
     RICH_TEXT_TABLE_HINT,
     LITE_MECHANICS_HINT,

@@ -1,4 +1,5 @@
 import type { ImportContent } from "@/lib/import/content-schema"
+import { SPELL_REFERENCE_IMPORT_NOTICE } from "@/lib/import/spell-reference-placeholder"
 import { enrichSpellRowWithBundledCardImage } from "@/lib/compendium/enrich-srd-spells"
 import {
   parsePsionicAugmentsFromDescription,
@@ -63,6 +64,9 @@ export function normalizeSpellImportRow(raw: RawSpellRow): NonNullable<ImportCon
 
   return {
     name: String(raw.name ?? "").trim(),
+    ...(typeof raw.creator_url === "string" && raw.creator_url.trim()
+      ? { creator_url: raw.creator_url.trim() }
+      : {}),
     ...(typeof raw.source === "string" && raw.source.trim()
       ? { source: raw.source.trim() }
       : {}),
@@ -73,7 +77,7 @@ export function normalizeSpellImportRow(raw: RawSpellRow): NonNullable<ImportCon
     components: normalizeComponents(raw.components),
     duration: typeof raw.duration === "string" ? raw.duration : null,
     concentration: raw.concentration === true,
-    description: split.description,
+    description: split.description || SPELL_REFERENCE_IMPORT_NOTICE,
     classes: classes?.length ? classes : [],
     ...(Array.isArray(raw.prerequisite_rules)
       ? { prerequisite_rules: raw.prerequisite_rules }

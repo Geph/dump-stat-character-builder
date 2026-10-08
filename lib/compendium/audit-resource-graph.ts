@@ -2,6 +2,7 @@
  * Walk shipped class/subclass features vs class_resources and report
  * prose that spends or restores a pool without a matching FeatureEffect.
  */
+import { isHitDiceResourceKey } from "@/lib/character/hit-dice-use-effects"
 import { canonicalThirdPartyResourceKey } from "@/lib/character/infer-class-resource-spend"
 import { THIRD_PARTY_RESOURCE_PATTERNS } from "@/lib/import/third-party-resources"
 import { enrichSrdClassList } from "@/lib/compendium/enrich-srd-classes"
@@ -95,7 +96,11 @@ export function resourceKeysMatch(left: string, right: string): boolean {
 
 export function isReservedResourceKey(resourceKey: string): boolean {
   const key = resourceKey.trim().toLowerCase()
-  return RESERVED_RESOURCE_KEYS.has(key) || RESERVED_RESOURCE_KEYS.has(canonicalThirdPartyResourceKey(key))
+  return (
+    RESERVED_RESOURCE_KEYS.has(key) ||
+    RESERVED_RESOURCE_KEYS.has(canonicalThirdPartyResourceKey(key)) ||
+    isHitDiceResourceKey(key)
+  )
 }
 
 /** Caps and static columns are not spent; mentioning them is not a wiring miss. */

@@ -2668,6 +2668,37 @@ export const ALCHEMIST_PHILOSOPHER_PRESETS: EnrichmentPreset[] = []
 
 export const MHP_WARDEN_PRESETS: EnrichmentPreset[] = [
   {
+    id: "mhp_warden.class.font_of_life",
+    pack: "mhp_warden", target: "class_feature",
+    match: { className: /^warden$/i, name: /^font of life$/i },
+    operations: [
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      { op: "setActivation", activation: { action: true, noEconomyCost: true } },
+      { op: "setLimitedUses", uses: { type: "fixed", fixedAmount: 2,
+        recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }] } },
+      { op: "attachNamedPreset", replaceCharacteristicTypes: ["uses"], preset: {
+        kind: "char_instance", idKey: "font_of_life_uses", catalogRefId: "cat_char_uses",
+        characteristics: [{ id: modId("font_of_life_uses"), type: "uses", uses: {
+          type: "fixed", fixedAmount: 2, recharges: [{ rest: "short_rest", amount: 1 }, { rest: "long_rest" }],
+        } }],
+      } },
+    ],
+  },
+  {
+    id: "mhp_warden.class.legendary_resistance",
+    pack: "mhp_warden", target: "class_feature",
+    match: { className: /^warden$/i, name: /^legendary resistance$/i },
+    operations: [
+      { op: "setSheetDisplay", sheetDisplay: { combatActions: true, featuresTab: true } },
+      { op: "setLimitedUses", uses: { type: "fixed", fixedAmount: 3, recharges: [{ rest: "long_rest" }] } },
+      { op: "attachNamedPreset", replaceEffectKinds: ["check_roll_modifier"], preset: {
+        kind: "fx_instance", idKey: "legendary_resistance", catalogRefId: effectCatalogRefId("check_roll_modifier"),
+        activation: { action: true, noEconomyCost: true, requirements: [{ kind: "fail_saving_throw" }] },
+        effects: [{ id: modId("legendary_resistance"), kind: "check_roll_modifier", checkCategory: "save", checkRollMode: "replace_failure", label: "Choose to succeed on a failed saving throw" }],
+      } },
+    ],
+  },
+  {
     id: "mhp_warden.class.interrupt",
     pack: "mhp_warden",
     target: "class_feature",
