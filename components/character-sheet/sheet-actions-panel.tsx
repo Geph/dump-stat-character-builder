@@ -120,6 +120,8 @@ import {
   type ActionGroupId,
 } from "@/lib/character/action-group-layout"
 import { ActionGroupColumns } from "@/components/character-sheet/action-group-columns"
+import { SignaturePinMenu, useSignatureAbilities } from "@/components/character-sheet/signature-abilities"
+import { SIGNATURE_DRAG_TYPE } from "@/lib/character/signature-abilities"
 import { ActionEntryHeading } from "@/components/character-sheet/action-entry-heading"
 
 type SheetActionsPanelProps = {
@@ -3210,6 +3212,16 @@ export function SheetActionsPanel({
   const rollCtx = useSheetRollContext()
   const [openActionId, setOpenActionId] = useState<string | null>(null)
   const [openEconomyKind, setOpenEconomyKind] = useState<ActionEconomyKind | null>(null)
+  const signatures = useSignatureAbilities()
+  const signatureRequest = signatures?.request
+  const acknowledgeSignature = signatures?.acknowledge
+  useEffect(() => {
+    if (signatureRequest?.scope !== layoutScope || !actions.some(action => action.id === signatureRequest.id)) return
+    if (incapacitated) { acknowledgeSignature?.(); return }
+    setOpenEconomyKind(null)
+    setOpenActionId(signatureRequest.id)
+    acknowledgeSignature?.()
+  }, [signatureRequest, layoutScope, actions, acknowledgeSignature, incapacitated])
   const [groupOrder, setGroupOrder] = useState<string[]>([])
   const [groupColumns, setGroupColumns] = useState<ActionGroupColumnMap>({})
 
@@ -3470,15 +3482,8 @@ export function SheetActionsPanel({
       )
       .filter((label): label is string => Boolean(label))
     const hdHealLabel = hitDiceHealLabel(entry)
-    const useBonusPreview = formatSheetActionUseBonusLines(entry.useBonuses, {
-      proficiencyBonus: resolveContext.proficiencyBonus,
-      abilityMods: resolveContext.abilityModifiers,
-      characterLevel: entry.classLevel,
-      classResourceDieSides: rollCtx.featureEffectContext?.classResourceDieSides,
-    }).join(" · ")
     const costMeta = formatSheetActionCostMeta(entry, usage)
     const subtitleMeta = [
-      entry.trigger,
       costMeta,
       isSpecialAttack ? specialAttackProfileLabel(primaryAttack!) : null,
       hdHealLabel,
@@ -3497,6 +3502,8 @@ export function SheetActionsPanel({
     return (
       <div
         key={`${keyPrefix}-${entry.id}`}
+        draggable={Boolean(signatures)}
+        onDragStart={event => { event.stopPropagation(); event.dataTransfer.setData(SIGNATURE_DRAG_TYPE, JSON.stringify({ kind: "action", id: entry.id })) }}
         role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
         onClick={
@@ -3542,14 +3549,14 @@ export function SheetActionsPanel({
         <div className="flex items-stretch justify-between gap-2">
           <div className={cn("min-w-0 flex-1 space-y-0.5",
             groupLayout === "responsive-grid" && !isSpecialAttack && "relative min-h-8 pl-10")}>
-            <ActionEntryHeading name={entry.name} icon={entry.icon} group={keyPrefix}
+            <div className="flex items-start justify-between gap-1"><ActionEntryHeading name={entry.name} icon={entry.icon} group={keyPrefix}
               compact={groupLayout === "responsive-grid" && !isSpecialAttack}
-              hint={entry.relatedTalentAlerts?.map((alert) => `${alert.name}: ${alert.summary}`).join(" · ")} />
+              hint={entry.relatedTalentAlerts?.map((alert) => `${alert.name}: ${alert.summary}`).join(" · ")} /><SignaturePinMenu target={{ kind: "action", id: entry.id }} /></div>
 
             {subtitleMeta || showOwnUses ? (
               <div className={groupLayout === "responsive-grid" && !subtitleMeta ? "flex flex-wrap items-center gap-x-2 gap-y-1" : "space-y-1"}>
                 {subtitleMeta || (usage && showOwnUses) ? (
-                  <p className="text-[10px] leading-snug text-muted-foreground tabular-nums">
+                  <p className="line-clamp-1 text-[10px] leading-snug text-muted-foreground tabular-nums">
                     {[
                       subtitleMeta,
                       usage && showOwnUses
@@ -3567,10 +3574,6 @@ export function SheetActionsPanel({
                 ) : null}
               </div>
             ) : null}
-            {useBonusPreview ? (
-              <p className="text-[10px] font-semibold text-primary">{useBonusPreview}</p>
-            ) : null}
-
             {isSpecialAttack ? (
               <>
                 {damageLabel || rangeLabel ? (

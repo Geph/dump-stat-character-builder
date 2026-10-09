@@ -1,6 +1,12 @@
 # Custom modifiers — agent map
 
-Last reviewed: 2026-10-08.
+Last reviewed: 2026-10-09.
+
+`removeRedundantTriggerDamage` repairs legacy import duplicates within one owning
+feature: a generated unconditional extra-dice modifier identical to damage nested
+inside its on-hit trigger is removed. `readLinkedModifiers` applies this to existing
+sheet data; `syncModifierRefs` applies it during import. Never deduplicate damage
+across independent sources or hide a duplicate badge while leaving its bonus active.
 
 Custom ability choices retain their nested metadata throughout import confirmation
 and normalization (`import-proposals.ts`, `normalize-ability-import.ts`).

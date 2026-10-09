@@ -1,4 +1,5 @@
 "use client"
+import { SignatureAbilitiesProvider, SignatureAbilitiesPanel } from "@/components/character-sheet/signature-abilities"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import dynamic from "next/dynamic"
@@ -4917,6 +4918,8 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     : 0
 
   return (
+    <SignatureAbilitiesProvider key={id} characterId={id} combatActions={combatActions} utilityActions={utilityActions}
+      spells={displayedSpells} artwork={[...customAbilities, ...classDetails.flatMap(entry => entry.class ? [entry.class] : [])]} onSpell={setSelectedSpell} onActionTab={setActiveTab}>
     <SheetRollHistoryProvider characterId={id}>
       <SheetRollProvider
         value={{
@@ -5594,6 +5597,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                     { id: "sheet-combat-stats", label: "Stats" },
                     { id: "sheet-combat-actions", label: "Actions" },
                     { id: "sheet-spells", label: "Spells" },
+                    { id: "sheet-signatures", label: "Favorites" },
                     { id: "sheet-saves", label: "Saves" },
                   ]
                 : activeTab === "features"
@@ -6592,6 +6596,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                 </div>
 
                 <div className="space-y-3 min-w-0">
+                <SignatureAbilitiesPanel />
                 <div id="sheet-saves" className={`${SHEET_COMBAT_PANEL.savingThrows} rounded-xl p-3 border border-border`}>
                   <SheetSectionHeading icon={ShieldCheck} className="flex-wrap">
                     Saving Throws
@@ -7670,5 +7675,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
     </div>
       </SheetRollProvider>
     </SheetRollHistoryProvider>
+    </SignatureAbilitiesProvider>
   )
 }

@@ -1,6 +1,30 @@
 # Component architecture — agent guide
 
-Last reviewed: 2026-10-08.
+Last reviewed: 2026-10-09.
+
+Sheet action tiles show the name (at most two lines), compact cost/use counts and
+attack statistics. Trigger sentences and bonus explanations belong in the action
+overlay, not the button. The same `SheetActionsPanel` policy covers Combat and
+non-combat actions; spell names also cap at two lines with full names in their
+overlays. Icons resolve from explicit assignments, attack/class defaults, then
+the action-group fallback, independent of which characters already exist.
+
+`SpellDetailOverlay` uses a narrow (20rem maximum) container with full 2:3 portrait
+artwork; reduce card width rather than cropping art to make room for rules text.
+Concentration belongs in the header; avoid repeated slot and
+concentration footer notes. Keep resource/Metamagic costs and casting warnings.
+Spell pins add shortcuts to Abilities & Skills → Non-Combat Actions, grouped by
+casting time; they do not remove spells from the Combat spell list.
+
+`signature-abilities.tsx` owns the Favorite Abilities panel with two portrait shortcuts above Combat saves, the
+spell/action destination menus, and drag targets. `SignatureAbilitiesProvider`
+persists only typed action/spell IDs in per-character local storage. Unconfigured
+sheets default to the first resource-backed action; explicit empty slots stay empty.
+Cards reuse the spell selector or request the existing `SheetActionsPanel` overlay
+in its owning scope, then acknowledge the request so later renders cannot reopen it.
+The mobile section links include `sheet-signatures`. Art resolves from the spell,
+custom ability, or owning class; icons are the fallback. No mechanics are copied
+into shortcut state. Pure selection/payload rules live in `lib/character/signature-abilities.ts`.
 
 How to keep UI modular and cheap to re-render as more classes arrive. The rule
 underneath all of it: **content is data, mechanics are modifiers, UI renders what the

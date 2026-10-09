@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { AlertTriangle, X, Sparkles, Dices, Pin } from "lucide-react"
+import { SignaturePinMenu } from "@/components/character-sheet/signature-abilities"
+import { AlertTriangle, X, Sparkles, Dices } from "lucide-react"
 import type { Spell } from "@/lib/types"
 import {
   concentrationConditionName,
@@ -39,7 +40,6 @@ import { useSheetRollHistory } from "@/components/character-sheet/sheet-roll-his
 import type { PsionicAugmentSelection } from "@/lib/compendium/parse-psionic-augments"
 import { CompendiumCardHero } from "@/components/compendium/compendium-card-hero"
 import {
-  CLASS_CARD_ASPECT_CLASS,
   COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS,
   getCompendiumCardImageUrl,
 } from "@/lib/compendium/card-image"
@@ -323,44 +323,21 @@ export function SpellDetailOverlay({
         initial={{ y: 24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 24, opacity: 0 }}
-        className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-card border-2 border-border rounded-2xl shadow-2xl"
+        className="w-full max-w-xs max-h-[85vh] overflow-y-auto bg-card border-2 border-border rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {imageUrl ? (
-          <div className={cn("relative w-full overflow-hidden", CLASS_CARD_ASPECT_CLASS, "max-h-[70vh]")}>
+          <div className="relative w-full aspect-[2/3] overflow-hidden">
             <CompendiumCardHero
               imageUrl={imageUrl}
               crop="top"
               variant="overlay"
               fillHeight
+              className="bg-black [&_img]:object-contain"
               overlayGradientClass={COMPENDIUM_SPELL_BACKGROUND_CARD_GRADIENT_CLASS}
             />
             <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-end gap-2 p-3">
-              {onTogglePinToAbilities ? (
-                <button
-                  type="button"
-                  onClick={onTogglePinToAbilities}
-                  aria-pressed={pinnedToAbilities}
-                  title={
-                    pinnedToAbilities
-                      ? "Unpin from Abilities & Skills actions"
-                      : "Pin to Abilities & Skills actions"
-                  }
-                  aria-label={
-                    pinnedToAbilities
-                      ? "Unpin from Abilities & Skills actions"
-                      : "Pin to Abilities & Skills actions"
-                  }
-                  className={cn(
-                    "rounded-full border p-2 transition-colors",
-                    pinnedToAbilities
-                      ? "border-white/50 bg-white/20 text-white"
-                      : "border-white/20 bg-black/40 text-white/85 hover:bg-black/60 hover:text-white",
-                  )}
-                >
-                  <Pin className={cn("h-4 w-4", pinnedToAbilities && "fill-current")} />
-                </button>
-              ) : null}
+              <SignaturePinMenu spell target={{ kind: "spell", id: spell.id }} utilityPinned={pinnedToAbilities} onUtilityToggle={onTogglePinToAbilities} />
               <button
                 type="button"
                 onClick={onClose}
@@ -414,31 +391,7 @@ export function SpellDetailOverlay({
               </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {onTogglePinToAbilities ? (
-                <button
-                  type="button"
-                  onClick={onTogglePinToAbilities}
-                  aria-pressed={pinnedToAbilities}
-                  title={
-                    pinnedToAbilities
-                      ? "Unpin from Abilities & Skills actions"
-                      : "Pin to Abilities & Skills actions"
-                  }
-                  aria-label={
-                    pinnedToAbilities
-                      ? "Unpin from Abilities & Skills actions"
-                      : "Pin to Abilities & Skills actions"
-                  }
-                  className={cn(
-                    "p-1.5 rounded-lg transition-colors",
-                    pinnedToAbilities
-                      ? "text-primary bg-primary/10 hover:bg-primary/15"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                  )}
-                >
-                  <Pin className={cn("h-5 w-5", pinnedToAbilities && "fill-current")} />
-                </button>
-              ) : null}
+              <SignaturePinMenu spell target={{ kind: "spell", id: spell.id }} utilityPinned={pinnedToAbilities} onUtilityToggle={onTogglePinToAbilities} />
               <button
                 type="button"
                 onClick={onClose}
@@ -725,13 +678,11 @@ export function SpellDetailOverlay({
                     (d20{spellAttackMod >= 0 ? `+${spellAttackMod}` : spellAttackMod})
                   </span>
                 )}
-                {spell.concentration && !needsAttack && (
-                  <span className="text-primary-foreground/80 font-medium">· Concentration</span>
-                )}
               </button>
-              <p className="text-[10px] text-center text-muted-foreground">
-                {needsAttack && "Rolls d20 + spell attack · "}
-                {spell.concentration && "Applies concentration condition · "}
+              {((!isCantrip && (
+                (isPointPool && castCost?.castKind === "arcanum") || (spendsResourcePoints && castCost)
+              )) || !!castCost?.metamagicCost) && (
+                <p className="text-[10px] text-center text-muted-foreground">
                 {!isCantrip && isPointPool && castCost?.castKind === "arcanum"
                   ? "Uses one Innate Arcanum charge"
                   : !isCantrip && spendsResourcePoints && castCost
@@ -740,16 +691,11 @@ export function SpellDetailOverlay({
                       }`
                     : !isCantrip && castCost?.metamagicCost
                       ? `Uses 1 spell slot + ${castCost.metamagicCost} ${resourceLabel} Metamagic`
-                      : !isCantrip
-                        ? usingFreeCast
-                          ? slotlessCast
-                            ? "Does not use a spell slot"
-                            : `Uses ${freeCast?.sourceLabel} free cast`
-                          : `Uses one level ${slotLevel ?? spell.level} spell slot`
-                        : castCost?.metamagicCost
+                      : isCantrip && castCost?.metamagicCost
                           ? `Cantrip · ${castCost.metamagicCost} ${resourceLabel} Metamagic`
-                          : "Cantrips do not use slots"}
-              </p>
+                          : null}
+                </p>
+              )}
             </>
           )}
         </div>

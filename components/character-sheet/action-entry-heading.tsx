@@ -11,6 +11,6 @@ export function ActionEntryHeading({ name, icon, group, hint, compact }: {
       compact ? cn("absolute left-0 top-0 h-8 w-8 border shadow-sm", theme.well) : "h-5 w-5")}>
       {icon ? <GameIcon name={icon} className={compact ? "h-6 w-6" : "h-5 w-5"} /> : <theme.Icon className="h-4 w-4" />}
     </span>
-    <p className="min-w-0 text-xs font-semibold leading-tight text-foreground [overflow-wrap:anywhere]">{name}</p>
+    <p title={name} className="line-clamp-2 min-w-0 text-xs font-semibold leading-tight text-foreground [overflow-wrap:anywhere]">{name}</p>
   </div>
 }

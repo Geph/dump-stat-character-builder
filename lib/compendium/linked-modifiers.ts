@@ -10,6 +10,7 @@ import {
   type ModifierCatalogEntry,
 } from "@/lib/compendium/modifier-catalog"
 import { characteristicCatalogRefId } from "@/lib/compendium/modifier-catalog-refs"
+import { removeRedundantTriggerDamage } from "@/lib/compendium/redundant-trigger-damage"
 import type { FeatureActivation } from "@/lib/types"
 
 import type { UsesConfig } from "@/lib/types"
@@ -178,9 +179,10 @@ export function modifierRefsFromLinked(linked: LinkedModifierInstance[]): string
 export function syncModifierRefs<T extends { linkedModifiers?: LinkedModifierInstance[]; modifierRefs?: string[] }>(
   patch: T,
 ): T & { modifierRefs: string[] } {
-  const linked = patch.linkedModifiers ?? []
+  const linked = removeRedundantTriggerDamage(patch.linkedModifiers ?? [])
   return {
     ...patch,
+    ...(patch.linkedModifiers ? { linkedModifiers: linked } : {}),
     modifierRefs: linked.length ? modifierRefsFromLinked(linked) : patch.modifierRefs ?? [],
   }
 }
@@ -284,9 +286,9 @@ export function readLinkedModifiers(
   const linked = normalizeLinkedModifiers(raw, catalog, legacyRefs)
   const inline = (record.benefits ?? record.characteristics) as CharacteristicModifier[] | undefined
   const uses = record.uses as unknown as unknown as unknown as UsesConfig | null | undefined
-  return appendInlineCharacteristicsAsLinked(
+  return removeRedundantTriggerDamage(appendInlineCharacteristicsAsLinked(
     linked,
     inline,
     uses,
-  )
+  ))
 }

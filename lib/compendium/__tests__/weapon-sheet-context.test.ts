@@ -93,6 +93,25 @@ describe("buildWeaponSheetContext", () => {
     classAddOrder: ["fighter"],
   } as unknown as CharacterBuildInputs
 
+  it("shows only the conditional badge for a legacy duplicate, retaining independent damage", () => {
+    const damage = { id: "mod_import_damage", type: "damage_roll_modifiers" as const, label: "Extra 2d8 damage", entries: [{ bonus: 0, target: "all", customTarget: "2d8" }] }
+    const flat = { instanceId: "flat", catalogRefId: "cat_char_damage_roll_modifiers", characteristics: [damage] }
+    const context = buildWeaponSheetContext(mace, {
+      ...baseInputs,
+      classes: [{ ...baseInputs.classes[0], features: [
+        { level: 1, name: "Conditional strike", description: "Conditional damage.", linkedModifiers: [
+          { instanceId: "hit", catalogRefId: "cat_char_on_hit_trigger", characteristics: [{ id: "hit", type: "on_hit_trigger", triggerOn: "hit", oncePerTurn: true, effect: { ...flat, instanceId: "nested" } }] },
+          flat,
+        ] },
+        { level: 1, name: "Independent damage", description: "Separate source.", linkedModifiers: [flat] },
+      ] }],
+    }, ["Simple weapons"])
+    expect(context.appliedModifiers.filter((entry) => entry.name === "Other on hit effects")).toHaveLength(1)
+    const extra = context.appliedModifiers.filter((entry) => entry.name === "Extra 2d8 damage")
+    expect(extra).toHaveLength(1)
+    expect(extra[0].sourceLabel).toBe("Independent damage (Fighter)")
+  })
+
   it("marks mastery active when weapon mastery picks include the weapon", () => {
     const context = buildWeaponSheetContext(mace, {
       ...baseInputs,

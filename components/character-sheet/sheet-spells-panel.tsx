@@ -1,4 +1,5 @@
 "use client"
+import { SIGNATURE_DRAG_TYPE } from "@/lib/character/signature-abilities"
 
 import { Wand2 } from "lucide-react"
 import type { Spell } from "@/lib/types"
@@ -38,12 +39,14 @@ export function SheetSpellsPanel({
                 {group.spells.map((spell) => (
                   <button
                     key={spell.id}
+                    draggable
+                    onDragStart={event => event.dataTransfer.setData(SIGNATURE_DRAG_TYPE, JSON.stringify({ kind: "spell", id: spell.id }))}
                     type="button"
                     onClick={() => onSelect(spell)}
                     title={spell.name}
                     className="flex min-h-11 min-w-0 items-center justify-between gap-1.5 rounded-lg border border-border/80 bg-muted/40 px-2.5 py-1.5 text-left text-xs transition-colors hover:border-primary/40 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <span className="min-w-0 break-words font-semibold leading-snug">{spell.name}</span>
+                    <span className="line-clamp-2 min-w-0 break-words font-semibold leading-snug">{spell.name}</span>
                     <span className="flex shrink-0 items-center gap-1">
                       {alwaysPreparedSpellIds.has(spell.id) && (
                         <span
