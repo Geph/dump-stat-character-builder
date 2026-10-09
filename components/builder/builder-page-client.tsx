@@ -1,5 +1,7 @@
 "use client"
 
+import { NameFontPicker, nameFontStyle } from "@/components/character-sheet/name-font-picker"
+import { readNameFontId, withNameFont } from "@/lib/character/name-fonts"
 import { useState, useEffect, useRef, useMemo, useCallback, useDeferredValue, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { motion, AnimatePresence } from "framer-motion"
@@ -7198,9 +7200,14 @@ export default function BuilderPageClient() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Character Name *</label>
+                    <div className="mb-2 flex items-center gap-2">
+                      <label htmlFor="builder-details-name" className="text-sm font-medium text-foreground">Character Name *</label>
+                      <NameFontPicker name={character.name} selectedId={readNameFontId(character.appearance)}
+                        onSelect={(fontId) => patchCharacter({ appearance: withNameFont(character.appearance, fontId) })} />
+                    </div>
                     <input
                       id="builder-details-name"
+                      style={nameFontStyle(readNameFontId(character.appearance))}
                       type="text"
                       value={character.name}
                       onChange={(e) => patchCharacter({ name: e.target.value })}

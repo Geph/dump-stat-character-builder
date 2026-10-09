@@ -45,3 +45,21 @@ Card art for Mage Hand Press **classes** and **free subclasses** ships under `pu
 - Hosted MySQL: `POST /api/seed/packs` with `{ packId: "kibbles-tasty" | "mage-hand-press", onlyFileIndexes?: number[] }`
 
 Seeding **continues after per-file errors** and returns `errors` / `partial` so the UI can offer retry of failed files.
+
+## Distribution checks (reviewed 2026-10-09)
+
+- The [MHP public categories](https://magehandpress.com/categories/) list all 39 currently bundled subclass names. The allowlist test checks every MHP JSON pack, including subclass ability ownership and paid-only prerequisites.
+- Public availability is not a redistribution license: the [MHP usage policy](https://magehandpress.com/content-usage-policy/) restricts verbatim reposting and publisher images. Distribution relies on the project-specific permission recorded above; keep its scope separate from the free-content allowlist.
+- The [KRD](https://www.kthomebrew.com/krd) lists Occultist, Spellblade, Warden, Warlord and spell collections. Our Inventor, Psion/psionics, backgrounds, species and crafting feats are outside that list. The [broader Kibbles permissions](https://www.kthomebrew.com/permissions) separately address character-builder ports; do not label the entire pack CC-BY/KRD.
+- The spell-reference regression test scans every bundled JSON pack for descriptions and requires entries attributed to Wizards of the Coast to contain only the import/overwrite notice. This catches attributed reference leaks; it cannot identify misattributed copied prose by itself.
+- Historical Kibbles portraits remain tracked from commit 1b3f2eb (Drive-approved art restoration). A filename or commit message does not establish image rights. Do not add publisher artwork based on the text permissions, and retain local-only handling for new restricted art.
+
+These are catalog/provenance checks, not a sentence-by-sentence comparison of every publisher document or independent verification of the original art licenses.
+
+### MHP spell provenance gaps
+
+A normalized name search of 107 public articles linked from the spell archive and Necromancer, Warmage, Witch, Martyr and Investigator categories matched 118 of 160 bundled spell names. This checks names, not equivalence of the bundled revision or license coverage. The following 42 need direct public-source URLs or confirmation that the project-specific permission covers them before claiming a fully public-source-only pack:
+
+Abduct; Aberrate; Accelerate/decelerate; Antiballistics Field; Arcane Anomaly; Ballistic Smite; Blunder; Candy Blast; Card Trick; Concealed Shot; Conjure Cannonball; Conjure Cover; Cosmic Horror; Cryptogram; Curse Of Chains; Dead Fog; Defenestration; Dire Warning; Eye Of Anubis; Eye Of Ra; Flashback; Free Throw; Gahoul’s Spectral Scythe; Hangover; Instant Replay; Jam Weapon; Lashing Tendrils; Mandy’s Enchanted Carriage; Mandy’s Feral Follower; Perforating Shot; Phantasmal Beauty; Pit Trap; Polybrachia; Prehensile Hair; Rocks Fall; Scurry; Solar Wind; Soul Effigy; Sword Of Judgement; Thunderous Echo; Time Hop; Unseen Artisan.
+
+An unmatched name is not evidence of a paid-only source: aliases, other public articles, downloads and revised names can explain a miss. Existing bundles were not removed by this audit.

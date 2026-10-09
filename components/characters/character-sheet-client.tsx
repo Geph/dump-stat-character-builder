@@ -49,8 +49,8 @@ import {
 } from "@/lib/character/character-export-format"
 import { collectPartyAllyCandidates } from "@/lib/character/party-ally-candidates"
 import { formatClassIdentityLabel } from "@/lib/character/class-identity-label"
-import { NameFontPicker, nameFontStyle } from "@/components/character-sheet/name-font-picker"
-import { readNameFontId, withNameFont, type NameFontId } from "@/lib/character/name-fonts"
+import { nameFontStyle } from "@/components/character-sheet/name-font-picker"
+import { readNameFontId } from "@/lib/character/name-fonts"
 import { applyIncomingHeal } from "@/lib/character/apply-heal-modifiers"
 import {
   normalizePartyCharacterIds,
@@ -1526,24 +1526,6 @@ export default function CharacterSheetClient({ id }: { id: string }) {
       if (!error && row) setCharacter(row)
     },
     [character, equipmentBaseSelections],
-  )
-
-  const persistNameFont = useCallback(
-    async (fontId: NameFontId) => {
-      if (!character) return
-      const nextAppearance = withNameFont(character.appearance, fontId)
-      setCharacter({ ...character, appearance: nextAppearance })
-      const db = createClient()
-      const { data, error } = await db
-        .from("characters")
-        .update({ appearance: nextAppearance })
-        .eq("id", character.id)
-        .select(`*, classes (*), species (*), backgrounds (*), subclasses (*)`)
-        .single()
-      const row = parseCharacterQueryRow(data)
-      if (!error && row) setCharacter(row)
-    },
-    [character],
   )
 
   const openAddEquipmentOverlay = useCallback(async () => {
@@ -4919,7 +4901,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
 
   return (
     <SignatureAbilitiesProvider key={id} characterId={id} combatActions={combatActions} utilityActions={utilityActions}
-      spells={displayedSpells} artwork={[...customAbilities, ...classDetails.flatMap(entry => entry.class ? [entry.class] : [])]} onSpell={setSelectedSpell} onActionTab={setActiveTab}>
+      spells={displayedSpells} weapons={equippedWeaponCards} fallbackArtwork={[classDetails[0]?.class, classDetails[0]?.subclass ?? undefined]} artwork={[...customAbilities, ...classDetails.flatMap(entry => [...(entry.class ? [entry.class] : []), ...(entry.subclass ? [entry.subclass] : [])])]} onSpell={setSelectedSpell} onActionTab={setActiveTab}>
     <SheetRollHistoryProvider characterId={id}>
       <SheetRollProvider
         value={{
@@ -5139,12 +5121,7 @@ export default function CharacterSheetClient({ id }: { id: string }) {
                   >
                     {character.name}
                   </h1>
-                  <NameFontPicker
-                    name={character.name}
-                    selectedId={readNameFontId(character.appearance)}
-                    onSelect={persistNameFont}
-                    onBanner={Boolean(character.banner_url)}
-                  />
+
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   {classDetails.length > 0

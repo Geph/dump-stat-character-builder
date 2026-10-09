@@ -18,13 +18,22 @@ casting time; they do not remove spells from the Combat spell list.
 
 `signature-abilities.tsx` owns the Favorite Abilities panel with two portrait shortcuts above Combat saves, the
 spell/action destination menus, and drag targets. `SignatureAbilitiesProvider`
-persists only typed action/spell IDs in per-character local storage. Unconfigured
+persists only typed action/spell/weapon IDs in per-character local storage. Unconfigured
 sheets default to the first resource-backed action; explicit empty slots stay empty.
 Cards reuse the spell selector or request the existing `SheetActionsPanel` overlay
 in its owning scope, then acknowledge the request so later renders cannot reopen it.
-The mobile section links include `sheet-signatures`. Art resolves from the spell,
-custom ability, or owning class; icons are the fallback. No mechanics are copied
+The mobile section links include `sheet-signatures`. In visual mode, art resolves
+from a per-character favorite image override, then the spell/custom ability/weapon,
+then the primary class for slot 1 or its subclass for slot 2. Compact mode uses icons.
+The favorite menu opens `FavoriteImagePicker` for uploads, URLs, and existing art;
+overrides use typed target IDs and report local-storage failures. Weapon favorites
+use hand + equipment ID and open the shared `WeaponAttackCard` with the original
+roll, resource, and modifier props. Main/off-hand attacks remain distinct.
+No mechanics are copied
 into shortcut state. Pure selection/payload rules live in `lib/character/signature-abilities.ts`.
+
+The name-font picker lives beside Character Name on the builder’s final details step.
+It updates the draft appearance through `withNameFont`; the sheet only renders the saved font.
 
 How to keep UI modular and cheap to re-render as more classes arrive. The rule
 underneath all of it: **content is data, mechanics are modifiers, UI renders what the

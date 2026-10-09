@@ -25,6 +25,7 @@ type CardImageFieldProps = {
   value: string | null
   onChange: (value: string | null) => void
   label?: string
+  hint?: string
   imageAspect?: "3/4" | "21/9"
   imageCrop?: CompendiumCardImageCrop
   /** Fills a narrow column (e.g. beside description). */
@@ -41,6 +42,7 @@ export function CardImageField({
   value,
   onChange,
   label = "Card background graphic",
+  hint,
   imageAspect = "21/9",
   imageCrop = "center",
   layout = "default",
@@ -68,10 +70,10 @@ export function CardImageField({
     layout === "paired"
       ? "relative flex-1 min-h-[10rem] w-full"
       : cn(previewWidthClass, aspectClass)
-  const hintText =
+  const hintText = hint ?? (
     imageAspect === "3/4"
       ? `Shown on compendium cards and detail overlays. ${PORTRAIT_CARD_IMAGE_HINT}`
-      : `Shown on compendium cards and detail overlays. ${CARD_IMAGE_ASPECT_LABEL} · ${CARD_IMAGE_RECOMMENDED}`
+      : `Shown on compendium cards and detail overlays. ${CARD_IMAGE_ASPECT_LABEL} · ${CARD_IMAGE_RECOMMENDED}`)
 
   const onFile = (file: File | undefined) => {
     if (!file) return

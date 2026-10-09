@@ -1,13 +1,17 @@
 import type { SheetActionEntry } from "@/lib/character/sheet-actions"
 
-export type SignatureTarget = { kind: "action" | "spell"; id: string }
+export type SignatureTarget = { kind: "action" | "spell" | "weapon"; id: string }
 export type SignatureSlots = [SignatureTarget | null, SignatureTarget | null]
 export const SIGNATURE_DRAG_TYPE = "application/x-dump-stat-signature"
+
+export function favoriteImage(visual: boolean, custom: string | null | undefined, assigned: string | null, fallback: string | null): string | null {
+  return visual ? custom ?? assigned ?? fallback : null
+}
 
 export function parseSignatureTarget(value: unknown): SignatureTarget | null {
   if (!value || typeof value !== "object") return null
   const row = value as Record<string, unknown>
-  return (row.kind === "action" || row.kind === "spell") && typeof row.id === "string" && row.id.trim()
+  return (row.kind === "action" || row.kind === "spell" || row.kind === "weapon") && typeof row.id === "string" && row.id.trim()
     ? { kind: row.kind, id: row.id } : null
 }
 

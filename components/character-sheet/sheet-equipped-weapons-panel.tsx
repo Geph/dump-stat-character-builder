@@ -1,5 +1,9 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { SignaturePinMenu, useSignatureAbilities } from "@/components/character-sheet/signature-abilities"
+import { SIGNATURE_DRAG_TYPE } from "@/lib/character/signature-abilities"
 import { D20RollButton } from "@/components/character-sheet/d20-roll-button"
 import { ConditionInfoTip } from "@/components/character-sheet/condition-info-tip"
 import { WeaponDamageRollButton } from "@/components/character-sheet/weapon-damage-roll-button"
@@ -235,7 +239,8 @@ function WeaponAttackCard({
             {weapon.icon?.trim() ? (
               <GameIcon name={weapon.icon.trim()} className="h-5 w-5 shrink-0 text-primary" />
             ) : null}
-            <p className="text-xs font-semibold text-foreground">{weapon.name}</p>
+            <p className="text-xs font-semibold text-foreground" draggable onDragStart={event => event.dataTransfer.setData(SIGNATURE_DRAG_TYPE, JSON.stringify({ kind: "weapon", id: `${hand}:${weapon.id}` }))}>{weapon.name}</p>
+            <SignaturePinMenu target={{ kind: "weapon", id: `${hand}:${weapon.id}` }} />
             {quantity != null && quantity > 0 && (quantity > 1 || isThrownWeapon(weapon)) ? (
               <span className="text-[10px] font-bold tabular-nums text-muted-foreground">
                 ×{quantity}
@@ -470,18 +475,18 @@ export function SheetEquippedWeaponsPanel({
   classResourceAvailable,
   onSpendDamageRiders,
 }: SheetEquippedWeaponsPanelProps) {
-  if (!weapons.length) return null
-
-  return (
-    <div>
-      {hideHeading ? null : (
-        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-          Weapon Attacks
-        </p>
-      )}
-      <div className="grid grid-cols-1 gap-2">
-        {weapons.map((entry) => (
-          <WeaponAttackCard
+  const favorites = useSignatureAbilities()
+  const request = favorites?.request
+  const acknowledge = favorites?.acknowledge
+  const [openWeaponId, setOpenWeaponId] = useState<string | null>(null)
+  useEffect(() => {
+    if (request?.scope !== "weapon") return
+    setOpenWeaponId(request.id)
+    acknowledge?.()
+  }, [request, acknowledge])
+  const selectedWeapon = weapons.find(entry => `${entry.hand}:${entry.weapon.id}` === openWeaponId)
+  const renderWeapon = (entry: EquippedWeaponCard) => (
+<WeaponAttackCard
             key={`${entry.hand}-${entry.weapon.id}`}
             {...entry}
             buildInputs={buildInputs}
@@ -503,8 +508,20 @@ export function SheetEquippedWeaponsPanel({
             classResourceAvailable={classResourceAvailable}
             onSpendDamageRiders={onSpendDamageRiders}
           />
-        ))}
+  )
+  if (!weapons.length) return null
+
+  return (
+    <div>
+      {hideHeading ? null : (
+        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+          Weapon Attacks
+        </p>
+      )}
+      <div className="grid grid-cols-1 gap-2">
+        {weapons.map(renderWeapon)}
       </div>
+      {selectedWeapon && <Dialog open onOpenChange={open => { if (!open) setOpenWeaponId(null) }}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogTitle>{selectedWeapon.weapon.name}</DialogTitle>{renderWeapon(selectedWeapon)}</DialogContent></Dialog>}
     </div>
   )
 }

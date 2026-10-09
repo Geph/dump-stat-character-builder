@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import {
   buildMhpFreeSubclassKeySet,
@@ -69,7 +71,12 @@ describe("MHP free subclass allowlist", () => {
 
   it("ships no paid-subclass abilities in bundled class JSON", () => {
     const allow = buildMhpFreeSubclassKeySet()
-    for (const pack of [alchemist, gunslinger, warmage] as const) {
+    const folder = join(process.cwd(), "lib/seed-packs/mage-hand-press")
+    for (const file of readdirSync(folder).filter((name) => name.endsWith(".json") && name !== "manifest.json")) {
+      const pack = JSON.parse(readFileSync(join(folder, file), "utf8"))
+      for (const subclass of pack.subclasses ?? []) {
+        expect(isMhpFreeSubclassName(subclass.name, allow), file + ": " + subclass.name).toBe(true)
+      }
       const abilities = (pack as { abilities?: Array<Record<string, unknown>> }).abilities ?? []
       for (const ability of abilities) {
         expect(
