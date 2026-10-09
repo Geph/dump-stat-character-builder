@@ -30,10 +30,11 @@ export function NameFontPicker({
           aria-label="Change name font"
           title="Change name font"
           className={cn(
-            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-background hover:text-foreground",
+            "inline-flex h-7 gap-1.5 px-2 text-xs shrink-0 items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-background hover:text-foreground",
             onBanner && "bg-background/85 text-foreground/80",
           )}
         >
+          <span>Font</span>
           <Pencil className="h-3.5 w-3.5" />
         </button>
       </PopoverTrigger>

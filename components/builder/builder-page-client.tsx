@@ -1156,7 +1156,7 @@ export default function BuilderPageClient() {
   }
 
   const applyRandomCharacterDetails = () => {
-    const generated = generateRandomCharacterDetails()
+    const generated = generateRandomCharacterDetails(selectedSpecies?.name)
     const stockBanner = isCompactOnly ? null : pickRandomSheetBannerUrl()
     setCharacter((prev) => ({
       ...prev,

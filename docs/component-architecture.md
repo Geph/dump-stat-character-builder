@@ -172,3 +172,5 @@ reminders (such as Skulker); preset badge synchronization updates older imports.
   this repo are mostly verified by the lib tests behind them plus a manual pass.
 - For a visible change, run `pnpm dev` (port 3001) and click through the affected
   builder step or sheet tab. Say what you checked in the PR.
+
+Random detail generation delegates names to lib/builder/random-character-name.ts. Original syllable pools vary by normalized species name, with Genasi elemental variants; unknown or missing species select from all styles. Keep naming data out of builder React. Random details preserve an existing character name.

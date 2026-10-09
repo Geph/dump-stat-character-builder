@@ -1,48 +1,4 @@
-const FIRST_NAMES = [
-  "Aldric",
-  "Bryn",
-  "Caelan",
-  "Dara",
-  "Elara",
-  "Finn",
-  "Greta",
-  "Haldor",
-  "Isolde",
-  "Joren",
-  "Kael",
-  "Lyra",
-  "Mira",
-  "Nolan",
-  "Orin",
-  "Petra",
-  "Quinn",
-  "Rowan",
-  "Sera",
-  "Thorne",
-  "Una",
-  "Vesper",
-  "Wren",
-  "Yara",
-  "Zephyr",
-]
-
-const EPITHETS = [
-  "Ashwalker",
-  "Brightblade",
-  "Dawnseeker",
-  "Emberfall",
-  "Frostwind",
-  "Goldhand",
-  "Ironheart",
-  "Nightwhisper",
-  "Oakenshield",
-  "Raveneye",
-  "Silverquill",
-  "Stormborn",
-  "Thistlebrook",
-  "Truearrow",
-  "Wildroot",
-]
+import { generateRandomCharacterName } from "./random-character-name"
 
 const PERSONALITY_TRAITS = [
   "I speak only when I have something worth saying, but I listen closely to everyone.",
@@ -124,8 +80,8 @@ export type RandomCharacterDetails = {
   backstory: string
 }
 
-export function generateRandomCharacterDetails(): RandomCharacterDetails {
-  const name = `${pickRandom(FIRST_NAMES)} ${pickRandom(EPITHETS)}`
+export function generateRandomCharacterDetails(speciesName?: string | null): RandomCharacterDetails {
+  const name = generateRandomCharacterName(speciesName)
   const [traitA, traitB] = pickRandomUnique(PERSONALITY_TRAITS, 2)
   const hook = pickRandom(BACKSTORY_HOOKS)
   const bond = pickRandom(BONDS)
