@@ -3636,7 +3636,7 @@ export function SheetActionsPanel({
   )
 
   const tileGridStyle = groupLayout === "responsive-grid"
-    ? { gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 110px), 1fr))" }
+    ? { gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, max(160px, calc(50% - 3px))), 1fr))" }
     : undefined
 
   const showEconomy = sections === "all" || sections === "economy"

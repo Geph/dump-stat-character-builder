@@ -14,7 +14,7 @@ import {
   loadBuilderCompendium,
 } from "@/lib/data/builder-compendium-cache"
 import { asCompendiumRow, asCompendiumRows } from "@/lib/data/types"
-import { characterSheetHref } from "@/lib/compendium/edit-href"
+import { characterSheetHref, savedCharacterNavigationHref } from "@/lib/compendium/edit-href"
 import { pageFloatingHintClass, pageStepStripClass } from "@/lib/compendium/editor-field-styles"
 import {
   filterEnabled,
@@ -2567,7 +2567,7 @@ export default function BuilderPageClient() {
 
       clearBuilderDraft()
       // Hard navigate so we always leave the builder after a successful save.
-      window.location.assign(`${characterSheetHref(savedRow.id)}&saved=1`)
+      window.location.assign(savedCharacterNavigationHref(savedRow.id))
     } catch (err) {
       console.error("Error saving character:", err)
       alert(err instanceof Error ? err.message : "Failed to save character. Please try again.")

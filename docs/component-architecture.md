@@ -178,3 +178,5 @@ Random detail generation delegates names to lib/builder/random-character-name.ts
 Builder detail overlays use compact text panels when the builder is dense or global Compact Only is enabled; never hide the details action when selection limits are full. Compact spell info buttons have named, 44px targets. Font preview grid children must retain min-width: 0 to prevent long names from widening the popover.
 
 User-provided Psion art is mapped by scripts/custom-ability-art-sources.json and optimized with node scripts/optimize-custom-ability-art.mjs. The generated custom-ability-art.json is the shared explicit public allowlist. Gameplay loading and generic card lookup fill missing Kibbles art by exact ability name; explicit user assignments win. Masters and rejected alternatives stay local.
+
+Post-save hard navigation uses savedCharacterNavigationHref to include the deployment base path; Next Link hrefs remain app-relative. Responsive combat action groups allow at most two tiles per row, collapsing to one below a 160px tile minimum.
