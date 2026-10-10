@@ -40,13 +40,13 @@ export function NameFontPicker({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="z-[80] w-56 border-border bg-card p-1.5 shadow-lg"
+        className="z-[80] w-72 max-w-[calc(100vw-2rem)] border-border bg-card p-1.5 shadow-lg"
         sideOffset={6}
       >
         <p className="px-1.5 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Name font
         </p>
-        <div className="grid gap-1">
+        <div className="grid min-w-0 grid-cols-1 gap-1">
           {NAME_FONTS.map((font) => {
             const selected = font.id === selectedId
             return (
@@ -58,7 +58,7 @@ export function NameFontPicker({
                   setOpen(false)
                 }}
                 className={cn(
-                  "rounded-md border px-2 py-1.5 text-left transition-colors",
+                  "min-w-0 w-full overflow-hidden rounded-md border px-2 py-1.5 text-left transition-colors",
                   selected
                     ? "border-primary bg-primary/10"
                     : "border-transparent hover:border-border hover:bg-muted/60",

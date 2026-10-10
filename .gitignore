@@ -607,3 +607,6 @@ lib/import/__tests__/fixtures/*homebrew*
 tmp-*.json
 # Scratch diagnostics that read those extracts (would fail in CI without them)
 lib/import/__tests__/tmp-*.test.ts
+
+# User-provided custom ability art masters; optimized allowlisted outputs may ship.
+/scripts/custom-ability-sources/

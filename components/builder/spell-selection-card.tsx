@@ -140,7 +140,7 @@ export function BuilderSpellCompactPick({
   onDetails,
 }: SpellPickHandlers & { spell: Spell }) {
   return (
-    <label
+    <div
       className={cn(
         "flex items-center gap-2 p-2 rounded-lg border transition-all",
         selected
@@ -150,10 +150,11 @@ export function BuilderSpellCompactPick({
             : "border-border bg-card opacity-50 cursor-not-allowed",
       )}
     >
+      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
       <input
         type="checkbox"
         checked={selected}
-        disabled={!selectable}
+        disabled={!selectable && !selected}
         onChange={() => {
           if (selectable || selected) onToggle()
         }}
@@ -171,6 +172,7 @@ export function BuilderSpellCompactPick({
         <p className="truncate text-sm font-medium text-foreground">{spell.name}</p>
         <p className={getDenseSpellPickerSchoolClass()}>{spell.school}</p>
       </div>
+      </label>
       <button
         type="button"
         onClick={(e) => {
@@ -178,10 +180,12 @@ export function BuilderSpellCompactPick({
           e.stopPropagation()
           onDetails()
         }}
-        className="shrink-0 p-0.5 text-muted-foreground hover:text-primary"
+        aria-label={`Details for ${spell.name}`}
+        title={`Details for ${spell.name}`}
+        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-primary"
       >
-        <Info className="h-3 w-3" />
+        <Info className="h-4 w-4" />
       </button>
-    </label>
+    </div>
   )
 }

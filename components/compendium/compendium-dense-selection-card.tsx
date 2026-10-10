@@ -53,7 +53,7 @@ export function CompendiumDenseSelectionCard({
       aria-label={onLearnMore && !onSelect ? `View ${name} details` : undefined}
       onClick={disabled ? undefined : activate}
       onKeyDown={(e) => {
-        if (!activate || disabled) return
+        if (e.target !== e.currentTarget || !activate || disabled) return
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault()
           activate()
@@ -64,10 +64,17 @@ export function CompendiumDenseSelectionCard({
         selected
           ? selectedClassName
           : "border-border hover:border-primary/40",
-        disabled && "pointer-events-none opacity-50 cursor-not-allowed",
+        disabled && "opacity-50 cursor-not-allowed",
         className,
       )}
     >
+      {onLearnMore && onSelect && (
+        <button type="button" aria-label={`Details for ${name}`}
+          className="mt-2 flex min-h-11 items-center justify-center rounded-md border border-border px-2 text-xs text-foreground hover:bg-muted order-last"
+          onClick={(event) => { event.stopPropagation(); onLearnMore() }}>
+          Details
+        </button>
+      )}
       {badge && <div className="absolute right-2 top-2">{badge}</div>}
       <div className="flex items-start gap-2">
         {icon && (

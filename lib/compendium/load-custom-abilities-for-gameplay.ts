@@ -1,3 +1,4 @@
+import customAbilityArt from "./custom-ability-art.json"
 import { filterEnabled } from "@/lib/compendium/compendium-enabled"
 import { enrichManipulateMagicAbilities } from "@/lib/compendium/enrich-manipulate-magic"
 import { enrichRowsWithModifierRefs } from "@/lib/compendium/normalize-modifier-refs"
@@ -22,7 +23,11 @@ export async function loadCustomAbilitiesForGameplay(
 
   const byId = new Map<string, Record<string, unknown>>()
   for (const row of asCompendiumRows(builderRes.data)) {
-    byId.set(row.id as string, row as unknown as Record<string, unknown>)
+    byId.set(row.id as string, {
+      ...row,
+      card_image_url: row.card_image_url || (/kibbles/i.test(String(row.source ?? ""))
+        ? (customAbilityArt as Record<string, string>)[String(row.name)] : null),
+    } as unknown as Record<string, unknown>)
   }
   for (const row of asCompendiumRows(systemRes.data)) {
     byId.set(row.id as string, row as unknown as Record<string, unknown>)

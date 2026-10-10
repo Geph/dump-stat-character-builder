@@ -1,3 +1,4 @@
+import customAbilityArt from "./custom-ability-art.json"
 /**
  * Card art that may be committed / pushed: SRD, Mage Hand Press class portraits,
  * Mage Hand Press free-subclass portraits (seed allowlist), plus original species
@@ -538,6 +539,7 @@ export function publicCardArtPathFromUrl(url: string | null | undefined): string
 
 export function isBundledPublicCardArtPath(repoRelative: string): boolean {
   const n = normalizeRepoPath(repoRelative)
+  if (Object.values(customAbilityArt).some((url) => `public${url}` === n)) return true
   const classes = n.match(/^public\/images\/compendium\/classes\/([^/]+)$/)
   if (classes) return BUNDLED_CLASS_FILES.has(classes[1]!)
   const backgrounds = n.match(/^public\/images\/compendium\/backgrounds\/([^/]+)$/)

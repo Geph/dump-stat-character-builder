@@ -4199,6 +4199,7 @@ export default function BuilderPageClient() {
                                 disabled={totalLevel >= 20 && !existingLevel}
                                 badge={levelBadge}
                                 onSelect={selectClass}
+                                onLearnMore={() => setDetailsModal({ type: "class", item: cls })}
                               />
                             )
                           }
@@ -4582,6 +4583,7 @@ export default function BuilderPageClient() {
                                         accentColor={accent}
                                         selected={isSelected}
                                         onSelect={selectSubclass}
+                                onLearnMore={() => setDetailsModal({ type: "subclass", item: displaySubclass })}
                                       />
                                     )
                                   }
@@ -5220,6 +5222,7 @@ export default function BuilderPageClient() {
                               accentColor={accent}
                               selected={isSelected}
                               onSelect={selectSpecies}
+                                onLearnMore={() => setDetailsModal({ type: "species", item: sp })}
                             />
                           )
                         }
@@ -5741,6 +5744,7 @@ export default function BuilderPageClient() {
                               accentColor={accent}
                               selected={isSelected}
                               onSelect={selectBackground}
+                                onLearnMore={() => setDetailsModal({ type: "background", item: bg })}
                             />
                           )
                         }
@@ -7121,11 +7125,11 @@ export default function BuilderPageClient() {
                           className="block"
                           title="Adjust 1:1 crop"
                         >
-                          <img
+                          {!isCompactOnly && cardViewMode === "cinematic" ? (<img
                             src={character.portrait_url}
                             alt="Portrait"
                             className="h-20 w-20 rounded-xl object-cover border-4 border-border sm:h-32 sm:w-32 sm:rounded-2xl"
-                          />
+                          />) : (<span className="flex min-h-20 items-center justify-center rounded-xl border border-border bg-muted p-4 text-sm">Portrait assigned</span>)}
                         </button>
                         <button
                             type="button"
@@ -7166,11 +7170,11 @@ export default function BuilderPageClient() {
                     <div className="relative min-w-0 flex-1 sm:min-w-[200px]">
                       {character.banner_url ? (
                         <div className="relative">
-                          <img
+                          {!isCompactOnly && cardViewMode === "cinematic" ? (<img
                             src={character.banner_url}
                             alt="Banner"
                             className="h-20 w-full rounded-xl object-cover border-4 border-border sm:h-32 sm:rounded-2xl"
-                          />
+                          />) : (<span className="flex min-h-20 items-center justify-center rounded-xl border border-border bg-muted p-4 text-sm">Banner assigned</span>)}
                           <button
                             onClick={() => patchCharacter({ banner_url: null })}
                             className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center"
@@ -7745,12 +7749,12 @@ export default function BuilderPageClient() {
           const classFlavor = getCompendiumDetailFlavor(cls, "class")
           return (
             <CompendiumDetailOverlay
+              enableCardImage={!isCompactOnly && cardViewMode === "cinematic"}
               open
               onClose={close}
               item={cls}
               imageCrop="top"
-              panelWidth="portrait"
-              enableCardImage
+              panelWidth={!isCompactOnly && cardViewMode === "cinematic" ? "portrait" : "compact"}
               subtitle={cls.source || "Custom"}
               tagline={getCompendiumCardBlurb(cls).toUpperCase()}
               tags={[
@@ -7843,12 +7847,12 @@ export default function BuilderPageClient() {
           }
           return (
             <CompendiumDetailOverlay
+              enableCardImage={!isCompactOnly && cardViewMode === "cinematic"}
               open
               onClose={close}
               item={cardItem}
               imageCrop="top"
-              panelWidth="portrait"
-              enableCardImage
+              panelWidth={!isCompactOnly && cardViewMode === "cinematic" ? "portrait" : "compact"}
               subtitle={parentClass?.name ? `${parentClass.name} Subclass` : "Subclass"}
               tagline={getCompendiumCardBlurb(subclass).toUpperCase()}
               accentColor={accent}
@@ -7899,12 +7903,12 @@ export default function BuilderPageClient() {
           const traits = sp.traits ?? []
           return (
             <CompendiumDetailOverlay
+              enableCardImage={!isCompactOnly && cardViewMode === "cinematic"}
               open
               onClose={close}
               item={sp}
               imageCrop="top"
-              panelWidth="portrait-species"
-              enableCardImage
+              panelWidth={!isCompactOnly && cardViewMode === "cinematic" ? "portrait-species" : "compact"}
               subtitle={sp.source || "Custom"}
               tagline={getCompendiumCardBlurb(sp).toUpperCase()}
               accentColor={accent}
@@ -7948,12 +7952,12 @@ export default function BuilderPageClient() {
           const bg = item as Background
           return (
             <CompendiumDetailOverlay
+              enableCardImage={!isCompactOnly && cardViewMode === "cinematic"}
               open
               onClose={close}
               item={bg}
-              enableCardImage
               heroLayout="widescreen"
-              panelWidth="widescreen"
+              panelWidth={!isCompactOnly && cardViewMode === "cinematic" ? "widescreen" : "compact"}
               subtitle={bg.source || "Custom"}
               accentColor={accent}
               detailScroll
@@ -7972,12 +7976,13 @@ export default function BuilderPageClient() {
           const spell = item as Spell
           return (
             <CompendiumDetailOverlay
+              enableCardImage={!isCompactOnly && cardViewMode === "cinematic"}
               open
               onClose={close}
               item={spell}
               subtitle={spell.school}
               imageCrop="top"
-              panelWidth={cardViewMode === "cinematic" ? "portrait-spell" : "default"}
+              panelWidth={cardViewMode === "cinematic" && !isCompactOnly ? "portrait-spell" : "compact"}
               tags={spellDetailOverlayTags(spell)}
               accentColor={accent}
             >

@@ -1,3 +1,4 @@
+import customAbilityArt from "./custom-ability-art.json"
 import type { CompendiumThemeColorId } from "@/lib/compendium/theme-colors"
 import { getCompendiumItemAccentColor } from "@/lib/compendium/theme-colors"
 import { SRD_CLASS_CARD_BLURBS } from "@/lib/srd/class-card-blurbs"
@@ -79,7 +80,8 @@ export function rewriteLegacyDumpstatCardImageUrl(url: string): string {
 }
 
 export function getCompendiumCardImageUrl(item: CompendiumCardVisual): string | null {
-  const url = normalizeCardImageUrl(item.card_image_url)
+  const url = normalizeCardImageUrl(item.card_image_url) ?? (/kibbles/i.test(item.source ?? "")
+    ? (customAbilityArt as Record<string, string>)[item.name ?? ""] ?? null : null)
   if (!url) return null
   if (
     areDefaultMidjourneyGraphicsDisabled() &&
