@@ -599,17 +599,26 @@ function resolveLimitedUsesWithInference(
   skipTextInference = false,
 ): UsesConfig | null | undefined {
   const existing = resolveItemLimitedUses(item)
-  if (existing) return existing
+  if (existing?.restoreByResource || existing?.restoreBySpellSlot) return existing
   // Augment costs belong to the selected augment, not the power's base activation.
   if (skipTextInference) return existing
   if (resolveSpellSlotUseEffects(item).restoreResourceFromSpellSlotOnUse) return existing
-  const fromTrigger = limitedUsesFromTriggerSpend(item)
-  if (fromTrigger) return fromTrigger
   const spend = inferClassResourceSpendFromText(
     `${item.description ?? ""} ${extraText ?? ""}`,
     availableKeys,
   )
-  return spend ? inferredSpendToLimitedUses(spend) : existing
+  if (existing?.classResourceKey) {
+    return spend?.costMode && spend.resourceKey === existing.classResourceKey && !existing.classResourceCostMode
+      ? { ...existing, classResourceAmount: spend.amount, classResourceCostMode: spend.costMode }
+      : existing
+  }
+  if (!spend) {
+    const fromTrigger = limitedUsesFromTriggerSpend(item)
+    return fromTrigger ? { ...fromTrigger, ...existing } : existing
+  }
+  return { ...inferredSpendToLimitedUses(spend), ...existing,
+    ...(existing?.type === "unlimited" ? { type: "class_resource" as const } : {}),
+  }
 }
 
 function haystackForItem(item: ActivatableItem, extraText?: string | null): string {
@@ -622,7 +631,7 @@ function fallbackKindsForResourceSpend(
   text: string,
 ): { kinds: ActionEconomyKind[]; spendsEconomy: boolean | undefined } {
   if (kinds.length) return { kinds, spendsEconomy: undefined }
-  if (limitedUses?.type === "class_resource" || hasManeuverSpendText(text)) {
+  if (limitedUses?.classResourceKey || hasManeuverSpendText(text)) {
     return { kinds: ["action"], spendsEconomy: false }
   }
   return { kinds, spendsEconomy: undefined }
@@ -973,7 +982,7 @@ function spendsLimitedPool(item: ActivatableItem): boolean {
 
 /** Find the class resource key consumed by an activatable item (feature or trait). */
 function resolveActionResourceKey(item: ActivatableItem): string | null {
-  if (item.limitedUses?.type === "class_resource") {
+  if (item.limitedUses?.classResourceKey) {
     return item.limitedUses.classResourceKey ?? null
   }
   for (const instance of item.linkedModifiers ?? []) {
@@ -2348,7 +2357,7 @@ function pushCustomAbilityActions(
     const trigger = resolveTriggeredActivationLabel({
       ...item,
       description: `${ability.description ?? ""} ${ability.execution ?? ""} ${ability.casting_time ?? ""}`,
-    })
+    }) ?? (fallback.spendsEconomy === false ? ability.execution?.trim() || null : null)
 
     if (!kinds.length && trigger) {
       kinds.push("action")

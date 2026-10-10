@@ -430,6 +430,14 @@ type ActionUsage = {
   setUsed: (next: number) => void
   resourceName?: string
   resourceId?: string
+  activationLimit?: { max: number; used: number }
+  /** Consume one activation as well as its resource price; manual counter edits use setUsed. */
+  spend?: (amount: number) => void
+}
+
+function spendActionUsage(usage: ActionUsage, amount: number) {
+  if (usage.spend) usage.spend(amount)
+  else usage.setUsed(usage.used + amount)
 }
 
 /** Compact cost for the action card title row (replaces publisher/source labels). */
@@ -1145,6 +1153,7 @@ function ActionDetailOverlay({
   const [parentUsedThisOpen, setParentUsedThisOpen] = useState(false)
   const [lastSpentHitPoints, setLastSpentHitPoints] = useState(0)
   const [resourceSpendAmount, setResourceSpendAmount] = useState(1)
+  const [waiveResourceCost, setWaiveResourceCost] = useState(false)
   const [selectedSpellSlotLevel, setSelectedSpellSlotLevel] = useState<number | null>(null)
   const [empowerSpend, setEmpowerSpend] = useState(0)
   const [overloadedChargeActive, setOverloadedChargeActive] = useState(false)
@@ -1260,7 +1269,8 @@ function ActionDetailOverlay({
         : 0
 
   const resourceCostMode = action.limitedUses?.classResourceCostMode ?? "fixed"
-  const configuredResourceCost = Math.max(1, action.limitedUses?.classResourceAmount ?? 1)
+  const resourceWaived = Boolean(waiveResourceCost && action.limitedUses?.resourceCostWaiver)
+  const configuredResourceCost = resourceWaived ? 0 : Math.max(1, action.limitedUses?.classResourceAmount ?? 1)
   const resourceSpendCap =
     resourceCostMode === "up_to_proficiency_bonus"
       ? Math.max(1, (resolveContext.proficiencyBonus ?? 2) * configuredResourceCost)
@@ -1288,7 +1298,7 @@ function ActionDetailOverlay({
     Math.min(resourceSpendCap, Math.max(availableResourcePoints, 1)),
   )
   const resourceSpend =
-    selectedResourceCost != null
+    resourceWaived ? 0 : selectedResourceCost != null
       ? selectedResourceCost
       : usesVariableResourceSpend
         ? Math.max(1, Math.min(resourceSpendAmount, maxSelectableResourceSpend))
@@ -1347,6 +1357,7 @@ function ActionDetailOverlay({
   const primedBlocked = primedModeSelected && primedBombUsedThisTurn
   const canUse =
     !incapacitated &&
+    (!usage?.activationLimit || usage.activationLimit.used < usage.activationLimit.max) &&
     requiredToggleActive &&
     !chargeExhausted &&
     canAffordPsi &&
@@ -1361,7 +1372,7 @@ function ActionDetailOverlay({
   const optionUseAffordable = (option: SheetActionMenuOption) => {
     const optionHd = option.hitDiceCost != null && option.hitDiceCost > 0 ? option.hitDiceCost : 0
     const optionResource =
-      option.resourceCost != null
+      resourceWaived ? 0 : option.resourceCost != null
         ? option.resourceCost
         : usesVariableResourceSpend
           ? Math.max(1, Math.min(resourceSpendAmount, maxSelectableResourceSpend))
@@ -1370,6 +1381,7 @@ function ActionDetailOverlay({
       usage != null && optionResource > 0 && usage.max - usage.used < optionResource
     return (
       !incapacitated &&
+      (!usage?.activationLimit || usage.activationLimit.used < usage.activationLimit.max) &&
       !optionExhausted &&
       canAffordPsi &&
       (optionHd <= 0 || optionHd <= hitDiceRemaining) &&
@@ -1388,7 +1400,7 @@ function ActionDetailOverlay({
           ? hitDiceNeeded
           : 0
     const optionResource =
-      option?.resourceCost != null
+      resourceWaived ? 0 : option?.resourceCost != null
         ? option.resourceCost
         : !option
           ? resourceSpend
@@ -1427,6 +1439,7 @@ function ActionDetailOverlay({
     setParentUsedThisOpen(false)
     setLastSpentHitPoints(0)
     setResourceSpendAmount(1)
+    setWaiveResourceCost(false)
     setSelectedSpellSlotLevel(null)
     setEmpowerSpend(attackProfiles[0]?.attackVariant === "primed" ? 1 : 0)
     setOverloadedChargeActive(false)
@@ -1457,7 +1470,7 @@ function ActionDetailOverlay({
       (menuOptions.length === 0 ? null : option?.hitDiceCost ?? null)
     const useHitDiceNeeded = useHitDiceCost != null && useHitDiceCost > 0 ? useHitDiceCost : 0
     const useResourceSpend =
-      option?.resourceCost != null
+      resourceWaived ? 0 : option?.resourceCost != null
         ? option.resourceCost
         : usesVariableResourceSpend
           ? Math.max(1, Math.min(resourceSpendAmount, maxSelectableResourceSpend))
@@ -1470,6 +1483,7 @@ function ActionDetailOverlay({
     const useCanAffordHitDice = useHitDiceNeeded <= 0 || useHitDiceNeeded <= hitDiceRemaining
     const useCanUse =
       !incapacitated &&
+      (!usage?.activationLimit || usage.activationLimit.used < usage.activationLimit.max) &&
       requiredToggleActive &&
       !useChargeExhausted &&
       canAffordPsi &&
@@ -1501,8 +1515,8 @@ function ActionDetailOverlay({
           )
           return
         }
-        if (usage && useResourceSpend > 0) {
-          usage.setUsed(usage.used + useResourceSpend)
+        if (usage && (useResourceSpend > 0 || usage.activationLimit)) {
+          spendActionUsage(usage, useResourceSpend)
         }
         onCastSpellChoice(named, choice)
         onClose()
@@ -1547,7 +1561,7 @@ function ActionDetailOverlay({
     const sharesEmpowerPool =
       empowerPool != null && usage != null && empowerPool.resourceId === usage.resourceId
     if (usage && !spendViaAugments && !deferResourceSpendUntilHit) {
-      usage.setUsed(usage.used + useResourceSpend + (sharesEmpowerPool ? empowerResourceCost : 0))
+      spendActionUsage(usage, useResourceSpend + (sharesEmpowerPool ? empowerResourceCost : 0))
     }
     setParentUsedThisOpen(true)
     if (empowerPool && empowerResourceCost > 0 && !sharesEmpowerPool) {
@@ -1912,7 +1926,7 @@ function ActionDetailOverlay({
     const parts: string[] = []
     if (!parentUsedThisOpen) {
       if (chargeExhausted) return
-      if (usage) usage.setUsed(usage.used + 1)
+      if (usage) spendActionUsage(usage, 1)
       if (action.dropToOneHpOnUse && onSetCurrentHp) {
         onSetCurrentHp(1)
         parts.push("Dropped to 1 HP")
@@ -2201,6 +2215,23 @@ function ActionDetailOverlay({
           ) : null}
         </div>
 
+        {step === "detail" && (usage?.activationLimit || action.limitedUses?.resourceCostWaiver) ? (
+          <div className="space-y-2 px-4 pt-4">
+            {usage?.activationLimit ? (
+              <p className="text-xs text-muted-foreground">
+                Uses before rest: {Math.max(0, usage.activationLimit.max - usage.activationLimit.used)} / {usage.activationLimit.max}
+              </p>
+            ) : null}
+            {action.limitedUses?.resourceCostWaiver ? (
+              <label className="flex items-start gap-2 text-xs text-foreground">
+                <input type="checkbox" checked={waiveResourceCost}
+                  onChange={(event) => setWaiveResourceCost(event.target.checked)} />
+                Use without resource cost — {action.limitedUses.resourceCostWaiver}. Confirm this condition applies.
+              </label>
+            ) : null}
+          </div>
+        ) : null}
+
         {step === "roll" && specialAttack ? (
           <ActionRollStep
             action={action}
@@ -2243,7 +2274,7 @@ function ActionDetailOverlay({
                     spendOnHit: Boolean(specialAttack.spendResourceOnHit),
                     onConfirmHit: () => {
                       if (usage.max - usage.used < resourceSpend) return false
-                      usage.setUsed(usage.used + resourceSpend)
+                      spendActionUsage(usage, resourceSpend)
                       return true
                     },
                   }
@@ -2272,8 +2303,8 @@ function ActionDetailOverlay({
                     key={spell.id}
                     type="button"
                     onClick={() => {
-                      if (usage && configuredResourceCost > 0) {
-                        usage.setUsed(usage.used + configuredResourceCost)
+                      if (usage && (configuredResourceCost > 0 || usage.activationLimit)) {
+                        spendActionUsage(usage, configuredResourceCost)
                       }
                       onCastSpellChoice?.(spell, action.castSpellChoice!)
                       onClose()
@@ -3326,7 +3357,23 @@ export function SheetActionsPanel({
     // (subclass-attached custom abilities, multiclass edge cases).
     if (action.classResourceKey) {
       const pool = resolveResourcePool(action.classResourceKey, action.classId)
-      if (pool) return pool
+      if (pool) {
+        const limit = action.limitedUses?.type !== "class_resource"
+          ? resolveActionMax(action.limitedUses, action.classLevel, resolveContext)
+          : null
+        if (limit != null && limit > 0) {
+          const trackingId = resolveActionUsesTrackingKey(action)
+          const used = usedByActionId[trackingId] ?? 0
+          return { ...pool, activationLimit: { max: limit, used }, spend: (amount) => {
+            if (used >= limit || pool.used + amount > pool.max) return
+            pool.setUsed(pool.used + amount)
+            onUsedChange({ ...usedByActionId, [trackingId]: used + 1 })
+          } }
+        }
+        return pool
+      }
+      // A missing resource must not silently make the action free.
+      return { max: 0, used: 0, setUsed: () => {} }
     }
     const share = action.limitedUses?.useShareKey?.trim()
     const max =

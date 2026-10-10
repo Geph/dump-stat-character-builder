@@ -82,6 +82,9 @@ export const BUILTIN_SHEET_TOGGLES: SheetToggleDefinition[] = [
 
 /** Feature-specific toggles resolvable by id but not shown on every character sheet. */
 export const OPTIONAL_SHEET_TOGGLES: SheetToggleDefinition[] = [
+  { id: "battle_trance_active", label: "Battle Trance", sourceType: "class_feature", defaultDuration: "1_minute", endsWhen: { incapacitated: true }, hint: "End when wearing heavy armor or a shield. Track the once-per-turn free exploit manually." },
+  { id: "runic_might_active", label: "Runic Might", sourceType: "class_feature", defaultDuration: "1_minute", endsWhen: { incapacitated: true }, hint: "Track size and once-per-turn damage manually." },
+  { id: "heroic_focus_active", label: "Heroic Focus", sourceType: "class_feature", defaultDuration: "1_minute", endsWhen: { incapacitated: true }, hint: "Requires concentration. End this toggle when concentration ends. Double walking, climbing and swimming speeds and track the restricted extra action manually." },
   { id: "in_combat_or_high_stakes", label: "In combat / high-stakes", sourceType: "class_feature" },
   {
     id: "first_turn_of_combat",
@@ -302,6 +305,10 @@ export function clearExclusiveSheetToggleGroup(
  * Resource key is preferred when present so renamed homebrew ports still wire.
  */
 const ACTION_NAME_ACTIVATES_TOGGLE: Record<string, string> = {
+  "heroic focus": "heroic_focus_active",
+  "battle trance": "battle_trance_active",
+  "reactive trance": "battle_trance_active",
+  "runic might": "runic_might_active",
   rage: "while_raging",
   "wild shape": "while_wild_shape",
   "innate sorcery": "while_innate_sorcery_active",

@@ -84,7 +84,7 @@ export const ACTION_EFFECT_OPTIONS: ActionEffectOption[] = [
     hint: "Lay on Hands",
     fields: ["classResourceKey", "classResourceChange"],
   },
-  { value: "heal_self", label: "Heal self", group: "healing_temp_hp", hint: "Second Wind", fields: ["healAmount", "damageLinkedHeal"] },
+  { value: "heal_self", label: "Heal self", group: "healing_temp_hp", hint: "Second Wind (dice healing: level table supplies the flat bonus)", fields: ["healAmount", "bonusByLevel", "damageLinkedHeal"] },
   {
     value: "grant_temp_hp",
     label: "Grant temporary HP",

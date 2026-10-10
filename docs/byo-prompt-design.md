@@ -1,6 +1,23 @@
 # BYO prompt design — agent guide
 
-Last reviewed: 2026-10-08.
+Last reviewed: 2026-10-09.
+
+Subclass follow-up: classes Full/Lite **201,508 / 28,492** (before
+201,266 / 28,250); subclasses **198,941 / 26,042** (before 198,699 / 25,800);
+abilities **220,223 / 21,152** (before 219,981 / 20,910). Both modes distinguish
+conditional speed from permanent bonuses, manual reminders from automation,
+and complete companion stat blocks from name-only placeholders. All Lite types
+remain below 30K.
+
+After the Alternate Fighter pass: classes Full **201,266**, Lite **28,250**
+characters (before: 199,666 / 27,376); subclasses 198,699 / 25,800; abilities
+219,981 / 20,910. All Lite types remain under 30K. Both modes now explain
+concurrent rest/resource costs, ability-score OR groups, temporary-effect gates,
+and filtered custom-ability upgrades. The Full Fighter pattern explicitly keeps
+Relentless initiative recharge on the level-20 feature, not the level-2 pool.
+The target-assessment/subclass follow-up changed classes from 201,046 / 28,007
+to 201,266 / 28,250: per-target retry locks use notes, and named subclass gates
+must not be duplicated as generic Subclass entries.
 
 The BYO (bring-your-own LLM) import flow hands the user a prompt they paste into
 their own chat model. The goal is that the prompt works on **entry-level models**:

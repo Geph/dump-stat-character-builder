@@ -15,6 +15,26 @@ import { COMMON_MODIFIERS_IMPORT_HINT } from "@/lib/import/common-modifiers-impo
 import { RICH_TEXT_TABLE_HINT } from "@/lib/import/rich-text-import-hints"
 
 describe("BYO prompt guidance (Psion audit follow-up)", () => {
+  it("keeps conditional subclass benefits and incomplete companions explicit in both modes", () => {
+    for (const promptMode of ["full", "lite"] as const) {
+      const prompt = buildByoExtractionPrompt("subclasses", { promptMode })
+      expect(prompt).toContain("never turn a post-action movement bonus into permanent speed")
+      expect(prompt).toContain("an action reminder is not automatic resolution")
+      expect(prompt).toContain("full stat blocks, not name-only rows")
+    }
+  })
+  it("keeps exploit costs and prerequisite guidance in both modes", () => {
+    for (const promptMode of ["full", "lite"] as const) {
+      const prompt = buildByoExtractionPrompt("classes", { promptMode })
+      expect(prompt).toContain("Concurrent costs")
+      expect(prompt).toContain("ability-score OR groups")
+        expect(prompt).toContain("skill/tool/language prerequisites")
+        expect(prompt).toContain("per-target retry locks")
+        expect(prompt).toContain("not a duplicate Subclass feature")
+      expect(prompt).toContain("resourceCostWaiver")
+      expect(prompt).toContain("removeUseLimit")
+    }
+  })
   it("preserves nested gates and separates independent point costs in both prompt modes", () => {
     for (const promptMode of ["full", "lite"] as const) {
       const prompt = buildByoExtractionPrompt("classes", { promptMode })

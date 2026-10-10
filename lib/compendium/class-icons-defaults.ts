@@ -16,6 +16,7 @@ export const SRD_CLASS_ICONS_BY_NAME: Record<string, string> = {
 
 /** Curated homebrew class icons (exact name match). */
 export const HOMEBREW_CLASS_ICONS_BY_NAME: Record<string, string> = {
+  "Alternate Fighter": "axe-sword",
   Psion: "rear-aura",
   "KibblesTasty Psion": "rear-aura",
   Occultist: "pentacle",

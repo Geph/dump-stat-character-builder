@@ -1,5 +1,6 @@
 import type { ImportContent } from "@/lib/import/content-schema"
 import { parseSignatureExploitTable } from "@/lib/import/enrichment-presets/packs/alternate-rogue"
+import { wireAlternateFighterProgression } from "./alternate-fighter-progression"
 
 /** LaserLlama Alternate Fighter Exploits Known column. */
 export const ALTERNATE_FIGHTER_EXPLOITS_KNOWN_BY_LEVEL = [
@@ -113,10 +114,6 @@ function renameToAlternateFighter(content: ImportContent): ImportContent {
 }
 
 function remapResources(content: ImportContent): ImportContent {
-  const hasRelentless = (content.classes ?? []).some((cls) =>
-    (cls.features ?? []).some((f) => /^relentless$/i.test(f.name ?? "")),
-  )
-
   const resources = (content.class_resources ?? []).map((row) => {
     const key = row.resource_key
     const uses = asRecord(row.uses) ?? {}
@@ -153,7 +150,7 @@ function remapResources(content: ImportContent): ImportContent {
               ? (uses.dieSidesByLevel as { level: number; count: number }[])
               : [...ALTERNATE_FIGHTER_EXPLOIT_DIE_SIDES_BY_LEVEL],
           recharges,
-          ...(hasRelentless ? { rechargeOnInitiative: true as const } : {}),
+          rechargeOnInitiative: undefined,
         },
       }
     }
@@ -258,47 +255,42 @@ function wireMartialExploitsAndClassFeatures(content: ImportContent): ImportCont
 
 function wireSubclassSignatureExploits(content: ImportContent): ImportContent {
   if (!content.subclasses?.length) return content
-
   return {
     ...content,
     subclasses: content.subclasses.map((sc) => {
       if (!/alternate\s+fighter/i.test(sc.class_name ?? "")) return sc
+      type ImportedFeature = NonNullable<typeof sc.features>[number]
+      const additions = new Map<string, ImportedFeature>()
       const features = (sc.features ?? []).map((feat) => {
-        if (!/exploits$/i.test(feat.name ?? "")) return feat
-        if (/^martial exploits$/i.test(feat.name ?? "")) return feat
+        if (!/exploits$/i.test(feat.name ?? "") || /^martial exploits$/i.test(feat.name ?? "")) return feat
         const parsed = parseSignatureExploitTable(feat.description ?? "")
         if (!parsed.length) return feat
-
-        const mechanics = Array.isArray(feat.mechanics) ? [...feat.mechanics] : []
-        const existing = new Set(
-          mechanics
-            .filter((m) => asRecord(m)?.kind === "grant_custom_ability")
-            .flatMap((m) => {
-              const names = asRecord(m)?.abilityNames
-              return Array.isArray(names) ? names.map(String) : []
-            }),
-        )
-
-        for (const row of parsed) {
-          for (const abilityName of row.names) {
-            if (existing.has(abilityName)) continue
-            existing.add(abilityName)
-            mechanics.push({
-              kind: "grant_custom_ability",
-              abilityNames: [abilityName],
-              sourcePhrase: `At Fighter level ${row.level}, you learn the signature Exploit ${abilityName}.`,
-              confidence: "high",
-            })
-          }
+        const grantAt = (level: number, names: string[]) => ({
+          instanceId: `signature_${sc.name}_${level}`,
+          catalogRefId: "cat_char_grant_custom_ability",
+          characteristics: [{ id: `signature_${sc.name}_${level}`, type: "grant_custom_ability" as const, abilityNames: names }],
+        })
+        const initialNames = parsed.filter((row) => row.level <= (feat.level ?? 3)).flatMap((row) => row.names)
+        for (const row of parsed.filter((row) => row.level > (feat.level ?? 3))) {
+          const name = `${feat.name} (level ${row.level})`
+          additions.set(name, {
+            name, level: row.level, description: "Additional signature exploits.",
+            linkedModifiers: [grantAt(row.level, row.names)], modifierRefs: ["cat_char_grant_custom_ability"],
+          })
         }
-
-        return { ...feat, mechanics }
+        const linkedModifiers = (feat.linkedModifiers ?? []).filter((instance) =>
+          !instance.characteristics?.some((char) => char.type === "grant_custom_ability"))
+        if (initialNames.length) linkedModifiers.push(grantAt(feat.level ?? 3, initialNames))
+        return {
+          ...feat,
+          mechanics: (feat.mechanics ?? []).filter((mechanic) => mechanic.kind !== "grant_custom_ability"),
+          linkedModifiers, modifierRefs: linkedModifiers.map((instance) => instance.catalogRefId),
+        }
       })
-      return { ...sc, features }
+      return { ...sc, features: [...features.filter((feature) => !additions.has(feature.name)), ...additions.values()] }
     }),
   }
 }
-
 function abilityToOption(ability: {
   name?: string | null
   description?: string | null
@@ -416,5 +408,6 @@ export function sanitizeAlternateFighterImportContent(content: ImportContent): I
   next = wireMartialExploitsAndClassFeatures(next)
   next = wireSubclassSignatureExploits(next)
   next = sanitizeSubclassCatalogs(next)
+  next = wireAlternateFighterProgression(next)
   return next
 }

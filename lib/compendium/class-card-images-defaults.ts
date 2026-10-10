@@ -19,6 +19,7 @@ export const SRD_CLASS_CARD_IMAGES_BY_NAME: Record<string, string> = {
   Cleric: classCardImage("cleric"),
   Druid: classCardImage("druid"),
   Fighter: classCardImage("fighter"),
+  "Alternate Fighter": classCardImage("alternate-fighter"),
   Inventor: classCardImage("inventor"),
   Monk: classCardImage("monk"),
   Occultist: classCardImage("occultist"),

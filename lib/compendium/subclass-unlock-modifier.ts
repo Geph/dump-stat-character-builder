@@ -8,7 +8,7 @@ import {
 export const SUBCLASS_UNLOCK_CATALOG_ID = "cat_char_subclass_unlock"
 
 const STRICT_SUBCLASS_GATE_NAME =
-  /^(?:subclass|.+\s+subclass|psionic archetype|inventor specialization|occult tradition|warden bond|divine domain|sacred oath|martial archetype|primal path|bard college|druid circle|monastic tradition|roguish archetype|sorcerous origin|otherworldly patron|arcane tradition)$/i
+  /^(?:subclass|.+\s+subclass|psionic archetype|inventor specialization|occult tradition|warden bond|divine domain|sacred oath|martial archetype|warrior archetype|primal path|bard college|druid circle|monastic tradition|roguish archetype|sorcerous origin|otherworldly patron|arcane tradition)$/i
 
 export function featureHasSubclassUnlockModifier(feature: Pick<Feature, "linkedModifiers">): boolean {
   return (feature.linkedModifiers ?? []).some(
@@ -49,7 +49,21 @@ export function ensureSubclassUnlockFeature(
   unlockLevel: number,
   preferredFeatureName?: string,
 ): Feature[] {
-  const features = [...(cls.features ?? [])]
+  let features = [...(cls.features ?? [])]
+  // Older imports may contain our generic fallback alongside the source's named gate.
+  // Remove only that exact generated shell; preserve authored features and extra effects.
+  const namedGate = strictGateAtLevel(features.filter((feature) => feature.name.trim().toLowerCase() !== "subclass"), unlockLevel)
+  if (namedGate) {
+    features = features.filter((feature) => !(
+      feature.level === unlockLevel && feature.name === "Subclass" &&
+      feature.description === "Choose a subclass for this class." &&
+      !feature.isChoice && !feature.activation &&
+      (feature.linkedModifiers ?? []).every((instance) =>
+        instance.catalogRefId === SUBCLASS_UNLOCK_CATALOG_ID &&
+        !instance.activation &&
+        (instance.characteristics ?? []).every((characteristic) => characteristic.type === "subclass_unlock"))
+    ))
+  }
   if (features.some(featureHasSubclassUnlockModifier)) return features
 
   const preferred = preferredFeatureName?.trim()

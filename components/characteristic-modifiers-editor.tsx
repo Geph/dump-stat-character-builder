@@ -3773,6 +3773,37 @@ function ModifierFields({
               Appended wherever the ability&apos;s description is shown.
             </p>
           </div>
+          <label className="flex gap-2 text-sm">
+            <input type="checkbox" checked={mod.removeUseLimit ?? false}
+              onChange={(e) => onChange({ ...mod, removeUseLimit: e.target.checked })} />
+            Remove independent use limit (keep resource cost)
+          </label>
+          <label className="flex gap-2 text-sm">
+            <input type="checkbox" checked={Boolean(mod.abilityFilter)}
+              onChange={(e) => onChange({ ...mod, abilityFilter: e.target.checked ? { role: "knack" } : null })} />
+            Also match a library by role and prerequisite level
+          </label>
+          {mod.abilityFilter ? (
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <label>Ability role<input className="w-full rounded border p-2 bg-background" value={mod.abilityFilter.role}
+                onChange={(e) => onChange({ ...mod, abilityFilter: { ...mod.abilityFilter!, role: e.target.value } })} /></label>
+              <label>Eligible classes (comma separated)<input className="w-full rounded border p-2 bg-background" value={mod.abilityFilter.eligibleClassNames?.join(", ") ?? ""}
+                onChange={(e) => onChange({ ...mod, abilityFilter: { ...mod.abilityFilter!, eligibleClassNames: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })} /></label>
+              {(["minLevel", "maxLevel"] as const).map((key) => (
+                <label key={key}>{key === "minLevel" ? "Minimum" : "Maximum"} prerequisite level
+                  <input type="number" min={1} max={20} className="w-full rounded border p-2 bg-background" value={mod.abilityFilter?.[key] ?? ""}
+                    onChange={(e) => onChange({ ...mod, abilityFilter: { ...mod.abilityFilter!, [key]: e.target.value ? Number(e.target.value) : undefined } })} />
+                </label>
+              ))}
+            </div>
+          ) : null}
+          <label className="block text-xs font-semibold">
+            Optional resource waiver condition
+            <input className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              value={mod.resourceCostWaiver ?? ""}
+              onChange={(e) => onChange({ ...mod, resourceCostWaiver: e.target.value || null })}
+              placeholder="Once per round" />
+          </label>
         </div>
       )
 

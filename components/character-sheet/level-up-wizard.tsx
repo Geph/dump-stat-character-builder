@@ -17,6 +17,7 @@ import {
   type CharacterClassDetail,
 } from "@/lib/character/character-classes"
 import { collectAsiPoolsFromFeat } from "@/lib/character/feat-asi-pools"
+import { buildInputsFromSavedCharacter, computeDerivedCharacter } from "@/lib/character/compute-derived"
 import {
   levelUpFeatAllocationPrefix,
   levelUpFeatSlotKey,
@@ -86,6 +87,7 @@ import { enrichClassesList } from "@/lib/compendium/normalize-class-data"
 import { enrichSpeciesList } from "@/lib/compendium/normalize-species-traits"
 import { asCompendiumRows } from "@/lib/data/types"
 import type {
+  Background,
   Character,
   CustomAbility,
   DndClass,
@@ -122,6 +124,7 @@ type IdentityCatalog = { id: string; name: string }
 
 type Loaded = {
   character: Character
+  background: Background | null
   classDetails: CharacterClassDetail[]
   subclasses: Subclass[]
   feats: Feat[]
@@ -200,7 +203,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
         db.from("equipment").select("*"),
         db.from("custom_abilities").select("*"),
         db.from("species").select("*"),
-        db.from("backgrounds").select("id, name, feat_granted"),
+        db.from("backgrounds").select("*"),
         loadModifierCatalog(db),
       ])
       if (cancelled) return
@@ -229,14 +232,11 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       const enrichedSpecies = enrichSpeciesList(
         asCompendiumRows(speciesRows) as unknown as Species[],
       )
-      const backgroundRows = asCompendiumRows<{
-        id: string
-        name: string
-        feat_granted: string | null
-      }>(backgrounds)
+      const backgroundRows = asCompendiumRows(backgrounds) as unknown as Background[]
       const background = backgroundRows.find((row) => row.id === char.background_id)
       setLoaded({
         character: char,
+        background: background ?? null,
         classDetails,
         subclasses: classDetails
           .flatMap((entry) => (entry.subclass ? [entry.subclass] : []))
@@ -440,9 +440,36 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
     }
   }, [choicePicks, knownSpellNames, loaded, plan, selectedEntry])
 
+  const prerequisiteStats = useMemo(() => {
+    if (!loaded || !plan) return null
+    const character = {
+      ...loaded.character,
+      level: plan.newTotalLevel,
+      character_classes: loaded.classDetails.map(({ row }) => row.class_id === plan.classId
+        ? { ...row, level: plan.toLevel, subclass_id: subclassId ?? row.subclass_id } : row),
+      feature_choice_picks: choicePicks,
+      feat_choice_picks: featChoicePicks,
+      modifier_player_picks: modifierPicks,
+      feat_ids: [...new Set([...(loaded.character.feat_ids ?? []), ...Object.values(featIdsByStep)])],
+      asi_allocations: { ...normalizeAsiAllocationsMap(loaded.character.asi_allocations), ...featAsiAllocations },
+    }
+    const inputs = buildInputsFromSavedCharacter({
+      character,
+      classes: loaded.classDetails.flatMap((entry) => entry.class ? [entry.class] : []),
+      subclasses: loaded.subclasses, species: loaded.species, background: loaded.background,
+      feats: loaded.feats, equipment: loaded.equipment.filter((item) => character.equipment_ids?.includes(item.id)),
+      equipmentCatalog: loaded.equipment, modifierCatalog: loaded.modifierCatalog,
+    })
+    return inputs ? computeDerivedCharacter({ ...inputs, customAbilities: loaded.customAbilities }) : null
+  }, [loaded, plan, subclassId, choicePicks, featChoicePicks, modifierPicks, featIdsByStep, featAsiAllocations])
+
   const featureChoiceOptions = useMemo((): SkillChoiceOption[] => {
     if (!loaded || !plan || !selectedEntry || current?.kind !== "feature_choice") return []
     const options = resolveFeatureChoiceOptions(current.feature, {
+      abilityScores: prerequisiteStats?.abilityScores ?? loaded.character,
+      proficientSkills: prerequisiteStats?.skillProficiencies ?? loaded.character.skill_proficiencies ?? [],
+      proficientTools: prerequisiteStats?.toolProficiencies ?? loaded.character.tool_proficiencies ?? [],
+      knownLanguages: prerequisiteStats?.languages ?? loaded.character.languages ?? [],
       customAbilities: loaded.customAbilities,
       featureChoicePicks: choicePicks,
       classNames: [plan.className],
@@ -466,7 +493,7 @@ export function LevelUpWizard({ characterId, open, onClose, onComplete }: LevelU
       required: current.required,
       fallbackOptions: selectedEntry.class?.skill_choices?.options ?? [],
     })
-  }, [choicePicks, current, knownSpellNames, loaded, plan, selectedEntry])
+  }, [choicePicks, current, knownSpellNames, loaded, plan, selectedEntry, prerequisiteStats])
 
   const modifierChoiceOptions = useMemo(() => {
     if (!loaded || current?.kind !== "modifier_choice") return []

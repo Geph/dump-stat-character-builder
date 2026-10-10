@@ -1,6 +1,35 @@
 # Repository overview
 
-Last reviewed: 2026-10-04.
+Last reviewed: 2026-10-09.
+
+Original generated class art: `public/images/compendium/classes/alternate-fighter.png`
+was created with Codex's built-in image generator on 2026-10-09. The user's local
+LaserLlama cover supplied mood/lighting inspiration; the generated portrait uses
+a different warrior, armor, low sword guard, and battlement composition. No
+publisher artwork was copied into the repository. Its full-resolution master is
+gitignored under `scripts/class-card-sources/generated/`. The optimized 2:3 asset
+is allowlisted in both bundled-art registries and `.gitignore`, and assigned by
+`defaultClassCardImageUrl`. Optimize this master at 684×1026 to retain the full
+composition.
+
+<details>
+<summary>Alternate Fighter art generation prompt (built-in image tool)</summary>
+
+Create an original high-fantasy character illustration for an Alternate Fighter
+class card in a tabletop character builder. Use the reference ONLY as inspiration
+for martial intensity, painterly detail, storm-blue and warm ember lighting;
+create a distinctly different warrior, armor design, pose, composition and setting.
+A battle-hardened adult warrior in practical weathered steel plate and mail, red
+cloth accents, wielding a longsword and shield with expert disciplined technique.
+Three-quarter standing portrait, sword held in a low forward guard rather than
+overhead, shield at the side, on a ruined stone battlement after a storm. Express
+experience and tactical mastery, not magic. Dramatic natural light, believable
+hands and weapons, premium painted fantasy illustration, richly textured but
+legible at small card size. Portrait 2:3 aspect ratio. Keep face and silhouette
+readable and leave the bottom area relatively calm for a UI title overlay. No
+text, no logos, no frame, no watermark. The reference image is not an edit target.
+
+</details>
 
 Dump Stat is a 5E-compatible character builder and compendium. This note maps the directories, the files that actually run the product, and how licensed content is kept separate from copyrighted books.
 

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 import { enrichSrdSubclassRow } from "@/lib/compendium/enrich-srd-subclasses"
 import {
   defaultSubclassCardImageUrl,
+  applyBundledSubclassCardImage,
   listSubclassCardImageRelativePaths,
   rewriteLegacyFlatSubclassCardImageUrl,
   SRD_SUBCLASS_CARD_IMAGES_BY_NAME,
@@ -34,6 +35,13 @@ function expectDefaultSubclassCardImage(
 }
 
 describe("subclass card images", () => {
+  it("does not borrow SRD Champion art for Alternate Fighter or retain that stale default", () => {
+    expect(defaultSubclassCardImageUrl("Champion", "Alternate Fighter", { requireAvailable: false })).toBeNull()
+    const stale = { name: "Champion", card_image_url: "/images/compendium/subclasses/fighter/champion.png" }
+    expect(applyBundledSubclassCardImage(stale, "Alternate Fighter").card_image_url).toBeNull()
+    expect(applyBundledSubclassCardImage({ ...stale, card_image_url: "https://example.com/my-champion.png" }, "Alternate Fighter").card_image_url).toBe("https://example.com/my-champion.png")
+    expect(defaultSubclassCardImageUrl("Champion", "Fighter", { requireAvailable: false })).toContain("/fighter/champion.png")
+  })
   it("stores art under parent-class subdirectories", () => {
     expectDefaultSubclassCardImage("Champion", "Fighter", /\/images\/compendium\/subclasses\/fighter\/champion\.png$/)
     expectDefaultSubclassCardImage("Knowing Mind", "Psion", /\/images\/compendium\/subclasses\/psion\/knowing-mind\.png$/)

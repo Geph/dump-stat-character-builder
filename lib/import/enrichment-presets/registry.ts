@@ -1,3 +1,4 @@
+import { ALTERNATE_FIGHTER_SUBCLASS_PRESETS } from "./packs/alternate-fighter-subclasses"
 import { ALCHEMIST_PRESETS, ALCHEMIST_SEEDS } from "@/lib/import/enrichment-presets/packs/alchemist"
 import { CAPTAIN_PRESETS } from "@/lib/import/enrichment-presets/packs/captain"
 import { CRAFTSMAN_PRESETS } from "@/lib/import/enrichment-presets/packs/craftsman"
@@ -32,6 +33,7 @@ import type {
 } from "@/lib/import/enrichment-presets/types"
 
 const PRESETS: EnrichmentPreset[] = [
+  ...ALTERNATE_FIGHTER_SUBCLASS_PRESETS,
   ...ALCHEMIST_PRESETS,
   ...ALCHEMIST_PHILOSOPHER_PRESETS,
   ...INVESTIGATOR_PRESETS,

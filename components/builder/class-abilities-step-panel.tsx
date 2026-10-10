@@ -181,6 +181,8 @@ export function ClassAbilitiesStepPanel(props: ClassAbilitiesStepProps) {
           <div key={classId} className="space-y-3 border-t border-border pt-4">
             <h3 className="text-lg font-bold text-foreground">{className}</h3>
             <ClassAbilityFeatureChoices
+              abilityScores={abilityScores}
+              proficientSkills={skillPickSourcesTaken}
               entries={choiceEntries}
               customAbilities={customAbilities}
               featureChoicePicks={featureChoicePicks}

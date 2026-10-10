@@ -209,6 +209,10 @@ export function aggregatePsionicTalentOptions(params: {
 
 /** Resolve effective choice options for builder/sheet (static or aggregated). */
 export type ResolveFeatureChoiceOptionsParams = {
+  abilityScores?: ChoicePrerequisiteContext["abilityScores"]
+  proficientSkills?: string[]
+  proficientTools?: string[]
+  knownLanguages?: string[]
   customAbilities: CustomAbility[]
   featureChoicePicks: Record<string, string[]>
   classNames: string[]
@@ -281,14 +285,15 @@ export function resolveFeatureChoiceOptions(
     featureChoicePicks: params.featureChoicePicks,
     grantedAbilityNames: params.grantedCustomAbilityNames,
   })
-  const prerequisiteContext = buildPrerequisiteContext({
+  const prerequisiteContext = { ...buildPrerequisiteContext({
     classLevel,
     featureChoicePicks: params.featureChoicePicks,
     knownSpellNames: params.knownSpellNames,
     subclassName: params.subclassName,
     grantedAbilityNames: params.grantedCustomAbilityNames,
     knownDisciplineNames: knownDisciplines,
-  })
+  }), abilityScores: params.abilityScores, proficientSkills: params.proficientSkills,
+    proficientTools: params.proficientTools, knownLanguages: params.knownLanguages }
   const filterOptions = (options: FeatureChoice["options"]) =>
     filterChoiceOptionsByEligibility(options, prerequisiteContext, {
       customAbilities: params.customAbilities,
@@ -368,6 +373,10 @@ export function resolveFeatureChoiceOptions(
       ? (params.featureChoicePicks[knackKey] ?? [])
       : Object.values(params.featureChoicePicks).flat()
     return aggregateKnackOptions({
+      abilityScores: params.abilityScores,
+      proficientSkills: params.proficientSkills,
+      proficientTools: params.proficientTools,
+      knownLanguages: params.knownLanguages,
       customAbilities: params.customAbilities,
       classNames: params.classNames,
       classIds: params.classIds,

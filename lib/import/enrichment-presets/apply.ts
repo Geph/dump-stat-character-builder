@@ -59,6 +59,7 @@ import type {
 } from "@/lib/import/enrichment-presets/types"
 
 const CLASS_ROW_PACKS = new Set([
+  "alternate_fighter",
   "monk",
   "alternate_ranger",
   "alternate_sorcerer",
@@ -80,6 +81,7 @@ const CLASS_ROW_PACKS = new Set([
   "investigator",
 ])
 const CONTENT_PACKS = new Set([
+  "alternate_fighter",
   "alchemist",
   "investigator",
   "psion",

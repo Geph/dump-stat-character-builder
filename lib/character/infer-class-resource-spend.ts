@@ -44,15 +44,15 @@ export type InferredClassResourceSpend = {
 }
 
 const UP_TO_PROFICIENCY_SPEND_RE =
-  /\bup\s+to\s+(?:a\s+maximum\s+of\s+)?(\d+)\s*(?:×|x|times)\s+(?:your\s+)?proficiency\s+bonus\b/i
+  /\bup\s+to\s+(?:a\s+maximum\s+of\s+)?(?:(\d+)\s*(?:×|x|times)\s+)?(?:your\s+)?proficiency\s+bonus\b/i
 
 function inferScaledProficiencySpend(
   haystack: string,
   availableKeys: readonly string[],
 ): InferredClassResourceSpend | null {
   const match = haystack.match(UP_TO_PROFICIENCY_SPEND_RE)
-  if (!match) return null
-  const amount = parseInt(match[1], 10)
+  if (!match || !/\b(?:spend|expend)\b/i.test(haystack)) return null
+  const amount = parseInt(match[1] ?? "1", 10)
   if (!Number.isFinite(amount) || amount < 1) return null
   for (const key of availableKeys) {
     const canonical = canonicalThirdPartyResourceKey(key)

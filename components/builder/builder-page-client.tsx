@@ -4618,6 +4618,10 @@ export default function BuilderPageClient() {
                               subclasses.find((sc) => sc.id === subclassByClassId[entry.classId]) ??
                               null
                             const choiceOptions = resolveFeatureChoiceOptions(feature, {
+                              abilityScores: effectiveAbilityScores,
+                              proficientSkills: effectiveSkillProficiencies,
+                              proficientTools: effectiveToolProficiencies,
+                              knownLanguages: characterDerived.languages,
                               customAbilities,
                               featureChoicePicks: { ...featureChoicePicks, ...featChoicePicks },
                               classNames: [cls.name],
@@ -4669,6 +4673,10 @@ export default function BuilderPageClient() {
                               if (isKnackPool) {
                                 const previous = featureChoicePicks[key] ?? []
                                 const validation = validateKnackSelectionChange({
+                                  abilityScores: effectiveAbilityScores,
+                                  proficientSkills: effectiveSkillProficiencies,
+                                  proficientTools: effectiveToolProficiencies,
+                                  knownLanguages: characterDerived.languages,
                                   previous,
                                   next: selected,
                                   customAbilities,

@@ -60,6 +60,10 @@ export function isKnackEligible(
 }
 
 export function aggregateKnackOptions(params: {
+  abilityScores?: ChoicePrerequisiteContext["abilityScores"]
+  proficientSkills?: string[]
+  proficientTools?: string[]
+  knownLanguages?: string[]
   customAbilities: CustomAbility[]
   classNames: string[]
   classLevel: number
@@ -74,6 +78,10 @@ export function aggregateKnackOptions(params: {
   })
   const selected = params.selectedKnackNames
   const context: KnackEligibilityContext = {
+    abilityScores: params.abilityScores,
+    proficientSkills: params.proficientSkills,
+    proficientTools: params.proficientTools,
+    knownLanguages: params.knownLanguages,
     classLevel: params.classLevel,
     selectedAbilityNames: selected,
     knownSpellNames: params.knownSpellNames,
@@ -98,6 +106,10 @@ export function aggregateKnackOptions(params: {
 }
 
 export function validateKnackSelectionChange(params: {
+  abilityScores?: ChoicePrerequisiteContext["abilityScores"]
+  proficientSkills?: string[]
+  proficientTools?: string[]
+  knownLanguages?: string[]
   previous: string[]
   next: string[]
   customAbilities: CustomAbility[]
@@ -145,6 +157,10 @@ export function validateKnackSelectionChange(params: {
     const others = params.next.filter((entry) => entry !== name)
     if (
       !isKnackEligible(knack, {
+        abilityScores: params.abilityScores,
+        proficientSkills: params.proficientSkills,
+        proficientTools: params.proficientTools,
+        knownLanguages: params.knownLanguages,
         classLevel: params.classLevel,
         selectedAbilityNames: others,
         knownSpellNames: params.knownSpellNames,

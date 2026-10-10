@@ -19,6 +19,7 @@ function expectEnrichedCardArt(
 }
 
 const EXPECTED_CLASS_NAMES = [
+  "Alternate Fighter",
   "Artificer",
   "Barbarian",
   "Bard",

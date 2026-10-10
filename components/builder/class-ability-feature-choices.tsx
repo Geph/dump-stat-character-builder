@@ -20,6 +20,8 @@ import { withChosenOptionChrome } from "@/lib/character/chosen-option-label"
 import type { CustomAbility, Equipment, Feature } from "@/lib/types"
 
 type Props = {
+  abilityScores?: import("@/lib/builder/choice-prerequisite").ChoicePrerequisiteContext["abilityScores"]
+  proficientSkills?: string[]
   entries: ClassAbilityFeatureEntry[]
   customAbilities: CustomAbility[]
   featureChoicePicks: Record<string, string[]>
@@ -110,6 +112,8 @@ function namesMatchLoose(a: string, b: string): boolean {
 }
 
 export function ClassAbilityFeatureChoices({
+  abilityScores,
+  proficientSkills,
   entries,
   customAbilities,
   featureChoicePicks,
@@ -138,6 +142,10 @@ export function ClassAbilityFeatureChoices({
         const { feature, classId, className, classLevel, subclassName } = entry
         const key = featureChoiceKey(classId, feature.name, feature.level)
         const choiceOptions = resolveFeatureChoiceOptions(feature, {
+          abilityScores,
+          proficientSkills: proficientSkills ?? [...getTakenSkills(skillPickSources)],
+          proficientTools,
+          knownLanguages,
           customAbilities,
           featureChoicePicks: { ...featureChoicePicks, ...(additionalChoicePicks ?? {}) },
           classNames: [className],
@@ -212,6 +220,10 @@ export function ClassAbilityFeatureChoices({
           if (isKnackPool) {
             const previous = featureChoicePicks[key] ?? []
             const validation = validateKnackSelectionChange({
+              abilityScores,
+              proficientSkills: proficientSkills ?? [...getTakenSkills(skillPickSources)],
+              proficientTools,
+              knownLanguages,
               previous,
               next: selected,
               customAbilities,

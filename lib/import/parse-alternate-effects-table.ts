@@ -92,7 +92,9 @@ export function parseAlternateEffectsCostRowsFromProse(text: string): AlternateE
   const plain = stripHtml(text).replace(/\s+/g, " ").trim()
   if (!plain) return []
   const out: AlternateEffectsCostRow[] = []
-  const re = /(\d+)\s*[—–\-:=]\s*([^;]+?)(?=;\s*\d+\s*[—–\-:=]|$)/g
+  // A cost row starts a list (or follows its heading/separator). Distances such
+  // as "a 20-foot cone" inside ordinary rules prose are never spell tables.
+  const re = /(?:^|[;:]\s*)(\d+)\s*[—–\-:=]\s*([^;]+?)(?=;\s*\d+\s*[—–\-:=]|$)/g
   let match
   while ((match = re.exec(plain))) {
     const pointCost = parseInt(match[1], 10)

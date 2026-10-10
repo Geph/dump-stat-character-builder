@@ -8,7 +8,7 @@ export const DEFAULT_SUBCLASS_LEVEL = 3
 export const SUBCLASS_LEVEL = DEFAULT_SUBCLASS_LEVEL
 
 const SUBCLASS_GATE_NAME =
-  /^(?:.+\s+subclass|bard college|primal path|arcane tradition|divine domain|sacred oath|roguish archetype|martial archetype|druid circle|sorcerous origin|otherworldly patron|monastic tradition|wizard school|psionic archetype|inventor specialization|occult tradition|warden bond)$/i
+  /^(?:.+\s+subclass|bard college|primal path|arcane tradition|divine domain|sacred oath|roguish archetype|martial archetype|warrior archetype|druid circle|sorcerous origin|otherworldly patron|monastic tradition|wizard school|psionic archetype|inventor specialization|occult tradition|warden bond)$/i
 
 const SUBCLASS_CHOICE_CATEGORY =
   /\b(college|path|tradition|domain|patron|archetype|circle|school|oath|philosophy|way of|subclass|covenant|specialty|calling)\b/i

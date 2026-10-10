@@ -20,6 +20,10 @@ import {
 
 export type ChoicePrerequisiteContext = {
   classLevel: number
+  abilityScores?: Partial<Record<"strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma", number>>
+  proficientSkills?: string[]
+  proficientTools?: string[]
+  knownLanguages?: string[]
   knownSpellNames?: string[]
   selectedAbilityNames?: string[]
   subclassName?: string | null
@@ -168,6 +172,13 @@ function requirementSatisfied(
   requirement: NamedRequirement,
   context: ChoicePrerequisiteContext,
 ): boolean {
+  const score = requirement.name.match(/^(strength|dexterity|constitution|intelligence|wisdom|charisma)\s+(\d+)(?:\s+or\s+higher)?$/i)
+  if (score) return (context.abilityScores?.[score[1].toLowerCase() as keyof NonNullable<ChoicePrerequisiteContext["abilityScores"]>] ?? 0) >= Number(score[2])
+  const skill = requirement.name.replace(/^proficiency\s+in\s+/i, "").trim()
+  if (listHasName(context.proficientTools, skill) || listHasName(context.knownLanguages, skill)) return true
+  if (/^(acrobatics|animal handling|arcana|athletics|deception|history|insight|intimidation|investigation|medicine|nature|perception|performance|persuasion|religion|sleight of hand|stealth|survival)$/i.test(skill)) {
+    return (context.proficientSkills ?? []).some((name) => normalizeName(name) === normalizeName(skill))
+  }
   if (requirement.kind === "spell") {
     return listHasName(context.knownSpellNames, requirement.name)
   }
@@ -216,7 +227,12 @@ export function isChoicePrerequisiteMet(
       if (excluded[1].split(/\s+or\s+|,\s*/i).some((name) => listHasName(context.selectedAbilityNames, name))) return false
       continue
     }
-    const groups = parseNamedRequirementGroups(chunk)
+    // "Strength or Constitution 13, Athletics" shares the score threshold,
+    // but the skill remains a separate AND requirement.
+    const expanded = chunk.replace(/\b(strength|dexterity|constitution|intelligence|wisdom|charisma)\s+or\s+(strength|dexterity|constitution|intelligence|wisdom|charisma)\s+(\d+)/gi, "$1 $3 or $2 $3")
+    const groups = /\b(?:strength|dexterity|constitution|intelligence|wisdom|charisma)\s+\d/i.test(expanded)
+      ? expanded.split(/\s*,\s*|\s+and\s+/i).flatMap((part) => parseNamedRequirementGroups(part))
+      : parseNamedRequirementGroups(expanded)
     for (const group of groups) {
       const satisfied = group.some((req) => {
         if (isWeaponPrerequisiteClause(req.name)) {

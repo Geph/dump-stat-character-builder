@@ -13,6 +13,8 @@ const BUNDLED_CARD_SOURCE_ORIGINS = new Set([
 ])
 
 const BUNDLED_CLASS_FILES = new Set([
+  // Original generated portrait; the LaserLlama reference is not bundled.
+  "alternate-fighter.png",
   "barbarian.png",
   "bard.png",
   "cleric.png",

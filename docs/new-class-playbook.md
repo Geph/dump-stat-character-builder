@@ -1,6 +1,24 @@
 # New class playbook — agent guide
 
-Last reviewed: 2026-10-08.
+Last reviewed: 2026-10-09.
+
+`packs/alternate-fighter-subclasses.ts` demonstrates subclass-scoped declarative
+presets: require the parent class and subclass name, replace incorrect detected
+modifiers before adding gated effects, and attach `power_rider` source alerts
+or `player_note` controls where a rule still requires manual resolution. A
+linked reminder is not a substitute for implementing resource or timing upgrades;
+keep those remaining limits explicit in the import-review documentation.
+
+Alternate Fighter is an example of a class that upgrades a separately imported
+library. `packs/alternate-fighter-progression.ts` attaches catalog metadata for
+use tiers, healing, extra attacks, level-gated initiative recovery, and filtered
+custom-ability upgrades. `modify_custom_ability.abilityFilter` avoids capturing
+only the abilities present in the same JSON paste. The shared prerequisite
+context carries effective ability scores, skill/tool proficiencies, and languages: preserve
+`Strength or Constitution 13, Athletics` as an OR score gate plus an AND skill gate.
+Never treat those words as names of required talents.
+The level-up picker derives these from saved and pending choices, including ASIs,
+using `buildInputsFromSavedCharacter` and `computeDerivedCharacter`.
 
 Use this when a class (or subclass pack) that has never been imported arrives, usually
 through the BYO LLM flow. Twenty-plus homebrew classes have already been workshopped;

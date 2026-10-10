@@ -394,6 +394,9 @@ export const ImportMechanicSchema = z.object({
   abilityNames: z.array(z.string()).optional(),
   /** modify_custom_ability — upgrade text appended to each named ability. */
   abilityAddendum: z.string().optional(),
+  removeUseLimit: z.boolean().optional(),
+  abilityFilter: z.object({ role: z.string(), eligibleClassNames: z.array(z.string()).optional(), minLevel: z.number().optional(), maxLevel: z.number().optional() }).optional(),
+  resourceCostWaiver: z.string().optional(),
   /** speed hover */
   canHover: z.boolean().optional(),
   /** turn_start_trigger */
@@ -1053,6 +1056,7 @@ const UsesConfigImportSchema = z.object({
   useShareKey: z.string().optional(),
   classResourceKey: z.string().optional(),
   classResourceAmount: z.number().optional(),
+  resourceCostWaiver: z.string().nullable().optional(),
   classResourceCostMode: z
     .enum(["fixed", "up_to_proficiency_bonus", "up_to_ability_modifier"])
     .optional(),

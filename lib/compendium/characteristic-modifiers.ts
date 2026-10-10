@@ -1545,6 +1545,12 @@ export interface ModifyCustomAbilityCharacteristic extends CharacteristicModifie
   abilityNames: string[]
   /** Text appended to the target ability wherever its description is shown. */
   addendum?: string | null
+  /** Remove the target's independent use cap, retaining its shared resource price. */
+  removeUseLimit?: boolean
+  /** Optional, player-confirmed resource waiver (e.g. once per round). */
+  resourceCostWaiver?: string | null
+  /** Optional selector for libraries imported separately; every supplied filter must match. */
+  abilityFilter?: { role: string; eligibleClassNames?: string[]; minLevel?: number; maxLevel?: number } | null
   /** Extra options appended to the target ability's own choice pool. */
   appendOptions?: { name: string; description: string }[]
 }

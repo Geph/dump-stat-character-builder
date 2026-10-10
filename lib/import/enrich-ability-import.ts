@@ -22,6 +22,7 @@ import {
 import { isModifierRedundantAgainst } from "@/lib/import/detect-feature-modifiers"
 import { enrichManipulateMagicAbility } from "@/lib/compendium/enrich-manipulate-magic"
 import type { Feature } from "@/lib/types"
+import { wireLaserLlamaExploitAbility } from "@/lib/import/enrichment-presets/packs/laserllama-exploit-abilities"
 
 function stripHtml(text: string): string {
   return text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
@@ -79,8 +80,10 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
     {
       name,
       description: plainText,
-      linkedModifiers: (row.linked_modifiers ?? row.linkedModifiers ?? []) as unknown as Feature["linkedModifiers"],
-      modifierRefs: (row.modifier_refs ?? row.modifierRefs ?? []) as string[],
+      // Enrichment updates the import (camel-case) fields. A persisted alias may
+      // still contain the original row and must not erase newly parsed mechanics.
+      linkedModifiers: (row.linkedModifiers ?? row.linked_modifiers ?? []) as unknown as Feature["linkedModifiers"],
+      modifierRefs: (row.modifierRefs ?? row.modifier_refs ?? []) as string[],
     } as Feature,
     {
       contentKind: "feat",
@@ -244,7 +247,7 @@ export function enrichAbilityImportRow(row: Record<string, unknown>): Record<str
 
   return applyDefaultAbilityIcon(
     applySpecializationAlternateEffectsChoice(
-      enrichManipulateMagicAbility(enrichedRow),
+      wireLaserLlamaExploitAbility(enrichManipulateMagicAbility(enrichedRow)),
     ),
   )
 }

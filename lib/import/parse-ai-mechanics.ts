@@ -1474,6 +1474,14 @@ function buildFromMechanic(
       // field (restores are modeled as passive bookkeeping, not their own activatable ability) and
       // is intentionally left off.
       const alternateRefresh = mechanic.alternateRefresh
+      // A per-rest cap and a resource price can apply to the same activation.
+      // Renewal prices remain separate (restoreByResource), never a second charge.
+      if (uses.type !== "class_resource" && mechanic.classResourceKey && !alternateRefresh) {
+        uses.classResourceKey = mechanic.classResourceKey
+        uses.classResourceAmount = mechanic.classResourceCost ?? 1
+        uses.classResourceCostMode = mechanic.classResourceCostMode
+        uses.classResourceCostAbility = mechanic.classResourceCostAbility
+      }
       if (alternateRefresh?.spendSpellSlotMinLevel != null) {
         uses.restoreBySpellSlot = {
           minSpellLevel: alternateRefresh.spendSpellSlotMinLevel,
@@ -1810,9 +1818,9 @@ function buildFromMechanic(
       const abilityNames = (mechanic.abilityNames ?? [])
         .map((name) => name.trim())
         .filter(Boolean)
-      if (!abilityNames.length) return null
+      if (!abilityNames.length && !mechanic.abilityFilter) return null
       const addendum = mechanic.abilityAddendum?.trim() || matchedPhrase || null
-      if (!addendum) return null
+      if (!addendum && !mechanic.removeUseLimit && !mechanic.resourceCostWaiver) return null
       return {
         ruleId: "ai.modify_custom_ability",
         confidence: aiConfidence(mechanic),
@@ -1821,6 +1829,9 @@ function buildFromMechanic(
           {
             id: modId(instanceKey(ctx, "modify_custom_ability")),
             type: "modify_custom_ability",
+            removeUseLimit: mechanic.removeUseLimit,
+            abilityFilter: mechanic.abilityFilter,
+            resourceCostWaiver: mechanic.resourceCostWaiver,
             abilityNames,
             addendum,
             label: matchedPhrase || `Upgrades ${abilityNames.join(", ")}`,

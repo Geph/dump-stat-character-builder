@@ -19,6 +19,19 @@ function feature(partial: Partial<Feature> & Pick<Feature, "name" | "level">): F
 }
 
 describe("resolveSubclassUnlockLevel", () => {
+  it("uses Warrior Archetype and repairs the old generated Subclass duplicate", () => {
+    const archetype = feature({ name: "Warrior Archetype", level: 3, description: "Choose your archetype." })
+    expect(isSubclassUnlockFeature(archetype)).toBe(true)
+    const oldFallback = ensureSubclassUnlockFeature({ name: "Test", features: [] }, 3)
+    const features = ensureSubclassUnlockFeature({ name: "Test", features: [...oldFallback, archetype] }, 3)
+    expect(features).toHaveLength(1)
+    expect(features[0].name).toBe("Warrior Archetype")
+    expect(features[0].modifierRefs).toContain("cat_char_subclass_unlock")
+    expect(ensureSubclassUnlockFeature({ name: "Test", features }, 3)).toEqual(features)
+    expect(resolveSubclassUnlockLabel({ features })).toBe("Warrior Archetype")
+    const authored = feature({ name: "Subclass", level: 3, description: "A separately authored feature." })
+    expect(ensureSubclassUnlockFeature({ name: "Test", features: [authored, archetype] }, 3)).toHaveLength(2)
+  })
   it("uses Psionic Archetype at level 1 for Psion", () => {
     const psion = {
       features: [

@@ -790,6 +790,8 @@ export interface UsesConfig {
   classResourceKey?: string
   /** When type is class_resource — uses spent per activation (default: 1) */
   classResourceAmount?: number
+  /** Explicit permission to waive the resource price; player verifies the stated condition. */
+  resourceCostWaiver?: string | null
   /** Variable per-activation spend cap for resource-powered actions. */
   classResourceCostMode?: "fixed" | "up_to_proficiency_bonus" | "up_to_ability_modifier"
   /** Ability used when classResourceCostMode is up_to_ability_modifier. */

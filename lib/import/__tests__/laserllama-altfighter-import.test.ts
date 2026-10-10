@@ -49,7 +49,7 @@ describe("LaserLlama Alternate Fighter import", () => {
     expect(dice?.class_name).toBe("Alternate Fighter")
     expect(dice?.uses?.atLevelTable?.some((t) => t.level === 16 && t.count === 6)).toBe(true)
     expect(dice?.uses?.dieSidesByLevel?.some((t) => t.level === 17 && t.count === 12)).toBe(true)
-    expect(dice?.uses?.rechargeOnInitiative).toBe(true)
+    expect(dice?.uses?.rechargeOnInitiative).toBeUndefined()
 
     const martial = cls?.features?.find((f) => /^martial exploits$/i.test(f.name ?? ""))
     expect(martial?.isChoice).toBe(true)
@@ -78,9 +78,7 @@ describe("LaserLlama Alternate Fighter import", () => {
     const championExploits = champion?.features?.find((f) =>
       /^champion exploits$/i.test(f.name ?? ""),
     )
-    const grants = (championExploits?.mechanics ?? []).filter(
-      (m) => (m as { kind?: string }).kind === "grant_custom_ability",
-    ) as { abilityNames?: string[] }[]
+    const grants = (champion?.features ?? []).flatMap((feature) => feature.linkedModifiers ?? []).flatMap((instance) => instance.characteristics ?? []).filter((char) => char.type === "grant_custom_ability")
     const granted = grants.flatMap((g) => g.abilityNames ?? [])
     expect(granted).toEqual(
       expect.arrayContaining([
@@ -91,6 +89,8 @@ describe("LaserLlama Alternate Fighter import", () => {
         "Mythic Athleticism",
       ]),
     )
+    expect(championExploits?.linkedModifiers?.flatMap((instance) => instance.characteristics ?? []).filter((char) => char.type === "grant_custom_ability").flatMap((char) => char.abilityNames)).toEqual(["Feat of Strength", "Heroic Fortitude"])
+    expect(champion?.features?.find((feature) => feature.name === "Champion Exploits (level 9)")?.level).toBe(9)
 
     const runecarver = enriched.subclasses?.find((s) => /^runecarver$/i.test(s.name ?? ""))
     const runeCarving = runecarver?.features?.find((f) => /^rune carving$/i.test(f.name ?? ""))
@@ -229,7 +229,7 @@ describe("LaserLlama Alternate Fighter import", () => {
     expect(
       next.class_resources?.find((r) => r.resource_key === "exploit_dice")?.uses
         ?.rechargeOnInitiative,
-    ).toBe(true)
+    ).toBeUndefined()
     expect(
       next.classes?.[0]?.features?.find((f) => /^martial exploits$/i.test(f.name ?? ""))?.choices
         ?.choiceCountByLevel?.length,

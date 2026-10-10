@@ -52,6 +52,8 @@ const LITE_MECHANIC_SHAPES = [
   'spells_known: spellNames ["Misty Step"]; one entry per unlock tier with unlocksAtClassLevel',
   "spellcasting_ability: spellcastingAbility intelligence | wisdom | charisma",
   "uses: usesFixed 1, usesRecharge short_rest | long_rest (or usesProficiency true)",
+  "Concurrent costs: usesFixed + usesRecharge AND classResourceKey + classResourceCost enforce both a rest cap and resource payment; alternateRefresh is a renewal price instead. For spend up to PB use classResourceCostMode up_to_proficiency_bonus. Preserve ability-score OR groups and skill/tool/language prerequisites verbatim. Gate temporary AC/saves with an active toggle; level-gated initiative refills belong on the feature, never the pool. modify_custom_ability can use abilityFilter {role, eligibleClassNames, minLevel, maxLevel}, removeUseLimit (keep the resource cost), and resourceCostWaiver (player-confirmed condition).",
+  "Target assessment: preserve activation; player_note (noteTarget feature, notePrompt) tracks per-target retry locks, not a global rest cap or unconditional skill bonus. Keep the source's named subclass gate, not a duplicate Subclass feature.",
   'damage_resistance: damageTypes ["Fire"]; condition_immunity: conditions ["Charmed"]',
   "speed: speedType walk | fly | swim | climb, speedFeet 30; vision: visionRangeFeet 60, visionType darkvision",
   'ac: acBase 10 + acAbilities ["dexterity", "wisdom"] or acFlatBonus 1',
@@ -73,6 +75,7 @@ export const LITE_MECHANICS_HINT = `Mechanics (Dump Stat wires these for you)
 - Allowed kind values: ${AI_MECHANIC_KINDS.join(", ")}. Never invent a kind.
 - Every mechanics[] entry needs sourcePhrase (the verbatim rule sentence) and confidence (high | medium | low).
 - If nothing fits, use { "kind": "unresolved", "sourcePhrase": "<the rule sentence>" }.
+- Conditional subclass benefits: never turn a post-action movement bonus into permanent speed. Keep unsupported upgrades unresolved; an action reminder is not automatic resolution. Companion imports need full stat blocks, not name-only rows.
 - A player pick between named options is isChoice + choices { category, count, options[] }, not mechanics[].
 - Keep each action cost: 'you can take a Magic/Utilize action' means activation.action; Bonus Actions and Reactions stay explicit. A rest-prepared item may still grant a combat action (sheetDisplay combatActions). Put selected actions on choice options. Do not charge a one-time creation use again for every later summon or activation.
 - A form or state ("while in this form") → declare once on the class or subclass: new_toggles [{ key, name, grantingFeature }]; then put requiresSheetToggle: key on the benefits. Rage, Wild Shape, and Bloodied (below_half_hp) need no declaration.

@@ -1,6 +1,66 @@
 # Homebrew class import review (Cursor handoff)
 
-Last reviewed: 2026-10-08.
+Last reviewed: 2026-10-09.
+
+## Alternate Fighter validation
+
+Subclass follow-up (2026-10-09): `packs/alternate-fighter-subclasses.ts` scopes
+declarative presets by both archetype and parent class. It adds missing action
+timing, editable target notes, and source-description alerts on the parent powers.
+Battle Trance and its Mythic Reflexes AC upgrade require the active toggle and
+exclude shields, heavy armor, and Incapacitated. Runic Might's Strength checks,
+saves and optional damage require its toggle. Tactical Reposition no longer
+adds permanent speed. `alternate-fighter-subclasses.test.ts` checks these gates,
+unlock timing, and isolation from the original Fighter.
+
+These links are not a claim of complete automation: parent-action alerts and
+`player_note` controls still require the player to resolve the source rule.
+Remaining work includes Master at Arms' extra exploit selections/die upgrades,
+Quartermaster ration and Tinker schematic inventories, Hound Master/Shade full
+companion stat blocks (the fixture currently contains name-only creature rows),
+and automatic high-level timing/cost replacements. Battle Trance Dash, its free
+exploit/d4 rule and at-will upgrade remain manual, as do conditional healing,
+ally effects, movement, and several recharge interactions. Do not attach a
+companion grant to a name-only row or substitute total character level for a
+Fighter-level formula. The import review's WIRED label means linked metadata
+exists, not that every sentence is automatically resolved.
+
+Alternate-class art matching must not fuzzy-match a base class. The shared
+subclass image resolver now keeps Alternate Fighter Champion separate from
+Fighter Champion and clears a stale bundled default while retaining custom art.
+
+Authority: the local `Alternate Fighter Class JAG v3.5.2 complete.pdf` and separate
+shared exploit library. `alternate-fighter-progression.test.ts` runs JSON parsing,
+proposal confirmation, enrichment, ability normalization, attachment, and sheet
+action collection across levels 1–20 and all 19 archetypes. It checks base use
+tiers, attack counts, variable spends, concurrent rest/resource costs, and
+level-gated upgrades. Signature-exploit tables grant each row at its own class
+level instead of granting the entire table with the initial subclass feature.
+This is an automated data-to-sheet check, not a manual
+browser playthrough or proof that every narrative effect is automated.
+
+`exploit-wiring-regressions.test.ts` runs without private fixtures and protects
+mechanic retention on proposals, score/skill/tool/language prerequisites, distance-text false
+positives, independent costs, class-level healing, and temporary AC gating.
+The Drive class and exploit imports carry the same wiring; revision backups
+remain in the external `review-backups` directory.
+
+The named Warrior Archetype feature owns the subclass-unlock modifier; reimport
+removes only the exact generated generic Subclass shell. Eye for Talent carries
+explicit Bonus Action activation and an editable `player_note` for observed
+creatures/retry restrictions. Its Search roll, target CR, conditional class-level
+bonus, and target-specific retry eligibility are resolved by the player from the
+source description; neither an unconditional skill bonus nor a global rest cap
+is appropriate. Regression checks assert linked metadata as well as visibility.
+
+Manual boundaries: Martial Superiority's once-per-round permission is confirmed
+by the player using the resource-waiver checkbox. Heroic Focus activates its
+one-minute toggle, gates AC and Dexterity-save Advantage, and spends its die/use;
+the player ends the toggle when concentration ends and tracks doubled movement
+and the restricted extra action manually. Do not turn temporary effects into
+unconditional bonuses to make a wiring report look complete. Narrative movement,
+target selection, and externally resolved weapon-hit riders still use the source
+description and existing combat overlays.
 
 How to give Cursor (and the repo tooling) content for the Mage Hand Press / homebrew **class extract → wiring review → merge → enrich** loop.
 

@@ -95,5 +95,8 @@ export function resolveFeatureEffectHeal(
       break
   }
 
-  return { amount: Math.max(0, Math.floor(base + (effect.healFlatBonus ?? 0))) }
+  const flatBonus = mode === "dice"
+    ? resolveFixedValueAtLevel(effect.bonusByLevel, ctx.classLevel ?? ctx.characterLevel, effect.healFlatBonus ?? 0) ?? 0
+    : effect.healFlatBonus ?? 0
+  return { amount: Math.max(0, Math.floor(base + flatBonus)) }
 }

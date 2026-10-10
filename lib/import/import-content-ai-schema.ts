@@ -117,6 +117,9 @@ const ImportMechanicAiSchema = z.object({
     .enum(["fixed", "up_to_proficiency_bonus", "up_to_ability_modifier"])
     .nullable(),
   classResourceCostAbility: z.enum(["STR", "DEX", "CON", "INT", "WIS", "CHA"]).nullable(),
+  removeUseLimit: z.boolean().nullable(),
+  abilityFilter: z.object({ role: z.string(), eligibleClassNames: z.array(z.string()).nullable(), minLevel: z.number().nullable(), maxLevel: z.number().nullable() }).nullable(),
+  resourceCostWaiver: z.string().nullable(),
   checkRollMode: z.enum(["advantage", "disadvantage", "bonus"]).nullable(),
   incomingAttackMode: z.enum(["advantage", "disadvantage"]).nullable(),
   checkCategory: z.enum(["save", "skill", "ability", "attack", "initiative", "death_save"]).nullable(),
@@ -1474,6 +1477,8 @@ export function normalizeAiImportContent(raw: AiImportContent): ImportContent {
     if (raw.import_proposals.custom_abilities?.length) {
       proposals.custom_abilities = raw.import_proposals.custom_abilities.map((ability) =>
         omitNull({
+          ...ability,
+          mechanics: normalizeMechanics(ability.mechanics),
           proposal_id: ability.proposal_id,
           definition: ability.definition,
           name: ability.name,

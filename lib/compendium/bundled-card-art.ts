@@ -11,6 +11,8 @@ import customAbilityArt from "./custom-ability-art.json"
  */
 
 const BUNDLED_CLASS_FILES = new Set([
+  // Original generated portrait; the LaserLlama reference is not bundled.
+  "alternate-fighter.png",
   "barbarian.png",
   "bard.png",
   "cleric.png",

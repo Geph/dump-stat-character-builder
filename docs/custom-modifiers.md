@@ -2,6 +2,27 @@
 
 Last reviewed: 2026-10-09.
 
+### Exploit costs and upgrades
+
+An action's `UsesConfig` can carry both an independent cap (`fixed`, `at_level`,
+etc.) and `classResourceKey` / `classResourceAmount`. Using it consumes one
+activation and its resource price; the counters remain separate, and rests reset
+each according to its own recharge rules. Editing the resource counter manually
+does not consume an activation. `restoreByResource` is a renewal price, not a
+concurrent cost. Keep the two meanings distinct in imports.
+
+`modify_custom_ability` supports `removeUseLimit` (retain the resource price) and
+`resourceCostWaiver` (an explicit player-confirmed condition). Besides exact
+`abilityNames`, `abilityFilter` selects by `role`, `eligibleClassNames`, and
+prerequisite `minLevel` / `maxLevel`; all supplied filters must match. This allows
+a class to upgrade a library imported later. These fields are editable in the
+Compendium. Waivers do not create a round tracker: the player confirms the
+once-per-round condition in the action overlay each time they open it.
+
+For `heal_self` with `healMode: dice`, fixed `bonusByLevel` rows supply the flat
+bonus at the owning class level (Second Wind). They do not change the number of
+dice. `hit_dice` mode retains its existing dice-count scaling.
+
 `removeRedundantTriggerDamage` repairs legacy import duplicates within one owning
 feature: a generated unconditional extra-dice modifier identical to damage nested
 inside its on-hit trigger is removed. `readLinkedModifiers` applies this to existing

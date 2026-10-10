@@ -406,6 +406,8 @@ export function subclassCardParentClassMatches(actual: string, mapped: string): 
   const m = mapped.trim()
   if (!a || !m) return false
   if (a.toLowerCase() === m.toLowerCase()) return true
+  // Alternate classes are separate publications, not decorated aliases of the SRD class.
+  if (/^alternate\s/i.test(a) !== /^alternate\s/i.test(m)) return false
   if (/\bwarden\b/i.test(m) && /\bmage\s*hand|\bmhp\b/i.test(a)) return false
   if (/\bwarden\b/i.test(a) && /\bmage\s*hand|\bmhp\b/i.test(m)) return false
   const an = a.toLowerCase()

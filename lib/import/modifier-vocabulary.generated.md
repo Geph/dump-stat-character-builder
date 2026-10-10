@@ -34,7 +34,7 @@ char = CharacteristicModifier `type`. fx = FeatureEffect `kind`.
 
 - `grant_feat` (char) Gain a Feat — UNDOCUMENTED · req: featCategories, count · opt: alsoFeatNames · `{"type":"grant_feat","featCategories":[],"count":null}`
 - `grant_custom_ability` (char) Grant Custom Ability — Know / unlock a named custom ability (e.g. Telekinetic Weapons power) · req: abilityNames · opt: — · `{"type":"grant_custom_ability","abilityNames":[]}`
-- `modify_custom_ability` (char) Modify Custom Ability — Upgrade a named custom ability you already know (e.g. Phase Dancer improving Phase Rift) · req: abilityNames · opt: addendum, appendOptions · `{"type":"modify_custom_ability","abilityNames":[]}`
+- `modify_custom_ability` (char) Modify Custom Ability — Upgrade a named custom ability you already know (e.g. Phase Dancer improving Phase Rift) · req: abilityNames · opt: addendum, removeUseLimit, resourceCostWaiver, abilityFilter, appendOptions · `{"type":"modify_custom_ability","abilityNames":[]}`
 - `feature_choice_count_bonus` (char) Feature Choice Count Bonus — Extra picks for a named feature or choice category (Unlimited Imagination, Skill Thief) · req: — · opt: targetFeatureName, choiceCategory, bonus, bonusFrom · `{"type":"feature_choice_count_bonus"}`
 - `feature_choice_option_grant` (char) Feature Choice Option Grant — Add named options to a feature choice pool (Projected Nightmares → Boundless Imagination) · req: options · opt: targetFeatureName, choiceCategory · `{"type":"feature_choice_option_grant","options":[]}`
 - `subclass_unlock` (char) Subclass Selection — Marks the class feature level when the builder must choose a subclass or archetype · req: — · opt: — · `{"type":"subclass_unlock"}`
@@ -74,7 +74,7 @@ char = CharacteristicModifier `type`. fx = FeatureEffect `kind`.
 
 ## healing
 
-- `heal_self` (fx) Heal self — Second Wind · req: — · opt: healAmount, damageLinkedHeal · `{"kind":"heal_self"}`
+- `heal_self` (fx) Heal self — Second Wind (dice healing: level table supplies the flat bonus) · req: — · opt: healAmount, bonusByLevel, damageLinkedHeal · `{"kind":"heal_self"}`
 
 ## attack
 

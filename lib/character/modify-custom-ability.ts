@@ -1,5 +1,5 @@
 import type { ModifyCustomAbilityCharacteristic } from "@/lib/compendium/characteristic-modifiers"
-import type { CustomAbility, FeatureChoice } from "@/lib/types"
+import type { CustomAbility, FeatureChoice, UsesConfig } from "@/lib/types"
 
 function normalizeName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ")
@@ -58,10 +58,18 @@ export function applyCustomAbilityModifications(
       else byName.set(key, [mod])
     }
   }
-  if (!byName.size) return abilities
+  if (!byName.size && !modifications.some((mod) => mod.abilityFilter)) return abilities
 
   return abilities.map((ability) => {
-    const matched = byName.get(normalizeName(ability.name))
+    const matched = [...new Set([...(byName.get(normalizeName(ability.name)) ?? []), ...modifications.filter((mod) => {
+      const filter = mod.abilityFilter
+      if (!filter || ability.ability_role !== filter.role) return false
+      const level = ability.level_requirement ?? 1
+      if (filter.minLevel != null && level < filter.minLevel) return false
+      if (filter.maxLevel != null && level > filter.maxLevel) return false
+      return !filter.eligibleClassNames?.length || filter.eligibleClassNames.some((name) =>
+        ability.eligible_classes?.some((eligible) => normalizeName(eligible) === normalizeName(name)))
+    })])]
     if (!matched?.length) return ability
 
     let next = ability
@@ -82,6 +90,21 @@ export function applyCustomAbilityModifications(
       if (mod.addendum) description = appendDescription(description, mod.addendum)
 
       next = { ...next, description, choices }
+      if (mod.removeUseLimit || mod.resourceCostWaiver) {
+        const updateUses = (uses: UsesConfig): UsesConfig => ({
+          ...uses,
+          ...(mod.removeUseLimit ? { type: uses.classResourceKey ? "class_resource" : "unlimited", recharges: [] } : {}),
+          ...(mod.resourceCostWaiver ? { resourceCostWaiver: mod.resourceCostWaiver } : {}),
+        })
+        next = {
+          ...next,
+          uses: updateUses(next.uses ?? { type: "unlimited" }),
+          characteristics: next.characteristics?.map((c) => c.type === "uses" ? { ...c, uses: updateUses(c.uses) } : c) ?? null,
+          linked_modifiers: next.linked_modifiers?.map((instance) => ({ ...instance,
+            characteristics: instance.characteristics?.map((c) => c.type === "uses" ? { ...c, uses: updateUses(c.uses) } : c),
+          })),
+        }
+      }
     }
     return next
   })

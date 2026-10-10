@@ -90,7 +90,9 @@ describe("Alternate Fighter homebrew detection", () => {
     expect(previews.some((entry) => entry.summary.includes("speed"))).toBe(true)
     expect(previews.some((entry) => entry.summary.includes("damage resistance"))).toBe(true)
     expect(previews.some((entry) => entry.summary.includes("skills"))).toBe(true)
-    expect(previews.some((entry) => entry.ruleId.startsWith("uses."))).toBe(true)
+    const surgeUses = enriched.classes?.[0].features?.find((feature) => feature.name === "Action Surge")?.linkedModifiers
+      ?.flatMap((modifier) => modifier.characteristics ?? []).find((characteristic) => characteristic.type === "uses")
+    expect(surgeUses).toMatchObject({ uses: { type: "at_level", atLevelTable: [{ level: 6, count: 1 }, { level: 20, count: 2 }] } })
     expect(previews.some((entry) => entry.ruleId === "check.bonus.resource_die")).toBe(true)
   })
 })
